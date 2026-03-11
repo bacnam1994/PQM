@@ -1,0 +1,144 @@
+import { useState, useMemo, useEffect } from 'react';
+import { TCCS } from '../types';
+import { HydratedBatch } from './useDataGraph';
+import { findTCCSByMfgDate } from '../utils/tccsUtils';
+
+interface UseTCCSLogicProps {
+  batchId: string | null;
+  tccsList: TCCS[];
+  batches: HydratedBatch[];
+}
+
+/**
+ * Hook chuyên xử lý logic lựa chọn Tiêu chuẩn cơ sở (TCCS) cho một lô hàng.
+ * - Tự động chọn TCCS mặc định dựa trên ngày sản xuất.
+ * - Cho phép người dùng ghi đè lựa chọn thủ công.
+ * - Cung cấp TCCS đang hoạt động (activeTCCS) để sử dụng trong các logic khác.
+ * - Cảnh báo khi TCCS sắp hết hiệu lực (trong vòng 30 ngày)
+ */
+
+// Số ngày cảnh báo trước khi TCCS hết hiệu lực
+const EXPIRY_WARNING_DAYS = 30;
+
+export const useTCCSLogic = ({ batchId, tccsList, batches }: UseTCCSLogicProps) => {
+  const [manualTccsId, setManualTccsId] = useState<string | null>(null);
+
+  // Tự động reset lựa chọn thủ công khi lô hàng thay đổi
+  useEffect(() => {
+    setManualTccsId(null);
+  }, [batchId]);
+
+  // Lọc danh sách TCCS có sẵn cho sản phẩm của lô đã chọn (chỉ lấy active)
+  const availableTCCSList = useMemo(() => {
+    if (!batchId) return [];
+    const batch = batches.find(b => b.id === batchId);
+    if (!batch) return [];
+    return tccsList
+      .filter(t => t.productId === batch.productId && t.isActive)
+      .sort((a, b) => new Date(b.issueDate).getTime() - new Date(a.issueDate).getTime());
+  }, [batchId, batches, tccsList]);
+
+  // TCCS mới nhất (theo ngày ban hành)
+  const latestTCCS = useMemo(() => {
+    return availableTCCSList.length > 0 ? availableTCCSList[0] : null;
+  }, [availableTCCSList]);
+
+  // TCCS mặc định được đề xuất cho lô, dựa trên ngày sản xuất (sử dụng hàm tiện ích)
+  const defaultTCCS = useMemo(() => {
+    if (!batchId || availableTCCSList.length === 0) return null;
+    const batch = batches.find(b => b.id === batchId);
+    if (!batch) return null;
+
+    // Sử dụng hàm tiện ích để tìm TCCS phù hợp theo ngày SX
+    return findTCCSByMfgDate(
+      batch.productId,
+      batch.mfgDate || null,
+      availableTCCSList
+    );
+  }, [batchId, batches, availableTCCSList]);
+
+  // TCCS cuối cùng được sử dụng, có tính đến lựa chọn thủ công
+  const activeTCCS = useMemo(() => {
+    if (manualTccsId) {
+      return tccsList.find(t => t.id === manualTccsId) || defaultTCCS;
+    }
+    return defaultTCCS;
+  }, [manualTccsId, defaultTCCS, tccsList]);
+
+  // Cờ báo hiệu người dùng đã chọn TCCS khác với TCCS mặc định
+  const isOverridden = useMemo(() => {
+    return !!(manualTccsId && defaultTCCS && manualTccsId !== defaultTCCS.id);
+  }, [manualTccsId, defaultTCCS]);
+
+  // Kiểm tra TCCS có sắp hết hiệu lực không (trong vòng 30 ngày)
+  const expiryWarning = useMemo(() => {
+    if (!activeTCCS) return null;
+    
+    const now = new Date();
+    const issueDate = new Date(activeTCCS.issueDate);
+    
+    // Tính ngày hết hiệu lực (giả định TCCS có hiệu lực 1 năm)
+    const expiryDate = new Date(issueDate);
+    expiryDate.setFullYear(expiryDate.getFullYear() + 1);
+    
+    const daysUntilExpiry = Math.ceil((expiryDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+    
+    if (daysUntilExpiry <= 0) {
+      return {
+        isExpired: true,
+        isExpiringSoon: false,
+        daysUntilExpiry,
+        message: 'TCCS đã hết hiệu lực'
+      };
+    }
+    
+    if (daysUntilExpiry <= EXPIRY_WARNING_DAYS) {
+      return {
+        isExpired: false,
+        isExpiringSoon: true,
+        daysUntilExpiry,
+        message: `TCCS sẽ hết hiệu lực trong ${daysUntilExpiry} ngày`
+      };
+    }
+    
+    return null;
+  }, [activeTCCS]);
+
+  // Lấy danh sách TCCS sắp hết hiệu lực cho tất cả sản phẩm
+  const tccsExpiryWarnings = useMemo(() => {
+    const warnings: { tccs: TCCS; daysUntilExpiry: number; message: string }[] = [];
+    const now = new Date();
+    
+    tccsList.forEach(tccs => {
+      const issueDate = new Date(tccs.issueDate);
+      const expiryDate = new Date(issueDate);
+      expiryDate.setFullYear(expiryDate.getFullYear() + 1);
+      
+      const daysUntilExpiry = Math.ceil((expiryDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+      
+      if (daysUntilExpiry <= EXPIRY_WARNING_DAYS && tccs.isActive) {
+        warnings.push({
+          tccs,
+          daysUntilExpiry,
+          message: daysUntilExpiry <= 0 
+            ? `${tccs.code} đã hết hiệu lực` 
+            : `${tccs.code} sẽ hết hiệu lực trong ${daysUntilExpiry} ngày`
+        });
+      }
+    });
+    
+    return warnings.sort((a, b) => a.daysUntilExpiry - b.daysUntilExpiry);
+  }, [tccsList]);
+
+  return {
+    activeTCCS,
+    defaultTCCS,
+    latestTCCS,
+    availableTCCSList,
+    manualTccsId,
+    setManualTccsId,
+    isOverridden,
+    expiryWarning,
+    tccsExpiryWarnings,
+  };
+};

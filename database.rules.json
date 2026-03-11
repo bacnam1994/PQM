@@ -1,0 +1,65 @@
+{
+  "rules": {
+    ".read": "auth != null",
+    ".write": "auth != null && root.child('users/admins').child(auth.uid).exists()",
+    "products": {
+      ".indexOn": ["code", "name", "createdAt"],
+      "$productId": {
+        ".validate": "newData.hasChildren(['code', 'name'])"
+      }
+    },
+    "batches": {
+      ".indexOn": ["productId", "tccsId", "batchNo", "status", "createdAt", "mfgDate"],
+      "$batchId": {
+        ".validate": "newData.hasChildren(['productId', 'batchNo']) && root.child('products/' + newData.child('productId').val()).exists()",
+        "status": {
+          ".validate": "newData.val() === 'PENDING' || newData.val() === 'TESTING' || newData.val() === 'RELEASED' || newData.val() === 'REJECTED'"
+        }
+      }
+    },
+    "testResults": {
+      ".indexOn": ["batchId", "createdAt", "testDate"],
+      "$resultId": {
+        ".validate": "newData.hasChildren(['batchId', 'overallStatus']) && root.child('batches/' + newData.child('batchId').val()).exists()"
+      }
+    },
+    "tccs": {
+      ".indexOn": ["productId", "code", "issueDate", "createdAt"],
+      "$tccsId": {
+        ".validate": "newData.hasChildren(['productId', 'code', 'issueDate']) && root.child('products/' + newData.child('productId').val()).exists()"
+      }
+    },
+    "product_formulas": {
+      ".indexOn": ["productId", "createdAt"],
+      "$formulaId": {
+        ".validate": "newData.hasChildren(['productId', 'name'])"
+      }
+    },
+    "raw_materials": {
+      ".indexOn": ["name", "category", "createdAt"],
+      "$materialId": {
+        ".validate": "newData.hasChildren(['name'])"
+      }
+    },
+    "inventoryIn": {
+      ".indexOn": ["batchId", "date", "createdAt"],
+      "$invId": {
+        ".validate": "newData.hasChildren(['batchId', 'quantity']) && newData.child('quantity').isNumber() && root.child('batches/' + newData.child('batchId').val()).exists()"
+      }
+    },
+    "inventoryOut": {
+      ".indexOn": ["batchId", "date", "createdAt"],
+      "$invId": {
+        ".validate": "newData.hasChildren(['batchId', 'quantity']) && newData.child('quantity').isNumber() && root.child('batches/' + newData.child('batchId').val()).exists()"
+      }
+    },
+    "users": {
+      ".read": "root.child('users/admins').child(auth.uid).exists()",
+      ".write": false
+    },
+    "audit_logs": {
+      ".indexOn": ["timestamp", "action", "collection", "performedBy"]
+    }
+  }
+}
+
