@@ -1,0 +1,5 @@
+{
+  "name": "Hệ thống quản lý chất lượng",
+  "description": "Hệ thống toàn diện quản lý tiêu chuẩn kỹ thuật sản phẩm (TCCS), kết quả kiểm nghiệm Lab và phân tích chất lượng với khả năng hoạt động ngoại tuyến và đồng bộ thời gian thực.",
+  "requestFramePermissions": []
+}

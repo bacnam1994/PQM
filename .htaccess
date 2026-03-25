@@ -1,0 +1,20 @@
+
+# Cấu hình MIME type cho tệp TypeScript và JSON
+AddType application/javascript .tsx
+AddType application/javascript .ts
+AddType application/json .json
+
+# Bật nén Gzip để tải trang nhanh hơn
+<IfModule mod_deflate.c>
+  AddOutputFilterByType DEFLATE text/html text/plain text/xml text/css application/javascript application/json
+</IfModule>
+
+# Cấu hình Cache cho các tài nguyên tĩnh
+<IfModule mod_expires.c>
+  ExpiresActive On
+  ExpiresDefault "access plus 1 month"
+  ExpiresByType text/html "access plus 0 seconds"
+</IfModule>
+
+# Bảo mật: Chống liệt kê thư mục
+Options -Indexes

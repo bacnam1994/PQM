@@ -1,0 +1,6 @@
+{
+  "rules": {
+    ".read": "auth != null",
+    ".write": "root.child('users/admins').child(auth.uid).exists()"
+  }
+}
