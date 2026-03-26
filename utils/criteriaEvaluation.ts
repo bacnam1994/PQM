@@ -1,5 +1,13 @@
 import { evaluateCriterion } from './parsing';
 
+export const safeParseFloat = (str: string): number => {
+  if (!str) return NaN;
+  const cleaned = str.trim().replace(/[^\d.-]/g, '');
+  const num = parseFloat(cleaned);
+  return isNaN(num) ? NaN : num;
+};
+
+
 /**
  * Chuẩn hóa chuỗi số liệu nhập vào (xử lý dấu phẩy/chấm, số mũ, ký tự đặc biệt)
  */
@@ -53,6 +61,9 @@ export const normalizeNumericString = (text: string): string => {
     return match;
   });
   
+  // Final cleanup for range parsing
+  normalized = normalized.trim().replace(/[^\d.-]/g, '');
+  
   return normalized;
 };
 
@@ -103,11 +114,12 @@ export const checkRange = (limit: string, value: string): boolean | null => {
   // Kiểm tra định dạng khoảng "min - max"
   const parts = limit.split(/\s*[-~]\s*/);
   if (parts.length === 2) {
-    const min = parseFloat(parts[0]);
-    const max = parseFloat(parts[1]);
-    const val = parseFloat(value);
+    const min = safeParseFloat(parts[0]);
+    const max = safeParseFloat(parts[1]);
+    const val = safeParseFloat(value);
     if (!isNaN(min) && !isNaN(max) && !isNaN(val)) {
-      return val >= min && val <= max;
+      const EPSILON = 1e-6;
+      return val >= (min - EPSILON) && val <= (max + EPSILON);
     }
   }
   
@@ -135,11 +147,18 @@ const roundValue = (value: number, reference: string): number => {
   if (decimalMatch && decimalMatch[1]) {
     const decimalPlaces = decimalMatch[1].length;
     const factor = Math.pow(10, decimalPlaces);
-    // Sử dụng làm tròn toán học thông thường
     return Math.round(value * factor) / factor;
   }
   return value;
 };
+
+// Debug helper (remove in prod)
+const debugRange = (limit: string, value: string, result: boolean) => {
+  if (process.env.NODE_ENV === 'development') {
+    console.log(`Range check: "${limit}" vs "${value}" = ${result}`);
+  }
+};
+
 
 /**
  * Đánh giá chỉ tiêu thông minh: Tự động chuẩn hóa và chọn phương pháp đánh giá phù hợp
@@ -164,7 +183,10 @@ export const evaluateCriterionSmart = (criterion: any, value: any): boolean => {
       valueToCompare = String(roundedValue);
     }
      const rangeCheck = checkRange(normalizedCriterion.expectedText, valueToCompare);
-     if (rangeCheck !== null) return rangeCheck;
+     if (rangeCheck !== null) {
+       debugRange(normalizedCriterion.expectedText, valueToCompare, rangeCheck);
+       return rangeCheck;
+     }
   }
   
   // Fallback về hàm đánh giá cơ bản

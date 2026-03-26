@@ -68,6 +68,28 @@ describe('criteriaEvaluation Utils', () => {
   });
 
   describe('checkRange', () => {
+    describe('Bug Fix: Range 72-108', () => {
+      it('should pass values 72-108 consistently', () => {
+        expect(checkRange('72 - 108', '72')).toBe(true);
+        expect(checkRange('72 - 108', '100')).toBe(true);
+        expect(checkRange('72 - 108', '102')).toBe(true);
+        expect(checkRange('72 - 108', '108')).toBe(true);
+        expect(checkRange('72 - 108', '71')).toBe(false);
+        expect(checkRange('72 - 108', '109')).toBe(false);
+      });
+
+      it('should handle decimals and locale in range', () => {
+        expect(checkRange('72 - 108', '100.0')).toBe(true);
+        expect(checkRange('72 - 108', '108.000')).toBe(true);
+      });
+
+      it('should handle edge cases with safeParseFloat', () => {
+        expect(checkRange('72 - 108', ' 100 ')).toBe(true);
+        expect(checkRange('72 - 108', '100,')).toBe(true); // comma cleaned
+        expect(checkRange('72 - 108', '108.0abc')).toBe(true); // extra chars cleaned
+      });
+    });
+
     it('should handle min - max range', () => {
       expect(checkRange('10 - 20', '15')).toBe(true);
       expect(checkRange('10 - 20', '9')).toBe(false);
