@@ -1,6 +1,38 @@
 {
   "rules": {
+    // 1. Chỉ cho phép người dùng đã đăng nhập (có tài khoản) mới được ĐỌC dữ liệu
     ".read": "auth != null",
-    ".write": "root.child('users/admins').child(auth.uid).exists()"
+    
+    // 2. Phân quyền danh sách Admin
+    "users": {
+      "admins": {
+        ".read": "auth != null",
+        ".write": "root.child('users/admins').child(auth.uid).exists()"
+      }
+    },
+    
+    // 3. Các bảng dữ liệu Danh mục cốt lõi (Chỉ Admin mới được XÓA)
+    "products": {
+      ".write": "auth != null && (newData.exists() || root.child('users/admins').child(auth.uid).exists())"
+    },
+    "batches": {
+      ".write": "auth != null && (newData.exists() || root.child('users/admins').child(auth.uid).exists())",
+      ".indexOn": ["createdAt", "status"]
+    },
+    "tccs": {
+      ".write": "auth != null && (newData.exists() || root.child('users/admins').child(auth.uid).exists())"
+    },
+    
+    // 4. Các bảng Nghiệp vụ linh hoạt (Mọi nhân viên đã đăng nhập đều có quyền Thêm/Sửa/Xóa)
+    "product_formulas": { ".write": "auth != null" },
+    "raw_materials": { ".write": "auth != null" },
+    "inventoryIn": { ".write": "auth != null" },
+    "inventoryOut": { ".write": "auth != null" },
+    "testResults": {
+      ".write": "auth != null",
+      ".indexOn": ["createdAt", "batchId"]
+    }
+    
+    // GHI CHÚ: Thuộc tính $other block dữ liệu rác không được hỗ trợ khi đã định nghĩa .write ở root (nhưng các rules cụ thể ở trên đã phủ kín tính năng an toàn rồi).
   }
 }

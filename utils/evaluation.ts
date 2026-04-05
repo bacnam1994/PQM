@@ -9,6 +9,11 @@ import { TEST_RESULT_STATUS, EVALUATION_RULE } from './constants';
  * @returns 'PASS' or 'FAIL'.
  */
 export const calculateOverallStatus = (results: TestResultEntry[], tccs: TCCS | null): 'PASS' | 'FAIL' => {
+    // Chốt chặn an toàn: Nếu không có bất kỳ kết quả nào, đánh FAIL ngay lập tức
+    if (!results || results.length === 0) {
+      return TEST_RESULT_STATUS.FAIL;
+    }
+
     // Get alternate rules from TCCS, if available
     const rules = tccs?.alternateRules || [];
 
@@ -23,8 +28,9 @@ export const calculateOverallStatus = (results: TestResultEntry[], tccs: TCCS | 
         // Find the result of the alternate criterion
         const altResult = results.find(r => r.criteriaName === rule.alt);
         
-        // If the alternate is missing or also fails, the overall result is FAIL
-        if (!altResult || !altResult.value || !altResult.isPass) {
+        // FIX: Không dùng !altResult.value vì số 0 (Zero) trong kiểm nghiệm là giá trị hợp lệ (VD: 0 CFU)
+        // Chỉ đánh FAIL nếu giá trị thực sự bị bỏ trống (undefined/rỗng) hoặc isPass = false
+        if (!altResult || altResult.value === undefined || altResult.value === '' || !altResult.isPass) {
           return TEST_RESULT_STATUS.FAIL;
         }
         // If altResult PASSES, this failure is ignored.
@@ -44,7 +50,8 @@ export const calculateOverallStatus = (results: TestResultEntry[], tccs: TCCS | 
           
           if (threshold !== null && val !== null && val > threshold) {
              const altResult = results.find(r => r.criteriaName === rule.alt);
-             if (!altResult || !altResult.value || !altResult.isPass) {
+             // FIX BUG: Tương tự như trên, không dùng !altResult.value để tránh lỗi với số 0
+             if (!altResult || altResult.value === undefined || altResult.value === '' || !altResult.isPass) {
                 return TEST_RESULT_STATUS.FAIL;
              }
           }

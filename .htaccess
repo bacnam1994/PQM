@@ -16,5 +16,22 @@ AddType application/json .json
   ExpiresByType text/html "access plus 0 seconds"
 </IfModule>
 
+# Cấu hình Routing cho React SPA (Tránh lỗi 404 khi F5)
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /
+  RewriteRule ^index\.html$ - [L]
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+  RewriteRule . /index.html [L]
+</IfModule>
+
 # Bảo mật: Chống liệt kê thư mục
 Options -Indexes
+
+# Bảo mật: Các HTTP Headers chống tấn công XSS, Clickjacking và Sniffing
+<IfModule mod_headers.c>
+  Header always set X-Content-Type-Options "nosniff"
+  Header always set X-Frame-Options "SAMEORIGIN"
+  Header always set X-XSS-Protection "1; mode=block"
+</IfModule>

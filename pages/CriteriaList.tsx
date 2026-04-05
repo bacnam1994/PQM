@@ -1,10 +1,8 @@
-import React, { useState, useMemo, memo } from 'react';
+import React, { useState, useMemo, memo, useCallback } from 'react';
 import { Activity, Edit, Save, AlertCircle, Loader2, ChevronLeft, ChevronRight, LayoutGrid, List, FileText } from 'lucide-react';
-import { useAppContext } from '../context/AppContext';
-import { useTestResultContext } from '../context/TestResultContext';
-import { PageHeader, Modal } from '../components/CommonUI';
-import { DSFilterBar, DSSearchInput, DSTable, DSFormInput, DSViewToggle, DSCard } from '../components/DesignSystem';
-import { useLocalStorage } from '../hooks/useLocalStorage';
+import { useAppStore } from '../store/useAppStore';
+import { DSFilterBar, DSSearchInput, DSTable, DSFormInput, DSViewToggle, DSCard, PageHeader, Modal } from '../components';
+import { useUIStore } from '../store/useUIStore';
 
 interface CriteriaSummary {
   id: string;
@@ -89,13 +87,18 @@ const CriteriaListItem = memo(({ item, onEdit }: { item: CriteriaSummary, onEdit
 ));
 
 const CriteriaList = () => {
-  const { state, updateTCCS, notify } = useAppContext();
-  const { testResults, updateTestResult } = useTestResultContext();
+  const tccsList = useAppStore(state => state.tccsList);
+  const products = useAppStore(state => state.products);
+  const updateTCCS = useAppStore(state => state.updateTCCS);
+  const notify = useAppStore(state => state.notify);
+  const testResults = useAppStore(state => state.testResults);
+  const updateTestResult = useAppStore(state => state.updateTestResult);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCriteria, setSelectedCriteria] = useState<CriteriaSummary | null>(null);
   const [newName, setNewName] = useState('');
   const [isRenaming, setIsRenaming] = useState(false);
-  const [viewMode, setViewMode] = useLocalStorage<'grid' | 'list'>('criteria_view_mode', 'list');
+  const viewMode = useUIStore(s => s.criteriaViewMode);
+  const setViewMode = useUIStore(s => s.setCriteriaViewMode);
   
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -104,9 +107,10 @@ const CriteriaList = () => {
   // 1. Tổng hợp dữ liệu chỉ tiêu từ tất cả TCCS
   const criteriaList = useMemo(() => {
     const map = new Map<string, CriteriaSummary>();
+    const productMap = new Map(products.map(p => [p.id, p]));
 
-    state.tccsList.forEach((tccs) => {
-      const product = state.products.find(p => p.id === tccs.productId);
+    tccsList.forEach((tccs) => {
+      const product = productMap.get(tccs.productId);
       const productName = product ? product.name : 'Unknown Product';
 
       // Helper để xử lý danh sách chỉ tiêu
@@ -147,7 +151,7 @@ const CriteriaList = () => {
 
     // Chuyển Map thành Array và sắp xếp A-Z
     return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
-  }, [state.tccsList, state.products]);
+  }, [tccsList, products]);
 
   // 2. Lọc dữ liệu theo tìm kiếm
   const filteredList = useMemo(() => {
@@ -164,7 +168,7 @@ const CriteriaList = () => {
   const paginatedList = useMemo(() => {
     const start = (currentPage - 1) * ITEMS_PER_PAGE;
     return filteredList.slice(start, start + ITEMS_PER_PAGE);
-  }, [filteredList, currentPage]);
+  }, [filteredList, currentPage, ITEMS_PER_PAGE]);
 
   // Reset page on search
   React.useEffect(() => {
@@ -172,10 +176,10 @@ const CriteriaList = () => {
   }, [searchTerm, viewMode]);
 
   // 3. Xử lý mở Modal sửa
-  const handleOpenEdit = (item: CriteriaSummary) => {
+  const handleOpenEdit = useCallback((item: CriteriaSummary) => {
     setSelectedCriteria(item);
     setNewName(item.name);
-  };
+  }, []);
 
   // 4. Logic Đổi tên hàng loạt (Core Feature)
   const handleRename = async () => {
@@ -193,7 +197,7 @@ const CriteriaList = () => {
       const testResultUpdates: Promise<void>[] = [];
 
       // Duyệt qua tất cả TCCS để tìm và thay thế
-      state.tccsList.forEach((tccs) => {
+      tccsList.forEach((tccs) => {
         let hasChange = false;
 
         // Clone mảng để tránh mutate state trực tiếp
@@ -227,7 +231,7 @@ const CriteriaList = () => {
       // Duyệt qua tất cả Test Results để tìm và thay thế
       testResults.forEach(result => {
         let hasChange = false;
-        const newResults = result.results.map(entry => {
+        const newResults = (result.results || []).map(entry => {
           if (entry.criteriaName === oldName) {
             hasChange = true;
             return { ...entry, criteriaName: targetName };

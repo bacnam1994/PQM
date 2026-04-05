@@ -1,16 +1,27 @@
 
 import React, { useState } from 'react';
-import { useAppContext } from '../context/AppContext';
+import { useAppStore } from '../store/useAppStore';
 import { get, ref, update } from 'firebase/database';
 import { db } from '../firebase';
 import { Database, Download, Upload, Trash2, RefreshCcw, ShieldAlert, FileJson, Settings2, Hash, Calendar, FlaskConical, Wand2 } from 'lucide-react';
-import { ConfirmationModal } from '../components/CommonUI';
-import { useLocalStorage } from '../hooks/useLocalStorage';
-import { generateId } from '../utils/idGenerator';
+import { ConfirmationModal } from '../components';
+import { generateId } from '../utils';
 import { ProductFormula, FormulaIngredient } from '../types';
+import { useUIStore } from '../store/useUIStore';
+import { useShallow } from 'zustand/react/shallow';
 
 const SettingsPage: React.FC = () => {
-  const { state, resetToDemoData, clearAllData, loadBackup, addProductFormula, updateProductFormula } = useAppContext();
+  // Tối ưu 1: Gom nhóm selectors của Zustand bằng useShallow 
+  // Giúp trang Settings KHÔNG BỊ re-render khi các dữ liệu không liên quan (như Lô hàng, Kết quả test) thay đổi.
+  const { resetToDemoData, clearAllData, loadBackup, addProductFormula, updateProductFormula, tccsList, productFormulas } = useAppStore(useShallow(state => ({
+    resetToDemoData: state.resetToDemoData,
+    clearAllData: state.clearAllData,
+    loadBackup: state.loadBackup,
+    addProductFormula: state.addProductFormula,
+    updateProductFormula: state.updateProductFormula,
+    tccsList: state.tccsList,
+    productFormulas: state.productFormulas
+  })));
 
   // Generic confirmation modal state
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
@@ -20,8 +31,13 @@ const SettingsPage: React.FC = () => {
     onConfirm: () => {},
   });
 
-  const [decimalSeparator, setDecimalSeparator] = useLocalStorage<'dot' | 'comma'>('app_decimal_separator', 'dot');
-  const [dateFormat, setDateFormat] = useLocalStorage<string>('app_date_format', 'DD/MM/YYYY');
+  // Tối ưu 2: Gom nhóm selectors của useUIStore
+  const { decimalSeparator, setDecimalSeparator, dateFormat, setDateFormat } = useUIStore(useShallow(s => ({
+    decimalSeparator: s.decimalSeparator,
+    setDecimalSeparator: s.setDecimalSeparator,
+    dateFormat: s.dateFormat,
+    setDateFormat: s.setDateFormat
+  })));
 
   const openConfirmation = (title: string, message: string, onConfirm: () => void) => {
     setConfirmProps({ title, message, onConfirm });
@@ -35,10 +51,12 @@ const SettingsPage: React.FC = () => {
       const trSnapshot = await get(ref(db, 'testResults'));
       const allTestResults = trSnapshot.exists() ? Object.values(trSnapshot.val()) : [];
 
-      const fullData = {
-        ...state,
-        testResults: allTestResults
-      };
+      // Giả lập lại fullData để tương thích với cấu trúc Export cũ
+      const fullData: any = { testResults: allTestResults };
+      const currentState = useAppStore.getState();
+      ['products', 'batches', 'tccsList', 'productFormulas', 'rawMaterials', 'inventoryIn', 'inventoryOut'].forEach(key => {
+        fullData[key] = currentState[key as keyof typeof currentState];
+      });
 
       const dataStr = JSON.stringify(fullData, null, 2);
       const blob = new Blob([dataStr], { type: 'application/json' });
@@ -101,12 +119,16 @@ const SettingsPage: React.FC = () => {
     const newFormulas: ProductFormula[] = [];
     let count = 0;
 
-    state.tccsList.forEach(tccs => {
-      const existingFormula = state.productFormulas.find(f => f.productId === tccs.productId);
+    // Tối ưu 3: Dùng Map tra cứu thay vì dùng .find() bên trong vòng lặp .forEach()
+    // Giảm độ phức tạp thuật toán từ O(N²) xuống O(N), tránh treo trình duyệt khi CSDL lớn.
+    const formulaMap = new Map(productFormulas.map(f => [f.productId, f]));
+
+    tccsList.forEach(tccs => {
+      const existingFormula = formulaMap.get(tccs.productId);
       if (newFormulas.some(f => f.productId === tccs.productId)) return;
 
       const ingredients: FormulaIngredient[] = [];
-      const lines = tccs.composition.split('\n');
+      const lines = (tccs.composition || '').split('\n');
       
       lines.forEach(line => {
          // Regex đơn giản để bắt định dạng: "- Tên hoạt chất: Hàm lượng"
@@ -189,14 +211,14 @@ const SettingsPage: React.FC = () => {
     const updates: Record<string, any> = {};
     let count = 0;
 
-    state.tccsList.forEach(tccs => {
+    tccsList.forEach(tccs => {
         let needsUpdate = false;
-        if (tccs.composition && tccs.composition !== '') { updates[`tccs/${tccs.id}/composition`] = null; needsUpdate = true; }
-        if (tccs.packaging && tccs.packaging !== '') { updates[`tccs/${tccs.id}/packaging`] = null; needsUpdate = true; }
-        if (tccs.storage && tccs.storage !== '') { updates[`tccs/${tccs.id}/storage`] = null; needsUpdate = true; }
-        if (tccs.shelfLife && tccs.shelfLife !== '') { updates[`tccs/${tccs.id}/shelfLife`] = null; needsUpdate = true; }
-        if (tccs.standardRefs && tccs.standardRefs !== '') { updates[`tccs/${tccs.id}/standardRefs`] = null; needsUpdate = true; }
-        if (tccs.sensory && Object.values(tccs.sensory).some(v => v)) {
+        if ((tccs as any).composition && (tccs as any).composition !== '') { updates[`tccs/${tccs.id}/composition`] = null; needsUpdate = true; }
+        if ((tccs as any).packaging && (tccs as any).packaging !== '') { updates[`tccs/${tccs.id}/packaging`] = null; needsUpdate = true; }
+        if ((tccs as any).storage && (tccs as any).storage !== '') { updates[`tccs/${tccs.id}/storage`] = null; needsUpdate = true; }
+        if ((tccs as any).shelfLife && (tccs as any).shelfLife !== '') { updates[`tccs/${tccs.id}/shelfLife`] = null; needsUpdate = true; }
+        if ((tccs as any).standardRefs && (tccs as any).standardRefs !== '') { updates[`tccs/${tccs.id}/standardRefs`] = null; needsUpdate = true; }
+        if ((tccs as any).sensory && Object.values((tccs as any).sensory).some(v => v)) {
             updates[`tccs/${tccs.id}/sensory`] = null;
             needsUpdate = true;
         }

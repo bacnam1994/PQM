@@ -1,43 +1,50 @@
 import React, { useMemo } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
-import { useAppContext } from '../context/AppContext';
-import { Package, Layers, FileText, Search as SearchIcon, ArrowRight } from 'lucide-react';
-import { PageHeader } from '../components/CommonUI';
+import { useAppStore } from '../store/useAppStore';
+import { Package, Layers, Search as SearchIcon, ArrowRight } from 'lucide-react';
+import { PageHeader } from '../components';
 
 const SearchPage: React.FC = () => {
   const [searchParams] = useSearchParams();
   const query = searchParams.get('q') || '';
-  const { state } = useAppContext();
+  
+  // Dùng Zustand Selectors: Component này SẼ KHÔNG BAO GIỜ bị re-render 
+  // nếu user hay syncStatus hay formulas thay đổi!
+  const productsState = useAppStore(state => state.products);
+  const batchesState = useAppStore(state => state.batches);
+  const tccsState = useAppStore(state => state.tccsList);
 
   const results = useMemo(() => {
     if (!query) return { products: [], batches: [], tccs: [] };
     const lowerQuery = query.toLowerCase();
 
-    const products = state.products.filter(p => 
+    const productMap = new Map(productsState.map(p => [p.id, p]));
+
+    const products = productsState.filter(p => 
       p.name.toLowerCase().includes(lowerQuery) || 
       p.code.toLowerCase().includes(lowerQuery)
     );
 
-    const batches = state.batches.filter(b => {
-      const product = state.products.find(p => p.id === b.productId);
+    const batches = batchesState.filter(b => {
+      const product = productMap.get(b.productId);
       const pName = product ? product.name.toLowerCase() : '';
       return b.batchNo.toLowerCase().includes(lowerQuery) || pName.includes(lowerQuery);
     }).map(b => ({
       ...b,
-      productName: state.products.find(p => p.id === b.productId)?.name
+      productName: productMap.get(b.productId)?.name
     }));
 
-    const tccs = state.tccsList.filter(t => {
-      const product = state.products.find(p => p.id === t.productId);
+    const tccs = tccsState.filter(t => {
+      const product = productMap.get(t.productId);
       const pName = product ? product.name.toLowerCase() : '';
       return t.code.toLowerCase().includes(lowerQuery) || pName.includes(lowerQuery);
     }).map(t => ({
       ...t,
-      productName: state.products.find(p => p.id === t.productId)?.name
+      productName: productMap.get(t.productId)?.name
     }));
 
     return { products, batches, tccs };
-  }, [query, state]);
+  }, [query, productsState, batchesState, tccsState]);
 
   if (!query) {
     return (

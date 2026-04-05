@@ -1,26 +1,18 @@
 
 import React, { useState, useMemo, useCallback, memo, useEffect, lazy, Suspense } from 'react';
-import { useAppContext } from '../context/AppContext';
-import { useTestResultContext } from '../context/TestResultContext';
+import { useAppStore } from '../store/useAppStore';
 import { 
-  Plus, Search, ClipboardCheck, CheckCircle2, AlertCircle, Trash2, 
-  Calendar, Beaker, X, FileText, ChevronLeft, ChevronRight,
+  Plus, Search, ClipboardCheck, CheckCircle2, AlertCircle, Trash2,
+  Calendar, Beaker, X, FileText,
   History, ListPlus, FlaskConical, Printer, Eye, Edit2, Loader2,
-  Package, Hash, Clock, Filter, ShieldCheck, Keyboard, LayoutGrid, List, ArrowUpDown,
+  Package, Hash, Clock, Filter, ShieldCheck, LayoutGrid, List, ArrowUpDown, FileSearch, RefreshCcw
 } from 'lucide-react';
 import { TestResult, TestResultEntry } from '../types';
-import { ensureArray } from '../utils/parsing';
-import { PageHeader, Modal, Pagination } from '../components/CommonUI';
-import { useDataGraph, HydratedTestResult } from '../hooks/useDataGraph';
-import { DSFilterBar, DSSearchInput, DSSelect, DSCard, DSViewToggle, DSTable, DSFormInput } from '../components/DesignSystem';
-import CriteriaInputGroup from '../components/CriteriaInputGroup';
-import { TEST_RESULT_STATUS, BATCH_STATUS, CRITERION_TYPE_CONST } from '../utils/constants';
-import { useLocalStorage } from '../hooks/useLocalStorage';
-import { ActionButtons, DeleteModal, AddButton } from '../components/CrudControls';
+import { TEST_RESULT_STATUS, BATCH_STATUS, ensureArray } from '../utils';
 const CoAReport = lazy(() => import('../components/CoAReport'));
-import { useTestResultLogic } from '../hooks/useTestResultLogic';
-import SpecialCharToolbar from '../components/SpecialCharToolbar';
-import { useDebounce } from '../hooks/useDebounce';
+import { PageHeader, Modal, DSFilterBar, DSSearchInput, DSSelect, DSCard, DSViewToggle, DSTable, DSFormInput, CriteriaInputGroup, ActionButtons, DeleteModal, AddButton, SpecialCharToolbar, DSEmptyState } from '../components';
+import { useDataGraph, HydratedTestResult, useTestResultLogic, useDebounce } from '../hooks';
+import { useUIStore } from '../store/useUIStore';
 
 
 interface ExtraTestResultEntry extends TestResultEntry {
@@ -127,6 +119,10 @@ const printStyles = `
 `;
 
 const TestResultDataList = ({ viewMode, data, onEdit, onDelete, onPrint, isAdmin }: any) => {
+  if (data.length === 0) {
+     return <DSEmptyState icon={FileSearch} title="Không có phiếu kiểm nghiệm" message="Hệ thống chưa ghi nhận kết quả kiểm nghiệm nào khớp với thông tin tìm kiếm." />;
+  }
+
   if (viewMode === 'grid') {
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 no-print">
@@ -158,26 +154,32 @@ const TestResultDataList = ({ viewMode, data, onEdit, onDelete, onPrint, isAdmin
 };
 
 const TestResultList: React.FC = () => {
-  const { state, isAdmin, notify } = useAppContext();
-  const { loadMoreTestResults } = useTestResultContext();
-  const { testResults: hydratedResults, batches: hydratedBatches } = useDataGraph();
+  const products = useAppStore(state => state.products);
+  const isAdmin = useAppStore(state => state.isAdmin);
+  const notify = useAppStore(state => state.notify);
+  const productFormulas = useAppStore(state => state.productFormulas);
+  const loadMoreTestResults = useAppStore(state => state.loadMoreTestResults);
+  const testResultLimit = useAppStore(state => state.testResultLimit);
+  const fetchAllTestResultsForDashboard = useAppStore(state => state.fetchAllTestResultsForDashboard);
+  const syncStatus = useAppStore(state => state.syncStatus);
+  const { testResults: hydratedResults, allTestResultsHydrated, batches: hydratedBatches } = useDataGraph();
   const [searchTerm, setSearchTerm] = useState('');
   const debouncedSearchTerm = useDebounce(searchTerm, 300);
 
   // --- STATE MANAGEMENT ---
   const [filterProductId, setFilterProductId] = useState('');
-  const [viewMode, setViewMode] = useLocalStorage<'grid' | 'list'>('test_result_view_mode', 'grid');
+  const viewMode = useUIStore(s => s.testResultViewMode);
+  const setViewMode = useUIStore(s => s.setTestResultViewMode);
   const [filterMonth, setFilterMonth] = useState<string>('ALL');
   const [filterYear, setFilterYear] = useState<string>('ALL');
   const [sortConfig, setSortConfig] = useState<{ key: 'testDate' | 'batchNo'; direction: 'asc' | 'desc' }>({ key: 'testDate', direction: 'desc' });
-  const [currentPage, setCurrentPage] = useState(1);
-  const ITEMS_PER_PAGE = viewMode === 'grid' ? 12 : 15;
 
   // --- USE CUSTOM HOOK ---
   const {
     crud,
     formValues,
     setFieldValue,
+    setMapValue,
     addToArray,
     removeFromArray,
     updateInArray,
@@ -239,8 +241,18 @@ const TestResultList: React.FC = () => {
     };
   }, [isPrintModalOpen]);
 
+  // Giải quyết "Hố đen tìm kiếm": Tải toàn bộ dữ liệu (Index) một lần duy nhất khi người dùng bắt đầu tìm kiếm
+  useEffect(() => {
+    if (debouncedSearchTerm.length >= 2 && allTestResultsHydrated.length === 0) {
+      fetchAllTestResultsForDashboard();
+    }
+  }, [debouncedSearchTerm, allTestResultsHydrated.length, fetchAllTestResultsForDashboard]);
+
   const filteredResults = useMemo(() => {
-    return hydratedResults.filter(r => {
+    // Nếu đang search và đã có full data thì dùng full data, ngược lại dùng data giới hạn mặc định
+    const sourceData = (debouncedSearchTerm.length >= 2 && allTestResultsHydrated.length > 0) ? allTestResultsHydrated : hydratedResults;
+    
+    return sourceData.filter(r => {
       const matchesSearch = (r.batch?.batchNo || '').toLowerCase().includes(debouncedSearchTerm.toLowerCase()) || 
              (r.product?.name || '').toLowerCase().includes(debouncedSearchTerm.toLowerCase());
       const matchesProduct = filterProductId === '' || r.batch?.productId === filterProductId;
@@ -259,15 +271,11 @@ const TestResultList: React.FC = () => {
       const dateB = new Date(b.testDate).getTime();
       return sortConfig.direction === 'asc' ? dateA - dateB : dateB - dateA;
     });
-  }, [hydratedResults, debouncedSearchTerm, filterProductId, filterMonth, filterYear, sortConfig]);
-
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [debouncedSearchTerm, filterProductId, filterMonth, filterYear, sortConfig, viewMode]);
-
-  const totalPages = Math.ceil(filteredResults.length / ITEMS_PER_PAGE);
-  const paginatedResults = filteredResults.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
+  }, [hydratedResults, allTestResultsHydrated, debouncedSearchTerm, filterProductId, filterMonth, filterYear, sortConfig]);
   
+  // Kiểm tra xem còn dữ liệu trên Server để tải thêm không
+  const hasMoreData = hydratedResults.length >= testResultLimit && debouncedSearchTerm.length < 2;
+
   return (
     <div className="space-y-6">
       <style>{printStyles}</style>
@@ -293,7 +301,7 @@ const TestResultList: React.FC = () => {
 
       {/* Filter Bar */}
       <DSFilterBar>
-        <DSSearchInput placeholder="Tìm theo số lô hoặc tên sản phẩm..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+        <DSSearchInput placeholder="Tìm theo số lô hoặc tên sản phẩm..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} onClear={() => setSearchTerm('')} />
         
         <DSSelect value={filterYear} onChange={(e) => setFilterYear(e.target.value)} className="w-24">
           <option value="ALL">Năm</option>
@@ -307,7 +315,7 @@ const TestResultList: React.FC = () => {
 
         <DSSelect icon={Filter} value={filterProductId} onChange={(e) => setFilterProductId(e.target.value)} className="w-full md:w-64">
             <option value="">Tất cả sản phẩm</option>
-            {state.products.map(p => (
+        {products.map(p => (
               <option key={p.id} value={p.id}>{p.name}</option>
             ))}
         </DSSelect>
@@ -326,20 +334,32 @@ const TestResultList: React.FC = () => {
 
       <TestResultDataList 
         viewMode={viewMode}
-        data={paginatedResults}
+        data={filteredResults}
         onEdit={handleEditResult}
         onDelete={handleDeleteClick}
         onPrint={handlePrint}
         isAdmin={isAdmin}
       />
-
-      <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
       
-      <div className="flex justify-center mt-4 no-print">
-        <button onClick={loadMoreTestResults} className="text-xs font-bold text-slate-400 hover:text-indigo-600 transition-colors flex items-center gap-1 bg-slate-50 px-4 py-2 rounded-full border border-slate-100 hover:border-indigo-200">
-          <History size={14} /> Tải thêm dữ liệu cũ hơn ({hydratedResults.length} bản ghi đang hiển thị)
-        </button>
-      </div>
+      {/* --- NÚT TẢI THÊM PHÂN TRANG (LOAD MORE) --- */}
+      {hasMoreData && (
+        <div className="flex justify-center mt-6 no-print">
+          <button 
+            onClick={loadMoreTestResults} 
+            disabled={syncStatus === 'SAVING'}
+            className="text-xs font-bold text-slate-500 hover:text-indigo-600 transition-all flex items-center gap-2 bg-white px-5 py-2.5 rounded-full border border-slate-200 hover:border-indigo-300 disabled:opacity-50 disabled:pointer-events-none shadow-sm active:scale-95"
+          >
+            {syncStatus === 'SAVING' ? <RefreshCcw size={14} className="animate-spin" /> : <History size={14} />}
+            Tải thêm dữ liệu cũ hơn ({hydratedResults.length} bản ghi đang hiển thị)
+          </button>
+        </div>
+      )}
+
+      {!hasMoreData && hydratedResults.length > 0 && (
+        <div className="text-center mt-6 text-[11px] font-medium text-slate-400 no-print italic">
+          Đã tải toàn bộ {hydratedResults.length} kết quả kiểm nghiệm hiện có trên hệ thống.
+        </div>
+      )}
 
       <DeleteModal 
         isOpen={crud.mode === 'DELETE'} 
@@ -551,7 +571,7 @@ const TestResultList: React.FC = () => {
                         colorClass="text-indigo-600"
                         activeTCCS={activeTCCS}
                         testResultsMap={formValues.testResultsMap}
-                        setTestResultsMap={(map) => setFieldValue('testResultsMap', map)}
+                        setMapValue={setMapValue}
                         existingResultsForBatch={existingResultsForBatch}
                     />
                     {/* Render Safety Criteria (Split Micro & Metal) */}
@@ -581,7 +601,7 @@ const TestResultList: React.FC = () => {
                                 colorClass="text-emerald-600"
                                 activeTCCS={activeTCCS}
                                 testResultsMap={formValues.testResultsMap}
-                                setTestResultsMap={(map) => setFieldValue('testResultsMap', map)}
+                                setMapValue={setMapValue}
                                 existingResultsForBatch={existingResultsForBatch}
                            />
                            <CriteriaInputGroup
@@ -591,7 +611,7 @@ const TestResultList: React.FC = () => {
                                 colorClass="text-red-600"
                                 activeTCCS={activeTCCS}
                                 testResultsMap={formValues.testResultsMap}
-                                setTestResultsMap={(map) => setFieldValue('testResultsMap', map)}
+                                setMapValue={setMapValue}
                                 existingResultsForBatch={existingResultsForBatch}
                            />
                          </>
@@ -663,7 +683,7 @@ const TestResultList: React.FC = () => {
           >
             <X size={24}/>
           </button>
-          <div className="max-w-[21cm] mx-auto w-full print:block print:h-auto print:max-w-full">
+          <div className="max-h-[85vh] overflow-y-auto custom-scrollbar max-w-[21cm] mx-auto w-full print:block print:h-auto print:max-w-full">
             <div className="flex items-center justify-between mb-10 text-white no-print">
                <h3 className="text-2xl font-black uppercase tracking-tighter">Xuất Phiếu CoA</h3>
                <div className="flex items-center gap-4">
@@ -677,7 +697,7 @@ const TestResultList: React.FC = () => {
                   batch={selectedResultForPrint.batch}
                   product={selectedResultForPrint.product}
                   tccs={selectedResultForPrint.batch?.tccs}
-                  formula={state.productFormulas.find(f => f.productId === selectedResultForPrint.product?.id)}
+                  formula={productFormulas.find(f => f.productId === selectedResultForPrint.product?.id)}
                 />
               </Suspense>
             </div>

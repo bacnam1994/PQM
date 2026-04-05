@@ -9,38 +9,48 @@ import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react'
  * 3. Logic thay thế: Tự động pass TC2 nếu TC1 đạt (xử lý trong completionStatus và handleSaveResult).
  */
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { useAppContext } from '../context/AppContext';
-import { useTestResultContext } from '../context/TestResultContext';
-import { useAuth } from '../context/AuthContext';
-import { useDataGraph, HydratedTestResult } from './useDataGraph';
+import { useAppStore } from '../store/useAppStore';
+import { TestResult, TestResultEntry } from '../types';
+import { logAuditAction } from '../services/auditService';
 import { useForm } from './useForm';
 import { useCrud } from './useCrud';
-import { TestResult, TestResultEntry } from '../types';
-import { ensureArray, evaluateCriterion } from '../utils/parsing';
-import { calculateOverallStatus } from '../utils/evaluation';
-import { TEST_RESULT_STATUS, BATCH_STATUS, CRITERION_TYPE_CONST } from '../utils/constants';
-import { normalizeNumericString, checkRange, evaluateCriterionSmart } from '../utils/criteriaEvaluation';
 import { useFormDraft } from './useFormDraft';
-import { generateId } from '../utils/idGenerator';
-import { logAuditAction } from '../services/auditService';
+import { useDataGraph, HydratedTestResult } from './useDataGraph';
+import { useTestResultPrint } from './useTestResultPrint';
+import { useTccsSelection } from './useTccsSelection';
+import { useTestResultEvaluation } from './useTestResultEvaluation';
+import { useBatchStatusTransition } from './useBatchStatusTransition';
+import { ensureArray, evaluateCriterion, calculateOverallStatus, TEST_RESULT_STATUS, BATCH_STATUS, CRITERION_TYPE_CONST, normalizeNumericString, checkRange, evaluateCriterionSmart, parseNumberFromText, generateId } from '../utils';
 
 interface ExtraTestResultEntry extends TestResultEntry {
   limit?: string;
 }
 
+// Hàm lấy ngày Local chính xác (Tránh lỗi UTC lùi 1 ngày vào buổi sáng)
+const getLocalISODate = () => {
+  const tzOffset = (new Date()).getTimezoneOffset() * 60000;
+  return new Date(Date.now() - tzOffset).toISOString().split('T')[0];
+};
+
 const initialTestResultFormState = {
   batchId: '',
   labName: '',
-  testDate: new Date().toISOString().split('T')[0],
+  testDate: getLocalISODate(),
   notes: '',
   testResultsMap: {} as Record<string, string | number>,
   extraCriteria: [] as {id: string, name: string, value: string, unit: string, limit: string}[],
 };
 
 export const useTestResultLogic = (onInitialBatchSelect?: (batchNo: string) => void) => {
-  const { state, updateBatchStatus, notify } = useAppContext();
-  const { testResults, addTestResult, updateTestResult, deleteTestResult } = useTestResultContext();
-  const { user } = useAuth();
+  const tccsList = useAppStore(state => state.tccsList);
+  const batches = useAppStore(state => state.batches);
+  const updateBatchStatus = useAppStore(state => state.updateBatchStatus);
+  const notify = useAppStore(state => state.notify);
+  const testResults = useAppStore(state => state.testResults);
+  const addTestResult = useAppStore(state => state.addTestResult);
+  const updateTestResult = useAppStore(state => state.updateTestResult);
+  const deleteTestResult = useAppStore(state => state.deleteTestResult);
+  const user = useAppStore(state => state.user);
   const { batches: hydratedBatches } = useDataGraph();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -49,19 +59,12 @@ export const useTestResultLogic = (onInitialBatchSelect?: (batchNo: string) => v
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [batchSearch, setBatchSearch] = useState('');
   const [showBatchDropdown, setShowBatchDropdown] = useState(false);
-  const [manualTccsId, setManualTccsId] = useState<string | null>(null);
   
   // State cho modal xem chi tiết TCCS
   const [isTccsDetailModalOpen, setIsTccsDetailModalOpen] = useState(false);
 
-  // Print Modal State
-  const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
-  const [selectedResultForPrint, setSelectedResultForPrint] = useState<HydratedTestResult | null>(null);
-
-  // State cho hộp thoại xác nhận chuyển trạng thái
-  const [isStatusConfirmOpen, setIsStatusConfirmOpen] = useState(false);
-  const [pendingStatusUpdate, setPendingStatusUpdate] = useState<{status: string, batchId: string} | null>(null);
-  const [rejectReason, setRejectReason] = useState('');
+  // Print Logic extracted to a separate hook
+  const { isPrintModalOpen, setIsPrintModalOpen, selectedResultForPrint, handlePrint, handlePrintConsolidatedCoa } = useTestResultPrint();
 
   // Sử dụng useRef để giữ tham chiếu mới nhất của callback mà không gây re-render loop
   const onInitialBatchSelectRef = useRef(onInitialBatchSelect);
@@ -74,10 +77,26 @@ export const useTestResultLogic = (onInitialBatchSelect?: (batchNo: string) => v
     setValues: setFormValues,
     resetForm: resetHookForm,
     setFieldValue,
+    setMapValue,
     addToArray,
     removeFromArray,
     updateInArray,
   } = useForm(initialTestResultFormState);
+
+  const skipSave = useCallback((vals: any) => {
+    return !vals.batchId && 
+           !vals.labName && 
+           !vals.notes && 
+           Object.keys(vals.testResultsMap || {}).length === 0 && 
+           (vals.extraCriteria || []).length === 0;
+  }, []);
+
+  const onDraftLoaded = useCallback((data: any) => {
+    if (data.batchId) {
+      const batch = hydratedBatches.find(b => b.id === data.batchId);
+      if (batch) setBatchSearch(`${batch.batchNo} - ${batch.product?.name}`);
+    }
+  }, [hydratedBatches]);
 
   // --- AUTO SAVE DRAFT ---
   const { checkDraft, clearDraft } = useFormDraft({
@@ -85,52 +104,22 @@ export const useTestResultLogic = (onInitialBatchSelect?: (batchNo: string) => v
     formValues,
     setFormValues,
     isEnabled: crud.mode === 'ADD',
-    onDraftLoaded: (data) => {
-      if (data.batchId) {
-        const batch = hydratedBatches.find(b => b.id === data.batchId);
-        if (batch) setBatchSearch(`${batch.batchNo} - ${batch.product?.name}`);
-      }
-    }
+    skipSave,
+    onDraftLoaded
   });
 
-  // --- TCCS SELECTION LOGIC ---
-  // This logic is centralized here to be used by the hook and the component.
-  const availableTCCSList = useMemo(() => {
-    if (!formValues.batchId) return [];
-    const batch = hydratedBatches.find(b => b.id === formValues.batchId);
-    if (!batch) return [];
-    return state.tccsList
-      .filter(t => t.productId === batch.productId)
-      .sort((a, b) => new Date(b.issueDate).getTime() - new Date(a.issueDate).getTime());
-  }, [formValues.batchId, hydratedBatches, state.tccsList]);
+  const {
+    manualTccsId, setManualTccsId, availableTCCSList, latestTCCS, defaultTCCS, activeTCCS, tccsMaps
+  } = useTccsSelection(formValues.batchId, hydratedBatches as any, tccsList as any);
 
-  const latestTCCS = useMemo(() => {
-    return availableTCCSList.length > 0 ? availableTCCSList[0] : null;
-  }, [availableTCCSList]);
+  const {
+    isStatusConfirmOpen, setIsStatusConfirmOpen, pendingStatusUpdate, rejectReason, setRejectReason,
+    handleUpdateBatchStatus: _handleUpdateBatchStatus, confirmBatchStatusUpdate
+  } = useBatchStatusTransition(updateBatchStatus, notify);
 
-  const defaultTCCS = useMemo(() => {
-    if (!formValues.batchId || availableTCCSList.length === 0) return null;
-    const batch = hydratedBatches.find(b => b.id === formValues.batchId);
-    if (!batch) return null;
-
-    if (batch.mfgDate) {
-        const mfgTime = new Date(batch.mfgDate).getTime();
-        const match = availableTCCSList.find(t => new Date(t.issueDate).getTime() <= mfgTime);
-        if (match) return match;
-        return availableTCCSList[availableTCCSList.length - 1]; // Fallback to oldest
-    }
-    
-    // If no mfgDate, default to the absolute latest TCCS
-    return latestTCCS;
-  }, [formValues.batchId, hydratedBatches, availableTCCSList, latestTCCS]);
-
-  // The final active TCCS, considering manual override
-  const activeTCCS = useMemo(() => {
-    if (manualTccsId) {
-      return state.tccsList.find(t => t.id === manualTccsId) || defaultTCCS;
-    }
-    return defaultTCCS;
-  }, [manualTccsId, defaultTCCS, state.tccsList]);
+  const handleUpdateBatchStatus = useCallback((newStatus: string, batchId?: string) => {
+    _handleUpdateBatchStatus(newStatus, batchId, formValues.batchId);
+  }, [_handleUpdateBatchStatus, formValues.batchId]);
 
   // Derived state: Existing results for batch
   const existingResultsForBatch = useMemo(() => {
@@ -139,52 +128,9 @@ export const useTestResultLogic = (onInitialBatchSelect?: (batchNo: string) => v
       .sort((a, b) => new Date(b.testDate).getTime() - new Date(a.testDate).getTime());
   }, [formValues.batchId, testResults, crud.selectedItem?.id]);
 
-  // Tính toán tiến độ nhập liệu (có tính đến logic thay thế)
-  const completionStatus = useMemo(() => {
-    if (!activeTCCS) return { progress: 0, isComplete: false, total: 0, completed: 0 };
-
-    const allCriteria = [
-      ...ensureArray(activeTCCS.mainQualityCriteria),
-      ...ensureArray(activeTCCS.safetyCriteria)
-    ].filter(c => c && c.name);
-
-    const total = allCriteria.length;
-    if (total === 0) return { progress: 0, isComplete: false, total: 0, completed: 0 };
-
-    let completed = 0;
-    const rules = activeTCCS.alternateRules || [];
-
-    allCriteria.forEach(c => {
-      const val = formValues.testResultsMap[c.name];
-      const hasValue = val !== undefined && val !== '' && val !== null;
-
-      if (hasValue) {
-        completed++;
-      } else {
-        // Kiểm tra logic thay thế: Nếu TC1 đạt -> TC2 (là c) được coi là hoàn thành (không cần kiểm)
-        const rule = rules.find(r => r.alt === c.name);
-        if (rule) {
-          const mainName = rule.main;
-          const mainVal = formValues.testResultsMap[mainName];
-          
-          if (mainVal !== undefined && mainVal !== '' && mainVal !== null) {
-            const mainDef = allCriteria.find(d => d.name === mainName);
-            if (mainDef) {
-              const isMainPass = evaluateCriterionSmart(mainDef, mainVal);
-
-              // Nếu rule là FAIL_RETRY (mặc định) và TC1 Đạt -> TC2 được tính là hoàn thành
-              if (rule.type !== 'CONDITIONAL_CHECK' && isMainPass === true) {
-                completed++;
-              }
-            }
-          }
-        }
-      }
-    });
-
-    const progress = Math.round((completed / total) * 100);
-    return { progress, isComplete: progress >= 100, total, completed };
-  }, [activeTCCS, formValues.testResultsMap]);
+  const { completionStatus } = useTestResultEvaluation(
+    activeTCCS, formValues.testResultsMap, tccsMaps
+  );
 
   const closeFormModal = useCallback(() => {
     crud.close();
@@ -193,11 +139,6 @@ export const useTestResultLogic = (onInitialBatchSelect?: (batchNo: string) => v
     setShowBatchDropdown(false);
     // Không clear draft ở đây để giữ lại nếu người dùng lỡ tay đóng modal
   }, [crud, resetHookForm]);
-
-  // Reset manual TCCS selection when batch changes
-  useEffect(() => {
-    setManualTccsId(null);
-  }, [formValues.batchId]);
 
   // Handle URL params for initial batch selection
   useEffect(() => {
@@ -217,50 +158,26 @@ export const useTestResultLogic = (onInitialBatchSelect?: (batchNo: string) => v
             onInitialBatchSelectRef.current(batch.batchNo);
         }
 
+        // Phục hồi lại chức năng mở form Add khi click từ URL
         crud.openAdd();
-        // Nếu có param URL thì ưu tiên URL, không check draft
         navigate('/test-results', { replace: true });
       }
     }
   }, [searchParams, hydratedBatches, navigate, updateBatchStatus, setFieldValue, resetHookForm, crud.openAdd]);
 
-  // Hàm chuyển trạng thái lô thủ công (Manual Status Transition)
-  const handleUpdateBatchStatus = (newStatus: string, batchId?: string) => {
-    const id = batchId || formValues.batchId;
-    if (!id) return notify({ type: 'WARNING', message: 'Vui lòng chọn Lô hàng!' });
-    
-    setRejectReason(''); // Reset lý do cũ
-    setPendingStatusUpdate({ status: newStatus, batchId: id });
-    setIsStatusConfirmOpen(true);
-  };
 
-  const confirmBatchStatusUpdate = async () => {
-    if (!pendingStatusUpdate) return;
-    try {
-      await updateBatchStatus(pendingStatusUpdate.batchId, pendingStatusUpdate.status, rejectReason);
-      notify({ type: 'SUCCESS', title: 'Cập nhật trạng thái', message: `Đã chuyển trạng thái lô sang: ${pendingStatusUpdate.status}` });
-    } catch (error) {
-      console.error("Lỗi cập nhật trạng thái:", error);
-      notify({ type: 'ERROR', message: 'Không thể cập nhật trạng thái lô.' });
-    } finally {
-      setIsStatusConfirmOpen(false);
-      setPendingStatusUpdate(null);
-      setRejectReason('');
-    }
-  };
-
-  const handleBatchSelect = (batchId: string) => {
+  const handleBatchSelect = useCallback((batchId: string) => {
     setFieldValue('batchId', batchId);
     setFieldValue('testResultsMap', {});
     setFieldValue('extraCriteria', []);
 
     if (batchId) {
-      const batch = state.batches.find(b => b.id === batchId);
+      const batch = batches.find(b => b.id === batchId);
       if (batch && batch.status !== BATCH_STATUS.TESTING) {
         updateBatchStatus(batchId, BATCH_STATUS.TESTING);
       }
     }
-  };
+  }, [setFieldValue, batches, updateBatchStatus]);
 
   const currentBatch = useMemo(() => {
     return hydratedBatches.find(b => b.id === formValues.batchId);
@@ -299,12 +216,12 @@ export const useTestResultLogic = (onInitialBatchSelect?: (batchNo: string) => v
     setBatchSearch(batch ? `${batch.batchNo} - ${batch.product?.name}` : '');
   }, [crud, hydratedBatches, setFormValues]);
 
-  const switchToEditMode = (res: TestResult) => {
+  const switchToEditMode = useCallback((res: TestResult) => {
     closeFormModal();
     setTimeout(() => handleEditResult(res as HydratedTestResult), 100);
-  };
+  }, [closeFormModal, handleEditResult]);
 
-  const handleSaveResult = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSaveResult = useCallback(async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!formValues.batchId) return notify({ type: 'WARNING', message: 'Vui lòng chọn Lô hàng!' });
 
@@ -314,22 +231,20 @@ export const useTestResultLogic = (onInitialBatchSelect?: (batchNo: string) => v
       let results: TestResultEntry[] = [];
       
       if (activeTCCS) {
-        const tccsCriteria = [...ensureArray(activeTCCS.mainQualityCriteria), ...ensureArray(activeTCCS.safetyCriteria)];
-        const rules = activeTCCS.alternateRules || [];
+        const { rulesMap, criteriaMap, allCriteria } = tccsMaps;
 
-        tccsCriteria.forEach(c => {
-          if (!c || !c.name) return;
+        allCriteria.forEach(c => {
           let val = formValues.testResultsMap[c.name];
           let isAutoPassed = false;
           let ruleSatisfied = false;
           
           // Kiểm tra quy tắc thay thế để xác định có được Auto Pass không
-          const rule = rules.find(r => r.alt === c.name);
+          const rule = rulesMap.get(c.name);
           if (rule && rule.type !== 'CONDITIONAL_CHECK') {
             const mainName = rule.main;
             const mainVal = formValues.testResultsMap[mainName];
             if (mainVal !== undefined && mainVal !== '') {
-               const mainDef = tccsCriteria.find(d => d.name === mainName);
+               const mainDef = criteriaMap.get(mainName);
                if (mainDef) {
                   const isMainPass = evaluateCriterionSmart(mainDef, mainVal);
 
@@ -368,17 +283,16 @@ export const useTestResultLogic = (onInitialBatchSelect?: (batchNo: string) => v
 
       formValues.extraCriteria.forEach(item => {
         if (item.name && item.value) {
-          const normalizedLimit = normalizeNumericString(item.limit);
-          const normalizedValue = normalizeNumericString(item.value);
-          
           let isPass = null;
-          const rangeCheck = checkRange(normalizedLimit, normalizedValue);
           
-          if (rangeCheck !== null) {
-            isPass = rangeCheck;
-          } else {
-            const pseudoCriterion = { type: CRITERION_TYPE_CONST.TEXT, expectedText: normalizedLimit, min: undefined, max: undefined };
-            isPass = evaluateCriterion(pseudoCriterion, normalizedValue);
+          if (item.limit) {
+            // Sử dụng evaluateCriterionSmart để tự động xử lý các toán tử (<=, >=), khoảng (~, -) và làm tròn số
+            const pseudoCriterion = {
+              name: item.name,
+              type: CRITERION_TYPE_CONST.TEXT,
+              expectedText: item.limit,
+            };
+            isPass = evaluateCriterionSmart(pseudoCriterion as any, item.value);
           }
           
           const newEntry: ExtraTestResultEntry = { criteriaName: item.name, value: item.value, isPass, isExtra: true, unit: item.unit, limit: item.limit };
@@ -389,6 +303,30 @@ export const useTestResultLogic = (onInitialBatchSelect?: (batchNo: string) => v
       if (results.length === 0) {
         setIsSubmitting(false);
         return notify({ type: 'WARNING', message: 'Vui lòng nhập ít nhất một kết quả kiểm nghiệm!' });
+      }
+
+      // Cảnh báo an toàn nếu phiếu chưa hoàn thiện 100%
+      if (!completionStatus.isComplete) {
+        const confirmIncomplete = window.confirm(
+          `CẢNH BÁO: Phiếu kiểm nghiệm mới hoàn thành ${completionStatus.progress}%. \n\nBạn có chắc chắn muốn lưu dạng nháp/chưa hoàn thiện không? (Các chỉ tiêu bị bỏ trống sẽ không hiển thị trên CoA)`
+        );
+        if (!confirmIncomplete) {
+          setIsSubmitting(false);
+          return;
+        }
+      }
+
+      // Cảnh báo an toàn nếu có chỉ tiêu KHÔNG ĐẠT
+      const failedCriteria = results.filter(r => r.isPass === false);
+      if (failedCriteria.length > 0) {
+        const failedNames = failedCriteria.map(r => `  • ${r.criteriaName} (Nhập: ${r.value})`).join('\n');
+        const confirmFail = window.confirm(
+          `CẢNH BÁO KẾT QUẢ KHÔNG ĐẠT:\n\nPhát hiện ${failedCriteria.length} chỉ tiêu bị vượt giới hạn / không đạt tiêu chuẩn:\n${failedNames}\n\nPhiếu kiểm nghiệm này sẽ đưa lô hàng về kết luận KHÔNG ĐẠT. Bạn có chắc chắn muốn lưu dữ liệu này không?`
+        );
+        if (!confirmFail) {
+          setIsSubmitting(false);
+          return;
+        }
       }
 
       const overallStatus = calculateOverallStatus(results, activeTCCS);
@@ -408,12 +346,33 @@ export const useTestResultLogic = (onInitialBatchSelect?: (batchNo: string) => v
               ...cleanResult,
               ...resultData,
           });
+          
+          try {
+            logAuditAction({
+              action: 'UPDATE',
+              collection: 'TEST_RESULTS',
+              documentId: crud.selectedItem.id,
+              details: `Sửa kết quả kiểm nghiệm lô: ${batch?.batchNo || resultData.batchId}`,
+              performedBy: user?.email || 'unknown'
+            });
+          } catch (e) { console.warn("Lỗi ghi log:", e); }
       } else {
+          const newId = generateId('res');
           await addTestResult({
-              id: generateId('res'),
+              id: newId,
               ...resultData,
               createdAt: new Date().toISOString(),
           });
+          
+          try {
+            logAuditAction({
+              action: 'CREATE',
+              collection: 'TEST_RESULTS',
+              documentId: newId,
+              details: `Tạo kết quả kiểm nghiệm lô: ${currentBatch?.batchNo || resultData.batchId}`,
+              performedBy: user?.email || 'unknown'
+            });
+          } catch (e) { console.warn("Lỗi ghi log:", e); }
       }
 
       clearDraft(); // Xóa nháp khi lưu thành công
@@ -424,13 +383,13 @@ export const useTestResultLogic = (onInitialBatchSelect?: (batchNo: string) => v
     } finally {
       setIsSubmitting(false);
     }
-  };
+  }, [formValues, notify, activeTCCS, completionStatus, crud, updateTestResult, addTestResult, clearDraft, closeFormModal]);
 
   const handleDeleteClick = useCallback((res: HydratedTestResult) => {
     crud.openDelete(res);
   }, [crud]);
 
-  const handleConfirmDelete = async () => {
+  const handleConfirmDelete = useCallback(async () => {
     if (crud.selectedItem) {
       try {
         await deleteTestResult(crud.selectedItem.id);
@@ -440,7 +399,7 @@ export const useTestResultLogic = (onInitialBatchSelect?: (batchNo: string) => v
 
         // Ghi log an toàn
         try {
-          const batch = state.batches.find(b => b.id === crud.selectedItem!.batchId);
+          const batch = batches.find(b => b.id === crud.selectedItem!.batchId);
           logAuditAction({
             action: 'DELETE',
             collection: 'TEST_RESULTS',
@@ -457,84 +416,19 @@ export const useTestResultLogic = (onInitialBatchSelect?: (batchNo: string) => v
     } else {
       crud.close();
     }
-  };
+  }, [crud, deleteTestResult, notify, batches, user]);
 
-  const handlePrint = useCallback((res: HydratedTestResult) => {
-    setSelectedResultForPrint(res);
-    setIsPrintModalOpen(true);
-  }, []);
-
-  const handleOpenAdd = () => {
+  const handleOpenAdd = useCallback(() => {
     closeFormModal();
     crud.openAdd();
     checkDraft(); // Kiểm tra nháp khi mở form thêm mới
-  };
-
-  const handlePrintConsolidatedCoa = useCallback((batchId: string) => {
-    if (!batchId) return;
-
-    const resultsForBatch = testResults
-      .filter(r => r.batchId === batchId)
-      .sort((a, b) => new Date(a.testDate).getTime() - new Date(b.testDate).getTime());
-
-    if (resultsForBatch.length === 0) {
-      notify({ type: 'INFO', message: 'Lô này chưa có kết quả kiểm nghiệm nào.' });
-      return;
-    }
-
-    const consolidatedResultsMap = new Map<string, TestResultEntry>();
-
-    resultsForBatch.forEach(res => {
-      ensureArray(res.results).forEach(entry => {
-        if (entry && entry.criteriaName) {
-          consolidatedResultsMap.set(entry.criteriaName, entry);
-        }
-      });
-    });
-
-    const finalResults = Array.from(consolidatedResultsMap.values());
-    const latestResult = resultsForBatch[resultsForBatch.length - 1];
-    const batch = hydratedBatches.find(b => b.id === batchId);
-    if (!batch) return;
-
-    const availableTCCSForBatch = state.tccsList
-      .filter(t => t.productId === batch.productId)
-      .sort((a, b) => new Date(b.issueDate).getTime() - new Date(a.issueDate).getTime());
-    
-    let tccsForEvaluation = null;
-    if (availableTCCSForBatch.length > 0) {
-        if (batch.mfgDate) {
-            const mfgTime = new Date(batch.mfgDate).getTime();
-            const match = availableTCCSForBatch.find(t => new Date(t.issueDate).getTime() <= mfgTime);
-            tccsForEvaluation = match || availableTCCSForBatch[availableTCCSForBatch.length - 1];
-        } else {
-            tccsForEvaluation = availableTCCSForBatch[0];
-        }
-    }
-
-    const overallStatus = calculateOverallStatus(finalResults, tccsForEvaluation);
-
-    const virtualResult: HydratedTestResult = {
-      id: `consolidated-${batchId}`,
-      batchId: batchId,
-      labName: 'Tổng hợp',
-      testDate: latestResult.testDate,
-      results: finalResults,
-      overallStatus: overallStatus,
-      notes: `Phiếu tổng hợp từ ${resultsForBatch.length} kết quả.`,
-      createdAt: new Date().toISOString(),
-      batch: { ...batch, tccs: tccsForEvaluation }, // Override TCCS for the report
-      product: batch.product,
-    };
-
-    setSelectedResultForPrint(virtualResult);
-    setIsPrintModalOpen(true);
-  }, [testResults, hydratedBatches, state.tccsList, notify]);
+  }, [closeFormModal, crud, checkDraft]);
 
   return {
     crud,
     formValues,
     setFieldValue,
+    setMapValue,
     addToArray,
     removeFromArray,
     updateInArray,

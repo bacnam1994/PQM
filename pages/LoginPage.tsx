@@ -1,11 +1,13 @@
 
 import React, { useState } from 'react';
-import { useAuth } from '../context/AuthContext';
 import { Navigate, useNavigate, Link } from 'react-router-dom';
+import { useAppStore } from '../store/useAppStore';
 import { Leaf, Lock, Mail, Loader2, AlertCircle, ShieldCheck } from 'lucide-react';
 
 const LoginPage: React.FC = () => {
-  const { user, login, loading: authLoading } = useAuth();
+  const user = useAppStore(state => state.user);
+  const login = useAppStore(state => state.login);
+  const authLoading = useAppStore(state => state.authLoading);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');

@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
 import { ref, onValue, set, remove, push, query, limitToLast, orderByChild } from 'firebase/database';
-import { useAppContext } from '../context/AppContext';
+import { useAppStore } from '../store/useAppStore';
 import { Users, Shield, Search, Calendar, UserCog, AlertTriangle, FileClock, History } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { DSFilterBar, DSSearchInput, DSTable } from '../components/DesignSystem';import { ConfirmationModal, Modal } from '../components/CommonUI';
+import { DSFilterBar, DSSearchInput, DSTable } from '../components/DesignSystem';
+import { ConfirmationModal, Modal } from '../components/CommonUI';
 
 type UserRole = 'ADMIN' | 'USER';
 
@@ -26,7 +27,7 @@ interface AuditLogEntry {
 }
 
 const UserManagement: React.FC = () => {
-  const { user: currentUser } = useAppContext();
+  const currentUser = useAppStore(state => state.user);
   const [users, setUsers] = useState<UserData[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');

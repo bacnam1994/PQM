@@ -1,49 +1,145 @@
-import React, { useState, useMemo } from 'react';
-import { FlaskConical, Plus, Search, Trash2, Save, X, AlertCircle, Beaker, Eye, Thermometer, BookOpen, Loader2, LayoutGrid, List, Package, Component } from 'lucide-react';
-import { useAppContext } from '../context/AppContext';
-import { useCrud } from '../hooks/useCrud';
-import { PageHeader, Modal, Pagination } from '../components/CommonUI';
-import { DSFilterBar, DSSearchInput, DSSelect, DSTable, DSFormInput, DSViewToggle, DSCard } from '../components/DesignSystem';
-import { AddButton, ActionButtons, DeleteModal } from '../components/CrudControls';
-import { generateId } from '../utils/idGenerator';
+import React, { useState, useMemo, useCallback, memo } from 'react';
+import { FlaskConical, Plus, Search, Trash2, Save, X, AlertCircle, Beaker, Eye, Thermometer, BookOpen, Loader2, LayoutGrid, List, Package, Component, FileSearch } from 'lucide-react';
+import { useAppStore } from '../store/useAppStore';
 import { ProductFormula, FormulaIngredient } from '../types';
-import SpecialCharToolbar from '../components/SpecialCharToolbar';
-import { useLocalStorage } from '../hooks/useLocalStorage';
-import { autoFormatInput, parseNumberFromText } from '../utils/criteriaEvaluation';
+import { PageHeader, Modal, Pagination, DSFilterBar, DSSearchInput, DSSelect, DSTable, DSFormInput, DSViewToggle, DSCard, AddButton, ActionButtons, DeleteModal, SpecialCharToolbar, DSEmptyState } from '../components';
+import { useCrud } from '../hooks';
+import { useUIStore } from '../store/useUIStore';
+import { generateId, autoFormatInput, parseNumberFromText } from '../utils';
 
 // Helper: Format số sang dạng mũ (VD: 1000 -> 10³)
 const formatScientific = (value: string | number) => {
-  let num = Number(value);
-  if (isNaN(num)) {
-    num = parseNumberFromText(String(value));
-    if (num === 0 && String(value).trim() !== '0') return value;
-  }
-  if (num === 0) return value;
+  if (value === null || value === undefined) return '';
+  const stringValue = String(value).trim();
+  
+  const match = stringValue.match(/^([<≤>≥~=]+)?\s*(.+)$/);
+  const prefix = match && match[1] ? match[1] + ' ' : '';
+  const coreValue = match ? match[2] : stringValue;
 
-  if (Math.abs(num) >= 1000 || (Math.abs(num) > 0 && Math.abs(num) <= 0.001)) {
+  let num = Number(coreValue);
+  const coreUpper = coreValue.toUpperCase();
+  const isSciFormat = coreUpper.includes('E') || coreValue.includes('10') || coreValue.includes('^') || coreUpper.includes('X');
+  
+  if (isNaN(num) || isSciFormat) {
+    num = parseNumberFromText(coreValue);
+    if (num === 0 && coreValue !== '0') return stringValue;
+  }
+  
+  if (num === 0) return stringValue;
+
+  if (isSciFormat || Math.abs(num) >= 1000000 || (Math.abs(num) > 0 && Math.abs(num) <= 0.00001)) {
     const exponent = Math.floor(Math.log10(Math.abs(num)));
     const mantissa = num / Math.pow(10, exponent);
-    const roundedMantissa = Math.round(mantissa * 1000) / 1000;
+    const roundedMantissa = Math.round((mantissa + Number.EPSILON) * 100000) / 100000;
 
     return (
       <span className="whitespace-nowrap">
+        {prefix.trim()}{prefix ? ' ' : ''}
         {roundedMantissa !== 1 && <>{roundedMantissa} × </>}
         10<sup>{exponent}</sup>
       </span>
     );
   }
-  return num.toLocaleString('vi-VN');
+  return `${prefix.trim()}${prefix ? ' ' : ''}${num.toLocaleString('vi-VN', { maximumFractionDigits: 10 })}`;
 };
 
+// Tối ưu 1: Component hỗ trợ render từng dòng nguyên liệu riêng biệt
+// Tránh việc React render lại hàng chục ô input khác mỗi khi người dùng gõ 1 ký tự
+const FormulaRow = memo(({ item, index, type, rawMaterials, onUpdate, onRemove }: any) => {
+  const handleNameBlur = useCallback(() => {
+    if (!item.name || item.materialId) return;
+    const enteredName = item.name.trim().toLowerCase();
+    const matchedMaterial = rawMaterials.find((m: any) =>
+      m.name.toLowerCase() === enteredName ||
+      (m.aliases || []).some((alias: string) => alias.toLowerCase() === enteredName)
+    );
+    if (matchedMaterial) {
+      onUpdate(index, 'materialId', matchedMaterial.id);
+      useAppStore.getState().notify({ type: 'INFO', message: `Đã tự động liên kết "${item.name}" với "${matchedMaterial.name}".` });
+    }
+  }, [item.name, item.materialId, rawMaterials, index, onUpdate]);
+
+  const isIngredient = type === 'ingredient';
+  const namePlaceholder = isIngredient ? "VD: Vitamin C..." : "VD: Lactose, Tinh bột...";
+  const catFilter = isIngredient ? ['ACTIVE', 'OTHER'] : ['EXCIPIENT', 'OTHER'];
+
+  return (
+    <tr className="group hover:bg-white transition-colors">
+      <td className="p-2">
+        <input
+          type="text"
+          placeholder={namePlaceholder}
+          value={item.name}
+          onChange={(e) => onUpdate(index, 'name', e.target.value)}
+          onBlur={handleNameBlur}
+          className={`w-full bg-transparent font-bold text-sm outline-none placeholder:font-normal ${isIngredient ? '' : 'text-slate-600'}`}
+        />
+      </td>
+      <td className="p-2">
+        <select
+          value={item.materialId || ''}
+          onChange={(e) => onUpdate(index, 'materialId', e.target.value)}
+          className="w-full bg-white border border-slate-200 rounded text-xs py-1 px-2 outline-none focus:border-indigo-500"
+        >
+          <option value="">-- Chọn --</option>
+          {rawMaterials.filter((m: any) => catFilter.includes(m.category)).map((m: any) => (
+            <option key={m.id} value={m.id}>{m.name}</option>
+          ))}
+        </select>
+      </td>
+      <td className="p-2">
+        <input
+          type="text"
+          placeholder={isIngredient ? "0" : "-"}
+          value={item.declaredContent}
+          onChange={(e) => onUpdate(index, 'declaredContent', e.target.value)}
+          className={`w-full bg-transparent font-mono font-bold text-sm outline-none text-right ${isIngredient ? 'text-indigo-600' : 'text-slate-600'}`}
+        />
+      </td>
+      <td className="p-2">
+        <input
+          type="text"
+          placeholder="-"
+          value={item.elementalContent || ''}
+          onChange={(e) => onUpdate(index, 'elementalContent', e.target.value)}
+          className="w-full bg-transparent font-mono font-bold text-sm outline-none text-right text-blue-600"
+        />
+      </td>
+      <td className="p-2">
+        <input
+          type="text"
+          placeholder="mg"
+          value={item.unit}
+          onChange={(e) => onUpdate(index, 'unit', e.target.value)}
+          className={`w-full bg-transparent font-bold text-xs outline-none text-center ${isIngredient ? 'text-slate-500' : 'text-slate-400'}`}
+        />
+      </td>
+      <td className="p-2 text-center">
+        <button type="button" onClick={() => onRemove(index)} className="text-slate-300 hover:text-red-500 transition-colors">
+          <X size={14} />
+        </button>
+      </td>
+    </tr>
+  );
+});
+
 const ProductFormulaList: React.FC = () => {
-  const { state, addProductFormula, updateProductFormula, deleteProductFormula, notify } = useAppContext();
+  const products = useAppStore(state => state.products);
+  const productFormulas = useAppStore(state => state.productFormulas);
+  const rawMaterials = useAppStore(state => state.rawMaterials);
+  const addProductFormula = useAppStore(state => state.addProductFormula);
+  const updateProductFormula = useAppStore(state => state.updateProductFormula);
+  const deleteProductFormula = useAppStore(state => state.deleteProductFormula);
+  const notify = useAppStore(state => state.notify);
+
   const crud = useCrud<ProductFormula>();
   
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [viewMode, setViewMode] = useLocalStorage<'grid' | 'list'>('formula_view_mode', 'list');
+  const viewMode = useUIStore(s => s.formulaViewMode);
+  const setViewMode = useUIStore(s => s.setFormulaViewMode);
   const [viewFormula, setViewFormula] = useState<ProductFormula | null>(null);
 
   // Form State
@@ -63,15 +159,15 @@ const ProductFormulaList: React.FC = () => {
 
   // Filter Data
   const filteredFormulas = useMemo(() => {
-    return (state.productFormulas || []).filter(f => {
-      const product = state.products.find(p => p.id === f.productId);
+    return (productFormulas || []).filter(f => {
+      const product = products.find(p => p.id === f.productId);
       const searchLower = searchTerm.toLowerCase();
       return (
         (product?.name || '').toLowerCase().includes(searchLower) ||
         (product?.code || '').toLowerCase().includes(searchLower)
       );
     });
-  }, [state.productFormulas, state.products, searchTerm]);
+  }, [productFormulas, products, searchTerm]);
 
   const totalPages = Math.ceil(filteredFormulas.length / itemsPerPage);
   const currentItems = filteredFormulas.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
@@ -155,7 +251,7 @@ const ProductFormulaList: React.FC = () => {
         notify({ type: 'SUCCESS', message: 'Đã cập nhật công thức.' });
       } else {
         // Check if product already has formula
-        const exists = state.productFormulas?.some(f => f.productId === selectedProductId);
+        const exists = productFormulas?.some(f => f.productId === selectedProductId);
         if (exists) return notify({ type: 'ERROR', message: 'Sản phẩm này đã có công thức!' });
 
         await addProductFormula(formulaData);
@@ -177,88 +273,52 @@ const ProductFormulaList: React.FC = () => {
     }
   };
 
-  // Ingredient Helpers
-  const addIngredientRow = () => {
-    setIngredients([...ingredients, { id: generateId('ing'), name: '', declaredContent: '', elementalContent: '', unit: 'mg', materialId: '' }]);
-  };
+  // Tối ưu 2: Dùng useCallback và Functional Updates (prev => ...)
+  // Giúp các hàm không bị khởi tạo lại, bảo toàn cờ React.memo cho các dòng Table.
+  const addIngredientRow = useCallback(() => {
+    setIngredients(prev => [...prev, { id: generateId('ing'), name: '', declaredContent: '', elementalContent: '', unit: 'mg', materialId: '' }]);
+  }, []);
 
-  const removeIngredientRow = (index: number) => {
-    const newIngs = [...ingredients];
-    newIngs.splice(index, 1);
-    setIngredients(newIngs);
-  };
+  const removeIngredientRow = useCallback((index: number) => {
+    setIngredients(prev => prev.filter((_, i) => i !== index));
+  }, []);
 
-  const updateIngredient = (index: number, field: keyof FormulaIngredient | 'declaredContent' | 'elementalContent' | 'materialId', value: any) => {
-    const newIngs = [...ingredients];
-    let finalValue = value;
-    if ((field === 'declaredContent' || field === 'elementalContent') && typeof value === 'string') {
-      finalValue = autoFormatInput(value);
-    }
-    newIngs[index] = { ...newIngs[index], [field]: finalValue };
-    setIngredients(newIngs);
-  };
+  const updateIngredient = useCallback((index: number, field: string, value: any) => {
+    setIngredients(prev => {
+      const newIngs = [...prev];
+      let finalValue = value;
+      if ((field === 'declaredContent' || field === 'elementalContent') && typeof value === 'string') {
+        finalValue = autoFormatInput(value);
+      }
+      newIngs[index] = { ...newIngs[index], [field]: finalValue } as any;
+      return newIngs;
+    });
+  }, []);
 
-  const handleIngredientNameBlur = (index: number) => {
-    const currentIngredient = ingredients[index];
-    // Chỉ gợi ý khi người dùng chưa chọn thủ công và đã nhập tên
-    if (!currentIngredient.name || currentIngredient.materialId) {
-      return;
-    }
+  const addExcipientRow = useCallback(() => {
+    setExcipients(prev => [...prev, { id: generateId('exc'), name: '', declaredContent: '', elementalContent: '', unit: 'mg', materialId: '' }]);
+  }, []);
 
-    const enteredName = currentIngredient.name.trim().toLowerCase();
-    const matchedMaterial = state.rawMaterials.find(material => 
-      material.name.toLowerCase() === enteredName || 
-      (material.aliases || []).some(alias => alias.toLowerCase() === enteredName)
-    );
+  const removeExcipientRow = useCallback((index: number) => {
+    setExcipients(prev => prev.filter((_, i) => i !== index));
+  }, []);
 
-    if (matchedMaterial) {
-      updateIngredient(index, 'materialId', matchedMaterial.id);
-      notify({ type: 'INFO', message: `Đã tự động liên kết "${currentIngredient.name}" với "${matchedMaterial.name}".` });
-    }
-  };
+  const updateExcipient = useCallback((index: number, field: string, value: any) => {
+    setExcipients(prev => {
+      const newExcs = [...prev];
+      let finalValue = value;
+      if ((field === 'declaredContent' || field === 'elementalContent') && typeof value === 'string') {
+        finalValue = autoFormatInput(value);
+      }
+      newExcs[index] = { ...newExcs[index], [field]: finalValue } as any;
+      return newExcs;
+    });
+  }, []);
 
-  // Excipient Helpers
-  const addExcipientRow = () => {
-    setExcipients([...excipients, { id: generateId('exc'), name: '', declaredContent: '', elementalContent: '', unit: 'mg', materialId: '' }]);
-  };
-
-  const removeExcipientRow = (index: number) => {
-    const newExcs = [...excipients];
-    newExcs.splice(index, 1);
-    setExcipients(newExcs);
-  };
-
-  const updateExcipient = (index: number, field: keyof FormulaIngredient | 'declaredContent' | 'elementalContent' | 'materialId', value: any) => {
-    const newExcs = [...excipients];
-    let finalValue = value;
-    if ((field === 'declaredContent' || field === 'elementalContent') && typeof value === 'string') {
-      finalValue = autoFormatInput(value);
-    }
-    newExcs[index] = { ...newExcs[index], [field]: finalValue };
-    setExcipients(newExcs);
-  };
-
-  const handleExcipientNameBlur = (index: number) => {
-    const currentExcipient = excipients[index];
-    if (!currentExcipient.name || currentExcipient.materialId) {
-      return;
-    }
-
-    const enteredName = currentExcipient.name.trim().toLowerCase();
-    const matchedMaterial = state.rawMaterials.find(material => 
-      material.name.toLowerCase() === enteredName || 
-      (material.aliases || []).some(alias => alias.toLowerCase() === enteredName)
-    );
-
-    if (matchedMaterial) {
-      updateExcipient(index, 'materialId', matchedMaterial.id);
-      notify({ type: 'INFO', message: `Đã tự động liên kết "${currentExcipient.name}" với "${matchedMaterial.name}".` });
-    }
-  };
-
-  const handleExtraChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    setExtraInfo({ ...extraInfo, [e.target.name]: e.target.value });
-  };
+  const handleExtraChange = useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setExtraInfo(prev => ({ ...prev, [name]: value }));
+  }, []);
 
   const handleView = (formula: ProductFormula) => {
     setViewFormula(formula);
@@ -277,15 +337,20 @@ const ProductFormulaList: React.FC = () => {
         <DSSearchInput 
           placeholder="Tìm theo tên hoặc mã sản phẩm..." 
           value={searchTerm} 
-          onChange={(e) => setSearchTerm(e.target.value)} 
+          onChange={(e) => setSearchTerm(e.target.value)}
+          onClear={() => setSearchTerm('')}
         />
         <DSViewToggle viewMode={viewMode} setViewMode={setViewMode} gridIcon={LayoutGrid} listIcon={List} />
       </DSFilterBar>
 
+      {currentItems.length === 0 ? (
+         <DSEmptyState icon={FileSearch} title="Không có Công thức" message="Chưa có dữ liệu Công thức sản phẩm nào khớp với tìm kiếm của bạn." />
+      ) : (
+        <>
       {viewMode === 'grid' ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {currentItems.map(formula => {
-            const product = state.products.find(p => p.id === formula.productId);
+            const product = products.find(p => p.id === formula.productId);
             return (
               <DSCard key={formula.id} className="p-5 flex flex-col group h-full hover:shadow-lg transition-all">
                 <div className="flex justify-between items-start mb-3">
@@ -331,7 +396,7 @@ const ProductFormulaList: React.FC = () => {
           </thead>
           <tbody className="divide-y divide-slate-50">
             {currentItems.map(formula => {
-              const product = state.products.find(p => p.id === formula.productId);
+              const product = products.find(p => p.id === formula.productId);
               return (
                 <tr key={formula.id} className="hover:bg-slate-50 transition-colors">
                   <td className="px-4 py-3 font-black text-slate-400 text-xs">{product?.code || '---'}</td>
@@ -357,15 +422,10 @@ const ProductFormulaList: React.FC = () => {
                 </tr>
               );
             })}
-            {currentItems.length === 0 && (
-              <tr>
-                <td colSpan={5} className="p-8 text-center text-slate-400 text-sm italic">
-                  Chưa có dữ liệu công thức nào.
-                </td>
-              </tr>
-            )}
           </tbody>
         </DSTable>
+      )}
+        </>
       )}
       
       <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
@@ -391,8 +451,8 @@ const ProductFormulaList: React.FC = () => {
                 className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl font-bold outline-none text-sm appearance-none disabled:opacity-60"
               >
                 <option value="">-- Chọn sản phẩm --</option>
-                {state.products
-                  .filter(p => crud.mode === 'EDIT' || !state.productFormulas?.some(f => f.productId === p.id)) // Filter out products that already have formulas in ADD mode
+                {products
+                  .filter(p => crud.mode === 'EDIT' || !productFormulas?.some(f => f.productId === p.id))
                   .map(p => (
                   <option key={p.id} value={p.id}>{p.code} - {p.name}</option>
                 ))}
@@ -426,66 +486,15 @@ const ProductFormulaList: React.FC = () => {
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {ingredients.map((ing, idx) => (
-                    <tr key={ing.id || idx} className="group hover:bg-white transition-colors">
-                      <td className="p-2">
-                        <input 
-                          type="text" 
-                          placeholder="VD: Vitamin C..." 
-                          value={ing.name}
-                          onChange={(e) => updateIngredient(idx, 'name', e.target.value)}
-                          onBlur={() => handleIngredientNameBlur(idx)}
-                          className="w-full bg-transparent font-bold text-sm outline-none placeholder:font-normal"
-                        />
-                      </td>
-                      <td className="p-2">
-                        <select
-                          value={ing.materialId || ''}
-                          onChange={(e) => updateIngredient(idx, 'materialId', e.target.value)}
-                          className="w-full bg-white border border-slate-200 rounded text-xs py-1 px-2 outline-none focus:border-indigo-500"
-                        >
-                          <option value="">-- Chọn --</option>
-                          {state.rawMaterials.filter(m => m.category === 'ACTIVE' || m.category === 'OTHER').map(m => (
-                            <option key={m.id} value={m.id}>{m.name}</option>
-                          ))}
-                        </select>
-                      </td>
-                      <td className="p-2">
-                        <input 
-                          type="text" 
-                          placeholder="0" 
-                          value={ing.declaredContent}
-                          onChange={(e) => updateIngredient(idx, 'declaredContent', e.target.value)}
-                          className="w-full bg-transparent font-mono font-bold text-sm outline-none text-right text-indigo-600"
-                        />
-                      </td>
-                      <td className="p-2">
-                        <input 
-                          type="text" 
-                          placeholder="-" 
-                          value={ing.elementalContent || ''}
-                          onChange={(e) => updateIngredient(idx, 'elementalContent', e.target.value)}
-                          className="w-full bg-transparent font-mono font-bold text-sm outline-none text-right text-blue-600"
-                        />
-                      </td>
-                      <td className="p-2">
-                        <input 
-                          type="text" 
-                          placeholder="mg" 
-                          value={ing.unit}
-                          onChange={(e) => updateIngredient(idx, 'unit', e.target.value)}
-                          className="w-full bg-transparent font-bold text-xs outline-none text-center text-slate-500"
-                        />
-                      </td>
-                      <td className="p-2 text-center">
-                        <button 
-                          type="button" 
-                          onClick={() => removeIngredientRow(idx)}
-                          className="text-slate-300 hover:text-red-500 transition-colors"
-                        >
-                          <X size={14} />
-                        </button>
-                      </td>
-                    </tr>
+                    <FormulaRow
+                      key={ing.id || idx}
+                      item={ing}
+                      index={idx}
+                      type="ingredient"
+                      rawMaterials={rawMaterials}
+                      onUpdate={updateIngredient}
+                      onRemove={removeIngredientRow}
+                    />
                   ))}
                   {ingredients.length === 0 && (
                     <tr>
@@ -526,60 +535,15 @@ const ProductFormulaList: React.FC = () => {
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {excipients.map((exc, idx) => (
-                    <tr key={exc.id || idx} className="group hover:bg-white transition-colors">
-                      <td className="p-2">
-                        <input 
-                          type="text" 
-                          placeholder="VD: Lactose, Tinh bột..." 
-                          value={exc.name}
-                          onChange={(e) => updateExcipient(idx, 'name', e.target.value)}
-                          onBlur={() => handleExcipientNameBlur(idx)}
-                          className="w-full bg-transparent font-bold text-sm outline-none placeholder:font-normal text-slate-600"
-                        />
-                      </td>
-                      <td className="p-2">
-                        <select
-                          value={exc.materialId || ''}
-                          onChange={(e) => updateExcipient(idx, 'materialId', e.target.value)}
-                          className="w-full bg-white border border-slate-200 rounded text-xs py-1 px-2 outline-none focus:border-indigo-500"
-                        >
-                          <option value="">-- Chọn --</option>
-                          {state.rawMaterials.filter(m => m.category === 'EXCIPIENT' || m.category === 'OTHER').map(m => (
-                            <option key={m.id} value={m.id}>{m.name}</option>
-                          ))}
-                        </select>
-                      </td>
-                      <td className="p-2">
-                        <input 
-                          type="text" 
-                          placeholder="-" 
-                          value={exc.declaredContent}
-                          onChange={(e) => updateExcipient(idx, 'declaredContent', e.target.value)}
-                          className="w-full bg-transparent font-mono font-bold text-sm outline-none text-right text-slate-600"
-                        />
-                      </td>
-                      <td className="p-2">
-                        <input 
-                          type="text" 
-                          placeholder="-" 
-                          value={exc.elementalContent || ''}
-                          onChange={(e) => updateExcipient(idx, 'elementalContent', e.target.value)}
-                          className="w-full bg-transparent font-mono font-bold text-sm outline-none text-right text-blue-600"
-                        />
-                      </td>
-                      <td className="p-2">
-                        <input 
-                          type="text" 
-                          placeholder="mg" 
-                          value={exc.unit}
-                          onChange={(e) => updateExcipient(idx, 'unit', e.target.value)}
-                          className="w-full bg-transparent font-bold text-xs outline-none text-center text-slate-400"
-                        />
-                      </td>
-                      <td className="p-2 text-center">
-                        <button type="button" onClick={() => removeExcipientRow(idx)} className="text-slate-300 hover:text-red-500 transition-colors"><X size={14} /></button>
-                      </td>
-                    </tr>
+                    <FormulaRow
+                      key={exc.id || idx}
+                      item={exc}
+                      index={idx}
+                      type="excipient"
+                      rawMaterials={rawMaterials}
+                      onUpdate={updateExcipient}
+                      onRemove={removeExcipientRow}
+                    />
                   ))}
                 </tbody>
               </table>
@@ -636,8 +600,8 @@ const ProductFormulaList: React.FC = () => {
              <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 flex items-center gap-3">
                 <div className="p-3 bg-white rounded-lg text-indigo-600 shadow-sm"><Package size={24}/></div>
                 <div>
-                  <h4 className="text-sm font-bold text-slate-700 uppercase">{state.products.find(p => p.id === viewFormula.productId)?.name}</h4>
-                  <p className="text-xs text-slate-500 font-bold">{state.products.find(p => p.id === viewFormula.productId)?.code}</p>
+                  <h4 className="text-sm font-bold text-slate-700 uppercase">{products.find(p => p.id === viewFormula.productId)?.name}</h4>
+                  <p className="text-xs text-slate-500 font-bold">{products.find(p => p.id === viewFormula.productId)?.code}</p>
                 </div>
              </div>
 
@@ -656,11 +620,11 @@ const ProductFormulaList: React.FC = () => {
                      </tr>
                    </thead>
                    <tbody className="divide-y divide-slate-50">
-                     {viewFormula.ingredients.map((ing, idx) => (
+                  {(viewFormula.ingredients || []).map((ing, idx) => (
                        <tr key={idx}>
                          <td className="px-4 py-2 font-medium text-slate-700">{ing.name}</td>
                          <td className="px-4 py-2 text-xs text-slate-500 italic">
-                           {state.rawMaterials.find(m => m.id === ing.materialId)?.name || '-'}
+                           {rawMaterials.find(m => m.id === ing.materialId)?.name || '-'}
                          </td>
                          <td className="px-4 py-2 text-right font-mono font-bold text-rose-600">
                            {formatScientific(ing.declaredContent)}
@@ -695,7 +659,7 @@ const ProductFormulaList: React.FC = () => {
                        <tr key={idx}>
                          <td className="px-4 py-2 font-medium text-slate-600">{exc.name}</td>
                          <td className="px-4 py-2 text-xs text-slate-500 italic">
-                           {state.rawMaterials.find(m => m.id === exc.materialId)?.name || '-'}
+                           {rawMaterials.find(m => m.id === exc.materialId)?.name || '-'}
                          </td>
                          <td className="px-4 py-2 text-right font-mono font-bold text-slate-600">{formatScientific(exc.declaredContent)}</td>
                          <td className="px-4 py-2 text-right font-mono font-bold text-blue-600">
@@ -733,7 +697,7 @@ const ProductFormulaList: React.FC = () => {
         isOpen={crud.mode === 'DELETE'} 
         onClose={crud.close} 
         onConfirm={handleDelete} 
-        itemName={crud.selectedItem ? state.products.find(p => p.id === crud.selectedItem?.productId)?.name : ''}
+        itemName={crud.selectedItem ? products.find(p => p.id === crud.selectedItem?.productId)?.name : ''}
         warningMessage="Việc xóa công thức sẽ làm mất khả năng tính toán tỷ lệ % trên các phiếu kiểm nghiệm cũ và mới."
       />
     </div>

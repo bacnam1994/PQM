@@ -1,31 +1,51 @@
 
 import React, { useState, useMemo } from 'react';
-import { useAppContext } from '../context/AppContext';
+import { useAppStore } from '../store/useAppStore';
 import { Warehouse, LogIn, ShoppingCart, Search, Hash, ArrowUpRight, ArrowDownLeft, Boxes } from 'lucide-react';
 import { InventoryIn, InventoryOut, Batch } from '../types';
 import { PageHeader, StatusBadge, Modal } from '../components/CommonUI';
+import { generateId } from '../utils';
 
 const InventoryManagement: React.FC = () => {
-  const { state, stockMap, addInventoryIn, addInventoryOut } = useAppContext();
+  const inventoryIn = useAppStore(state => state.inventoryIn);
+  const inventoryOut = useAppStore(state => state.inventoryOut);
+  const batches = useAppStore(state => state.batches);
+  const products = useAppStore(state => state.products);
+  const addInventoryIn = useAppStore(state => state.addInventoryIn);
+  const addInventoryOut = useAppStore(state => state.addInventoryOut);
+
+  const stockMap = useMemo(() => {
+    const map = new Map<string, any>();
+    inventoryIn.forEach(i => {
+      const current = map.get(i.batchId) || { totalIn: 0, totalOut: 0, currentStock: 0 };
+      map.set(i.batchId, { ...current, totalIn: current.totalIn + i.quantity, currentStock: current.currentStock + i.quantity });
+    });
+    inventoryOut.forEach(o => {
+      const current = map.get(o.batchId) || { totalIn: 0, totalOut: 0, currentStock: 0 };
+      map.set(o.batchId, { ...current, totalOut: current.totalOut + o.quantity, currentStock: current.currentStock - o.quantity });
+    });
+    return map;
+  }, [inventoryIn, inventoryOut]);
+
   const [activeTab, setActiveTab] = useState<'stock' | 'in' | 'out'>('stock');
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalInOpen, setIsModalInOpen] = useState(false);
   const [isModalOutOpen, setIsModalOutOpen] = useState(false);
 
   const stockSummary = useMemo(() => {
-    return state.batches.map(batch => {
-      const product = state.products.find(p => p.id === batch.productId);
+    return batches.map(batch => {
+      const product = products.find(p => p.id === batch.productId);
       const stock = stockMap.get(batch.id) || { totalIn: 0, totalOut: 0, currentStock: 0 };
       return { ...batch, productName: product?.name || 'Unknown', totalIn: stock.totalIn, totalOut: stock.totalOut, currentStock: stock.currentStock };
     }).filter(s => s.batchNo.toLowerCase().includes(searchTerm.toLowerCase()) || s.productName.toLowerCase().includes(searchTerm.toLowerCase()))
     .sort((a, b) => b.currentStock - a.currentStock);
-  }, [state.batches, state.products, stockMap, searchTerm]);
+  }, [batches, products, stockMap, searchTerm]);
 
   const handleSaveIn = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
     addInventoryIn({ 
-      id: crypto.randomUUID(), batchId: formData.get('batchId') as string, 
+      id: generateId('inv'), batchId: formData.get('batchId') as string, 
       quantity: parseFloat(formData.get('quantity') as string), 
       inDate: formData.get('inDate') as string, note: formData.get('note') as string, 
       createdAt: new Date().toISOString() 
@@ -37,7 +57,7 @@ const InventoryManagement: React.FC = () => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
     addInventoryOut({ 
-      id: crypto.randomUUID(), batchId: formData.get('batchId') as string, 
+      id: generateId('out'), batchId: formData.get('batchId') as string, 
       quantity: parseFloat(formData.get('quantity') as string), 
       outDate: formData.get('outDate') as string, receiver: formData.get('receiver') as string, 
       createdAt: new Date().toISOString() 
@@ -98,7 +118,7 @@ const InventoryManagement: React.FC = () => {
         <form onSubmit={handleSaveIn} className="space-y-4">
           <select name="batchId" required className="w-full px-4 py-3 bg-slate-50 border rounded-xl font-bold">
             <option value="">-- CHỌN LÔ --</option>
-            {state.batches.filter(b => b.status !== 'REJECTED').map(b => <option key={b.id} value={b.id}>{b.batchNo}</option>)}
+            {batches.filter(b => b.status !== 'REJECTED').map(b => <option key={b.id} value={b.id}>{b.batchNo}</option>)}
           </select>
           <div className="grid grid-cols-2 gap-4">
             <input type="date" name="inDate" required defaultValue={new Date().toISOString().split('T')[0]} className="px-4 py-3 bg-slate-50 border rounded-xl" />
@@ -112,7 +132,7 @@ const InventoryManagement: React.FC = () => {
         <form onSubmit={handleSaveOut} className="space-y-4">
           <select name="batchId" required className="w-full px-4 py-3 bg-slate-50 border rounded-xl font-bold">
             <option value="">-- CHỌN LÔ --</option>
-            {state.batches.filter(b => b.status === 'RELEASED').map(b => <option key={b.id} value={b.id}>{b.batchNo}</option>)}
+            {batches.filter(b => b.status === 'RELEASED').map(b => <option key={b.id} value={b.id}>{b.batchNo}</option>)}
           </select>
           <div className="grid grid-cols-2 gap-4">
             <input type="date" name="outDate" required defaultValue={new Date().toISOString().split('T')[0]} className="px-4 py-3 bg-slate-50 border rounded-xl" />

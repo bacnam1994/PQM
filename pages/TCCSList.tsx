@@ -1,26 +1,18 @@
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
-import { useAppContext } from '../context/AppContext';
-import { useAuth } from '../context/AuthContext';
+import { useAppStore } from '../store/useAppStore';
 import { 
-  Plus, Search, FileText, ChevronDown, Trash2, 
-  Calendar, Package, Layers, Beaker, ShieldCheck, Keyboard,
-  X, Info, ListPlus, Box, Wand2, Eye, Type as TypeIcon, Hash as HashIcon, LayoutGrid, List, CornerDownRight, ArrowRightLeft, Loader2, FlaskConical,
-  CheckCircle2, Clock, Copy, Filter, ChevronRight, Activity, Thermometer, BookOpen, Edit2, History, GitCompare, ArrowRight, ArrowUpDown, ChevronLeft
+  Plus, Search, FileText, ChevronDown, Trash2,
+  Calendar, Package, Layers, Beaker, ShieldCheck,
+  X, Info, Eye, LayoutGrid, List, CornerDownRight, ArrowRightLeft, Loader2, FlaskConical,
+  CheckCircle2, Clock, Copy, Filter, Activity, Thermometer, Edit2, History, GitCompare, ArrowRight, ArrowUpDown
 } from 'lucide-react';
 import { CriterionType, TCCS, Product, Criterion, TestResultEntry } from '../types';
-import { StatusBadge, PageHeader, Modal, Pagination } from '../components/CommonUI';
-import { DSFilterBar, DSSearchInput, DSSelect, DSViewToggle, DSCard, DSTable } from '../components/DesignSystem';
-import { useForm } from '../hooks/useForm';
-import { useLocalStorage } from '../hooks/useLocalStorage';
-import { useCrud } from '../hooks/useCrud';
-import { ActionButtons, DeleteModal, AddButton } from '../components/CrudControls';
 import { logAuditAction } from '../services/auditService';
-import { parseFlexibleValue, ensureArray } from '../utils/parsing';
-import { useFormDraft } from '../hooks/useFormDraft';
-import SpecialCharToolbar from '../components/SpecialCharToolbar';
-import { generateId } from '../utils/idGenerator';
-import { normalizeNumericString } from '../utils/criteriaEvaluation';
+import { StatusBadge, PageHeader, Modal, Pagination, DSFilterBar, DSSearchInput, DSSelect, DSViewToggle, DSCard, DSTable, ActionButtons, DeleteModal, AddButton, SpecialCharToolbar } from '../components';
+import { useForm, useCrud, useFormDraft } from '../hooks';
+import { useUIStore } from '../store/useUIStore';
+import { parseFlexibleValue, ensureArray, generateId, normalizeNumericString } from '../utils';
 
 const calculateRangePreview = (text: string): string | null => {
   const fmt = (n: number): string => {
@@ -121,7 +113,7 @@ const SensoryBox: React.FC<{ label: string; value: string }> = ({ label, value }
   </div>
 );
 
-const TCCSGridItem = ({ tccs, product, isExpanded, onExpand, onView, onClone, onEdit, onDelete, handleViewHistory, isAdmin }: any) => {
+const TCCSGridItem = React.memo(({ tccs, product, isExpanded, onExpand, onView, onClone, onEdit, onDelete, handleViewHistory, isAdmin }: any) => {
   return (
     <DSCard isExpanded={isExpanded} className={`group ${isExpanded ? 'md:col-span-2 xl:col-span-3' : ''}`}>
       <div className="p-5 flex flex-col gap-4">
@@ -187,9 +179,9 @@ const TCCSGridItem = ({ tccs, product, isExpanded, onExpand, onView, onClone, on
       )}
     </DSCard>
   );
-};
+});
 
-const TCCSListItem = ({ tccs, product, onView, onClone, onEdit, onDelete, isAdmin }: any) => (
+const TCCSListItem = React.memo(({ tccs, product, onView, onClone, onEdit, onDelete, isAdmin }: any) => (
   <tr className="hover:bg-slate-50 transition-colors">
     <td className="px-4 py-3 font-black text-slate-800">{tccs.code}</td>
     <td className="px-4 py-3 font-bold text-slate-600">{product?.name}</td>
@@ -208,7 +200,7 @@ const TCCSListItem = ({ tccs, product, onView, onClone, onEdit, onDelete, isAdmi
       </div>
     </td>
   </tr>
-);
+));
 
 const TCCSDataList = ({ viewMode, data, products, expandedIds, onExpand, onView, onClone, onEdit, onDelete, handleViewHistory, isAdmin }: any) => {
   if (viewMode === 'grid') {
@@ -249,8 +241,16 @@ const TCCSDataList = ({ viewMode, data, products, expandedIds, onExpand, onView,
 };
 
 const TCCSList: React.FC = () => {
-  const { state, addTCCS, updateTCCS, deleteTCCS, isAdmin, notify } = useAppContext();
-  const { user } = useAuth();
+  const products = useAppStore(s => s.products);
+  const tccsList = useAppStore(s => s.tccsList);
+  const batches = useAppStore(s => s.batches);
+  const productFormulas = useAppStore(s => s.productFormulas);
+  const addTCCS = useAppStore(s => s.addTCCS);
+  const updateTCCS = useAppStore(s => s.updateTCCS);
+  const deleteTCCS = useAppStore(s => s.deleteTCCS);
+  const isAdmin = useAppStore(s => s.isAdmin);
+  const notify = useAppStore(s => s.notify);
+  const user = useAppStore(s => s.user);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterProductId, setFilterProductId] = useState('');
   const [filterStatus, setFilterStatus] = useState<'ALL' | 'ACTIVE' | 'INACTIVE'>('ALL');
@@ -263,7 +263,8 @@ const TCCSList: React.FC = () => {
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [productSearch, setProductSearch] = useState('');
   const [showProductDropdown, setShowProductDropdown] = useState(false);
-  const [viewMode, setViewMode] = useLocalStorage<'grid' | 'list'>('tccs_view_mode', 'grid');
+  const viewMode = useUIStore(s => s.tccsViewMode);
+  const setViewMode = useUIStore(s => s.setTccsViewMode);
   const [filterMonth, setFilterMonth] = useState<string>('ALL');
   const [filterYear, setFilterYear] = useState<string>('ALL');
   const [currentPage, setCurrentPage] = useState(1);
@@ -293,7 +294,7 @@ const TCCSList: React.FC = () => {
       return;
     }
 
-    const formula = state.productFormulas.find(f => f.productId === formValues.productId);
+    const formula = productFormulas.find(f => f.productId === formValues.productId);
 
     if (!formula || !formula.ingredients || formula.ingredients.length === 0) {
       notify({ type: 'INFO', message: 'Sản phẩm này chưa có công thức hoặc công thức không có hoạt chất nào.' });
@@ -327,7 +328,7 @@ const TCCSList: React.FC = () => {
     onDraftLoaded: (data) => {
       setIsCloning(true); // Chặn auto-fill đè lên draft
       if (data.productId) {
-        const p = state.products.find(x => x.id === data.productId);
+        const p = products.find(x => x.id === data.productId);
         if (p) setProductSearch(`${p.code} - ${p.name}`);
       }
     }
@@ -337,7 +338,7 @@ const TCCSList: React.FC = () => {
   useEffect(() => {
     // Chỉ tự động điền nếu KHÔNG phải đang trong chế độ Copy (Cloning)
     if (formValues.productId && crud.mode === 'ADD' && !isCloning) {
-      const latestVersion = state.tccsList
+      const latestVersion = tccsList
         .filter(t => t.productId === formValues.productId)
         .sort((a, b) => new Date(b.issueDate).getTime() - new Date(a.issueDate).getTime())[0];
 
@@ -351,13 +352,15 @@ const TCCSList: React.FC = () => {
         }));
       }
     }
-  }, [formValues.productId, crud.mode, state.tccsList, setFormValues, isCloning]);
+  }, [formValues.productId, crud.mode, tccsList, setFormValues, isCloning]);
 
-  const toggleExpand = (id: string) => {
-    const next = new Set(expandedIds);
-    if (next.has(id)) next.delete(id); else next.add(id);
-    setExpandedIds(next);
-  };
+  const toggleExpand = useCallback((id: string) => {
+    setExpandedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }, []);
 
   const handleAddTCCS = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -402,7 +405,7 @@ const TCCSList: React.FC = () => {
     
     setIsSubmitting(true);
     try {
-      const existingTCCS = state.tccsList.find(t => t.id === crud.selectedItem?.id);
+      const existingTCCS = tccsList.find(t => t.id === crud.selectedItem?.id);
       if (!existingTCCS) return;
 
       const updatedTCCS: TCCS = {
@@ -430,15 +433,15 @@ const TCCSList: React.FC = () => {
     }
   };
 
-  const handleDeleteTCCS = async (tccs: TCCS) => {
+  const handleDeleteTCCS = useCallback(async (tccs: TCCS) => {
     // Check if the TCCS is used by any valid batch object
-    const isUsed = state.batches.some(b => b && b.tccsId === tccs.id);
+    const isUsed = batches.some(b => b && b.tccsId === tccs.id);
     if (isUsed) {
       notify({ type: 'WARNING', title: 'Không thể xóa', message: 'TCCS này đang được sử dụng bởi một hoặc nhiều Lô sản xuất.' });
       return;
     }
     crud.openDelete(tccs);
-  };
+  }, [batches, notify, crud]);
 
   const handleConfirmDelete = useCallback(async () => {
     if (crud.selectedItem) {
@@ -446,15 +449,15 @@ const TCCSList: React.FC = () => {
         await deleteTCCS(crud.selectedItem.id);
         // Đóng modal ngay khi xóa thành công
         crud.close();
-        notify({ type: 'SUCCESS', title: 'Đã xóa', message: `Đã xóa TCCS ${crud.selectedItem.code}` });
+        notify({ type: 'SUCCESS', title: 'Đã xóa', message: `Đã xóa TCCS ${crud.selectedItem!.code}` });
         
         // Ghi log an toàn
         try {
           logAuditAction({
             action: 'DELETE',
             collection: 'TCCS',
-            documentId: crud.selectedItem.id,
-            details: `Xóa TCCS: ${crud.selectedItem.code}`,
+            documentId: crud.selectedItem!.id,
+            details: `Xóa TCCS: ${crud.selectedItem!.code}`,
             performedBy: user?.email || 'unknown'
           });
         } catch (logErr) {
@@ -481,20 +484,20 @@ const TCCSList: React.FC = () => {
     resetHookForm();
   };
 
-  const handleEdit = (tccs: TCCS) => {
+  const handleEdit = useCallback((tccs: TCCS) => {
     crud.openEdit(tccs);
-    const product = state.products.find(p => p.id === tccs.productId);
+    const product = products.find(p => p.id === tccs.productId);
     setProductSearch(product ? `${product.code} - ${product.name}` : '');
     
     const HEAVY_METAL_KEYWORDS = ['asen', 'chì', 'thủy ngân', 'cadmi'];
-    const micro = tccs.safetyCriteria.filter(c => {
+    const micro = (tccs.safetyCriteria || []).filter(c => {
         if (!c) return false;
         const nameLower = (c.name || '').toLowerCase();
         if ((c as any).category === 'micro') return true;
         if (!(c as any).category && !HEAVY_METAL_KEYWORDS.some(kw => nameLower.includes(kw))) return true;
         return false;
     });
-    const metal = tccs.safetyCriteria.filter(c => {
+    const metal = (tccs.safetyCriteria || []).filter(c => {
         if (!c) return false;
         const nameLower = (c.name || '').toLowerCase();
         if ((c as any).category === 'metal') return true;
@@ -511,13 +514,13 @@ const TCCSList: React.FC = () => {
       heavyMetalCriteria: metal && metal.length > 0 ? metal : initialTccsFormState.heavyMetalCriteria,
       alternateRules: (tccs as any).alternateRules || [],
     });
-  };
+  }, [crud, products, setFormValues]);
 
-  const handleClone = (tccs: TCCS) => {
+  const handleClone = useCallback((tccs: TCCS) => {
     setIsCloning(true); // Đánh dấu đang Copy để chặn auto-fill
     crud.openAdd();
     
-    const product = state.products.find(p => p.id === tccs.productId);
+    const product = products.find(p => p.id === tccs.productId);
     setProductSearch(product ? `${product.code} - ${product.name}` : '');
     
     const HEAVY_METAL_KEYWORDS = ['asen', 'chì', 'thủy ngân', 'cadmi'];
@@ -546,24 +549,24 @@ const TCCSList: React.FC = () => {
       heavyMetalCriteria: metal.length > 0 ? metal : initialTccsFormState.heavyMetalCriteria,
       alternateRules: ((tccs as any).alternateRules || []).map((r: any) => ({...r})),
     });
-  };
+  }, [crud, products, setFormValues]);
 
-  const handleViewHistory = (pid: string) => {
+  const handleViewHistory = useCallback((pid: string) => {
     setHistoryProductId(pid);
     setCompareSelection([]);
     setIsHistoryModalOpen(true);
-  };
+  }, []);
 
-  const handleView = (tccs: TCCS) => {
+  const handleView = useCallback((tccs: TCCS) => {
     setViewTccs(tccs);
-  };
+  }, []);
 
   const historyVersions = useMemo(() => {
     if (!historyProductId) return [];
-    return state.tccsList
+    return tccsList
       .filter(t => t.productId === historyProductId)
       .sort((a, b) => new Date(b.issueDate).getTime() - new Date(a.issueDate).getTime());
-  }, [state.tccsList, historyProductId]);
+  }, [tccsList, historyProductId]);
 
   const toggleCompareSelection = (id: string) => {
     setCompareSelection(prev => {
@@ -575,15 +578,17 @@ const TCCSList: React.FC = () => {
 
   const compareVersions = useMemo(() => {
     if (compareSelection.length !== 2) return null;
-    const v1 = state.tccsList.find(t => t.id === compareSelection[0]);
-    const v2 = state.tccsList.find(t => t.id === compareSelection[1]);
+    const v1 = tccsList.find(t => t.id === compareSelection[0]);
+    const v2 = tccsList.find(t => t.id === compareSelection[1]);
     if (!v1 || !v2) return null;
     return new Date(v1.issueDate) < new Date(v2.issueDate) ? [v1, v2] : [v2, v1];
-  }, [compareSelection, state.tccsList]);
+  }, [compareSelection, tccsList]);
 
   const filteredTCCS = useMemo(() => {
-    return state.tccsList.filter(t => {
-      const p = state.products.find(prod => prod.id === t.productId);
+    const productMap = new Map(products.map(p => [p.id, p]));
+
+    return tccsList.filter(t => {
+      const p = productMap.get(t.productId);
       const matchesSearch = t.code.toLowerCase().includes(searchTerm.toLowerCase()) || (p?.name || '').toLowerCase().includes(searchTerm.toLowerCase());
       const matchesProduct = !filterProductId || t.productId === filterProductId;
       const matchesStatus = filterStatus === 'ALL' ? true : filterStatus === 'ACTIVE' ? t.isActive : !t.isActive;
@@ -601,7 +606,7 @@ const TCCSList: React.FC = () => {
       const dateB = new Date(b.issueDate).getTime();
       return sortConfig.direction === 'asc' ? dateA - dateB : dateB - dateA;
     });
-  }, [state.tccsList, state.products, searchTerm, filterProductId, filterStatus, sortConfig, filterMonth, filterYear]);
+  }, [tccsList, products, searchTerm, filterProductId, filterStatus, sortConfig, filterMonth, filterYear]);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -633,12 +638,12 @@ const TCCSList: React.FC = () => {
 
   const allCriteriaNames = useMemo(() => {
     const names = new Set<string>();
-    state.tccsList.forEach(tccs => {
+    tccsList.forEach(tccs => {
         (tccs.mainQualityCriteria || []).forEach(c => c && c.name && names.add(c.name));
         (tccs.safetyCriteria || []).forEach(c => c && c.name && names.add(c.name));
     });
     return Array.from(names).sort();
-  }, [state.tccsList]);
+  }, [tccsList]);
 
   // Helper lấy danh sách tất cả tên chỉ tiêu hiện tại để bind vào dropdown
   const getAllCurrentCriteriaNames = () => {
@@ -691,12 +696,12 @@ const TCCSList: React.FC = () => {
             
             {showProductDropdown && crud.mode !== 'EDIT' && (
               <div className="absolute z-20 w-full mt-2 bg-white rounded-xl shadow-2xl border border-slate-100 max-h-60 overflow-y-auto">
-                {state.products.filter(p => 
+                {products.filter(p => 
                   !productSearch || 
                   p.name.toLowerCase().includes(productSearch.toLowerCase()) || 
                   p.code.toLowerCase().includes(productSearch.toLowerCase())
                 ).length > 0 ? (
-                  state.products.filter(p => 
+                  products.filter(p => 
                     !productSearch || 
                     p.name.toLowerCase().includes(productSearch.toLowerCase()) || 
                     p.code.toLowerCase().includes(productSearch.toLowerCase())
@@ -972,7 +977,7 @@ const TCCSList: React.FC = () => {
 
         <DSSelect value={filterYear} onChange={(e) => setFilterYear(e.target.value)} className="w-24">
           <option value="ALL">Năm</option>
-          {Array.from(new Set(state.tccsList.map(t => new Date(t.issueDate).getFullYear()))).sort((a: number, b: number) => b - a).map(y => <option key={y} value={y}>{y}</option>)}
+        {Array.from(new Set(tccsList.map(t => new Date(t.issueDate).getFullYear()))).sort((a, b) => (b as number) - (a as number)).map(y => <option key={String(y)} value={String(y)}>{y}</option>)}
         </DSSelect>
 
         <DSSelect value={filterMonth} onChange={(e) => setFilterMonth(e.target.value)} className="w-24">
@@ -982,7 +987,7 @@ const TCCSList: React.FC = () => {
 
         <DSSelect value={filterProductId} onChange={(e) => setFilterProductId(e.target.value)} className="w-full md:w-48">
           <option value="">Tất cả sản phẩm</option>
-          {state.products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+        {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
         </DSSelect>
 
         <DSSelect icon={ArrowUpDown} value={`${sortConfig.key}-${sortConfig.direction}`} onChange={(e) => {
@@ -1001,7 +1006,7 @@ const TCCSList: React.FC = () => {
       <TCCSDataList 
         viewMode={viewMode}
         data={paginatedTCCS}
-        products={state.products}
+      products={products}
         expandedIds={expandedIds}
         onExpand={toggleExpand}
         onView={handleView}
@@ -1032,7 +1037,7 @@ const TCCSList: React.FC = () => {
         {viewTccs ? (
           <div className="space-y-6 max-h-[70vh] overflow-y-auto pr-2 custom-scrollbar text-sm">
             <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 space-y-2">
-              <p><span className="font-bold text-slate-500">Sản phẩm:</span> <span className="font-bold text-slate-800">{state.products.find(p => p.id === viewTccs.productId)?.name}</span></p>
+          <p><span className="font-bold text-slate-500">Sản phẩm:</span> <span className="font-bold text-slate-800">{products.find(p => p.id === viewTccs.productId)?.name}</span></p>
               <p><span className="font-bold text-slate-500">Ngày ban hành:</span> <span className="font-medium">{new Date(viewTccs.issueDate).toLocaleDateString('en-GB')}</span></p>
             </div>
 

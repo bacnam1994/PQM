@@ -1,8 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { useAppContext } from '../context/AppContext';
-import { useTestResultContext } from '../context/TestResultContext';
+import { useAppStore } from '../store/useAppStore';
 import { 
   ChevronLeft, Info, FileText, History, BarChart3, ArrowRight,
   Plus, Beaker, Calendar, Tag, Hash, Activity, CheckCircle2,
@@ -10,7 +9,7 @@ import {
 } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { ProductStatus } from '../types';
-import { parseNumberFromText } from '../utils/criteriaEvaluation';
+import { parseNumberFromText } from '../utils';
 
 // Helper: Format số sang dạng mũ (VD: 1000 -> 10³)
 const formatScientific = (value: string | number) => {
@@ -39,20 +38,23 @@ const formatScientific = (value: string | number) => {
 const ProductDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { state } = useAppContext();
-  const { testResults } = useTestResultContext();
+  const products = useAppStore(state => state.products);
+  const tccsList = useAppStore(state => state.tccsList);
+  const productFormulas = useAppStore(state => state.productFormulas);
+  const batches = useAppStore(state => state.batches);
+  const testResults = useAppStore(state => state.testResults);
   const [activeTab, setActiveTab] = useState<'info' | 'formula' | 'tccs' | 'history' | 'analytics'>('info');
   
-  const product = state.products.find(p => p.id === id);
-  const productTCCSList = state.tccsList.filter(t => t.productId === id).sort((a, b) => new Date(b.issueDate).getTime() - new Date(a.issueDate).getTime());
-  const productFormula = state.productFormulas.find(f => f.productId === id);
+  const product = products.find(p => p.id === id);
+  const productTCCSList = tccsList.filter(t => t.productId === id).sort((a, b) => new Date(b.issueDate).getTime() - new Date(a.issueDate).getTime());
+  const productFormula = productFormulas.find(f => f.productId === id);
   
   const productResults = useMemo(() => 
     testResults.filter(r => {
-      const b = state.batches.find(batch => batch.id === r.batchId);
+      const b = batches.find(batch => batch.id === r.batchId);
       return b?.productId === id;
     }).sort((a, b) => new Date(b.testDate).getTime() - new Date(a.testDate).getTime())
-  , [testResults, state.batches, id]);
+  , [testResults, batches, id]);
 
   const [selectedCriterion, setSelectedCriterion] = useState<string>('');
   
@@ -69,7 +71,7 @@ const ProductDetail: React.FC = () => {
     if (!selectedCriterion) return [];
     const batchMap = new Map<string, any>();
     [...productResults].reverse().forEach(res => {
-      const batch = state.batches.find(b => b.id === res.batchId);
+      const batch = batches.find(b => b.id === res.batchId);
       const match = res.results.find(r => r.criteriaName === selectedCriterion);
       if (match && typeof match.value === 'number' && batch) {
         const existing = batchMap.get(batch.batchNo) || { name: batch.batchNo };
@@ -78,9 +80,9 @@ const ProductDetail: React.FC = () => {
       }
     });
     return Array.from(batchMap.values());
-  }, [productResults, selectedCriterion, state.batches]);
+  }, [productResults, selectedCriterion, batches]);
 
-  const labs = Array.from(new Set(productResults.map(r => r.labName)));
+  const labs: string[] = Array.from(new Set(productResults.map(r => r.labName)));
   const labColors = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#ec4899'];
 
   const getStatusBadge = (status: ProductStatus) => {
@@ -272,7 +274,7 @@ const ProductDetail: React.FC = () => {
             </thead>
             <tbody className="divide-y divide-slate-50">
               {productResults.map(res => {
-                const batch = state.batches.find(b => b.id === res.batchId);
+                const batch = batches.find(b => b.id === res.batchId);
                 return (
                   <tr key={res.id} className="hover:bg-slate-50 transition-colors">
                     <td className="py-4 font-bold text-slate-700 uppercase">{batch?.batchNo || '---'}</td>

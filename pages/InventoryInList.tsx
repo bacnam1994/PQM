@@ -1,14 +1,19 @@
 
 import React, { useState, useMemo } from 'react';
-import { useAppContext } from '../context/AppContext';
+import { useAppStore } from '../store/useAppStore';
 import { 
   LogIn, Plus, Search, Calendar, Trash2, CheckCircle2,
-  Hash, Scale, X, Filter, Package, ArrowDownLeft, History
+  Hash, X, Filter, History
 } from 'lucide-react';
 import { InventoryIn } from '../types';
 
 const InventoryInList: React.FC = () => {
-  const { state, addInventoryIn, deleteInventoryIn } = useAppContext();
+  const inventoryIn = useAppStore(state => state.inventoryIn);
+  const batches = useAppStore(state => state.batches);
+  const products = useAppStore(state => state.products);
+  const addInventoryIn = useAppStore(state => state.addInventoryIn);
+  const deleteInventoryIn = useAppStore(state => state.deleteInventoryIn);
+
   const [searchTerm, setSearchTerm] = useState('');
   const [filterProductId, setFilterProductId] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -16,18 +21,21 @@ const InventoryInList: React.FC = () => {
   const [batchSearch, setBatchSearch] = useState('');
   const [showBatchDropdown, setShowBatchDropdown] = useState(false);
 
+  const batchMap = useMemo(() => new Map(batches.map(b => [b.id, b])), [batches]);
+  const productMap = useMemo(() => new Map(products.map(p => [p.id, p])), [products]);
+
   const filteredRecords = useMemo(() => {
-    return state.inventoryIn.filter(record => {
-      const batch = state.batches.find(b => b.id === record.batchId);
-      const product = state.products.find(p => p.id === batch?.productId);
+    return inventoryIn.filter(record => {
+      const batch = batchMap.get(record.batchId);
+      const product = productMap.get(batch?.productId || '');
       
       const matchesSearch = batch?.batchNo.toLowerCase().includes(searchTerm.toLowerCase()) || 
-             product?.name.toLowerCase().includes(searchTerm.toLowerCase());
+             (product?.name || '').toLowerCase().includes(searchTerm.toLowerCase());
       const matchesProduct = filterProductId === '' || batch?.productId === filterProductId;
       
       return matchesSearch && matchesProduct;
     }).sort((a, b) => new Date(b.inDate).getTime() - new Date(a.inDate).getTime());
-  }, [state.inventoryIn, state.batches, state.products, searchTerm, filterProductId]);
+  }, [inventoryIn, batchMap, productMap, searchTerm, filterProductId]);
 
   const handleSaveIn = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -83,7 +91,7 @@ const InventoryInList: React.FC = () => {
             className="w-full md:w-64 px-4 py-3 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500 bg-white transition-all font-medium text-slate-700"
           >
             <option value="">Tất cả sản phẩm</option>
-            {state.products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+            {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
         </div>
       </div>
@@ -101,8 +109,8 @@ const InventoryInList: React.FC = () => {
             </thead>
             <tbody className="divide-y divide-slate-50">
               {filteredRecords.map(record => {
-                const batch = state.batches.find(b => b.id === record.batchId);
-                const product = state.products.find(p => p.id === batch?.productId);
+                const batch = batchMap.get(record.batchId);
+                const product = productMap.get(batch?.productId || '');
                 return (
                   <tr key={record.id} className="hover:bg-slate-50 transition-colors">
                     <td className="px-8 py-5">
@@ -173,8 +181,8 @@ const InventoryInList: React.FC = () => {
                    
                    {showBatchDropdown && (
                      <div className="absolute z-20 w-full mt-2 bg-white rounded-xl shadow-2xl border border-slate-100 max-h-60 overflow-y-auto">
-                       {state.batches.filter(b => (b.status === 'RELEASED' || b.status === 'PENDING') && (!batchSearch || b.batchNo.toLowerCase().includes(batchSearch.toLowerCase()) || state.products.find(p => p.id === b.productId)?.name.toLowerCase().includes(batchSearch.toLowerCase()))).map(b => {
-                         const p = state.products.find(prod => prod.id === b.productId);
+                       {batches.filter(b => (b.status === 'RELEASED' || b.status === 'PENDING') && (!batchSearch || b.batchNo.toLowerCase().includes(batchSearch.toLowerCase()) || (productMap.get(b.productId)?.name || '').toLowerCase().includes(batchSearch.toLowerCase()))).map(b => {
+                         const p = productMap.get(b.productId);
                          return (
                            <div 
                              key={b.id}

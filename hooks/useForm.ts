@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 
 type Validator<T> = (values: T) => Partial<Record<keyof T, string>>;
 
@@ -65,7 +65,7 @@ export function useForm<T>(initialValues: T, validator?: Validator<T>) {
     });
   }, []);
 
-  return {
+  return useMemo(() => ({
     values,
     errors,
     setValues,
@@ -78,5 +78,16 @@ export function useForm<T>(initialValues: T, validator?: Validator<T>) {
     addToArray,
     removeFromArray,
     updateInArray,
-  };
+  }), [
+    values, 
+    errors, 
+    resetForm, 
+    validate, 
+    handleChange, 
+    setFieldValue, 
+    setMapValue, 
+    addToArray, 
+    removeFromArray, 
+    updateInArray
+  ]);
 }

@@ -1,12 +1,15 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { useAppContext } from '../context/AppContext';
+import { useAppStore } from '../store/useAppStore';
 import { GitBranch, AlertTriangle, User, Cpu, Box, Settings, Thermometer, Ruler, FileText, ChevronRight, Hash } from 'lucide-react';
 import { TestResult, Batch } from '../types';
 
 const FishboneAnalysis: React.FC = () => {
-  const { state } = useAppContext();
+  const testResults = useAppStore(state => state.testResults);
+  const batches = useAppStore(state => state.batches);
+  const products = useAppStore(state => state.products);
+  const tccsList = useAppStore(state => state.tccsList);
   const [searchParams] = useSearchParams();
   const [selectedResultId, setSelectedResultId] = useState<string>('');
 
@@ -19,23 +22,23 @@ const FishboneAnalysis: React.FC = () => {
   }, [searchParams]);
 
   const failResults = useMemo(() => 
-    state.testResults.filter(r => r.overallStatus === 'FAIL'), 
-    [state.testResults]
+    testResults.filter(r => r.overallStatus === 'FAIL'), 
+    [testResults]
   );
 
   const selectedResult = useMemo(() => 
-    state.testResults.find(r => r.id === selectedResultId),
-    [state.testResults, selectedResultId]
+    testResults.find(r => r.id === selectedResultId),
+    [testResults, selectedResultId]
   );
 
   const selectedBatch = useMemo(() => 
-    state.batches.find(b => b.id === selectedResult?.batchId),
-    [state.batches, selectedResult]
+    batches.find(b => b.id === selectedResult?.batchId),
+    [batches, selectedResult]
   );
 
   const product = useMemo(() => 
-    state.products.find(p => p.id === selectedBatch?.productId),
-    [state.products, selectedBatch]
+    products.find(p => p.id === selectedBatch?.productId),
+    [products, selectedBatch]
   );
 
   return (
@@ -65,8 +68,8 @@ const FishboneAnalysis: React.FC = () => {
           >
             <option value="">-- CHỌN LÔ HÀNG KHÔNG ĐẠT TRONG DANH SÁCH --</option>
             {failResults.map(r => {
-              const b = state.batches.find(batch => batch.id === r.batchId);
-              const p = state.products.find(prod => prod.id === b?.productId);
+              const b = batches.find(batch => batch.id === r.batchId);
+              const p = products.find(prod => prod.id === b?.productId);
               return (
                 <option key={r.id} value={r.id}>
                   Lô: {b?.batchNo || '---'} | {p?.name || '---'}
@@ -89,7 +92,7 @@ const FishboneAnalysis: React.FC = () => {
               </div>
               <div className="bg-indigo-50 px-4 py-3 rounded-xl border border-indigo-100">
                  <p className="text-[9px] font-black text-indigo-400 uppercase tracking-widest mb-1">Căn cứ TCCS</p>
-                 <p className="text-xs font-black text-indigo-600">{state.tccsList.find(t => t.id === selectedBatch?.tccsId)?.code || 'N/A'}</p>
+                 <p className="text-xs font-black text-indigo-600">{tccsList.find(t => t.id === selectedBatch?.tccsId)?.code || 'N/A'}</p>
               </div>
            </div>
         )}

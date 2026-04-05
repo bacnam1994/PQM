@@ -14,6 +14,7 @@ export interface Criterion {
   max?: number;
   expectedText?: string;
   type: CriterionType;
+  category?: string;
 }
 
 export interface SensoryCharacteristics {
@@ -100,6 +101,7 @@ export interface Batch {
   yieldUnit: string;
   packaging?: string;
   status: 'PENDING' | 'TESTING' | 'RELEASED' | 'REJECTED';
+  rejectReason?: string;
   createdAt: string;
   updatedAt?: string;
 }
@@ -135,6 +137,7 @@ export interface TestResultEntry {
   isPass: boolean;
   isExtra?: boolean;
   unit?: string;
+  limit?: string;
 }
 
 export interface FishboneData {
@@ -166,6 +169,7 @@ export interface AppState {
   batches: Batch[];
   rawMaterials: RawMaterial[];
   testResults: TestResult[];
+  allTestResults?: TestResult[];
   inventoryIn: InventoryIn[]; // Mới
   inventoryOut: InventoryOut[];
   lastSync: string | null;

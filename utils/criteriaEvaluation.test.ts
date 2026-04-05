@@ -87,6 +87,8 @@ describe('criteriaEvaluation Utils', () => {
         expect(checkRange('72 - 108', ' 100 ')).toBe(true);
         expect(checkRange('72 - 108', '100,')).toBe(true); // comma cleaned
         expect(checkRange('72 - 108', '108.0abc')).toBe(true); // extra chars cleaned
+        expect(checkRange('72 - 108', '71')).toBe(false); // below min FAIL
+        expect(checkRange('72 - 108', '109')).toBe(false); // above max FAIL
       });
     });
 

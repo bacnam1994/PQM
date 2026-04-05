@@ -1,26 +1,54 @@
 
 import { CriterionType } from '../types';
 
+// Tối ưu 1: Cache localStorage để tránh blocking I/O khi gọi hàm hàng ngàn lần
+let cachedDecimalSeparator: string | null = null;
+const getDecimalSeparator = () => {
+  if (cachedDecimalSeparator !== null) return cachedDecimalSeparator;
+  if (typeof window === 'undefined') return 'dot';
+  try {
+    let separator = localStorage.getItem('app_decimal_separator');
+    if (separator && separator.startsWith('"') && separator.endsWith('"')) {
+      separator = separator.slice(1, -1);
+    }
+    cachedDecimalSeparator = separator || 'dot';
+  } catch {
+    cachedDecimalSeparator = 'dot';
+  }
+  return cachedDecimalSeparator;
+};
+
+// Tối ưu 2: Đưa các object, array, RegExp tĩnh ra ngoài scope hàm
+// Tránh việc Engine JS phải khởi tạo lại bộ nhớ (Memory Allocation) và compile RegExp mỗi lần gọi hàm.
+const SUPERS: Record<string, string> = { '⁰': '0', '¹': '1', '²': '2', '³': '3', '⁴': '4', '⁵': '5', '⁶': '6', '⁷': '7', '⁸': '8', '⁹': '9', '⁻': '-' };
+const SUPER_CHARS = Object.keys(SUPERS).join('');
+const POWER_REGEX = new RegExp(`10(?:([${SUPER_CHARS}]+)|\\^(\\-?[\\d\\.]+))`);
+const NEGATIVE_KEYWORDS = ['âm tính', 'negative', 'không phát hiện', 'không có', 'not detected', 'kph', 'k.p.h', 'nd', 'không được có'];
+const POSITIVE_KEYWORDS = ['dương tính', 'positive', 'phát hiện', 'có phát hiện', 'detected', 'có'];
+
 // --- HELPER: Parse Microbiological Values (e.g., "10⁴", "≤ 1.5x10⁵") ---
 export const parseFlexibleValue = (input: string | number): number | null => {
   if (input === null || input === undefined) return null;
   if (typeof input === 'number') return input;
 
-  // Standardize input for US/UK format: remove thousand separators (,) and trim.
-  const str = input.toString().trim().replace(/,/g, '');
+  // Standardize input based on locale settings
+  let separator = getDecimalSeparator();
+
+  let str = input.toString().trim();
+  if (separator === 'comma') {
+    str = str.replace(/\./g, '').replace(/,/g, '.');
+  } else {
+    str = str.replace(/,/g, '');
+  }
+
   if (str === '') return null;
   
   // --- Priority 1: Superscript or Caret notation (e.g., "10⁴", "1.5x10^5") ---
-  const supers: Record<string, string> = { '⁰': '0', '¹': '1', '²': '2', '³': '3', '⁴': '4', '⁵': '5', '⁶': '6', '⁷': '7', '⁸': '8', '⁹': '9', '⁻': '-' };
-  const superChars = Object.keys(supers).join('');
-  
-  // Regex to find "10" followed by superscript characters OR "10^" followed by regular digits
-  const powerRegex = new RegExp(`10(?:([${superChars}]+)|\\^(\\-?[\\d\\.]+))`);
-  const powerMatch = str.match(powerRegex);
+  const powerMatch = str.match(POWER_REGEX);
   
   if (powerMatch) {
     // powerMatch[1] will be the superscript exponent, powerMatch[2] will be the caret exponent
-    const expStr = powerMatch[1] ? powerMatch[1].split('').map(c => supers[c]).join('') : powerMatch[2];
+    const expStr = powerMatch[1] ? powerMatch[1].split('').map(c => SUPERS[c]).join('') : powerMatch[2];
     if (expStr !== undefined) {
         const exp = parseFloat(expStr);
         
@@ -89,13 +117,17 @@ export const evaluateCriterion = (c: any, value: string | number): boolean => {
     return false;
   }
 
-  const negatives = ['âm tính', 'negative', 'không phát hiện', 'không có', 'not detected', 'kph', 'không được có'];
   const strVal = String(value).trim();
   const lowerStrVal = strVal.toLowerCase();
   
   const isZeroOrAbsent = (v: string) => {
     const lower = v.toLowerCase();
-    return negatives.some(n => lower.includes(n)) || v.trim() === '0';
+    return NEGATIVE_KEYWORDS.some(n => lower.includes(n)) || v.trim() === '0';
+  };
+
+  const isPositive = (v: string) => {
+    const lower = v.toLowerCase();
+    return POSITIVE_KEYWORDS.some(p => lower.includes(p));
   };
 
   const isResultAbsent = isZeroOrAbsent(strVal);
@@ -122,10 +154,16 @@ export const evaluateCriterion = (c: any, value: string | number): boolean => {
   }
   
   const isRequirementAbsent = isZeroOrAbsent(limitText);
+  const isRequirementPositive = isPositive(limitText);
 
   // Path 2a: Requirement is "absent" type.
   if (isRequirementAbsent) {
     return isResultAbsent;
+  }
+  
+  // Path 2a-bis: Requirement is "positive" type.
+  if (isRequirementPositive) {
+    return isPositive(strVal);
   }
   
   // Path 2b: Requirement is not "absent", but result is.
@@ -165,9 +203,11 @@ export const evaluateCriterion = (c: any, value: string | number): boolean => {
           let tolerance = parseFlexibleValue(tolerancePart);
           if (base !== null && tolerance !== null) {
             if (tolerancePart.includes('%')) {
-              tolerance = base * (tolerance / 100);
+              tolerance = Math.abs(base) * (tolerance / 100);
             }
-            return resultAsNumber >= base - tolerance && resultAsNumber <= base + tolerance;
+            
+            const EPSILON = 1e-6;
+            return resultAsNumber >= base - tolerance - EPSILON && resultAsNumber <= base + tolerance + EPSILON;
           }
         }
         return resultAsNumber === limitVal;

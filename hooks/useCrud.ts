@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 
 export type CrudMode = 'IDLE' | 'ADD' | 'EDIT' | 'DELETE' | 'VIEW';
 
@@ -43,7 +43,7 @@ export function useCrud<T>(): UseCrudReturn<T> {
     setSelectedItem(null);
   }, []);
 
-  return {
+  return useMemo(() => ({
     mode,
     selectedItem,
     isOpen: mode !== 'IDLE',
@@ -52,5 +52,5 @@ export function useCrud<T>(): UseCrudReturn<T> {
     openDelete,
     openView,
     close
-  };
+  }), [mode, selectedItem, openAdd, openEdit, openDelete, openView, close]);
 }

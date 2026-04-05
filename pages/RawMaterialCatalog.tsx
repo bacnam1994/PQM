@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { BookUser, Plus, Search, Loader2, Save, Tag, Layers3, X as XIcon } from 'lucide-react';
-import { useAppContext } from '../context/AppContext';
+import { useAppStore } from '../store/useAppStore';
 import { useCrud } from '../hooks/useCrud';
 import { PageHeader, Modal, Pagination } from '../components/CommonUI';
 import { DSFilterBar, DSSearchInput, DSTable, DSFormInput, DSSelect } from '../components/DesignSystem';
@@ -9,7 +9,11 @@ import { generateId } from '../utils/idGenerator';
 import { RawMaterial } from '../types';
 
 const RawMaterialCatalog: React.FC = () => {
-  const { state, addRawMaterial, updateRawMaterial, deleteRawMaterial, notify } = useAppContext();
+  const rawMaterials = useAppStore(state => state.rawMaterials);
+  const addRawMaterial = useAppStore(state => state.addRawMaterial);
+  const updateRawMaterial = useAppStore(state => state.updateRawMaterial);
+  const deleteRawMaterial = useAppStore(state => state.deleteRawMaterial);
+  const notify = useAppStore(state => state.notify);
   const crud = useCrud<RawMaterial>();
   
   const [searchTerm, setSearchTerm] = useState('');
@@ -26,7 +30,7 @@ const RawMaterialCatalog: React.FC = () => {
 
   // Filter Data
   const filteredMaterials = useMemo(() => {
-    return (state.rawMaterials || []).filter(m => {
+    return (rawMaterials || []).filter(m => {
       const searchLower = searchTerm.toLowerCase();
       return (
         m.name.toLowerCase().includes(searchLower) ||

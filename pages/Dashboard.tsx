@@ -1,34 +1,60 @@
-import React, { useMemo } from 'react';
-import { useAppContext } from '../context/AppContext';
-import { useTestResultContext } from '../context/TestResultContext';
+import React, { useMemo, useEffect } from 'react';
+import { useAppStore } from '../store/useAppStore';
 import { 
   Package, Layers, ClipboardCheck, FileText, 
   Activity, ArrowRight, Clock 
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
-import { DSCard } from '../components/DesignSystem';
-import { BATCH_STATUS, PRODUCT_STATUS, TEST_RESULT_STATUS } from '../utils/constants';
+import { DSCard } from '../components';
+import { BATCH_STATUS, PRODUCT_STATUS, TEST_RESULT_STATUS } from '../utils';
+import { useShallow } from 'zustand/react/shallow';
 
 const Dashboard: React.FC = () => {
-  const { state } = useAppContext();
-  const { testResults } = useTestResultContext();
+  // Tối ưu 1: Gom nhóm Zustand Selectors bằng useShallow
+  const { products, batches, tccsList, testResultsRealtime, allTestResults, fetchAllTestResultsForDashboard } = useAppStore(useShallow(state => ({
+    products: state.products,
+    batches: state.batches,
+    tccsList: state.tccsList,
+    testResultsRealtime: state.testResults || [],
+    allTestResults: state.allTestResults || [],
+    fetchAllTestResultsForDashboard: state.fetchAllTestResultsForDashboard
+  })));
+
+  // Tự động tải TOÀN BỘ dữ liệu 1 lần duy nhất khi mở Dashboard
+  useEffect(() => {
+    fetchAllTestResultsForDashboard();
+  }, [fetchAllTestResultsForDashboard]);
+
+  // Trộn dữ liệu: Background Fetch + Realtime
+  const testResults = useMemo(() => {
+    const map = new Map(allTestResults.map(r => [r.id, r]));
+    testResultsRealtime.forEach(r => map.set(r.id, r));
+    return Array.from(map.values());
+  }, [allTestResults, testResultsRealtime]);
 
   // Thống kê tổng quan
   const stats = useMemo(() => {
-    const totalProducts = state.products.length;
-    const activeProducts = state.products.filter(p => p.status === PRODUCT_STATUS.ACTIVE).length;
+    const totalProducts = products.length;
+    const activeProducts = products.filter(p => p.status === PRODUCT_STATUS.ACTIVE).length;
     
-    const totalBatches = state.batches.length;
-    const pendingBatches = state.batches.filter(b => b.status === BATCH_STATUS.PENDING).length;
-    const testingBatches = state.batches.filter(b => b.status === BATCH_STATUS.TESTING).length;
-    const releasedBatches = state.batches.filter(b => b.status === BATCH_STATUS.RELEASED).length;
-    const rejectedBatches = state.batches.filter(b => b.status === BATCH_STATUS.REJECTED).length;
+    // Tối ưu 2: Dùng vòng lặp 1 lần duy nhất thay vì duyệt mảng 4 lần
+    let pendingBatches = 0, testingBatches = 0, releasedBatches = 0, rejectedBatches = 0;
+    batches.forEach(b => {
+       if (b.status === BATCH_STATUS.PENDING) pendingBatches++;
+       else if (b.status === BATCH_STATUS.TESTING) testingBatches++;
+       else if (b.status === BATCH_STATUS.RELEASED) releasedBatches++;
+       else if (b.status === BATCH_STATUS.REJECTED) rejectedBatches++;
+    });
+    const totalBatches = batches.length;
     
+    let passResults = 0;
+    testResults.forEach(r => {
+       if (r.overallStatus === TEST_RESULT_STATUS.PASS) passResults++;
+    });
     const totalResults = testResults.length;
-    const passResults = testResults.filter(r => r.overallStatus === TEST_RESULT_STATUS.PASS).length;
     
-    const totalTCCS = state.tccsList.length;
+    const totalTCCS = tccsList.length;
 
     return {
       totalProducts, activeProducts,
@@ -36,7 +62,7 @@ const Dashboard: React.FC = () => {
       totalResults, passResults,
       totalTCCS
     };
-  }, [state, testResults]);
+  }, [products, batches, tccsList, testResults]);
 
   // Dữ liệu biểu đồ tròn (Trạng thái Lô)
   const batchStatusData = useMemo(() => [
@@ -56,30 +82,37 @@ const Dashboard: React.FC = () => {
 
   // Hoạt động gần đây (Lô mới + Kết quả mới)
   const recentActivities = useMemo(() => {
-    const batches = state.batches.map(b => ({
+    // Tối ưu 3: Cắt lấy 5 phần tử mới nhất từ mỗi mảng TRƯỚC KHI map.
+    // Tránh việc map hàng ngàn bản ghi không cần thiết!
+    const latestBatches = [...batches].sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || '')).slice(0, 5);
+    const latestResults = [...testResults].sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || '')).slice(0, 5);
+
+    const mappedBatches = latestBatches.map(b => ({
       type: 'BATCH',
       id: b.id,
       title: `Lô mới: ${b.batchNo}`,
-      subtitle: b.product?.name,
+      subtitle: products.find(p => p.id === b.productId)?.name || 'Sản phẩm không xác định',
       date: b.createdAt,
       icon: Layers,
-      color: 'text-indigo-600 bg-indigo-50'
+      color: 'text-indigo-600 bg-indigo-50',
+      link: '/batches'
     }));
 
-    const results = testResults.map(r => ({
+    const results = latestResults.map(r => ({
       type: 'RESULT',
       id: r.id,
-      title: `Kết quả: ${r.batch?.batchNo}`,
+      title: `Kết quả: ${batches.find(b => b.id === r.batchId)?.batchNo || 'Lô không xác định'}`,
       subtitle: r.overallStatus === TEST_RESULT_STATUS.PASS ? 'ĐẠT' : 'KHÔNG ĐẠT',
       date: r.createdAt,
       icon: ClipboardCheck,
-      color: r.overallStatus === TEST_RESULT_STATUS.PASS ? 'text-emerald-600 bg-emerald-50' : 'text-red-600 bg-red-50'
+      color: r.overallStatus === TEST_RESULT_STATUS.PASS ? 'text-emerald-600 bg-emerald-50' : 'text-red-600 bg-red-50',
+      link: '/test-results'
     }));
 
-    return [...batches, ...results]
-      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+    return [...mappedBatches, ...results]
+      .sort((a, b) => (b.date || '').localeCompare(a.date || ''))
       .slice(0, 5);
-  }, [state.batches, testResults]);
+  }, [batches, testResults, products]);
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
@@ -187,7 +220,7 @@ const Dashboard: React.FC = () => {
               </h3>
               <div className="space-y-6">
                  {recentActivities.map((item, idx) => (
-                    <div key={idx} className="flex gap-4 items-start group">
+                    <Link to={item.link} key={idx} className="flex gap-4 items-start group hover:bg-slate-50 p-2 -mx-2 rounded-xl transition-colors cursor-pointer">
                        <div className={`p-2.5 rounded-xl shrink-0 transition-colors ${item.color}`}>
                           <item.icon size={18} />
                        </div>
@@ -198,7 +231,7 @@ const Dashboard: React.FC = () => {
                              <Clock size={10} /> {new Date(item.date).toLocaleDateString('vi-VN')}
                           </p>
                        </div>
-                    </div>
+                    </Link>
                  ))}
                  {recentActivities.length === 0 && (
                     <p className="text-center text-slate-400 text-xs italic">Chưa có hoạt động nào.</p>

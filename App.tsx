@@ -1,14 +1,13 @@
 
 import React, { useEffect, Suspense, lazy } from 'react';
-import { Toaster, toast } from 'react-hot-toast';
-import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { Toaster } from 'react-hot-toast';
+import { HashRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { AppProvider } from './context/AppContext';
-import { AuthProvider, useAuth } from './context/AuthContext';
-import { TestResultProvider } from './context/TestResultContext';
-import Layout from './components/Layout';
 import { Outlet } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
-import ReloadPrompt from './components/ReloadPrompt';
+import { Layout, ReloadPrompt, ErrorBoundary } from './components';
+import { useAppStore } from './store/useAppStore';
+import { useShallow } from 'zustand/react/shallow';
 
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const ProductList = lazy(() => import('./pages/ProductList'));
@@ -28,15 +27,26 @@ const ForgotPasswordPage = lazy(() => import('./pages/ForgotPasswordPage'));
 const UserManagement = lazy(() => import('./pages/UserManagement'));
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user, loading } = useAuth();
-  if (loading) return null; // App loader in index.html will be visible
+  // Tối ưu: Dùng useShallow để gom nhóm theo dõi State
+  const { user, authLoading } = useAppStore(useShallow(s => ({
+    user: s.user,
+    authLoading: s.authLoading
+  })));
+
+  if (authLoading) return null; // App loader in index.html will be visible
   if (!user) return <Navigate to="/login" replace />;
   return <Layout><Outlet /></Layout>;
 };
 
 const AdminRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user, role, loading } = useAuth();
-  if (loading) return null;
+  // Tối ưu: Chỉ re-render khi user, role hoặc authLoading thực sự thay đổi
+  const { user, role, authLoading } = useAppStore(useShallow(s => ({
+    user: s.user,
+    role: s.role,
+    authLoading: s.authLoading
+  })));
+
+  if (authLoading) return null;
   if (!user) return <Navigate to="/login" replace />;
   if (role !== 'ADMIN') {
     return <Navigate to="/" replace />;
@@ -46,14 +56,14 @@ const AdminRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 };
 
 const AppRoutes: React.FC = () => {
-  const { loading } = useAuth();
+  const authLoading = useAppStore(s => s.authLoading);
 
   useEffect(() => {
-    if (!loading) {
+    if (!authLoading) {
       const loader = document.getElementById('app-loader');
       if (loader) loader.remove();
     }
-  }, [loading]);
+  }, [authLoading]);
 
   const LoadingFallback = () => (
     <div className="flex items-center justify-center h-screen w-full bg-[#f8faf9]">
@@ -93,19 +103,27 @@ const AppRoutes: React.FC = () => {
   );
 };
 
+// Component "tàng hình" để nạp useNavigate vào Zustand
+const GlobalNavigation = () => {
+  const navigate = useNavigate();
+  useEffect(() => {
+    useAppStore.setState({ navigate });
+  }, [navigate]);
+  return null;
+};
+
 const App: React.FC = () => {
   return (
-    <AuthProvider>
       <AppProvider>
-        <TestResultProvider>
           <HashRouter>
+            <GlobalNavigation />
             <Toaster position="bottom-right" toastOptions={{ duration: 4000 }} />
             <ReloadPrompt />
-            <AppRoutes />
+            <ErrorBoundary>
+              <AppRoutes />
+            </ErrorBoundary>
           </HashRouter>
-        </TestResultProvider>
       </AppProvider>
-    </AuthProvider>
   );
 };
 

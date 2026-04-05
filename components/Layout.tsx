@@ -7,15 +7,57 @@ import {
   Clock, LogOut, User as UserIcon, FlaskConical, Users, Activity,
   ChevronDown, Search
 } from 'lucide-react';
-import { useAppContext } from '../context/AppContext';
-import { useAuth } from '../context/AuthContext';
+import { useAppStore } from '../store/useAppStore';
+import { useShallow } from 'zustand/react/shallow';
+
+// Tối ưu 1: Đưa cấu hình Menu tĩnh ra ngoài Component
+// Tránh việc mảng bị khởi tạo lại liên tục mỗi khi chuyển trang hoặc gõ tìm kiếm
+const navItems = [
+  { name: 'Dashboard', path: '/', icon: LayoutDashboard },
+  { 
+    name: 'Danh mục', 
+    icon: Package,
+    children: [
+      { name: 'Sản phẩm', path: '/products', icon: Package },
+      { name: 'Nguyên liệu', path: '/materials', icon: Layers },
+      { name: 'Chỉ tiêu', path: '/criteria', icon: Activity },
+    ]
+  },
+  { 
+    name: 'Hồ sơ', 
+    icon: FileText,
+    children: [
+      { name: 'Hồ sơ TCCS', path: '/tccs', icon: FileText },
+      { name: 'Công thức sản phẩm', path: '/product-formulas', icon: FlaskConical },
+    ]
+  },
+  { 
+    name: 'Nghiệp vụ', 
+    icon: Layers,
+    children: [
+      { name: 'Quản lý Lô', path: '/batches', icon: Layers },
+      { name: 'Kiểm soát Lab', path: '/test-results', icon: ClipboardCheck },
+    ]
+  },
+  { 
+    name: 'Hệ thống', 
+    icon: Settings,
+    children: [
+      { name: 'Người dùng', path: '/users', icon: Users, adminOnly: true },
+      { name: 'Cấu hình', path: '/settings', icon: Settings },
+    ]
+  }
+];
 
 const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [isMobileMenuOpen, setMobileMenuOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
-  const { state, syncStatus } = useAppContext();
-  const { user, logout, role } = useAuth();
+  const lastSync = useAppStore(state => state.lastSync);
+  const syncStatus = useAppStore(state => state.syncStatus);
+  const user = useAppStore(state => state.user);
+  const role = useAppStore(state => state.role);
+  const logout = useAppStore(state => state.logout);
   const [searchTerm, setSearchTerm] = useState('');
 
   const handleSearch = (e: React.FormEvent) => {
@@ -71,7 +113,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   };
 
   const getSyncStatusContent = () => {
-    const lastSyncTime = state.lastSync ? new Date(state.lastSync).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : '---';
+    const lastSyncTime = lastSync ? new Date(lastSync).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : '---';
     
     switch(syncStatus) {
       case 'SAVING':

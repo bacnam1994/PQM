@@ -1,12 +1,10 @@
 import React, { useMemo, useState, useEffect } from 'react';
-import { useAppContext } from '../context/AppContext';
-import { PageHeader, Modal } from '../components/CommonUI';
+import { useAppStore } from '../store/useAppStore';
 import { FlaskConical, Search, Filter, Layers, Beaker, Component, Package, LayoutGrid, List, ChevronLeft, ChevronRight, Edit2, Info, Loader2 } from 'lucide-react';
 import { ProductFormula, FormulaIngredient } from '../types';
-import { DSFilterBar, DSSearchInput, DSSelect, DSViewToggle, DSCard, DSTable, DSFormInput } from '../components/DesignSystem';
-import { useLocalStorage } from '../hooks/useLocalStorage';
-import { useCrud } from '../hooks/useCrud';
-import { ActionButtons } from '../components/CrudControls';
+import { PageHeader, Modal, DSFilterBar, DSSearchInput, DSSelect, DSViewToggle, DSCard, DSTable, DSFormInput, ActionButtons } from '../components';
+import { useCrud } from '../hooks';
+import { useUIStore } from '../store/useUIStore';
 
 interface AggregatedMaterial {
   id: string;
@@ -95,11 +93,15 @@ const MaterialDataList = ({ viewMode, data, onEdit }: any) => {
 };
 
 const MaterialList: React.FC = () => {
-  const { state, updateProductFormula, notify } = useAppContext();
+  const products = useAppStore(state => state.products);
+  const productFormulas = useAppStore(state => state.productFormulas);
+  const updateProductFormula = useAppStore(state => state.updateProductFormula);
+  const notify = useAppStore(state => state.notify);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState<'ALL' | 'ACTIVE' | 'EXCIPIENT'>('ALL');
   const [filterProductId, setFilterProductId] = useState<string>('');
-  const [viewMode, setViewMode] = useLocalStorage<'grid' | 'list'>('material_view_mode', 'grid');
+  const viewMode = useUIStore(s => s.materialViewMode);
+  const setViewMode = useUIStore(s => s.setMaterialViewMode);
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = viewMode === 'grid' ? 12 : 15;
   const crud = useCrud<AggregatedMaterial>();
@@ -114,9 +116,10 @@ const MaterialList: React.FC = () => {
   // Logic phân tích dữ liệu từ TCCS
   const materials = useMemo(() => {
     const map = new Map<string, AggregatedMaterial>();
+    const productMap = new Map(products.map(p => [p.id, p]));
     
-    state.productFormulas.forEach(formula => {
-        const product = state.products.find(p => p.id === formula.productId);
+    productFormulas.forEach(formula => {
+        const product = productMap.get(formula.productId);
         if (!product) return;
 
         (formula.ingredients || []).forEach(ing => {
@@ -163,7 +166,7 @@ const MaterialList: React.FC = () => {
         });
     });
     return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
-  }, [state.productFormulas, state.products]);
+  }, [productFormulas, products]);
 
   const filteredMaterials = useMemo(() => {
     return materials.filter(m => {
@@ -198,10 +201,11 @@ const MaterialList: React.FC = () => {
     
     setIsSubmitting(true);
     try {
-      const updates = state.productFormulas.map(formula => {
+      const oldNameLower = oldName.trim().toLowerCase();
+      const updates = productFormulas.map(formula => {
           let needsUpdate = false;
-          const newIngredients = formula.ingredients.map(ing => {
-              if (ing.name === oldName) {
+          const newIngredients = (formula.ingredients || []).map(ing => {
+              if ((ing.name || '').trim().toLowerCase() === oldNameLower) {
                   needsUpdate = true;
                   return { ...ing, name: newNameTrimmed };
               }
@@ -209,7 +213,7 @@ const MaterialList: React.FC = () => {
           });
           
           const newExcipients = (formula.excipients || []).map(exc => {
-              if (exc.name === oldName) {
+              if ((exc.name || '').trim().toLowerCase() === oldNameLower) {
                   needsUpdate = true;
                   return { ...exc, name: newNameTrimmed };
               }
@@ -252,7 +256,7 @@ const MaterialList: React.FC = () => {
 
         <DSSelect icon={Package} value={filterProductId} onChange={(e) => setFilterProductId(e.target.value)} className="w-48 truncate">
              <option value="">Tất cả sản phẩm</option>
-             {state.products.map(p => (
+             {products.map(p => (
                <option key={p.id} value={p.id}>{p.name}</option>
              ))}
         </DSSelect>

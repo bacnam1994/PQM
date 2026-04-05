@@ -1,22 +1,101 @@
 
 import React, { useState, useMemo, useEffect, memo, useCallback } from 'react';
-import { useAppContext } from '../context/AppContext';
-import { useTestResultContext } from '../context/TestResultContext';
-import { useAuth } from '../context/AuthContext';
-import { Link } from 'react-router-dom';
-import { Plus, Search, Layers, Trash2, Hash, History, CheckCircle2, AlertTriangle, CalendarOff, Upload, FileSpreadsheet, Info, LayoutGrid, List, Edit2, Loader2, ClipboardCheck, ChevronLeft, ChevronRight, FlaskConical, ListChecks, ArrowUpDown, Filter, CalendarRange, X, ShieldCheck, Clock, FileUp, Eye } from 'lucide-react';
-import { Batch, Product, TestResult } from '../types';
-import { PageHeader, Modal, StatusBadge, Pagination, ConfirmationModal } from '../components/CommonUI';
-import { useDataGraph } from '../hooks/useDataGraph';
-import { DSFilterBar, DSSearchInput, DSSelect, DSViewToggle, DSCard, DSTable, DSFormInput } from '../components/DesignSystem';
-import { BATCH_STATUS } from '../utils/constants';
-import { useDebounce } from '../hooks/useDebounce';
-import { useLocalStorage } from '../hooks/useLocalStorage';
-import { formatDateStandard, toInputDate, parseDateToISO } from '../utils/dateUtils';
+import { useAppStore } from '../store/useAppStore';
+import { Plus, Search, Layers, Trash2, Hash, History, CheckCircle2, AlertTriangle, CalendarOff, Upload, Download, FileSpreadsheet, Info, LayoutGrid, List, Edit2, Loader2, ClipboardCheck, FlaskConical, ListChecks, ArrowUpDown, Filter, CalendarRange, X, ShieldCheck, Clock, FileUp, Eye, Printer, PackageOpen } from 'lucide-react';
+import { Batch, Product, TestResult, TestResultEntry } from '../types';
 import { logAuditAction } from '../services/auditService';
-import { useCrud } from '../hooks/useCrud';
-import { ActionButtons, DeleteModal, AddButton } from '../components/CrudControls';
-import { generateId } from '../utils/idGenerator';
+import { PageHeader, Modal, StatusBadge, Pagination, ConfirmationModal, DSFilterBar, DSSearchInput, DSSelect, DSViewToggle, DSCard, DSTable, DSFormInput, ActionButtons, DeleteModal, AddButton, BatchCriteriaHistory, DSEmptyState } from '../components';
+import { useDataGraph, HydratedTestResult, useDebounce, useCrud } from '../hooks';
+import { useUIStore } from '../store/useUIStore';
+import { BATCH_STATUS, formatDateStandard, toInputDate, parseDateToISO, generateId, parseNumberFromText, calculateOverallStatus, ensureArray } from '../utils';
+const CoAReport = React.lazy(() => import('../components/CoAReport'));
+
+// --- CSS Styles for Printing ---
+const printStyles = `
+@media print {
+  body.print-active * {
+    visibility: hidden;
+  }
+  body.print-active .print-container,
+  body.print-active .print-container * {
+    visibility: visible;
+  }
+  body.print-active .print-container {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: white !important;
+    z-index: 9999 !important;
+  }
+  .no-print {
+    display: none !important;
+  }
+}
+`;
+
+// --- HELPER: Tính toán tiến độ kiểm nghiệm ---
+const calculateBatchProgress = (batch: any, batchResults: TestResult[]) => {
+  const tccs = batch.tccs;
+  const requiredCriteria = tccs ? [
+    ...ensureArray(tccs.mainQualityCriteria),
+    ...ensureArray(tccs.safetyCriteria)
+  ].filter(c => c && c.name) : [];
+
+  if (requiredCriteria.length === 0) {
+    return { progressPercent: 0, missingCriteria: [], requiredCriteria: [] };
+  }
+  
+  const testedCriteriaNames = new Set<string>();
+  const latestResultsMap = new Map<string, { value: any, isPass: boolean }>();
+
+  // Sắp xếp tăng dần theo thời gian để kết quả mới nhất ghi đè kết quả cũ
+  // Tối ưu 1: Dùng localeCompare để so sánh chuỗi ISO date tránh khởi tạo Date object
+  if (batchResults.length > 0) {
+    const sortedBatchResults = [...batchResults].sort((a,b) => a.testDate.localeCompare(b.testDate));
+    sortedBatchResults.forEach(r => {
+      ensureArray(r.results).forEach(res => { 
+        if (res && res.criteriaName) {
+          testedCriteriaNames.add(res.criteriaName);
+          latestResultsMap.set(res.criteriaName, { value: res.value, isPass: res.isPass });
+        }
+      });
+    });
+  }
+
+  // Chuyển alternateRules thành Map để tra cứu O(1)
+  const rulesMap = new Map<string, any>();
+  if (tccs && tccs.alternateRules) {
+    tccs.alternateRules.forEach((r: any) => {
+      if (r && r.alt) rulesMap.set(r.alt, r);
+    });
+  }
+
+  const missingCriteria = requiredCriteria.filter(c => {
+    if (testedCriteriaNames.has(c.name)) return false;
+
+    const rule = rulesMap.get(c.name);
+    if (rule) {
+      const mainRes = latestResultsMap.get(rule.main);
+      if (mainRes !== undefined) {
+        if (rule.type === 'CONDITIONAL_CHECK') {
+          const conditionVal = parseNumberFromText(String(rule.conditionValue || '0'));
+          const actualMainVal = parseNumberFromText(String(mainRes.value));
+          if (!mainRes.isPass) return false;
+          if (actualMainVal <= conditionVal) return false;
+        } else {
+          if (mainRes.isPass) return false;
+        }
+      }
+    }
+    return true;
+  });
+
+  const progressPercent = Math.round(((requiredCriteria.length - missingCriteria.length) / requiredCriteria.length) * 100);
+  return { progressPercent, missingCriteria, requiredCriteria };
+};
 
 // --- SUB-COMPONENT: Batch Status Selector ---
 const BatchStatusSelect = ({ status, batchId, onUpdate, isAdmin }: { status: string, batchId: string, onUpdate: (s: string, id: string) => void, isAdmin: boolean }) => {
@@ -86,26 +165,7 @@ const BatchGridItem = memo(({ batch, isExpanded, onExpand, onEdit, onDelete, onV
   const isExpired = diffDays < 0;
   const isNearExpiry = diffDays > 0 && diffDays <= 90; // Cảnh báo trước 90 ngày
 
-  // --- LOGIC TÍNH TOÁN TIẾN ĐỘ KIỂM NGHIỆM ---
-  const tccs = batch.tccs;
-  const batchResults = testResults.filter(r => r.batchId === batch.id);
-  
-  // Tập hợp các chỉ tiêu đã kiểm (Dựa trên tên)
-  const testedCriteriaNames = new Set<string>();
-  batchResults.forEach(r => {
-    if (Array.isArray(r.results)) {
-      r.results.forEach(res => testedCriteriaNames.add(res.criteriaName));
-    }
-  });
-
-  // Tập hợp các chỉ tiêu yêu cầu trong TCCS
-  const requiredCriteria = tccs ? [
-    ...(Array.isArray(tccs.mainQualityCriteria) ? tccs.mainQualityCriteria : []),
-    ...(Array.isArray(tccs.safetyCriteria) ? tccs.safetyCriteria : [])
-  ].filter(c => c && c.name) : [];
-
-  const missingCriteria = requiredCriteria.filter(c => !testedCriteriaNames.has(c.name));
-  const progressPercent = requiredCriteria.length > 0 ? Math.round(((requiredCriteria.length - missingCriteria.length) / requiredCriteria.length) * 100) : 0;
+  const { progressPercent, missingCriteria } = useMemo(() => calculateBatchProgress(batch, testResults), [batch, testResults]);
 
   return (
     <DSCard isExpanded={isExpanded} className={`p-6 relative group ${isExpanded ? 'col-span-2' : ''}`}>
@@ -153,9 +213,6 @@ const BatchGridItem = memo(({ batch, isExpanded, onExpand, onEdit, onDelete, onV
       <div className="flex items-center justify-between mt-4">
         <button onClick={() => onExpand(batch.id)} className="text-[10px] font-black text-indigo-600 uppercase hover:underline flex items-center gap-1"><History size={14}/> {isExpanded ? 'Ẩn' : 'Lịch sử'}</button>
         <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-            <Link to={`/test-results?batchId=${batch.id}`} className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors" title="Kết quả kiểm nghiệm">
-              <ClipboardCheck size={16}/>
-            </Link>
             <ActionButtons 
               onView={() => onView(batch)}
               onEdit={() => onEdit(batch)}
@@ -193,7 +250,9 @@ const BatchGridItem = memo(({ batch, isExpanded, onExpand, onEdit, onDelete, onV
   );
 });
 
-const BatchListItem = memo(({ batch, onEdit, onDelete, onView, onUpdateBatchStatus, isAdmin }: { batch: any, onEdit: (b: any) => void, onDelete: (batch: any) => void, onView: (batch: any) => void, onUpdateBatchStatus: (status: string, batchId: string) => void, isAdmin: boolean }) => {
+const BatchListItem = memo(({ batch, onEdit, onDelete, onView, onUpdateBatchStatus, isAdmin, testResults }: { batch: any, onEdit: (b: any) => void, onDelete: (batch: any) => void, onView: (batch: any) => void, onUpdateBatchStatus: (status: string, batchId: string) => void, isAdmin: boolean, testResults: TestResult[] }) => {
+  const { progressPercent } = useMemo(() => calculateBatchProgress(batch, testResults), [batch, testResults]);
+
   return (
     <tr className="hover:bg-slate-50 transition-colors">
       <td className="px-4 py-3 font-black text-slate-800">{batch.batchNo}</td>
@@ -218,9 +277,10 @@ const BatchListItem = memo(({ batch, onEdit, onDelete, onView, onUpdateBatchStat
           onUpdate={onUpdateBatchStatus} 
           isAdmin={isAdmin} 
         />
+        <div className="mt-1.5 text-[9px] font-bold text-slate-400">Tiến độ: {progressPercent}%</div>
       </td>
       <td className="px-4 py-3 text-right">
-        <div className="flex justify-end gap-2">
+        <div className="flex justify-end items-center gap-2">
           <ActionButtons 
             onView={() => onView(batch)}
             onEdit={() => onEdit(batch)}
@@ -233,6 +293,10 @@ const BatchListItem = memo(({ batch, onEdit, onDelete, onView, onUpdateBatchStat
 });
 
 const BatchDataList = ({ viewMode, data, expandedId, onExpand, onEdit, onDelete, onView, testResults, onUpdateBatchStatus, isAdmin }: any) => {
+  if (data.length === 0) {
+     return <DSEmptyState icon={PackageOpen} title="Không tìm thấy Lô hàng" message="Không có lô hàng nào khớp với điều kiện tìm kiếm hoặc bộ lọc hiện tại của bạn." />;
+  }
+
   if (viewMode === 'grid') {
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -275,6 +339,7 @@ const BatchDataList = ({ viewMode, data, expandedId, onExpand, onEdit, onDelete,
             onView={onView}
             onUpdateBatchStatus={onUpdateBatchStatus}
             isAdmin={isAdmin}
+            testResults={testResults}
           />
         ))}
       </tbody>
@@ -283,9 +348,19 @@ const BatchDataList = ({ viewMode, data, expandedId, onExpand, onEdit, onDelete,
 };
 
 const BatchList: React.FC = () => {
-  const { state, addBatch, updateBatch, deleteBatch, updateBatchStatus, isAdmin, notify } = useAppContext();
-  const { testResults } = useTestResultContext();
-  const { user } = useAuth();
+  const products = useAppStore(s => s.products);
+  const batches = useAppStore(s => s.batches);
+  const tccsList = useAppStore(s => s.tccsList);
+  const addBatch = useAppStore(s => s.addBatch);
+  const updateBatch = useAppStore(s => s.updateBatch);
+  const deleteBatch = useAppStore(s => s.deleteBatch);
+  const updateBatchStatus = useAppStore(s => s.updateBatchStatus);
+  const isAdmin = useAppStore(s => s.isAdmin);
+  const notify = useAppStore(s => s.notify);
+  const productFormulas = useAppStore(s => s.productFormulas);
+
+  const testResults = useAppStore(s => s.testResults);
+  const user = useAppStore(s => s.user);
   const { batches: hydratedBatches } = useDataGraph(); // Sử dụng dữ liệu đã liên kết
   const [isImportResultModalOpen, setIsImportResultModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -295,7 +370,8 @@ const BatchList: React.FC = () => {
   const [filterMonth, setFilterMonth] = useState<string>('ALL');
   const [filterYear, setFilterYear] = useState<string>('ALL');
   const [sortConfig, setSortConfig] = useState<{ key: 'createdAt' | 'mfgDate' | 'batchNo'; direction: 'asc' | 'desc' }>({ key: 'createdAt', direction: 'desc' });
-  const [viewMode, setViewMode] = useLocalStorage<'grid' | 'list'>('batch_view_mode', 'grid');
+  const viewMode = useUIStore(s => s.batchViewMode);
+  const setViewMode = useUIStore(s => s.setBatchViewMode);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [importText, setImportText] = useState('');
   const [viewBatch, setViewBatch] = useState<Batch | null>(null);
@@ -315,6 +391,9 @@ const BatchList: React.FC = () => {
   const [isStatusConfirmOpen, setIsStatusConfirmOpen] = useState(false);
   const [pendingStatusUpdate, setPendingStatusUpdate] = useState<{status: string, batchId: string} | null>(null);
   const [rejectReason, setRejectReason] = useState('');
+  const [historyBatchId, setHistoryBatchId] = useState<string | null>(null);
+  const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
+  const [selectedResultForPrint, setSelectedResultForPrint] = useState<HydratedTestResult | null>(null);
   
   const crud = useCrud<Batch>();
 
@@ -334,39 +413,54 @@ const BatchList: React.FC = () => {
   }, [hydratedBatches]);
 
   const filteredBatches = useMemo(() => {
-    return hydratedBatches.filter(b => {
-      const matchesSearch = b.batchNo.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) || (b.product?.name || '').toLowerCase().includes(debouncedSearchTerm.toLowerCase());
-      const matchesProduct = filterProductId === '' || b.productId === filterProductId;
-      const matchesStatus = filterStatus === 'ALL' || b.status === filterStatus;
+    const searchLower = debouncedSearchTerm.toLowerCase();
+    const hasSearch = searchLower.length > 0;
 
-      let matchesTime = true;
-      if (isAdvancedFilterOpen) {
-         // Lọc theo khoảng thời gian cụ thể (Ngày SX)
-         if (dateRange.from && (!b.mfgDate || b.mfgDate < dateRange.from)) matchesTime = false;
-         if (dateRange.to && (!b.mfgDate || b.mfgDate > dateRange.to)) matchesTime = false;
-      } else {
-         // Lọc theo Năm/Tháng (Cơ bản)
-         const mfgDate = new Date(b.mfgDate);
-         const matchesYear = filterYear === 'ALL' || mfgDate.getFullYear().toString() === filterYear;
-         const matchesMonth = filterMonth === 'ALL' || (mfgDate.getMonth() + 1).toString() === filterMonth;
-         matchesTime = matchesYear && matchesMonth;
+    return hydratedBatches.filter(b => {
+      // Tối ưu: Dùng early return (thoát sớm) để tránh tính toán thừa
+      if (filterProductId !== '' && b.productId !== filterProductId) return false;
+      if (filterStatus !== 'ALL' && b.status !== filterStatus) return false;
+
+      if (hasSearch) {
+        const batchNoLower = b.batchNo.toLowerCase();
+        const productNameLower = (b.product?.name || '').toLowerCase();
+        if (!batchNoLower.includes(searchLower) && !productNameLower.includes(searchLower)) {
+          return false;
+        }
       }
 
-      return matchesSearch && matchesProduct && matchesStatus && matchesTime;
+      if (isAdvancedFilterOpen) {
+         // Lọc theo khoảng thời gian cụ thể (Ngày SX)
+         if (dateRange.from && (!b.mfgDate || b.mfgDate < dateRange.from)) return false;
+         if (dateRange.to && (!b.mfgDate || b.mfgDate > dateRange.to)) return false;
+      } else {
+         // Tối ưu: Lọc theo Năm/Tháng bằng xử lý chuỗi thay vì parse Date object
+         if (filterYear !== 'ALL' || filterMonth !== 'ALL') {
+           if (!b.mfgDate) return false;
+           if (filterYear !== 'ALL' && b.mfgDate.substring(0, 4) !== filterYear) return false;
+           if (filterMonth !== 'ALL') {
+              const month = parseInt(b.mfgDate.substring(5, 7), 10).toString();
+              if (month !== filterMonth) return false;
+           }
+         }
+      }
+
+      return true;
     }).sort((a, b) => {
       if (sortConfig.key === 'batchNo') {
         return sortConfig.direction === 'asc' 
           ? a.batchNo.localeCompare(b.batchNo)
           : b.batchNo.localeCompare(a.batchNo);
       } else if (sortConfig.key === 'mfgDate') {
-        const dateA = new Date(a.mfgDate || 0).getTime();
-        const dateB = new Date(b.mfgDate || 0).getTime();
-        return sortConfig.direction === 'asc' ? dateA - dateB : dateB - dateA;
+        // Tối ưu: Chuỗi ISO ngày tháng có thể so sánh trực tiếp không cần parse Date
+        const dateA = a.mfgDate || '';
+        const dateB = b.mfgDate || '';
+        return sortConfig.direction === 'asc' ? dateA.localeCompare(dateB) : dateB.localeCompare(dateA);
       } else {
         // Default createdAt
-        const dateA = new Date(a.createdAt).getTime();
-        const dateB = new Date(b.createdAt).getTime();
-        return sortConfig.direction === 'asc' ? dateA - dateB : dateB - dateA;
+        const dateA = a.createdAt || '';
+        const dateB = b.createdAt || '';
+        return sortConfig.direction === 'asc' ? dateA.localeCompare(dateB) : dateB.localeCompare(dateA);
       }
     });  }, [hydratedBatches, debouncedSearchTerm, filterProductId, filterStatus, filterMonth, filterYear, sortConfig, isAdvancedFilterOpen, dateRange]);
 
@@ -385,19 +479,28 @@ const BatchList: React.FC = () => {
       return;
     }
     const pid = selectedProductId;
-    const latestTccs = state.tccsList.filter(t => t.productId === pid).sort((a, b) => new Date(b.issueDate).getTime() - new Date(a.issueDate).getTime())[0];
-    if (!latestTccs) return notify({ type: 'WARNING', title: 'Thiếu TCCS', message: 'Sản phẩm được chọn chưa có TCCS hiệu lực. Vui lòng lập TCCS trước.' });
     
+    const availableTccs = tccsList.filter(t => t.productId === pid).sort((a, b) => new Date(b.issueDate).getTime() - new Date(a.issueDate).getTime());
+    if (availableTccs.length === 0) return notify({ type: 'WARNING', title: 'Thiếu TCCS', message: 'Sản phẩm được chọn chưa có TCCS hiệu lực. Vui lòng lập TCCS trước.' });
+
+    const mfgDateStr = formData.get('mfgDate') as string;
+    let assignedTccs = availableTccs[0];
+    if (mfgDateStr) {
+      const mfgTime = new Date(mfgDateStr).getTime();
+      const match = availableTccs.find(t => new Date(t.issueDate).getTime() <= mfgTime);
+      assignedTccs = match || availableTccs[availableTccs.length - 1];
+    }
+
     const batchNo = (formData.get('batchNo') as string).toUpperCase();
 
     // Kiểm tra trùng số lô (1 số lô chỉ xuất hiện 1 lần cho 1 sản phẩm)
-    if (state.batches.some(b => b.batchNo === batchNo && b.productId === pid)) {
+    if (batches.some(b => b.batchNo === batchNo && b.productId === pid)) {
       return notify({ type: 'WARNING', title: 'Trùng lặp', message: `Số lô "${batchNo}" đã tồn tại cho sản phẩm này.` });
     }
 
     const batchData = {
         productId: pid, 
-        tccsId: latestTccs.id,
+        tccsId: assignedTccs.id,
         batchNo: batchNo,
         mfgDate: formData.get('mfgDate') as string, 
         expDate: formData.get('expDate') as string,
@@ -441,19 +544,28 @@ const BatchList: React.FC = () => {
     
     // Nếu không chọn lại sản phẩm thì dùng ID cũ
     const pid = selectedProductId || crud.selectedItem.productId;
-    const latestTccs = state.tccsList.filter(t => t.productId === pid).sort((a, b) => new Date(b.issueDate).getTime() - new Date(a.issueDate).getTime())[0];
-    if (!latestTccs) return notify({ type: 'WARNING', title: 'Thiếu TCCS', message: 'Sản phẩm được chọn chưa có TCCS hiệu lực.' });
     
+    const availableTccs = tccsList.filter(t => t.productId === pid).sort((a, b) => new Date(b.issueDate).getTime() - new Date(a.issueDate).getTime());
+    if (availableTccs.length === 0) return notify({ type: 'WARNING', title: 'Thiếu TCCS', message: 'Sản phẩm được chọn chưa có TCCS hiệu lực.' });
+
+    const mfgDateStr = formData.get('mfgDate') as string;
+    let assignedTccs = availableTccs[0];
+    if (mfgDateStr) {
+      const mfgTime = new Date(mfgDateStr).getTime();
+      const match = availableTccs.find(t => new Date(t.issueDate).getTime() <= mfgTime);
+      assignedTccs = match || availableTccs[availableTccs.length - 1];
+    }
+
     const batchNo = (formData.get('batchNo') as string).toUpperCase();
 
     // Kiểm tra trùng số lô (trừ chính nó khi cập nhật)
-    if (state.batches.some(b => b.batchNo === batchNo && b.productId === pid && b.id !== crud.selectedItem.id)) {
+    if (batches.some(b => b.batchNo === batchNo && b.productId === pid && b.id !== crud.selectedItem.id)) {
       return notify({ type: 'WARNING', title: 'Trùng lặp', message: `Số lô "${batchNo}" đã tồn tại cho sản phẩm này.` });
     }
 
     const batchData = {
         productId: pid, 
-        tccsId: latestTccs.id,
+        tccsId: assignedTccs.id,
         batchNo: batchNo,
         mfgDate: formData.get('mfgDate') as string, 
         expDate: formData.get('expDate') as string,
@@ -504,6 +616,9 @@ const BatchList: React.FC = () => {
     setIsSubmitting(true);
     
     try {
+      const productCodeMap = new Map(products.map(p => [p.code.toUpperCase(), p]));
+      const existingBatchesSet = new Set(batches.map(b => `${b.productId}-${b.batchNo}`));
+
       for (const line of lines) {
         // Format: Mã SP | Số Lô | Ngày SX | Hạn dùng | SL Lý thuyết | SL Thực tế | Đơn vị
         const parts = line.includes('\t') ? line.split('\t') : line.split(',');
@@ -512,25 +627,33 @@ const BatchList: React.FC = () => {
         
         if (!pCode || !batchNo) continue;
 
-        const product = state.products.find(p => p.code === pCode);
+        const product = productCodeMap.get(pCode);
         if (!product) {
           errors.push(`Không tìm thấy sản phẩm mã "${pCode}" cho lô ${batchNo}`);
           continue;
         }
 
-        // Tìm TCCS mới nhất
-        const latestTccs = state.tccsList
+        // Tìm TCCS theo ngày sản xuất (Backdate logic)
+        const availableTccs = tccsList
           .filter(t => t.productId === product.id)
-          .sort((a, b) => new Date(b.issueDate).getTime() - new Date(a.issueDate).getTime())[0];
+          .sort((a, b) => new Date(b.issueDate).getTime() - new Date(a.issueDate).getTime());
 
-        if (!latestTccs) {
+        if (availableTccs.length === 0) {
           errors.push(`Sản phẩm "${pCode}" chưa có TCCS để gán cho lô ${batchNo}`);
           continue;
         }
 
+        const mfgDateStr = parseDateToISO(parts[2]);
+        let assignedTccs = availableTccs[0];
+        if (mfgDateStr) {
+          const mfgTime = new Date(mfgDateStr).getTime();
+          const match = availableTccs.find(t => new Date(t.issueDate).getTime() <= mfgTime);
+          assignedTccs = match || availableTccs[availableTccs.length - 1];
+        }
+
         const compositeKey = `${product.id}-${batchNo}`;
         // Kiểm tra trùng trong DB hoặc trùng trong chính file đang nhập
-        if (state.batches.some(b => b.batchNo === batchNo && b.productId === product.id) || processedBatchNos.has(compositeKey)) {
+        if (existingBatchesSet.has(compositeKey) || processedBatchNos.has(compositeKey)) {
           errors.push(`Lô "${batchNo}" của sản phẩm "${pCode}" đã tồn tại (hoặc bị trùng lặp)`);
           continue;
         }
@@ -538,9 +661,9 @@ const BatchList: React.FC = () => {
         await addBatch({
           id: generateId('batch'),
           productId: product.id,
-          tccsId: latestTccs.id,
+          tccsId: assignedTccs.id,
           batchNo: batchNo,
-          mfgDate: parseDateToISO(parts[2]),
+          mfgDate: mfgDateStr,
           expDate: parseDateToISO(parts[3]),
           theoreticalYield: parseFloat(parts[4]?.trim()) || 0,
           actualYield: parseFloat(parts[5]?.trim()) || 0,
@@ -590,12 +713,40 @@ const BatchList: React.FC = () => {
     e.target.value = '';
   };
 
+  const handleExportExcel = () => {
+    if (filteredBatches.length === 0) return notify({ type: 'WARNING', message: 'Không có dữ liệu để xuất!' });
+    const headers = ['Số Lô', 'Mã SP', 'Tên Sản phẩm', 'Ngày SX', 'Hạn dùng', 'Cỡ lô', 'Sản lượng', 'ĐVT', 'Quy cách', 'Trạng thái'];
+    const rows = filteredBatches.map(b => [
+      b.batchNo,
+      b.product?.code || '',
+      `"${b.product?.name || ''}"`, // Bọc ngoặc kép để tránh lỗi dấu phẩy trong tên SP
+      formatDateStandard(b.mfgDate),
+      formatDateStandard(b.expDate),
+      b.theoreticalYield || 0,
+      b.actualYield || 0,
+      b.yieldUnit || '',
+      `"${b.packaging || ''}"`,
+      b.status === 'RELEASED' ? 'Phê duyệt' : b.status === 'REJECTED' ? 'Từ chối' : b.status === 'TESTING' ? 'Đang kiểm' : 'Kế hoạch'
+    ]);
+    
+    const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' }); // Thêm BOM để Excel đọc đúng Tiếng Việt
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `Danh_sach_lo_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   const handleAutoCalculateYield = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = parseFloat(e.target.value);
     const form = e.target.form;
     if (form && !isNaN(val)) {
       const actualInput = form.elements.namedItem('actualYield') as HTMLInputElement;
-      if (actualInput) {
+      // Chỉ tự động điền nếu ô Sản lượng thực tế đang trống (tránh ghi đè mất dữ liệu khi Edit)
+      if (actualInput && !actualInput.value) {
         // Tự động tính 98% (làm tròn)
         actualInput.value = Math.round(val * 0.98).toString();
       }
@@ -605,9 +756,9 @@ const BatchList: React.FC = () => {
   const handleEditClick = useCallback((batch: Batch) => {
     crud.openEdit(batch);
     setSelectedProductId(batch.productId);
-    const p = state.products.find(prod => prod.id === batch.productId);
+    const p = products.find(prod => prod.id === batch.productId);
     setProductSearch(p ? `${p.code} - ${p.name}` : '');
-  }, [state.products]);
+  }, [products, crud]);
 
   const handleViewClick = useCallback((batch: Batch) => {
     setViewBatch(batch);
@@ -627,15 +778,15 @@ const BatchList: React.FC = () => {
         await deleteBatch(crud.selectedItem.id);
         // Đóng modal ngay khi xóa thành công
         crud.close();
-        notify({ type: 'SUCCESS', title: 'Đã xóa', message: `Đã xóa lô ${crud.selectedItem.batchNo}` });
+        notify({ type: 'SUCCESS', title: 'Đã xóa', message: `Đã xóa lô ${crud.selectedItem!.batchNo}` });
         
         // Ghi log an toàn
         try {
           logAuditAction({
             action: 'DELETE',
             collection: 'BATCHES',
-            documentId: crud.selectedItem.id,
-            details: `Xóa lô ID: ${crud.selectedItem.id}`,
+            documentId: crud.selectedItem!.id,
+            details: `Xóa lô ID: ${crud.selectedItem!.id}`,
             performedBy: user?.email || 'unknown'
           });
         } catch (logErr) {
@@ -650,11 +801,11 @@ const BatchList: React.FC = () => {
     }
   }, [crud.selectedItem, deleteBatch, user]);
 
-  const handleUpdateBatchStatusClick = (newStatus: string, batchId: string) => {
+  const handleUpdateBatchStatusClick = useCallback((newStatus: string, batchId: string) => {
       setRejectReason('');
       setPendingStatusUpdate({ status: newStatus, batchId });
       setIsStatusConfirmOpen(true);
-  };
+  }, []);
 
   const confirmBatchStatusUpdate = async () => {
     if (!pendingStatusUpdate) return;
@@ -670,14 +821,109 @@ const BatchList: React.FC = () => {
     }
   };
 
+  const handlePrintIndividualCoa = useCallback((res: TestResult) => {
+    const batch = hydratedBatches.find(b => b.id === res.batchId);
+    const virtualResult: HydratedTestResult = {
+      ...res,
+      batch: batch,
+      product: batch?.product,
+    };
+    setSelectedResultForPrint(virtualResult);
+    setIsPrintModalOpen(true);
+  }, [hydratedBatches]);
+
+  const handlePrintConsolidatedCoa = useCallback((batchId: string) => {
+    if (!batchId) return;
+
+    const resultsForBatch = testResults
+      .filter(r => r.batchId === batchId)
+      .sort((a, b) => new Date(a.testDate).getTime() - new Date(b.testDate).getTime());
+
+    if (resultsForBatch.length === 0) {
+      notify({ type: 'INFO', message: 'Lô này chưa có kết quả kiểm nghiệm nào.' });
+      return;
+    }
+
+    const consolidatedResultsMap = new Map<string, TestResultEntry>();
+
+    resultsForBatch.forEach(res => {
+      ensureArray(res.results).forEach(entry => {
+        if (entry && entry.criteriaName) {
+          consolidatedResultsMap.set(entry.criteriaName, entry);
+        }
+      });
+    });
+
+    const finalResults = Array.from(consolidatedResultsMap.values());
+    const latestResult = resultsForBatch[resultsForBatch.length - 1];
+    const batch = hydratedBatches.find(b => b.id === batchId);
+    if (!batch) return;
+
+    const availableTCCSForBatch = tccsList
+      .filter(t => t.productId === batch.productId)
+      .sort((a, b) => new Date(b.issueDate).getTime() - new Date(a.issueDate).getTime());
+    
+    let tccsForEvaluation = null;
+    if (availableTCCSForBatch.length > 0) {
+        if (batch.mfgDate) {
+            const mfgTime = new Date(batch.mfgDate).getTime();
+            const match = availableTCCSForBatch.find(t => new Date(t.issueDate).getTime() <= mfgTime);
+            tccsForEvaluation = match || availableTCCSForBatch[availableTCCSForBatch.length - 1];
+        } else {
+            tccsForEvaluation = availableTCCSForBatch[0];
+        }
+    }
+
+    const overallStatus = calculateOverallStatus(finalResults, tccsForEvaluation);
+
+    const virtualResult: HydratedTestResult = {
+      id: `consolidated-${batchId}`,
+      batchId: batchId,
+      labName: 'Tổng hợp',
+      testDate: latestResult.testDate,
+      results: finalResults,
+      overallStatus: overallStatus,
+      notes: `Phiếu tổng hợp từ ${resultsForBatch.length} kết quả.`,
+      createdAt: new Date().toISOString(),
+      batch: { ...batch, tccs: tccsForEvaluation },
+      product: batch.product,
+    };
+
+    setSelectedResultForPrint(virtualResult);
+    setIsPrintModalOpen(true);
+  }, [testResults, hydratedBatches, tccsList, notify]);
+
+  useEffect(() => {
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (isPrintModalOpen) setIsPrintModalOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleEsc);
+    return () => window.removeEventListener('keydown', handleEsc);
+  }, [isPrintModalOpen]);
+
+  useEffect(() => {
+    if (isPrintModalOpen) {
+      document.body.classList.add('print-active');
+    } else {
+      document.body.classList.remove('print-active');
+    }
+    return () => document.body.classList.remove('print-active');
+  }, [isPrintModalOpen]);
+
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
+      <style>{printStyles}</style>
       <PageHeader 
         title="Quản lý Lô & Tồn kho" 
         subtitle="Quản lý dòng đời sản phẩm." 
         icon={Layers} 
         action={
           <div className="flex gap-3">
+            <button onClick={handleExportExcel} className="flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-200 text-slate-700 rounded-xl hover:bg-slate-50 font-black uppercase text-[10px] transition-all shadow-sm">
+              <Download size={16} /> Xuất Excel
+            </button>
             <button onClick={() => setIsImportModalOpen(true)} className="flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-200 text-slate-700 rounded-xl hover:bg-slate-50 font-black uppercase text-[10px] transition-all shadow-sm">
               <Upload size={16} /> Nhập Excel
             </button>
@@ -687,7 +933,7 @@ const BatchList: React.FC = () => {
       />
 
       <DSFilterBar>
-        <DSSearchInput placeholder="Tìm số lô..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+        <DSSearchInput placeholder="Tìm số lô..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} onClear={() => setSearchTerm('')} />
         
         {!isAdvancedFilterOpen && (
           <>
@@ -751,7 +997,7 @@ const BatchList: React.FC = () => {
                 className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500"
               >
                  <option value="">-- Tất cả sản phẩm --</option>
-                 {state.products.map(p => <option key={p.id} value={p.id}>{p.name} - {p.code}</option>)}
+                 {products.map(p => <option key={p.id} value={p.id}>{p.name} - {p.code}</option>)}
               </select>
            </div>
         </div>
@@ -788,13 +1034,23 @@ const BatchList: React.FC = () => {
               onFocus={() => setShowProductDropdown(true)}
               onBlur={() => setTimeout(() => setShowProductDropdown(false), 200)}
               placeholder="Tìm kiếm sản phẩm..."
-              className="w-full pl-10 pr-4 py-3 bg-slate-50 border rounded-xl font-bold outline-none shadow-inner text-sm focus:ring-2 focus:ring-indigo-500"
+              className="w-full pl-10 pr-10 py-3 bg-slate-50 border rounded-xl font-bold outline-none shadow-inner text-sm focus:ring-2 focus:ring-indigo-500"
             />
-            {selectedProductId && <CheckCircle2 className="absolute right-4 top-1/2 -translate-y-1/2 text-indigo-600" size={16} />}
+            
+            {selectedProductId ? (
+              <button type="button" onClick={() => { setSelectedProductId(''); setProductSearch(''); setShowProductDropdown(true); }} className="absolute right-4 top-1/2 -translate-y-1/2 group transition-colors" title="Hủy chọn">
+                <CheckCircle2 size={16} className="text-emerald-600 group-hover:hidden" />
+                <X size={16} className="text-red-500 hidden group-hover:block" />
+              </button>
+            ) : productSearch ? (
+              <button type="button" onClick={() => { setProductSearch(''); setSelectedProductId(''); }} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors" title="Xóa">
+                <X size={16} />
+              </button>
+            ) : null}
             
             {showProductDropdown && (
               <div className="absolute z-20 w-full mt-2 bg-white rounded-xl shadow-2xl border border-slate-100 max-h-60 overflow-y-auto">
-                {state.products.filter(p => !productSearch || p.name.toLowerCase().includes(productSearch.toLowerCase()) || p.code.toLowerCase().includes(productSearch.toLowerCase())).map(p => (
+                       {products.filter(p => !productSearch || p.name.toLowerCase().includes(productSearch.toLowerCase()) || p.code.toLowerCase().includes(productSearch.toLowerCase())).map(p => (
                   <div 
                     key={p.id}
                     onClick={() => {
@@ -813,8 +1069,8 @@ const BatchList: React.FC = () => {
           </div>
           <DSFormInput name="batchNo" required placeholder="Số Lô" className="uppercase" />
           <div className="grid grid-cols-2 gap-4">
-            <DSFormInput type="date" name="mfgDate" />
-            <DSFormInput type="date" name="expDate" />
+            <DSFormInput type="date" name="mfgDate" required />
+            <DSFormInput type="date" name="expDate" required />
           </div>
           <div className="grid grid-cols-2 gap-4">
             <DSFormInput type="number" name="theoreticalYield" placeholder="Cỡ lô" onChange={handleAutoCalculateYield} />
@@ -846,8 +1102,8 @@ const BatchList: React.FC = () => {
             </div>
             <DSFormInput label="Số Lô" name="batchNo" defaultValue={crud.selectedItem.batchNo} required className="uppercase" />
             <div className="grid grid-cols-2 gap-4">
-              <DSFormInput label="Ngày SX" type="date" name="mfgDate" defaultValue={toInputDate(crud.selectedItem.mfgDate)} />
-              <DSFormInput label="Hạn dùng" type="date" name="expDate" defaultValue={toInputDate(crud.selectedItem.expDate)} />
+              <DSFormInput label="Ngày SX" type="date" name="mfgDate" defaultValue={toInputDate(crud.selectedItem.mfgDate)} required />
+              <DSFormInput label="Hạn dùng" type="date" name="expDate" defaultValue={toInputDate(crud.selectedItem.expDate)} required />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <DSFormInput type="number" name="theoreticalYield" defaultValue={crud.selectedItem.theoreticalYield} placeholder="Cỡ lô" onChange={handleAutoCalculateYield} />
@@ -1028,12 +1284,38 @@ const BatchList: React.FC = () => {
                     <div><span className="font-bold text-slate-500">HSD:</span> {formatDateStandard(viewBatch.expDate)}</div>
                     <div><span className="font-bold text-slate-500">Cỡ lô:</span> {viewBatch.theoreticalYield?.toLocaleString()} {viewBatch.yieldUnit}</div>
                     <div><span className="font-bold text-slate-500">Thực tế:</span> {viewBatch.actualYield?.toLocaleString()} {viewBatch.yieldUnit}</div>
+                    <div className="col-span-2 pt-2 mt-1 border-t border-slate-200">
+                      <span className="font-bold text-slate-500">Tiêu chuẩn áp dụng:</span>{' '}
+                      <span className="font-bold text-indigo-700">{(viewBatch as any).tccs?.code || 'Không xác định'}</span>
+                      {(viewBatch as any).tccs?.name && <span className="text-slate-500 ml-1">({(viewBatch as any).tccs?.name})</span>}
+                    </div>
                  </div>
               </div>
 
+              {/* Tiến độ kiểm nghiệm */}
+              {(() => {
+                 const { progressPercent, missingCriteria } = calculateBatchProgress(viewBatch, testResults);
+                 return (
+                   <div className="bg-white p-4 rounded-xl border border-slate-200">
+                     <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2"><FlaskConical size={12}/> Tiến độ kiểm nghiệm ({progressPercent}%)</h4>
+                     <div className="w-full bg-slate-100 rounded-full h-2 mb-3">
+                       <div className={`h-2 rounded-full transition-all duration-500 ${progressPercent === 100 ? 'bg-emerald-500' : 'bg-indigo-500'}`} style={{ width: `${progressPercent}%` }}></div>
+                     </div>
+                     {missingCriteria.length > 0 ? (
+                       <p className="text-[10px] font-bold text-amber-600 flex items-center gap-1"><AlertTriangle size={12}/> Còn thiếu {missingCriteria.length} chỉ tiêu (Chưa kiểm hoặc chờ kết quả)</p>
+                     ) : (
+                       <p className="text-[10px] font-bold text-emerald-600 flex items-center gap-1"><CheckCircle2 size={12}/> Đã hoàn thành 100% chỉ tiêu theo TCCS</p>
+                     )}
+                   </div>
+                 );
+              })()}
+
               {/* Test Results */}
               <div>
-                 <h5 className="text-xs font-black text-slate-500 uppercase tracking-widest mb-2 flex items-center gap-2"><ClipboardCheck size={14}/> Lịch sử Kiểm nghiệm</h5>
+                 <div className="flex justify-between items-center mb-3">
+                    <h5 className="text-xs font-black text-slate-500 uppercase tracking-widest flex items-center gap-2"><ClipboardCheck size={14}/> Lịch sử Kiểm nghiệm</h5>
+                    <button type="button" onClick={() => { const currentId = viewBatch.id; setViewBatch(null); setTimeout(() => setHistoryBatchId(currentId), 400); }} className="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-lg hover:bg-indigo-100 flex items-center gap-1 transition-colors"><Layers size={12}/> Xem Bảng Tổng hợp</button>
+                 </div>
                  <div className="space-y-4">
                     {testResults.filter(r => r.batchId === viewBatch.id).length === 0 ? (
                         <div className="p-8 text-center border border-slate-100 rounded-xl bg-slate-50 text-slate-400 italic text-xs">
@@ -1052,9 +1334,9 @@ const BatchList: React.FC = () => {
                                             <p className="text-[10px] text-slate-500">{new Date(res.testDate).toLocaleDateString('en-GB')}</p>
                                         </div>
                                     </div>
-                                    <Link to={`/test-results?batchId=${viewBatch.id}`} className="text-[10px] font-bold text-indigo-600 hover:underline">
-                                        Xem phiếu
-                                    </Link>
+                                    <button type="button" onClick={() => handlePrintIndividualCoa(res)} className="text-[10px] font-bold text-blue-600 hover:underline flex items-center gap-1">
+                                        <Printer size={12}/> Xem phiếu
+                                    </button>
                                 </div>
                                 <div className="p-0">
                                     <table className="w-full text-xs">
@@ -1093,6 +1375,67 @@ const BatchList: React.FC = () => {
            </div>
         )}
       </Modal>
+
+      {/* Modal Tổng hợp Lịch sử Kiểm nghiệm */}
+      <Modal 
+        isOpen={!!historyBatchId} 
+        onClose={() => setHistoryBatchId(null)} 
+        title="Tổng hợp Kết quả Kiểm nghiệm" 
+        icon={ClipboardCheck}
+        color="bg-indigo-600"
+      >
+        {historyBatchId && (
+          <div className="max-h-[70vh] overflow-y-auto custom-scrollbar pr-2">
+            <BatchCriteriaHistory batchId={historyBatchId} />
+            <div className="flex justify-end gap-3 pt-4 mt-4 border-t border-slate-100">
+              <button 
+                type="button" onClick={() => handlePrintConsolidatedCoa(historyBatchId!)} 
+                className="flex items-center gap-2 px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold uppercase transition-colors shadow-md shadow-indigo-100"
+              >
+                <Printer size={14} /> In CoA Tổng hợp
+              </button>
+              <button 
+                type="button" onClick={() => setHistoryBatchId(null)} 
+                className="px-6 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg text-xs font-bold uppercase transition-colors"
+              >
+                Đóng
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* CoA Viewer modal */}
+      {isPrintModalOpen && selectedResultForPrint && (
+        <div className="print-container fixed inset-0 z-[150] flex flex-col bg-slate-900/98 backdrop-blur-2xl overflow-y-auto p-4 md:p-12 animate-in fade-in duration-300 print:static print:p-0 print:bg-white print:overflow-visible">
+          <button 
+            onClick={() => setIsPrintModalOpen(false)} 
+            className="fixed top-6 right-6 z-[80] p-3 bg-white/10 hover:bg-white/20 text-white rounded-full backdrop-blur-md transition-all border border-white/10 shadow-xl no-print"
+            title="Đóng (Esc)"
+          >
+            <X size={24}/>
+          </button>
+          <div className="max-h-[85vh] overflow-y-auto custom-scrollbar max-w-[21cm] mx-auto w-full print:block print:h-auto print:max-w-full">
+            <div className="flex items-center justify-between mb-10 text-white no-print">
+               <h3 className="text-2xl font-black uppercase tracking-tighter">Xuất Phiếu CoA</h3>
+               <div className="flex items-center gap-4">
+                  <button onClick={() => window.print()} className="px-10 py-4 bg-white text-slate-900 rounded-[2rem] font-black hover:bg-slate-100 shadow-2xl transition-all uppercase text-xs tracking-widest flex items-center gap-2"><Printer size={18}/> In phiếu</button>
+               </div>
+            </div>
+            <div className="bg-white shadow-2xl rounded-sm animate-in zoom-in-95 duration-500 print:shadow-none">
+              <React.Suspense fallback={<div className="p-20 text-center font-bold text-slate-400">Đang tải phiếu CoA...</div>}>
+                <CoAReport 
+                  res={selectedResultForPrint} 
+                  batch={selectedResultForPrint.batch}
+                  product={selectedResultForPrint.product}
+                  tccs={selectedResultForPrint.batch?.tccs}
+                  formula={productFormulas.find(f => f.productId === selectedResultForPrint.product?.id)}
+                />
+              </React.Suspense>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -15,13 +15,14 @@ export const generateId = (prefix?: string): string => {
 
     // Ưu tiên dùng randomUUID nếu khả dụng (Secure Context)
     if (cryptoObj && typeof cryptoObj.randomUUID === 'function') {
-      id = cryptoObj.randomUUID();
+      // Xóa dấu gạch ngang để ID ngắn gọn và liền mạch hơn (VD: thay vì a-b-c thì thành abc)
+      id = cryptoObj.randomUUID().replace(/-/g, '');
     } else {
       throw new Error('Fallback needed');
     }
   } catch (e) {
     // Fallback: Timestamp + Random string (cho môi trường HTTP/Legacy hoặc khi crypto.randomUUID throw lỗi)
-    id = `${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
+    id = `${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 11)}`;
   }
 
   return prefix ? `${prefix}_${id}` : id;

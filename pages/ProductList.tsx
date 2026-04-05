@@ -1,19 +1,15 @@
 
 import React, { useState, useMemo, useCallback, memo, useEffect } from 'react';
-import { useAppContext } from '../context/AppContext';
-import { useAuth } from '../context/AuthContext';
-import { Plus, Search, Trash2, Edit2, Upload, Eye, FileSpreadsheet, Package, X, Calendar, Building2, AlertCircle, Info, CheckCircle2, ChevronLeft, ChevronRight, LayoutGrid, List, ArrowUpDown, FileUp, Loader2 } from 'lucide-react';
+import { useAppStore } from '../store/useAppStore';
+import { Plus, Search, Trash2, Edit2, Upload, Eye, FileSpreadsheet, Package, X, Building2, AlertCircle, Info, CheckCircle2, LayoutGrid, List, ArrowUpDown, FileUp, Loader2, PackageSearch } from 'lucide-react';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import { Product, ProductStatus } from '../types';
-import { StatusBadge, PageHeader, Modal, Pagination } from '../components/CommonUI';
-import { DSFilterBar, DSSearchInput, DSSelect, DSViewToggle, DSCard, DSTable, DSFormInput } from '../components/DesignSystem';
-import { PRODUCT_STATUS } from '../utils/constants';
-import { useLocalStorage } from '../hooks/useLocalStorage';
-import { useDebounce } from '../hooks/useDebounce';
-import { useCrud } from '../hooks/useCrud';
 import { logAuditAction } from '../services/auditService';
-import { ActionButtons, DeleteModal, AddButton } from '../components/CrudControls';
-import { generateId } from '../utils/idGenerator';
+import { StatusBadge, PageHeader, Modal, Pagination, DSFilterBar, DSSearchInput, DSSelect, DSViewToggle, DSCard, DSTable, DSFormInput, ActionButtons, DeleteModal, AddButton, DSEmptyState } from '../components';
+import { useDebounce, useCrud } from '../hooks';
+import { useUIStore } from '../store/useUIStore';
+import { PRODUCT_STATUS, generateId } from '../utils';
+import { useShallow } from 'zustand/react/shallow';
 
 const SELF_ANNOUNCED_COMPANY = "CÔNG TY CỔ PHẦN CÔNG NGHỆ SINH PHẨM NAM VIỆT";
 
@@ -105,6 +101,10 @@ const ProductListItem = memo(({ product, onEdit, onDelete }: { product: Product,
 });
 
 const ProductDataList = ({ viewMode, data, onEdit, onDelete }: any) => {
+  if (data.length === 0) {
+     return <DSEmptyState icon={PackageSearch} title="Không tìm thấy Sản phẩm" message="Chưa có sản phẩm nào khớp với từ khóa hoặc bộ lọc." />;
+  }
+
   if (viewMode === 'grid') {
     return (
       <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
@@ -135,8 +135,17 @@ const ProductDataList = ({ viewMode, data, onEdit, onDelete }: any) => {
 };
 
 const ProductList: React.FC = () => {
-  const { state, addProduct, updateProduct, deleteProduct, bulkAddProducts, notify } = useAppContext();
-  const { user } = useAuth();
+  // Zustand Selectors
+  // Tối ưu 1: Gom nhóm Zustand Selectors bằng useShallow
+  const { products, addProduct, updateProduct, deleteProduct, bulkAddProducts, notify, user } = useAppStore(useShallow(state => ({
+    products: state.products,
+    addProduct: state.addProduct,
+    updateProduct: state.updateProduct,
+    deleteProduct: state.deleteProduct,
+    bulkAddProducts: state.bulkAddProducts,
+    notify: state.notify,
+    user: state.user
+  })));
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   
@@ -149,7 +158,8 @@ const ProductList: React.FC = () => {
 
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [importText, setImportText] = useState('');
-  const [viewMode, setViewMode] = useLocalStorage<'grid' | 'list'>('product_view_mode', 'grid');
+  const viewMode = useUIStore(s => s.productViewMode);
+  const setViewMode = useUIStore(s => s.setProductViewMode);
   const [sortConfig, setSortConfig] = useState<{ key: keyof Product; direction: 'asc' | 'desc' }>({ key: 'createdAt', direction: 'desc' });
   const [filterType, setFilterType] = useState<'ALL' | 'SELF' | 'OUTSOURCE'>('ALL');
   const [filterStatus, setFilterStatus] = useState<ProductStatus | 'ALL'>('ALL');
@@ -168,16 +178,27 @@ const ProductList: React.FC = () => {
   };
 
   const filteredProducts = useMemo(() => {
-    let result = state.products.filter(p => {
-      const matchesSearch = p.name.toLowerCase().includes(paramSearchTerm.toLowerCase()) || 
-      p.code.toLowerCase().includes(paramSearchTerm.toLowerCase()) ||
-      p.registrant.toLowerCase().includes(paramSearchTerm.toLowerCase());
+    const searchLower = paramSearchTerm.toLowerCase();
+    const hasSearch = searchLower.length > 0;
 
-      const isSelf = p.registrant.trim().toUpperCase() === SELF_ANNOUNCED_COMPANY;
-      const matchesType = filterType === 'ALL' ? true : filterType === 'SELF' ? isSelf : !isSelf;
+    let result = products.filter(p => {
+      // Tối ưu 2: Early return để tránh tính toán chuỗi thừa
+      if (filterStatus !== 'ALL' && p.status !== filterStatus) return false;
+      
+      if (filterType !== 'ALL') {
+         const isSelf = p.registrant.trim().toUpperCase() === SELF_ANNOUNCED_COMPANY;
+         if (filterType === 'SELF' && !isSelf) return false;
+         if (filterType === 'OUTSOURCE' && isSelf) return false;
+      }
 
-      const matchesStatus = filterStatus === 'ALL' ? true : p.status === filterStatus;
-      return matchesSearch && matchesType && matchesStatus;
+      if (hasSearch) {
+         if (!p.name.toLowerCase().includes(searchLower) && 
+             !p.code.toLowerCase().includes(searchLower) &&
+             !p.registrant.toLowerCase().includes(searchLower)) {
+           return false;
+         }
+      }
+      return true;
     });
 
     // Sorting logic
@@ -186,21 +207,19 @@ const ProductList: React.FC = () => {
       const bValue = b[sortConfig.key];
 
       if (sortConfig.key === 'createdAt' || sortConfig.key === 'registrationDate') {
-        const dateA = new Date(aValue as string).getTime();
-        const dateB = new Date(bValue as string).getTime();
-        return sortConfig.direction === 'asc' ? dateA - dateB : dateB - dateA;
+        // Tối ưu 3: So sánh chuỗi ISO trực tiếp thay vì khởi tạo Date object
+        const dateA = (aValue as string) || '';
+        const dateB = (bValue as string) || '';
+        return sortConfig.direction === 'asc' ? dateA.localeCompare(dateB) : dateB.localeCompare(dateA);
       }
 
-      const strA = String(aValue).toLowerCase();
-      const strB = String(bValue).toLowerCase();
-      
-      if (strA < strB) return sortConfig.direction === 'asc' ? -1 : 1;
-      if (strA > strB) return sortConfig.direction === 'asc' ? 1 : -1;
-      return 0;
+      const strA = String(aValue || '');
+      const strB = String(bValue || '');
+      return sortConfig.direction === 'asc' ? strA.localeCompare(strB) : strB.localeCompare(strA);
     });
 
     return result;
-  }, [state.products, paramSearchTerm, sortConfig, filterType, filterStatus]);
+  }, [products, paramSearchTerm, sortConfig, filterType, filterStatus]);
 
   // Effect to update URL search param when debounced term changes
   useEffect(() => {
@@ -249,7 +268,7 @@ const ProductList: React.FC = () => {
     }
 
     // Validate: Không trùng cả Mã và Tên
-    const isDuplicate = state.products.some(p => p.code === data.code && p.name === data.name);
+    const isDuplicate = products.some(p => p.code === data.code && p.name === data.name);
 
     if (isDuplicate) {
       notify({ type: 'ERROR', title: 'Trùng lặp', message: 'Sản phẩm với cùng Mã và Tên đã tồn tại!' });
@@ -290,7 +309,7 @@ const ProductList: React.FC = () => {
         return;
       }
 
-      const isDuplicate = state.products.some(p => 
+      const isDuplicate = products.some(p => 
         p.id !== crud.selectedItem?.id && p.code === data.code && p.name === data.name
       );
 
@@ -323,7 +342,7 @@ const ProductList: React.FC = () => {
       const errors: string[] = [];
       
       // Use existing products + products in this batch for duplicate checks
-      const existingProductSignatures = new Set(state.products.map(p => `${p.code?.trim().toUpperCase()}|${p.name?.trim()}`));
+      const existingProductSignatures = new Set(products.map(p => `${p.code?.trim().toUpperCase()}|${p.name?.trim()}`));
 
       for (const line of lines) {
         const parts = line.includes('\t') ? line.split('\t') : line.split(',');
@@ -410,15 +429,15 @@ const ProductList: React.FC = () => {
         await deleteProduct(crud.selectedItem.id);
         // Đóng modal ngay khi xóa thành công
         crud.close();
-        notify({ type: 'SUCCESS', title: 'Đã xóa', message: `Đã xóa sản phẩm ${crud.selectedItem.name}` });
+        notify({ type: 'SUCCESS', title: 'Đã xóa', message: `Đã xóa sản phẩm ${crud.selectedItem!.name}` });
         
         // Ghi log an toàn
         try {
           logAuditAction({
             action: 'DELETE',
             collection: 'PRODUCTS',
-            documentId: crud.selectedItem.id,
-            details: `Xóa sản phẩm: ${crud.selectedItem.name}`,
+            documentId: crud.selectedItem!.id,
+            details: `Xóa sản phẩm: ${crud.selectedItem!.name}`,
             performedBy: user?.email || 'unknown'
           });
         } catch (logErr) {
@@ -449,7 +468,7 @@ const ProductList: React.FC = () => {
       />
 
       <DSFilterBar>
-        <DSSearchInput placeholder="Tìm theo tên, mã sản phẩm..." value={localSearchTerm} onChange={(e) => setLocalSearchTerm(e.target.value)} />
+        <DSSearchInput placeholder="Tìm theo tên, mã sản phẩm..." value={localSearchTerm} onChange={(e) => setLocalSearchTerm(e.target.value)} onClear={() => setLocalSearchTerm('')} />
         
         <DSSelect icon={Building2} value={filterType} onChange={(e) => setFilterType(e.target.value as any)} className="w-32">
            <option value="ALL">Tất cả nguồn</option>
@@ -479,7 +498,7 @@ const ProductList: React.FC = () => {
 
       <div className="flex flex-wrap items-center justify-between gap-4 px-2 animate-in fade-in slide-in-from-top-2 duration-500">
         <div className="flex items-center gap-2 text-xs font-bold text-slate-500">
-          <span className="bg-slate-100 text-slate-600 px-2.5 py-1 rounded-lg">Tổng: {state.products.length}</span>
+          <span className="bg-slate-100 text-slate-600 px-2.5 py-1 rounded-lg">Tổng: {products.length}</span>
           <span className="text-slate-300">|</span>
           <span className="text-indigo-600">Kết quả: {filteredProducts.length}</span>
           {paramSearchTerm && (

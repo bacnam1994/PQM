@@ -1,4 +1,4 @@
-import React, { useEffect, useCallback } from 'react';
+import React, { useEffect, useCallback, useMemo } from 'react';
 
 interface UseFormDraftOptions<T> {
   key: string;
@@ -6,6 +6,7 @@ interface UseFormDraftOptions<T> {
   setFormValues: React.Dispatch<React.SetStateAction<T>>;
   isEnabled?: boolean;
   onDraftLoaded?: (data: T) => void;
+  skipSave?: (values: T) => boolean;
 }
 
 export function useFormDraft<T>({
@@ -13,12 +14,19 @@ export function useFormDraft<T>({
   formValues,
   setFormValues,
   isEnabled = true,
-  onDraftLoaded
+  onDraftLoaded,
+  skipSave
 }: UseFormDraftOptions<T>) {
   
   // Tự động lưu nháp sau mỗi 500ms khi form thay đổi
   useEffect(() => {
     if (isEnabled) {
+      // Nếu form rỗng (thỏa mãn skipSave) -> Xóa nháp hiện tại và hủy lưu
+      if (skipSave && skipSave(formValues)) {
+        try { localStorage.removeItem(key); } catch {}
+        return;
+      }
+
       const timeout = setTimeout(() => {
         try {
           localStorage.setItem(key, JSON.stringify(formValues));
@@ -28,7 +36,7 @@ export function useFormDraft<T>({
       }, 500);
       return () => clearTimeout(timeout);
     }
-  }, [formValues, isEnabled, key]);
+  }, [formValues, isEnabled, key, skipSave]);
 
   // Hàm kiểm tra và khôi phục bản nháp
   const checkDraft = useCallback(() => {
@@ -44,6 +52,12 @@ export function useFormDraft<T>({
         const parsed = JSON.parse(draft);
         // Kiểm tra sơ bộ xem object có dữ liệu không
         if (parsed && typeof parsed === 'object' && Object.keys(parsed).length > 0) {
+          // Tự động dọn dẹp nháp rác từ các phiên cũ mà không cần hỏi người dùng
+          if (skipSave && skipSave(parsed)) {
+            try { localStorage.removeItem(key); } catch {}
+            return false;
+          }
+
           if (window.confirm('Hệ thống tìm thấy dữ liệu đang nhập dở từ phiên trước. Bạn có muốn khôi phục không?')) {
             setFormValues(parsed);
             if (onDraftLoaded) {
@@ -60,7 +74,7 @@ export function useFormDraft<T>({
       }
     }
     return false;
-  }, [key, setFormValues, onDraftLoaded]);
+  }, [key, setFormValues, onDraftLoaded, skipSave]);
 
   // Hàm xóa bản nháp (gọi khi lưu thành công)
   const clearDraft = useCallback(() => {
@@ -69,5 +83,5 @@ export function useFormDraft<T>({
     } catch {}
   }, [key]);
 
-  return { checkDraft, clearDraft };
+  return useMemo(() => ({ checkDraft, clearDraft }), [checkDraft, clearDraft]);
 }

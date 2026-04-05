@@ -1,10 +1,10 @@
 
-import React from 'react';
+import React, { memo } from 'react';
 import { X, CheckCircle2, AlertCircle, Loader2, Tag, ShieldCheck, Clock, HelpCircle, ChevronLeft, ChevronRight } from 'lucide-react';
 import { BATCH_STATUS, PRODUCT_STATUS, TEST_RESULT_STATUS } from '../utils/constants';
 
 // --- BỘ NHẬN DIỆN TRẠNG THÁI DÙNG CHUNG ---
-export const StatusBadge: React.FC<{ type: string; status: string }> = ({ type, status }) => {
+export const StatusBadge: React.FC<{ type: string; status: string }> = memo(({ type, status }) => {
   const configs: Record<string, any> = {
     PRODUCT: {
       [PRODUCT_STATUS.ACTIVE]: { bg: 'bg-emerald-50', text: 'text-emerald-700', icon: Tag, label: 'Đang công bố' },
@@ -32,9 +32,10 @@ export const StatusBadge: React.FC<{ type: string; status: string }> = ({ type, 
       {config.label}
     </span>
   );
-};
+});
 
 // --- WRAPPER CHO CÁC MODAL ---
+// Tối ưu 2: Gỡ bỏ React.memo cho Modal vì nó nhận prop "children" (luôn thay đổi tham chiếu, memo bị vô tác dụng)
 export const Modal: React.FC<{ isOpen: boolean; onClose: () => void; title: string; children: React.ReactNode; icon: any; color?: string }> = ({ isOpen, onClose, title, children, icon: Icon, color = 'bg-[#009639]' }) => {
   if (!isOpen) return null;
   return (
@@ -54,6 +55,7 @@ export const Modal: React.FC<{ isOpen: boolean; onClose: () => void; title: stri
 };
 
 // --- TIÊU ĐỀ TRANG DÙNG CHUNG ---
+// Tối ưu 3: Gỡ bỏ React.memo do component nhận "action" (ReactNode)
 export const PageHeader: React.FC<{ title: string; subtitle: string; icon: any; action?: React.ReactNode }> = ({ title, subtitle, icon: Icon, action }) => (
   <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-6">
     <div>
@@ -71,7 +73,7 @@ export const Pagination: React.FC<{
   currentPage: number;
   totalPages: number;
   onPageChange: (page: number) => void;
-}> = ({ currentPage, totalPages, onPageChange }) => {
+}> = memo(({ currentPage, totalPages, onPageChange }) => {
   if (totalPages <= 1) {
     return null;
   }
@@ -97,7 +99,7 @@ export const Pagination: React.FC<{
       </button>
     </div>
   );
-};
+});
 
 // --- COMPONENT MODAL XÁC NHẬN ---
 export const ConfirmationModal: React.FC<{
