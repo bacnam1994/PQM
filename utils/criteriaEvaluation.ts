@@ -1,5 +1,4 @@
 import { evaluateCriterion } from './parsing';
-import React from 'react';
 
 export const safeParseFloat = (str: string): number => {
   if (!str) return NaN;
@@ -190,39 +189,6 @@ export const checkRange = (limit: string, value: string): boolean | null => {
   return null;
 };
 
-/**
- * Làm tròn một giá trị số dựa trên số chữ số thập phân của một chuỗi tham chiếu
- * (hỗ trợ cả số thập phân và số mũ).
- */
-const roundValue = (actualValue: number, reference: string): number => {
-  if (!reference) return actualValue;
-
-  // 1. Nhận diện dạng số mũ (Ví dụ: "1.5 x 10^3", "1.54*10^4", "1.5e3")
-  const sciMatch = reference.match(/([0-9]+(?:\.[0-9]+)?)\s*(?:x|\*|X)?\s*(?:10\^|e|E)\s*(-?[0-9]+)/);
-  if (sciMatch) {
-    const mantissaStr = sciMatch[1]; // Phần định trị (VD: "1.5")
-    const exponent = parseInt(sciMatch[2], 10); // Phần mũ (VD: 3)
-    const decimals = mantissaStr.includes('.') ? mantissaStr.split('.')[1].length : 0;
-    
-    const valueMantissa = actualValue / Math.pow(10, exponent);
-    const multiplier = Math.pow(10, decimals);
-    // Bù trừ sai số dấu phẩy động (VD: 1.005 * 100 = 100.499999)
-    const roundedMantissa = Math.round((valueMantissa + Number.EPSILON) * multiplier) / multiplier;
-    
-    return roundedMantissa * Math.pow(10, exponent);
-  }
-
-  // 2. Nhận diện dạng số thập phân thông thường
-  const decimalMatch = reference.match(/[.,](\d+)/);
-  if (decimalMatch && decimalMatch[1]) {
-    const decimalPlaces = decimalMatch[1].length;
-    const factor = Math.pow(10, decimalPlaces);
-    // Bù trừ sai số dấu phẩy động
-    return Math.round((actualValue + Number.EPSILON) * factor) / factor;
-  }
-  return actualValue;
-};
-
 // Debug helper (remove in prod)
 const debugRange = (limit: string, value: string, result: boolean) => {
   if (process.env.NODE_ENV === 'development') {
@@ -268,8 +234,9 @@ export const evaluateCriterionSmart = (criterion: any, value: any): boolean => {
 
 /**
  * Helper: Format số sang dạng mũ (VD: 1000 -> 10³) để hiển thị đẹp trên toàn UI
+ * Trả về chuỗi thuần (Pure String) sử dụng Unicode để tránh rò rỉ React Object
  */
-export const formatScientific = (value: string | number): React.ReactNode => {
+export const formatScientific = (value: string | number): string => {
   const stringValue = String(value).trim();
   const stringUpper = stringValue.toUpperCase();
 
@@ -286,7 +253,7 @@ export const formatScientific = (value: string | number): React.ReactNode => {
   // Chỉ cho phép các ký tự dùng trong toán học cơ bản. Chữ cái (khác e, E, x, X) sẽ được tính là văn bản thuần.
   const hasText = /[a-df-wy-zA-DF-WY-Zà-ỹÀ-Ỹ]/.test(stringValue);
   if (hasText) {
-    return value;
+    return stringValue;
   }
 
   let num = Number(value);
@@ -296,10 +263,10 @@ export const formatScientific = (value: string | number): React.ReactNode => {
   
   if (isNaN(num) || isSciFormat) {
     num = parseNumberFromText(stringValue);
-    if (num === 0 && String(value).trim() !== '0') return value;
+    if (num === 0 && String(value).trim() !== '0') return stringValue;
   }
   
-  if (num === 0) return value;
+  if (num === 0) return stringValue;
 
   // Chỉ tự động biến thành mũ nếu là dạng mũ gốc, hoặc số siêu lớn/siêu nhỏ
   if (isSciFormat || Math.abs(num) >= 1000000 || (Math.abs(num) > 0 && Math.abs(num) <= 0.00001)) {
@@ -308,12 +275,15 @@ export const formatScientific = (value: string | number): React.ReactNode => {
     // Tăng độ chính xác làm tròn lên 5 chữ số để không làm mất phần định trị dài
     const roundedMantissa = Math.round((mantissa + Number.EPSILON) * 100000) / 100000;
 
-    const elements: React.ReactNode[] = [];
-    if (roundedMantissa !== 1) elements.push(`${roundedMantissa} × `);
-    elements.push('10');
-    elements.push(React.createElement('sup', { key: 'exp' }, exponent));
+    // Sử dụng mã Unicode thay vì HTML/ReactNode để giữ tính toàn vẹn của chuỗi
+    const superscripts: Record<string, string> = {
+      '0': '⁰', '1': '¹', '2': '²', '3': '³', '4': '⁴',
+      '5': '⁵', '6': '⁶', '7': '⁷', '8': '⁸', '9': '⁹', '-': '⁻'
+    };
+    const expStr = String(exponent).split('').map(c => superscripts[c] || c).join('');
 
-    return React.createElement('span', { className: 'whitespace-nowrap' }, ...elements);
+    if (roundedMantissa !== 1) return `${roundedMantissa} × 10${expStr}`;
+    return `10${expStr}`;
   }
   // Chặn lỗi toLocaleString tự động cắt xén chuỗi nếu vượt quá 3 chữ số thập phân
   return num.toLocaleString('vi-VN', { maximumFractionDigits: 10 });

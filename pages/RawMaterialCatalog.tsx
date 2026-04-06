@@ -37,7 +37,7 @@ const RawMaterialCatalog: React.FC = () => {
         m.aliases.some(a => a.toLowerCase().includes(searchLower))
       );
     }).sort((a, b) => a.name.localeCompare(b.name));
-  }, [state.rawMaterials, searchTerm]);
+  }, [rawMaterials, searchTerm]);
 
   const totalPages = Math.ceil(filteredMaterials.length / itemsPerPage);
   const currentItems = filteredMaterials.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
@@ -217,7 +217,6 @@ const RawMaterialCatalog: React.FC = () => {
             onChange={(e) => setName(e.target.value)}
             placeholder="VD: Ferrous Fumarate"
             required
-            icon={Tag}
           />
           
           <div className="space-y-2">
@@ -258,23 +257,29 @@ const RawMaterialCatalog: React.FC = () => {
             <p className="text-[10px] text-slate-400 italic pl-2">* Nhập tên và nhấn Enter (hoặc nút +). Các tên này sẽ được dùng để tự động nhận diện nguyên liệu.</p>
           </div>
 
-          <DSSelect
-            label="Phân loại"
-            value={category}
-            onChange={(e) => setCategory(e.target.value as any)}
-          >
-            <option value="ACTIVE">Hoạt chất</option>
-            <option value="EXCIPIENT">Tá dược</option>
-            <option value="OTHER">Khác</option>
-          </DSSelect>
+          <div className="space-y-1">
+            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-2">Phân loại</label>
+            <DSSelect
+              value={category}
+              onChange={(e) => setCategory(e.target.value as any)}
+              className="w-full"
+            >
+              <option value="ACTIVE">Hoạt chất</option>
+              <option value="EXCIPIENT">Tá dược</option>
+              <option value="OTHER">Khác</option>
+            </DSSelect>
+          </div>
 
-          <DSFormInput
-            isTextArea
-            label="Mô tả / Ghi chú"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            placeholder="Mô tả chi tiết, nguồn gốc, hoặc các thông tin khác..."
-          />
+          <div className="space-y-1">
+            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-2">Mô tả / Ghi chú</label>
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Mô tả chi tiết, nguồn gốc, hoặc các thông tin khác..."
+              className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl font-bold outline-none shadow-inner text-sm focus:ring-2 focus:ring-indigo-100 transition-all"
+              rows={3}
+            />
+          </div>
 
           <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
             <button type="button" onClick={crud.close} className="px-6 py-3 text-slate-400 font-black uppercase text-xs tracking-widest hover:bg-slate-50 rounded-xl">Hủy</button>

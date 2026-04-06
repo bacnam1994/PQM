@@ -412,7 +412,6 @@ const TCCSList: React.FC = () => {
       ...existingTCCS,
       code: formValues.code.toUpperCase(),
       issueDate: formValues.issueDate,
-      updatedAt: new Date().toISOString(),
       composition: '', // Đã bỏ trường này, set rỗng
       mainQualityCriteria: formValues.mainCriteria.filter(c => c.name),
       safetyCriteria: [

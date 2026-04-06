@@ -18,7 +18,7 @@ interface CoAReportProps {
 const ND_KEYWORDS = ['ND', 'NOT DETECTED', 'KHÔNG PHÁT HIỆN', 'K.P.H', 'KPH', 'ÂM TÍNH', 'NEGATIVE', 'KHÔNG CÓ'];
 
 // Helper: Format số sang dạng mũ (VD: 1000 -> 10³)
-const formatScientific = (value: string | number) => {
+const formatScientific = (value: string | number, limitText?: string) => {
   if (value === null || value === undefined) return '';
   const stringValue = String(value).trim();
 
@@ -28,18 +28,18 @@ const formatScientific = (value: string | number) => {
   const coreValue = match ? match[2] : stringValue;
 
   let num = Number(coreValue);
-  const coreUpper = coreValue.toUpperCase();
-  const isSciFormat = coreUpper.includes('E') || coreValue.includes('10') || coreValue.includes('^') || coreUpper.includes('X');
+  const isSciFormat = /[eE][+-]?\d+/.test(coreValue) || coreValue.includes('^') || /\d+\s*[xX]\s*10/i.test(coreValue) || /10\s+\d+/.test(coreValue);
 
+  // Nếu không phải số hợp lệ (chuỗi chữ) thì parse, nếu vẫn lỗi thì trả về chuỗi gốc
   if (isNaN(num) || isSciFormat) {
     num = parseNumberFromText(coreValue);
     
-    if (num === 0 && coreValue !== '0') return stringValue;
+    if (num === 0 && !/^0([.,]0+)?$/.test(coreValue)) return stringValue;
   }
   
-  if (num === 0) return stringValue;
+  if (isNaN(num)) return stringValue;
 
-  if (isSciFormat || Math.abs(num) >= 1000000 || (Math.abs(num) > 0 && Math.abs(num) <= 0.00001)) {
+  if (isSciFormat || Math.abs(num) >= 10000 || (Math.abs(num) > 0 && Math.abs(num) <= 0.00001)) {
     const exponent = Math.floor(Math.log10(Math.abs(num)));
     const mantissa = num / Math.pow(10, exponent);
     const roundedMantissa = Math.round((mantissa + Number.EPSILON) * 100000) / 100000;
@@ -52,7 +52,28 @@ const formatScientific = (value: string | number) => {
       </span>
     );
   }
-  return `${prefix.trim()}${prefix ? ' ' : ''}${num.toLocaleString('vi-VN', { maximumFractionDigits: 10 })}`;
+  
+  // Đồng bộ số chữ số thập phân theo yêu cầu của TCCS
+  let fractionDigits: number | undefined = undefined;
+  if (limitText) {
+    const decimalMatches = String(limitText).match(/\d+[.,]\d+/g);
+    if (decimalMatches) {
+      let maxDecimals = 0;
+      decimalMatches.forEach(m => {
+        const decimals = m.split(/[.,]/)[1]?.length || 0;
+        if (decimals > maxDecimals) maxDecimals = decimals;
+      });
+      fractionDigits = maxDecimals;
+    }
+  }
+
+  const formatOptions: Intl.NumberFormatOptions = { maximumFractionDigits: 10 };
+  if (fractionDigits !== undefined) {
+    formatOptions.minimumFractionDigits = fractionDigits;
+    formatOptions.maximumFractionDigits = fractionDigits;
+  }
+
+  return `${prefix.trim()}${prefix ? ' ' : ''}${num.toLocaleString('vi-VN', formatOptions)}`;
 };
 
 const CoAReport = memo(({ res, batch, product, tccs, formula }: CoAReportProps) => {
@@ -239,7 +260,7 @@ const CoAReport = memo(({ res, batch, product, tccs, formula }: CoAReportProps) 
                 const limitText = getLimitText(r);
                 const limitUpper = String(limitText).toUpperCase();
                 
-                let displayValue: React.ReactNode = formatScientific(r.value);
+                let displayValue: React.ReactNode = formatScientific(r.value, String(limitText));
                 
                 // Ngăn chặn lỗi hiển thị "Không phát hiện" khi người dùng nhập "Dương tính" hoặc chuỗi chữ
                 // Chỉ ghi đè khi giá trị thực sự là số 0

@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { TCCS } from '../types';
-import { ensureArray, evaluateCriterionSmart, parseNumberFromText } from '../utils';
+import { ensureArray, evaluateCriterion, parseNumberFromText } from '../utils';
 
 export const useTestResultEvaluation = (
   activeTCCS: TCCS | null | undefined,
@@ -37,7 +37,7 @@ export const useTestResultEvaluation = (
           if (mainVal !== undefined && mainVal !== '' && mainVal !== null) {
             const mainDef = criteriaMap.get(mainName);
             if (mainDef) {
-              const isMainPass = evaluateCriterionSmart(mainDef, mainVal);
+              const isMainPass = evaluateCriterion(mainDef, mainVal);
 
               if (rule.type !== 'CONDITIONAL_CHECK' && isMainPass === true) {
                 completed++;

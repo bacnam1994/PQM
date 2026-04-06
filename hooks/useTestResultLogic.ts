@@ -20,7 +20,7 @@ import { useTestResultPrint } from './useTestResultPrint';
 import { useTccsSelection } from './useTccsSelection';
 import { useTestResultEvaluation } from './useTestResultEvaluation';
 import { useBatchStatusTransition } from './useBatchStatusTransition';
-import { ensureArray, evaluateCriterion, calculateOverallStatus, TEST_RESULT_STATUS, BATCH_STATUS, CRITERION_TYPE_CONST, normalizeNumericString, checkRange, evaluateCriterionSmart, parseNumberFromText, generateId } from '../utils';
+import { calculateOverallStatus, TEST_RESULT_STATUS, BATCH_STATUS, CRITERION_TYPE_CONST, evaluateCriterionSmart, generateId } from '../utils';
 
 interface ExtraTestResultEntry extends TestResultEntry {
   limit?: string;

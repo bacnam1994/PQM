@@ -13,7 +13,7 @@
 *   **Copy:** Khi tạo lô mới, TCCS ID được lưu cứng vào Lô để đảm bảo lịch sử (dù sau này có TCCS mới hơn, lô cũ vẫn dùng TCCS cũ).
 
 ## 2. Logic Đánh Giá Kết Quả (Evaluation)
-**File liên quan:** `utils/criteriaEvaluation.ts`, `components/CriteriaInputGroup.tsx`
+**File liên quan:** `utils/criteriaEvaluation.ts`, `components/CriteriaInputGroup.tsx`, `hooks/useTestResultLogic.ts`
 
 *   **Chuẩn hóa số liệu:**
     *   Dấu thập phân: Tự động nhận diện dấu chấm (.) hoặc phẩy (,) dựa trên cài đặt `localStorage`.
@@ -23,9 +23,9 @@
     *   Hỗ trợ khoảng: `min - max`, `min ~ max`.
     *   Hỗ trợ dung sai: `Giá trị ± Dung sai` (VD: `10 ± 5%`, `5 ± 0.5`).
 *   **Làm tròn số (Rounding):**
-    *   Hệ thống tự động xác định số chữ số thập phân cần làm tròn dựa trên `expectedText` của TCCS.
-    *   Ví dụ: Nếu `expectedText` là "≤ 0.50" (2 chữ số thập phân), kết quả nhập vào `0.501` sẽ được làm tròn thành `0.50` trước khi so sánh.
-    *   Sử dụng phương pháp làm tròn toán học thông thường.
+    *   **Chỉ nhằm mục đích hiển thị:** Quá trình đánh giá Đạt/Không đạt (Pass/Fail) **luôn luôn sử dụng dữ liệu gốc (raw data)** chưa qua làm tròn.
+    *   **Hàm sử dụng:** Bắt buộc gọi qua `evaluateCriterionSmart` (hỗ trợ đọc khoảng `~`, `-`, tự bù sai số thiết bị) thay vì hàm `evaluateCriterion` cũ.
+    *   Ví dụ: Nếu `expectedText` là "≤ 0.50", kết quả nhập vào `0.501` sẽ bị đánh giá là **KHÔNG ĐẠT**. Việc làm tròn để hiển thị (thành `0.50`) chỉ được áp dụng khi in phiếu CoA.
 ## 3. Logic Quy Tắc Thay Thế (Alternate Rules)
 **File liên quan:** `hooks/useTestResultLogic.ts`
 

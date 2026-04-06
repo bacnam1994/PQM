@@ -222,8 +222,7 @@ const CriteriaList = () => {
           tccsUpdates.push(updateTCCS({
             ...tccs,
             mainQualityCriteria: newMainCriteria,
-            safetyCriteria: newSafetyCriteria,
-            updatedAt: new Date().toISOString() // Cập nhật thời gian sửa
+            safetyCriteria: newSafetyCriteria
           }));
         }
       });
