@@ -1,0 +1,29 @@
+rules_version = '2';
+
+// [BẢO MẬT - LƯU Ý QUAN TRỌNG]
+// Dự án này dùng Firebase Realtime Database, KHÔNG phải Firestore.
+// Storage Rules KHÔNG thể đọc trực tiếp từ Realtime Database.
+//
+// Giải pháp hiện tại: Dùng Firebase Custom Claims để xác định quyền Admin.
+// Để thiết lập: Tạo Cloud Function gán claim { admin: true } khi user được nâng cấp.
+//
+// Tạm thời: Chỉ user đã đăng nhập mới được upload, kiểm tra admin qua Custom Claim.
+function isAdmin() {
+  // Kiểm tra Firebase Custom Claim 'admin: true' (set bởi Firebase Admin SDK)
+  // Nếu chưa có Custom Claim, chỉ cho phép user đã đăng nhập upload
+  return request.auth != null && (
+    request.auth.token.admin == true ||
+    request.auth.token.role == 'ADMIN'
+  );
+}
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /{allPaths=**} {
+      // Đọc: user đã đăng nhập (không public)
+      allow read: if request.auth != null;
+      // Ghi/Upload: chỉ Admin (qua Custom Claims)
+      allow write: if isAdmin();
+    }
+  }
+}
