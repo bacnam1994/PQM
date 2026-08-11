@@ -20,22 +20,24 @@
         ".write": "auth != null && root.child('users/admins/' + auth.uid).exists() && !data.exists() && newData.exists()"
       }
     },
-    
+
     "products": {
-      ".read": "true",
+      ".read": "auth != null",
       "$item_id": {
         ".write": "auth != null && root.child('users/admins/' + auth.uid).exists() && newData.exists()"
       }
     },
+
     "batches": {
-      ".read": "true",
+      ".read": "auth != null",
       ".indexOn": ["createdAt", "status"],
       "$item_id": {
         ".write": "auth != null && root.child('users/admins/' + auth.uid).exists() && newData.exists()"
       }
     },
+
     "tccs": {
-      ".read": "true",
+      ".read": "auth != null",
       "$item_id": {
         ".write": "auth != null && root.child('users/admins/' + auth.uid).exists() && newData.exists()"
       }
@@ -45,22 +47,40 @@
       ".read": "auth != null", 
       ".write": "auth != null && root.child('users/admins/' + auth.uid).exists() && newData.exists()" 
     },
+
     "raw_materials": { 
       ".read": "auth != null && root.child('users/admins/' + auth.uid).exists()", 
       ".write": "auth != null && root.child('users/admins/' + auth.uid).exists() && newData.exists()" 
     },
+
     "inventoryIn": { 
       ".read": "auth != null && root.child('users/admins/' + auth.uid).exists()", 
       ".write": "auth != null && root.child('users/admins/' + auth.uid).exists() && newData.exists()" 
     },
+
     "inventoryOut": { 
       ".read": "auth != null && root.child('users/admins/' + auth.uid).exists()", 
       ".write": "auth != null && root.child('users/admins/' + auth.uid).exists() && newData.exists()" 
     },
+
     "testResults": {
       ".read": "auth != null",
       ".write": "auth != null && root.child('users/admins/' + auth.uid).exists() && newData.exists()",
       ".indexOn": ["createdAt", "batchId"]
+    },
+
+    "quality_alerts": {
+      ".read": "auth != null",
+      "$alert_id": {
+        ".write": "auth != null && root.child('users/admins/' + auth.uid).exists()"
+      }
+    },
+
+    "ai_learned_mappings": {
+      ".read": "auth != null",
+      "$mapping_id": {
+        ".write": "auth != null"
+      }
     }
   }
 }

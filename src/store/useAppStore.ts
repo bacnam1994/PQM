@@ -5,6 +5,7 @@ import { ref, set as firebaseSet, remove as firebaseRemove, update as firebaseUp
 import { db } from '../firebase';
 import { User, getAuth, signInWithEmailAndPassword, signOut, createUserWithEmailAndPassword, updatePassword, reauthenticateWithCredential, EmailAuthProvider, sendPasswordResetEmail } from 'firebase/auth';
 import { parseNumberFromText } from '../utils';
+import { logAuditAction } from '../services/auditService';
 
 export type ToastType = 'SUCCESS' | 'ERROR' | 'INFO' | 'WARNING';
 export interface ToastMessage {
@@ -282,9 +283,19 @@ export const useAppStore = create<AppStoreState & AppStoreActions>()(devtools((s
   removeToast: (id) => set((state) => ({ toasts: state.toasts.filter(t => t.id !== id) }), false, 'removeToast'),
 
   // --- CRUD ACTIONS ---
-  addProduct: (p) => _handleSave('products', p, get),
-  updateProduct: (p) => _handleSave('products', p, get),
-  deleteProduct: (id) => _handleDelete('products', id, get, true),
+  addProduct: async (p) => {
+    await _handleSave('products', p, get);
+    logAuditAction({ action: 'CREATE', collection: 'PRODUCTS', documentId: p.id, details: `Tạo sản phẩm: ${p.name} (${p.code})`, performedBy: get().user?.email || 'unknown' });
+  },
+  updateProduct: async (p) => {
+    await _handleSave('products', p, get);
+    logAuditAction({ action: 'UPDATE', collection: 'PRODUCTS', documentId: p.id, details: `Cập nhật sản phẩm: ${p.name} (${p.code})`, performedBy: get().user?.email || 'unknown' });
+  },
+  deleteProduct: async (id) => {
+    const product = get().products.find(p => p.id === id);
+    await _handleDelete('products', id, get, true);
+    logAuditAction({ action: 'DELETE', collection: 'PRODUCTS', documentId: id, details: `Xóa sản phẩm: ${product?.name || id}`, performedBy: get().user?.email || 'unknown' });
+  },
   bulkAddProducts: async (products) => {
     try {
       const updates: Record<string, any> = {};
@@ -307,14 +318,18 @@ export const useAppStore = create<AppStoreState & AppStoreActions>()(devtools((s
   addBatch: async (b) => {
     await _handleSave('batches', b, get);
     await get().syncQualityAlerts();
+    logAuditAction({ action: 'CREATE', collection: 'BATCHES', documentId: b.id, details: `Tạo lô hàng: ${b.batchNo}`, performedBy: get().user?.email || 'unknown' });
   },
   updateBatch: async (b) => {
     await _handleSave('batches', b, get);
     await get().syncQualityAlerts();
+    logAuditAction({ action: 'UPDATE', collection: 'BATCHES', documentId: b.id, details: `Cập nhật lô: ${b.batchNo} -> trạng thái: ${b.status}`, performedBy: get().user?.email || 'unknown' });
   },
   deleteBatch: async (id) => {
+    const batch = get().batches.find(b => b.id === id);
     await _handleDelete('batches', id, get, true);
     await get().syncQualityAlerts();
+    logAuditAction({ action: 'DELETE', collection: 'BATCHES', documentId: id, details: `Xóa lô: ${batch?.batchNo || id}`, performedBy: get().user?.email || 'unknown' });
   },
   updateBatchStatus: async (id, status, rejectReason) => {
     try {
@@ -375,14 +390,17 @@ export const useAppStore = create<AppStoreState & AppStoreActions>()(devtools((s
   addTestResult: async (r) => {
     await _handleSave('testResults', r, get);
     await get().syncQualityAlerts();
+    logAuditAction({ action: 'CREATE', collection: 'TEST_RESULTS', documentId: r.id, details: `Thêm phiếu KN: Lô ${r.batchId}, Lab: ${r.labName}, Kết quả: ${r.overallStatus}`, performedBy: get().user?.email || 'unknown' });
   },
   updateTestResult: async (r) => {
     await _handleSave('testResults', r, get);
     await get().syncQualityAlerts();
+    logAuditAction({ action: 'UPDATE', collection: 'TEST_RESULTS', documentId: r.id, details: `Cập nhật phiếu KN: ${r.id}, Kết quả: ${r.overallStatus}`, performedBy: get().user?.email || 'unknown' });
   },
   deleteTestResult: async (id) => {
     await _handleDelete('testResults', id, get);
     await get().syncQualityAlerts();
+    logAuditAction({ action: 'DELETE', collection: 'TEST_RESULTS', documentId: id, details: `Xóa phiếu KN: ${id}`, performedBy: get().user?.email || 'unknown' });
   },
 
   loadMoreTestResults: () => set((state) => ({ testResultLimit: state.testResultLimit + 50 }), false, 'loadMoreTestResults'),
@@ -490,7 +508,15 @@ export const useAppStore = create<AppStoreState & AppStoreActions>()(devtools((s
         batches: state.batches,
         testResults: state.testResults
       }, 30);
-      await executeOfflineOptimistic(firebaseSet(ref(db, 'quality_alerts'), anomalies), get);
+
+      // [FIX P0.4] Dùng firebaseUpdate với timestamp key thay vì firebaseSet ghi đè
+      // Để giữ lịch sử cảnh báo, mỗi lần chạy đỬng overwrite key 'latest' dỡn biết
+      const alertUpdate: Record<string, any> = {};
+      alertUpdate['latest'] = {
+        updatedAt: new Date().toISOString(),
+        alerts: anomalies
+      };
+      await executeOfflineOptimistic(firebaseUpdate(ref(db, 'quality_alerts'), alertUpdate), get);
     } catch (e) {
       console.error("Lỗi đồng bộ cảnh báo chất lượng:", e);
     }

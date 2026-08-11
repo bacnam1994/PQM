@@ -1,16 +1,40 @@
 import { GoogleGenerativeAI, SchemaType, Content } from "@google/generative-ai";
 import { GEMINI_TOOL_DECLARATIONS, executeTool } from './aiTools';
 
-const getApiKey = () => {
-  return import.meta.env.VITE_GEMINI_API_KEY || localStorage.getItem('GEMINI_API_KEY') || "";
+// [BẢO MẬT] Chỉ lấy API key từ biến môi trường, KHÔNG lưu/lấy từ localStorage
+// để tránh rủi ro bị đánh cắp qua XSS attack.
+const getApiKey = (): string => {
+  return import.meta.env.VITE_GEMINI_API_KEY || "";
 };
 
 const getGenAI = () => {
   const key = getApiKey();
   if (!key) {
-    throw new Error("Vui lòng cấu hình VITE_GEMINI_API_KEY trong file .env hoặc settings");
+    throw new Error("Chưa cấu hình VITE_GEMINI_API_KEY. Vui lòng kiểm tra file .env của dự án.");
   }
   return new GoogleGenerativeAI(key);
+};
+
+// [BẢO MẬT] Danh sách MIME types hợp lệ cho OCR upload
+const ALLOWED_OCR_MIME_TYPES = [
+  'application/pdf',
+  'image/jpeg',
+  'image/jpg',
+  'image/png',
+  'image/webp',
+  'image/heic',
+  'image/heif',
+];
+const MAX_OCR_FILE_SIZE_BYTES = 20 * 1024 * 1024; // 20MB
+
+export const validateOCRFile = (file: File): { valid: boolean; error?: string } => {
+  if (file.size > MAX_OCR_FILE_SIZE_BYTES) {
+    return { valid: false, error: `File quá lớn (${(file.size / 1024 / 1024).toFixed(1)}MB). Giới hạn tối đa là 20MB.` };
+  }
+  if (!ALLOWED_OCR_MIME_TYPES.includes(file.type)) {
+    return { valid: false, error: `Định dạng file không hỗ trợ (${file.type}). Vui lòng upload PDF hoặc ảnh (JPG, PNG, WEBP, HEIC).` };
+  }
+  return { valid: true };
 };
 
 export const getGeminiModel = (): string => {
@@ -58,6 +82,11 @@ export const geminiService = {
    * @param systemPrompt Lệnh hướng dẫn AI
    */
   extractDataFromDocument: async (file: File, systemPrompt: string) => {
+    // Kiểm tra file hợp lệ trước khi gửi lên API
+    const validation = validateOCRFile(file);
+    if (!validation.valid) {
+      throw new Error(validation.error);
+    }
     const genAI = getGenAI();
 
     // Chuyển đổi File sang định dạng Base64
@@ -212,19 +241,69 @@ export const geminiService = {
       tools: [{ functionDeclarations: GEMINI_TOOL_DECLARATIONS as any }],
     });
 
-    // Rút gọn dữ liệu context (Chỉ lấy tối đa 50 bản ghi mới nhất để chống tràn Token)
-    const leanContext = {
-      products: (appContextData.products || []).slice(0, 50).map((p: any) => ({ id: p.id, code: p.code, name: p.name, status: p.status })),
-      batches: (appContextData.batches || []).slice(0, 50).map((b: any) => ({ id: b.id, batchNo: b.batchNo, productId: b.productId, product: b.product?.name, status: b.status, mfg: b.mfgDate, exp: b.expDate })),
-      tccs: (appContextData.tccsList || []).slice(0, 50).map((t: any) => ({ code: t.code, status: t.status, issueDate: t.issueDate, productId: t.productId })),
-      testResults: (appContextData.testResults || []).slice(0, 50).map((tr: any) => ({ id: tr.id, lab: tr.labName, date: tr.testDate, status: tr.overallStatus, batchId: tr.batchId }))
+    // [SMART CONTEXT BUILDER] Phân tích câu hỏi để xác định data liên quan
+    // Thay vì cắt cứng 50 records, ưu tiên data có liên quan đến từ khóa trong message
+    const buildSmartContext = (msg: string, data: any) => {
+      const msgLower = msg.toLowerCase();
+
+      const products = data.products || [];
+      const batches = data.batches || [];
+      const tccsList = data.tccsList || [];
+      const testResults = data.testResults || [];
+
+      // Bước 1: Tìm sản phẩm/lô được đề cập trong câu hỏi
+      const mentionedProducts = products.filter((p: any) =>
+        p.name && msgLower.includes(p.name.toLowerCase()) ||
+        p.code && msgLower.includes(p.code.toLowerCase())
+      );
+      const mentionedBatches = batches.filter((b: any) =>
+        b.batchNo && msgLower.includes(b.batchNo.toLowerCase())
+      );
+
+      const mentionedProductIds = new Set([
+        ...mentionedProducts.map((p: any) => p.id),
+        ...mentionedBatches.map((b: any) => b.productId)
+      ]);
+
+      // Bước 2: Nếu có sản phẩm cụ thể được đề cập → trả về đầy đủ data của sản phẩm đó
+      if (mentionedProductIds.size > 0) {
+        const relevantBatches = batches.filter((b: any) => mentionedProductIds.has(b.productId));
+        const relevantBatchIds = new Set(relevantBatches.map((b: any) => b.id));
+        const relevantTestResults = testResults.filter((tr: any) => relevantBatchIds.has(tr.batchId));
+        const relevantTccs = tccsList.filter((t: any) => mentionedProductIds.has(t.productId));
+
+        return {
+          _note: `Context ưu tiên: ${mentionedProductIds.size} sản phẩm được đề cập trong câu hỏi`,
+          products: mentionedProducts.map((p: any) => ({ id: p.id, code: p.code, name: p.name, status: p.status })),
+          allProducts_summary: `Tổng ${products.length} sản phẩm. Đang hiển thị ${mentionedProducts.length} sản phẩm liên quan.`,
+          batches: relevantBatches.map((b: any) => ({ id: b.id, batchNo: b.batchNo, productId: b.productId, status: b.status, mfg: b.mfgDate, exp: b.expDate })),
+          tccs: relevantTccs.map((t: any) => ({ id: t.id, code: t.code, isActive: t.isActive, issueDate: t.issueDate, productId: t.productId })),
+          testResults: relevantTestResults.map((tr: any) => ({ id: tr.id, lab: tr.labName, date: tr.testDate, status: tr.overallStatus, batchId: tr.batchId })),
+        };
+      }
+
+      // Bước 3: Nếu không tìm thấy sản phẩm cụ thể → context tổng hợp thông minh
+      // Ưu tiên 20 records mới nhất của mỗi loại + tóm tắt tổng số
+      const MAX_GENERAL = 20;
+      return {
+        _note: 'Context tổng hợp: không có sản phẩm cụ thể được đề cập',
+        products: products.slice(0, MAX_GENERAL).map((p: any) => ({ id: p.id, code: p.code, name: p.name, status: p.status })),
+        products_total: products.length,
+        batches: batches.slice(0, MAX_GENERAL).map((b: any) => ({ id: b.id, batchNo: b.batchNo, productId: b.productId, status: b.status, mfg: b.mfgDate, exp: b.expDate })),
+        batches_total: batches.length,
+        tccs: tccsList.slice(0, MAX_GENERAL).map((t: any) => ({ code: t.code, isActive: t.isActive, issueDate: t.issueDate, productId: t.productId })),
+        testResults: testResults.slice(0, MAX_GENERAL).map((tr: any) => ({ id: tr.id, lab: tr.labName, date: tr.testDate, status: tr.overallStatus, batchId: tr.batchId })),
+        testResults_total: testResults.length,
+      };
     };
+
+    const smartContext = buildSmartContext(message, appContextData);
 
     const systemPrompt = `Bạn là Trợ lý AI chuyên môn của phần mềm V-BIOTECH Quality Management (Quản lý Chất lượng Dược phẩm).
 Nhiệm vụ: Trả lời câu hỏi dựa trên DỮ LIỆU THỰC của ứng dụng và GỌI CÁC TOOL khi cần phân tích sâu hơn.
 
 DỮ LIỆU ỨNG DỤNG HIỆN TẠI (JSON):
-${JSON.stringify(leanContext, null, 2)}
+${JSON.stringify(smartContext, null, 2)}
 
 QUY TẮC:
 1. LUÔN dựa vào dữ liệu JSON để trả lời. Không bịa đặt thông tin.

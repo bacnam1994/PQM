@@ -24,13 +24,38 @@ interface ChatMessage {
   metadata?: any;
 }
 
+const WELCOME_MESSAGE: ChatMessage = {
+  id: 'msg_welcome',
+  sender: 'ai',
+  text: 'Xin chào! Tôi là trợ lý AI của V-Biotech QMS. Tôi có thể:\n\n📄 **Nhập liệu:** Tải lên Phiếu Kiểm Nghiệm để tự động trích xuất dữ liệu.\n\n📊 **Phân tích:** Hỏi tôi về xu hướng chất lượng, tỷ lệ đạt/lỗi theo sản phẩm.\n\n⚠️ **Cảnh báo:** "Có cảnh báo chất lượng nào không?"\n\n🔬 **Dược điển:** "Giới hạn vi sinh vật cho thuốc uống là bao nhiêu?"\n\n📥 **Xuất báo cáo:** "Xuất báo cáo tháng 5 năm 2026 ra Excel"\n\nBạn muốn bắt đầu với điều gì?'
+};
+
+const CHAT_HISTORY_KEY = 'pqm_ai_chat_history';
+
+/** Lưu messages vào sessionStorage (per-session, tự xóa khi đóng tab) */
+const saveChatHistory = (msgs: ChatMessage[]) => {
+  try {
+    // Chỉ lưu tối đa 50 tin nhắn gần nhất để tránh tốn bộ nhớ
+    const toSave = msgs.slice(-50);
+    sessionStorage.setItem(CHAT_HISTORY_KEY, JSON.stringify(toSave));
+  } catch { /* Bỏ qua nếu sessionStorage đầy */ }
+};
+
+/** Khôi phục messages từ sessionStorage */
+const loadChatHistory = (): ChatMessage[] => {
+  try {
+    const saved = sessionStorage.getItem(CHAT_HISTORY_KEY);
+    if (saved) {
+      const parsed = JSON.parse(saved) as ChatMessage[];
+      if (parsed.length > 0) return parsed;
+    }
+  } catch { /* Bỏ qua lỗi parse */ }
+  return [WELCOME_MESSAGE];
+};
+
 export const AIAssistantChat: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
-  const [messages, setMessages] = useState<ChatMessage[]>([{
-    id: 'msg_welcome',
-    sender: 'ai',
-    text: 'Xin chào! Tôi là trợ lý AI của V-Biotech QMS. Tôi có thể:\n\n📄 **Nhập liệu:** Tải lên Phiếu Kiểm Nghiệm để tự động trích xuất dữ liệu.\n\n📊 **Phân tích:** Hỏi tôi về xu hướng chất lượng, tỷ lệ đạt/lỗi theo sản phẩm.\n\n⚠️ **Cảnh báo:** "Có cảnh báo chất lượng nào không?"\n\n📥 **Xuất báo cáo:** "Xuất báo cáo tháng 5 năm 2026 ra Excel"\n\nBạn muốn bắt đầu với điều gì?'
-  }]);
+  const [messages, setMessages] = useState<ChatMessage[]>(loadChatHistory);
   
   const [isDragging, setIsDragging] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -47,6 +72,11 @@ export const AIAssistantChat: React.FC = () => {
   const [showConfig, setShowConfig] = useState(false);
   const [currentModel, setCurrentModel] = useState(() => localStorage.getItem('GEMINI_MODEL') || 'gemini-2.5-flash');
   const [thinkingEnabled, setThinkingEnabled] = useState(() => localStorage.getItem('GEMINI_THINKING_ENABLED') !== 'false');
+
+  // Lưu lịch sử chat vào sessionStorage mỗi khi messages thay đổi
+  useEffect(() => {
+    saveChatHistory(messages);
+  }, [messages]);
 
   const handleModelChange = (model: string) => {
     setCurrentModel(model);
@@ -131,8 +161,11 @@ export const AIAssistantChat: React.FC = () => {
   }, [tccsList]);
 
   const processFile = async (file: File) => {
-    if (!file.type.startsWith('image/') && file.type !== 'application/pdf') {
-      toast.error('Vui lòng upload file ảnh (JPG, PNG) hoặc PDF.');
+    // [SECURITY] Dùng hàm validateOCRFile đã chuẩn hóa (kiểm tra kích thước + MIME type)
+    const { validateOCRFile } = await import('../../services/ai/geminiService');
+    const validation = validateOCRFile(file);
+    if (!validation.valid) {
+      toast.error(validation.error || 'File không hợp lệ.');
       return;
     }
 

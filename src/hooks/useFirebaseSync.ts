@@ -47,17 +47,16 @@ export const useFirebaseSync = () => {
       if (!isMounted) return;
 
       // Sau khi nạp xong cache, đăng ký lắng nghe Firebase Realtime Database
-      const refs = {
+      const standardRefs: Record<string, any> = {
         products: ref(db, 'products'),
         batches: ref(db, 'batches'),
         tccsList: ref(db, 'tccs'),
         productFormulas: ref(db, 'product_formulas'),
         rawMaterials: ref(db, 'raw_materials'),
         aiLearnedMappings: ref(db, 'ai_learned_mappings'),
-        qualityAlerts: ref(db, 'quality_alerts'),
       };
 
-      Object.entries(refs).forEach(([key, reference]) => {
+      Object.entries(standardRefs).forEach(([key, reference]) => {
         const unsubscribe = onValue(reference, (snapshot) => {
           const data = snapshot.val();
           const list = data ? Object.values(data) : [];
@@ -77,6 +76,24 @@ export const useFirebaseSync = () => {
         });
         unsubscribes.push(unsubscribe);
       });
+
+      // [FIX] Đọc quality_alerts/latest.alerts theo cấu trúc mới
+      // (Hỗ trợ cả định dạng cũ là mảng trực tiếp nếu có)
+      const alertsUnsubscribe = onValue(ref(db, 'quality_alerts/latest'), (snapshot) => {
+        const data = snapshot.val();
+        if (data && data.alerts && Array.isArray(data.alerts)) {
+          useAppStore.getState().setAppState({ qualityAlerts: data.alerts });
+          saveToCache('qualityAlerts', data.alerts);
+        } else if (Array.isArray(data)) {
+          // Backward compat: định dạng cũ là mảng trực tiếp
+          useAppStore.getState().setAppState({ qualityAlerts: data });
+        } else {
+          useAppStore.getState().setAppState({ qualityAlerts: [] });
+        }
+      }, (error) => {
+        console.error('Lỗi đọc quality_alerts:', error);
+      });
+      unsubscribes.push(alertsUnsubscribe);
     };
 
     initializeData();
