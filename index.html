@@ -16,6 +16,20 @@
     <!-- Google Identity Services SDK for Google Drive Integration -->
     <script src="https://accounts.google.com/gsi/client" async defer></script>
 
+    <!-- SPA redirect handler for GitHub Pages -->
+    <script type="text/javascript">
+      (function(l) {
+        if (l.search[1] === '/' ) {
+          var decoded = l.search.slice(1).split('&').map(function(s) { 
+            return s.replace(/~and~/g, '&')
+          }).join('?');
+          window.history.replaceState(null, null,
+              l.pathname.slice(0, -1) + decoded + l.hash
+          );
+        }
+      }(window.location))
+    </script>
+
     <script>
       // Giải pháp khẩn cấp gỡ bỏ Service Worker cũ của PWA tránh kẹt cache trên shared host
       if ('serviceWorker' in navigator) {

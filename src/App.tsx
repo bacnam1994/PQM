@@ -255,10 +255,16 @@ const RouteTracker = () => {
   return null;
 };
 
+const getBasename = () => {
+  const base = import.meta.env.BASE_URL;
+  if (!base || base === './' || base === '/') return undefined;
+  return base.endsWith('/') ? base.slice(0, -1) : base;
+};
+
 const App: React.FC = () => {
   return (
       <AppProvider>
-          <BrowserRouter>
+          <BrowserRouter basename={getBasename()}>
             <GlobalNavigation />
             <ThemeManager />
             <UserPreferenceSync />

@@ -5,6 +5,7 @@ import { useAppStore } from '../../store/useAppStore';
 import { generateId, normalizeSearch, autoFormatInput, parseNumberFromText } from '../../utils';
 import { ProductFormula, FormulaIngredient } from '../../types';
 import { DSFormInput, SpecialCharToolbar } from '../../components';
+import { COMMON_CRITERIA_UNITS } from './TCCSFormPage';
 
 const ProductFormulaFormPage = () => {
   const { id } = useParams();
@@ -123,6 +124,7 @@ const ProductFormulaFormPage = () => {
       <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
         {(!id || formulaToEdit) && (
           <form onSubmit={handleSave} className="space-y-8">
+            <datalist id="formula-unit-suggestions">{COMMON_CRITERIA_UNITS.map(unit => <option key={unit} value={unit} />)}</datalist>
             <SpecialCharToolbar />
             {/* Product Selection */}
             <div className="relative">
@@ -171,7 +173,7 @@ const ProductFormulaFormPage = () => {
                   <div key={ing.id} className="grid grid-cols-12 gap-2 items-center bg-slate-50/50 p-1.5 rounded-xl border hover:border-slate-200 transition-all">
                     <input placeholder="Tên hoạt chất" value={ing.name} onChange={e => handleIngredientChange(index, 'name', e.target.value)} className="col-span-5 px-3 py-2 bg-white border border-slate-100 shadow-sm rounded-lg text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-400" />
                     <input placeholder="0" value={ing.declaredContent} onChange={e => handleIngredientChange(index, 'declaredContent', e.target.value)} className="col-span-2 px-3 py-2 bg-white border border-slate-100 shadow-sm rounded-lg text-xs font-bold outline-none text-right focus:ring-2 focus:ring-indigo-400" />
-                    <input placeholder="ĐVT" value={ing.unit} onChange={e => handleIngredientChange(index, 'unit', e.target.value)} className="col-span-2 px-3 py-2 bg-white border border-slate-100 shadow-sm rounded-lg text-xs font-bold outline-none text-center focus:ring-2 focus:ring-indigo-400" />
+                    <input placeholder="ĐVT" value={ing.unit} onChange={e => handleIngredientChange(index, 'unit', e.target.value)} className="col-span-2 px-3 py-2 bg-white border border-slate-100 shadow-sm rounded-lg text-xs font-bold outline-none text-center focus:ring-2 focus:ring-indigo-400" list="formula-unit-suggestions" />
                     <input placeholder="(rỗng nếu không có)" value={ing.elementalContent || ''} onChange={e => handleIngredientChange(index, 'elementalContent', e.target.value)} className="col-span-2 px-3 py-2 bg-white border border-slate-100 shadow-sm rounded-lg text-xs font-bold outline-none text-right focus:ring-2 focus:ring-indigo-400" />
                     <button type="button" onClick={() => setIngredients(ingredients.filter((_, i) => i !== index))} className="p-2 text-slate-300 hover:text-red-500 transition-colors"><X size={16}/></button>
                   </div>
@@ -198,7 +200,7 @@ const ProductFormulaFormPage = () => {
                   <div key={exc.id} className="grid grid-cols-12 gap-2 items-center bg-slate-50/50 p-1.5 rounded-xl border hover:border-slate-200 transition-all">
                     <input placeholder="Tên tá dược" value={exc.name} onChange={e => handleExcipientChange(index, 'name', e.target.value)} className="col-span-8 px-3 py-2 bg-white border border-slate-100 shadow-sm rounded-lg text-xs font-bold outline-none focus:ring-2 focus:ring-slate-400" />
                     <input placeholder="0" value={exc.declaredContent} onChange={e => handleExcipientChange(index, 'declaredContent', e.target.value)} className="col-span-2 px-3 py-2 bg-white border border-slate-100 shadow-sm rounded-lg text-xs font-bold outline-none text-right focus:ring-2 focus:ring-slate-400" />
-                    <input placeholder="ĐVT" value={exc.unit} onChange={e => handleExcipientChange(index, 'unit', e.target.value)} className="col-span-1 px-3 py-2 bg-white border border-slate-100 shadow-sm rounded-lg text-xs font-bold outline-none text-center focus:ring-2 focus:ring-slate-400" />
+                    <input placeholder="ĐVT" value={exc.unit} onChange={e => handleExcipientChange(index, 'unit', e.target.value)} className="col-span-1 px-3 py-2 bg-white border border-slate-100 shadow-sm rounded-lg text-xs font-bold outline-none text-center focus:ring-2 focus:ring-slate-400" list="formula-unit-suggestions" />
                     <button type="button" onClick={() => setExcipients(excipients.filter((_, i) => i !== index))} className="p-2 text-slate-300 hover:text-red-500 transition-colors"><X size={16}/></button>
                   </div>
                 ))}

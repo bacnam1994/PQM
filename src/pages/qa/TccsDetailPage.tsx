@@ -22,13 +22,14 @@ const TccsDetailPage = () => {
     );
   }
 
-  const HEAVY_METAL_KEYWORDS = ['asen', 'chì', 'thủy ngân', 'cadmi'];
+  const HEAVY_METAL_KEYWORDS = ['asen', 'chì', 'thủy ngân', 'cadmi', 'pb', 'cd', 'hg', 'as'];
+  const MYCOTOXIN_KEYWORDS = ['aflatoxin', 'ochratoxin', 'patulin', 'zearalenone', 'độc tố vi nấm', 'mycotoxin', 'dư lượng'];
   const safety = ensureArray(tccs.safetyCriteria);
   const micro = safety.filter(c => {
       if (!c) return false;
       const nameLower = (c.name || '').toLowerCase();
       if ((c as any).category === 'micro') return true;
-      if (!(c as any).category && !HEAVY_METAL_KEYWORDS.some(kw => nameLower.includes(kw))) return true;
+      if (!(c as any).category && !HEAVY_METAL_KEYWORDS.some(kw => nameLower.includes(kw)) && !MYCOTOXIN_KEYWORDS.some(kw => nameLower.includes(kw))) return true;
       return false;
   });
   const metal = safety.filter(c => {
@@ -38,11 +39,19 @@ const TccsDetailPage = () => {
       if (!(c as any).category && HEAVY_METAL_KEYWORDS.some(kw => nameLower.includes(kw))) return true;
       return false;
   });
+  const mycotoxin = safety.filter(c => {
+      if (!c) return false;
+      const nameLower = (c.name || '').toLowerCase();
+      if ((c as any).category === 'mycotoxin' || (c as any).category === 'other') return true;
+      if (!(c as any).category && MYCOTOXIN_KEYWORDS.some(kw => nameLower.includes(kw))) return true;
+      return false;
+  });
 
   const groups = [
     { title: 'Chỉ tiêu Chất lượng', criteria: tccs.mainQualityCriteria, color: 'text-indigo-600' },
     { title: 'Giới hạn Vi sinh vật', criteria: micro, color: 'text-emerald-600' },
-    { title: 'Giới hạn Kim loại nặng', criteria: metal, color: 'text-red-600' }
+    { title: 'Giới hạn Kim loại nặng', criteria: metal, color: 'text-red-600' },
+    { title: 'Độc tố vi nấm / Chỉ tiêu An toàn khác', criteria: mycotoxin, color: 'text-amber-600' }
   ];
 
   return (

@@ -1,12 +1,21 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, Loader2, Search, CheckCircle2, X, Plus, Info, Activity, ShieldCheck, ArrowRightLeft, CornerDownRight, ArrowRight, FlaskConical, Package } from 'lucide-react';
+import { ArrowLeft, Loader2, Search, CheckCircle2, X, Plus, Info, Activity, ShieldCheck, ArrowRightLeft, CornerDownRight, ArrowRight, FlaskConical, Package, AlertCircle, Sparkles } from 'lucide-react';
 import { useAppStore } from '../../store/useAppStore';
 import { useForm, useFormDraft } from '../../hooks';
 import { CriterionType, TCCS, Criterion } from '../../types';
 import { generateId, parseFlexibleValue, normalizeNumericString, autoFormatInput, parseNumberFromText, parseDateToISO } from '../../utils';
 import { SpecialCharToolbar, DSDateInput } from '../../components';
 import { logAuditAction } from '../../services/auditService';
+
+export const COMMON_CRITERIA_UNITS = [
+  'mg/viên', 'g/gói', 'mg/gói', 'mg/ml', 'mcg/ml', 'µg/ml',
+  'mg', 'g', 'kg', 'mcg', 'µg', 'ml', 'l',
+  '%', '% w/w', '% w/v',
+  'CFU/g', 'CFU/ml', 'CFU/10g', 'CFU/25g',
+  'ppm', 'ppb', 'mg/kg', 'µg/kg',
+  'viên', 'nang', 'ống', 'gói', 'lọ', 'chai', 'độ'
+];
 
 const calculateRangePreview = (text: string): string | null => {
   const fmt = (n: number): string => {
@@ -58,6 +67,7 @@ const initialTccsFormState = {
   mainCriteria: [{ name: '', unit: '', min: undefined, max: undefined, type: CriterionType.NUMBER, notes: '' }] as (Criterion & { notes?: string })[],
   microbiologicalCriteria: [{ name: '', unit: '', max: undefined, type: CriterionType.NUMBER, notes: '' }] as (Criterion & { notes?: string })[],
   heavyMetalCriteria: [{ name: '', unit: '', max: undefined, type: CriterionType.NUMBER, notes: '' }] as (Criterion & { notes?: string })[],
+  mycotoxinCriteria: [] as (Criterion & { notes?: string })[],
   alternateRules: [] as { main: string, alt: string, type?: 'FAIL_RETRY' | 'CONDITIONAL_CHECK', conditionValue?: string }[],
 };
 
@@ -66,6 +76,25 @@ const validateTCCS = (values: typeof initialTccsFormState) => {
   if (!values.productId) errors.productId = 'Vui lòng chọn sản phẩm';
   if (!values.code) errors.code = 'Vui lòng nhập mã TCCS';
   if (!values.issueDate) errors.issueDate = 'Vui lòng chọn ngày ban hành';
+
+  // Kiểm tra Min > Max
+  const checkMinMax = (list: Criterion[], sectionName: string, label: string) => {
+    (list || []).forEach((c, idx) => {
+      if (c.type === CriterionType.NUMBER && c.min !== undefined && c.max !== undefined && c.min !== null && c.max !== null) {
+        const minNum = Number(c.min);
+        const maxNum = Number(c.max);
+        if (!isNaN(minNum) && !isNaN(maxNum) && minNum > maxNum) {
+          errors[`minMax_${sectionName}_${idx}`] = `Mục ${label} - Chỉ tiêu "${c.name || `#${idx + 1}`}": Min (${minNum}) không được lớn hơn Max (${maxNum})`;
+        }
+      }
+    });
+  };
+
+  checkMinMax(values.mainCriteria, 'main', 'Chất lượng chính');
+  checkMinMax(values.microbiologicalCriteria, 'micro', 'Vi sinh');
+  checkMinMax(values.heavyMetalCriteria, 'metal', 'Kim loại nặng');
+  checkMinMax(values.mycotoxinCriteria, 'mycotoxin', 'Độc tố vi nấm & Khác');
+
   return errors;
 };
 
@@ -113,12 +142,14 @@ const TCCSFormPage = () => {
         setProductSearch(product ? `${product.code} - ${product.name}` : '');
         setIsCloning(!!cloneId);
 
-        const HEAVY_METAL_KEYWORDS = ['asen', 'chì', 'thủy ngân', 'cadmi'];
+        const HEAVY_METAL_KEYWORDS = ['asen', 'chì', 'thủy ngân', 'cadmi', 'pb', 'cd', 'hg', 'as'];
+        const MYCOTOXIN_KEYWORDS = ['aflatoxin', 'ochratoxin', 'patulin', 'zearalenone', 'độc tố vi nấm', 'mycotoxin', 'dư lượng'];
+
         const micro = (tccs.safetyCriteria || []).filter(c => {
             if (!c) return false;
             const nameLower = (c.name || '').toLowerCase();
             if ((c as any).category === 'micro') return true;
-            if (!(c as any).category && !HEAVY_METAL_KEYWORDS.some(kw => nameLower.includes(kw))) return true;
+            if (!(c as any).category && !HEAVY_METAL_KEYWORDS.some(kw => nameLower.includes(kw)) && !MYCOTOXIN_KEYWORDS.some(kw => nameLower.includes(kw))) return true;
             return false;
         }).map(c => ({...c}));
         
@@ -130,6 +161,14 @@ const TCCSFormPage = () => {
             return false;
         }).map(c => ({...c}));
 
+        const myco = (tccs.safetyCriteria || []).filter(c => {
+            if (!c) return false;
+            const nameLower = (c.name || '').toLowerCase();
+            if ((c as any).category === 'mycotoxin' || (c as any).category === 'other') return true;
+            if (!(c as any).category && MYCOTOXIN_KEYWORDS.some(kw => nameLower.includes(kw))) return true;
+            return false;
+        }).map(c => ({...c}));
+
         setFormValues({
           productId: tccs.productId,
           code: cloneId ? `${tccs.code}-COPY` : tccs.code,
@@ -137,6 +176,7 @@ const TCCSFormPage = () => {
           mainCriteria: (tccs.mainQualityCriteria || []).filter(c => c).length > 0 ? (tccs.mainQualityCriteria || []).filter(c => c).map(c => ({...c})) : initialTccsFormState.mainCriteria,
           microbiologicalCriteria: micro.length > 0 ? micro : initialTccsFormState.microbiologicalCriteria,
           heavyMetalCriteria: metal.length > 0 ? metal : initialTccsFormState.heavyMetalCriteria,
+          mycotoxinCriteria: myco,
           alternateRules: ((tccs as any).alternateRules || []).map((r: any) => ({...r})),
         });
       } else {
@@ -162,6 +202,7 @@ const TCCSFormPage = () => {
           mainCriteria: (latestVersion.mainQualityCriteria || []).filter(c => c).length > 0 ? (latestVersion.mainQualityCriteria || []).map(c => ({...c})) : initialTccsFormState.mainCriteria,
           microbiologicalCriteria: (latestVersion.safetyCriteria || []).filter(c => c && (c as any).category === 'micro').length > 0 ? (latestVersion.safetyCriteria || []).filter(c => c && (c as any).category === 'micro').map(c => ({...c})) : initialTccsFormState.microbiologicalCriteria,
           heavyMetalCriteria: (latestVersion.safetyCriteria || []).filter(c => c && (c as any).category === 'metal').length > 0 ? (latestVersion.safetyCriteria || []).filter(c => c && (c as any).category === 'metal').map(c => ({...c})) : initialTccsFormState.heavyMetalCriteria,
+          mycotoxinCriteria: (latestVersion.safetyCriteria || []).filter(c => c && ((c as any).category === 'mycotoxin' || (c as any).category === 'other')).map(c => ({...c})),
           alternateRules: ((latestVersion as any).alternateRules || []).map((r: any) => ({...r})),
         }));
       }
@@ -186,7 +227,14 @@ const TCCSFormPage = () => {
   // 3. Hàm Lưu chung
   const handleSave = async (e: React.FormEvent<HTMLFormElement>) => {
      e.preventDefault();
-     if (!validate()) return;
+     if (!validate()) {
+       const errorKeys = Object.keys(errors);
+       const minMaxError = errorKeys.find(k => k.startsWith('minMax_'));
+       if (minMaxError) {
+         notify({ type: 'ERROR', title: 'Lỗi giá trị Min - Max', message: errors[minMaxError] });
+       }
+       return;
+     }
      setIsSubmitting(true);
      try {
        const tccsData: TCCS = {
@@ -199,7 +247,8 @@ const TCCSFormPage = () => {
          mainQualityCriteria: formValues.mainCriteria.filter(c => c.name),
          safetyCriteria: [
            ...formValues.microbiologicalCriteria.filter(c => c.name).map(c => ({ ...(c as any), category: 'micro' })),
-           ...formValues.heavyMetalCriteria.filter(c => c.name).map(c => ({ ...(c as any), category: 'metal' }))
+           ...formValues.heavyMetalCriteria.filter(c => c.name).map(c => ({ ...(c as any), category: 'metal' })),
+           ...(formValues.mycotoxinCriteria || []).filter(c => c.name).map(c => ({ ...(c as any), category: 'mycotoxin' }))
          ],
          alternateRules: formValues.alternateRules.filter(r => r.main && r.alt),
          createdAt: new Date().toISOString(),
@@ -251,7 +300,8 @@ const TCCSFormPage = () => {
     return [
       ...formValues.mainCriteria.map(c => c.name),
       ...formValues.microbiologicalCriteria.map(c => c.name),
-      ...formValues.heavyMetalCriteria.map(c => c.name)
+      ...formValues.heavyMetalCriteria.map(c => c.name),
+      ...(formValues.mycotoxinCriteria || []).map(c => c.name)
     ].filter(n => n.trim() !== '');
   };
 
@@ -279,6 +329,7 @@ const TCCSFormPage = () => {
         <form onSubmit={handleSave}>
           <div className="space-y-6 pr-4">
             <datalist id="criteria-name-suggestions">{allCriteriaNames.map(name => <option key={name} value={name} />)}</datalist>
+            <datalist id="criteria-unit-suggestions">{COMMON_CRITERIA_UNITS.map(unit => <option key={unit} value={unit} />)}</datalist>
             
             {(!id || cloneId) && (
               <div className="bg-blue-50 p-4 rounded-xl border border-blue-100 flex gap-3">
@@ -350,15 +401,17 @@ const TCCSFormPage = () => {
                   <button type="button" onClick={() => addToArray('mainCriteria', { name: '', unit: '', min: undefined, max: undefined, type: CriterionType.NUMBER, notes: '' })} className="p-2 bg-amber-50 text-amber-600 rounded-lg hover:bg-amber-100 transition-colors"><Plus size={16}/></button>
                 </div>
               </div>
-              {formValues.mainCriteria.map((c, i) => (
-                <div key={i} className="flex flex-col gap-1 bg-slate-50/50 p-1.5 rounded-xl border hover:border-slate-200 transition-all group">
+              {formValues.mainCriteria.map((c, i) => {
+                const isMinMaxError = c.type === CriterionType.NUMBER && c.min !== undefined && c.max !== undefined && c.min !== null && c.max !== null && Number(c.min) > Number(c.max);
+                return (
+                <div key={i} className={`flex flex-col gap-1 p-1.5 rounded-xl border transition-all group ${isMinMaxError ? 'bg-red-50/50 border-red-200' : 'bg-slate-50/50 hover:border-slate-200'}`}>
                   <div className="flex gap-2 items-center">
                     <select value={c.type} onChange={(e) => updateInArray('mainCriteria', i, 'type', e.target.value as any)} className="w-16 px-1 py-2 bg-white rounded-lg text-[10px] font-bold outline-none border border-slate-100 shadow-sm"><option value="NUMBER">Số</option><option value="TEXT">Chữ</option></select>
                     <input placeholder="Tên chỉ tiêu" value={c.name} onChange={(e) => updateInArray('mainCriteria', i, 'name', e.target.value)} className="flex-[2] px-3 py-2 bg-white rounded-lg text-xs font-bold outline-none border border-slate-100 shadow-sm" list="criteria-name-suggestions" />
-                    <input placeholder="ĐVT" value={c.unit} onChange={(e) => updateInArray('mainCriteria', i, 'unit', e.target.value)} className="w-16 px-3 py-2 bg-white rounded-lg text-xs font-bold outline-none text-center border border-slate-100 shadow-sm" />
+                    <input placeholder="ĐVT" value={c.unit} onChange={(e) => updateInArray('mainCriteria', i, 'unit', e.target.value)} className="w-16 px-3 py-2 bg-white rounded-lg text-xs font-bold outline-none text-center border border-slate-100 shadow-sm" list="criteria-unit-suggestions" />
                     {c.type === CriterionType.NUMBER ? (
-                      <><input type="text" inputMode="decimal" placeholder="Min" value={c.min ?? ''} onChange={(e) => { const v = autoFormatInput(e.target.value); updateInArray('mainCriteria', i, 'min', v === '' ? undefined : v as any); }} onBlur={(e) => { const v = e.target.value; const n = parseNumberFromText(v); if (v !== '' && !isNaN(n) && !v.trim().endsWith('.')) updateInArray('mainCriteria', i, 'min', n); }} className="w-20 px-3 py-2 bg-white rounded-lg text-xs font-bold outline-none text-right border shadow-sm font-mono" />
-                       <input type="text" inputMode="decimal" placeholder="Max" value={c.max ?? ''} onChange={(e) => { const v = autoFormatInput(e.target.value); updateInArray('mainCriteria', i, 'max', v === '' ? undefined : v as any); }} onBlur={(e) => { const v = e.target.value; const n = parseNumberFromText(v); if (v !== '' && !isNaN(n) && !v.trim().endsWith('.')) updateInArray('mainCriteria', i, 'max', n); }} className="w-20 px-3 py-2 bg-white rounded-lg text-xs font-bold outline-none text-right border shadow-sm font-mono" />
+                      <><input type="text" inputMode="decimal" placeholder="Min" value={c.min ?? ''} onChange={(e) => { const v = autoFormatInput(e.target.value); updateInArray('mainCriteria', i, 'min', v === '' ? undefined : v as any); }} onBlur={(e) => { const v = e.target.value; const n = parseNumberFromText(v); if (v !== '' && !isNaN(n) && !v.trim().endsWith('.')) updateInArray('mainCriteria', i, 'min', n); }} className={`w-20 px-3 py-2 bg-white rounded-lg text-xs font-bold outline-none text-right border shadow-sm font-mono ${isMinMaxError ? 'border-red-400 text-red-700 bg-red-50' : ''}`} />
+                       <input type="text" inputMode="decimal" placeholder="Max" value={c.max ?? ''} onChange={(e) => { const v = autoFormatInput(e.target.value); updateInArray('mainCriteria', i, 'max', v === '' ? undefined : v as any); }} onBlur={(e) => { const v = e.target.value; const n = parseNumberFromText(v); if (v !== '' && !isNaN(n) && !v.trim().endsWith('.')) updateInArray('mainCriteria', i, 'max', n); }} className={`w-20 px-3 py-2 bg-white rounded-lg text-xs font-bold outline-none text-right border shadow-sm font-mono ${isMinMaxError ? 'border-red-400 text-red-700 bg-red-50' : ''}`} />
                        <input type="text" placeholder="HL công bố" value={c.declaredContent ?? ''} onChange={(e) => { const v = autoFormatInput(e.target.value); updateInArray('mainCriteria', i, 'declaredContent', v === '' ? undefined : v); }} className="w-24 px-3 py-2 bg-indigo-50/50 rounded-lg text-xs font-bold outline-none text-right border border-indigo-100 shadow-sm font-mono text-indigo-700" title="Hàm lượng công bố (để làm gốc tính %)" /></>
                     ) : (
                       <div className="flex-[2] flex gap-2">
@@ -371,6 +424,12 @@ const TCCSFormPage = () => {
                     )}
                     <button type="button" onClick={() => removeFromArray('mainCriteria', i)} className="p-2 text-slate-300 hover:text-red-500"><X size={16}/></button>
                   </div>
+                  {isMinMaxError && (
+                    <p className="text-[10px] font-bold text-red-600 pl-2 flex items-center gap-1">
+                      <AlertCircle size={12} className="shrink-0" />
+                      Giá trị Min ({c.min}) không được lớn hơn Max ({c.max})
+                    </p>
+                  )}
                   <div className="flex items-center gap-2 px-2 opacity-50 group-hover:opacity-100 transition-opacity">
                       <CornerDownRight size={12} className="text-slate-300 shrink-0" />
                       <input placeholder="Ghi chú / Điều kiện (VD: Phương pháp thử...)" value={(c as any).notes || ''} onChange={(e) => updateInArray('mainCriteria', i, 'notes', e.target.value)} className="w-full bg-transparent text-[10px] font-medium text-slate-500 outline-none border-b border-transparent focus:border-slate-300 transition-colors" />
@@ -399,11 +458,12 @@ const TCCSFormPage = () => {
                     )}
                   </div>
                 </div>
-              ))}
+              );})}
             </div>
 
-            {/* 3 & 4. Chỉ tiêu Vi sinh & Kim loại (Mẫu thu gọn) */}
+            {/* 3, 4 & 5. Chỉ tiêu Vi sinh, Kim loại, Độc tố vi nấm */}
             <div className="grid grid-cols-1 gap-6">
+              {/* 3. Vi sinh vật */}
               <div className="space-y-3">
                 <div className="flex justify-between items-center">
                   <div className="flex items-center gap-2 text-red-600 font-black text-[10px] uppercase tracking-widest"><ShieldCheck size={14}/> 3. Giới hạn Vi sinh vật</div>
@@ -413,7 +473,7 @@ const TCCSFormPage = () => {
                   <div key={i} className="flex gap-2 items-center bg-slate-50/50 p-1.5 rounded-xl border hover:border-slate-200">
                     <select value={c.type} onChange={(e) => updateInArray('microbiologicalCriteria', i, 'type', e.target.value as any)} className="w-16 px-1 py-2 bg-white rounded-lg text-[10px] font-bold outline-none border border-slate-100 shadow-sm"><option value="NUMBER">Số</option><option value="TEXT">Chữ</option></select>
                     <input placeholder="Tên chỉ tiêu" value={c.name} onChange={(e) => updateInArray('microbiologicalCriteria', i, 'name', e.target.value)} className="flex-[2] px-3 py-2 bg-white rounded-lg text-xs font-bold outline-none border shadow-sm" list="criteria-name-suggestions" />
-                    <input placeholder="ĐVT" value={c.unit} onChange={(e) => updateInArray('microbiologicalCriteria', i, 'unit', e.target.value)} className="w-16 px-3 py-2 bg-white rounded-lg text-xs font-bold outline-none text-center border shadow-sm" />
+                    <input placeholder="ĐVT" value={c.unit} onChange={(e) => updateInArray('microbiologicalCriteria', i, 'unit', e.target.value)} className="w-16 px-3 py-2 bg-white rounded-lg text-xs font-bold outline-none text-center border shadow-sm" list="criteria-unit-suggestions" />
                     {c.type === CriterionType.NUMBER ? (<div className="flex items-center gap-2 bg-white px-3 w-32 border shadow-sm rounded-lg"><span className="text-[10px] font-bold text-slate-400">≤</span><input type="text" inputMode="decimal" placeholder="Max" value={c.max ?? ''} onChange={(e) => { const v = autoFormatInput(e.target.value); updateInArray('microbiologicalCriteria', i, 'max', v === '' ? undefined : v as any); }} onBlur={(e) => { const v = e.target.value; const n = parseNumberFromText(v); if (v !== '' && !isNaN(n) && !v.trim().endsWith('.')) updateInArray('microbiologicalCriteria', i, 'max', n); }} className="w-full bg-transparent py-2 text-xs font-bold outline-none text-right font-mono" /></div>
                     ) : (<input type="text" placeholder="Giới hạn" value={c.expectedText || ''} onChange={(e) => updateInArray('microbiologicalCriteria', i, 'expectedText', e.target.value)} className="flex-[2] px-3 py-2 bg-white rounded-lg text-xs font-bold outline-none border shadow-sm" />)}
                     <button type="button" onClick={() => removeFromArray('microbiologicalCriteria', i)} className="p-2 text-slate-300 hover:text-red-500"><X size={16}/></button>
@@ -421,6 +481,7 @@ const TCCSFormPage = () => {
                 ))}
               </div>
               
+              {/* 4. Kim loại nặng */}
               <div className="space-y-3">
                 <div className="flex justify-between items-center">
                   <div className="flex items-center gap-2 text-red-600 font-black text-[10px] uppercase tracking-widest"><ShieldCheck size={14}/> 4. Giới hạn Kim loại nặng</div>
@@ -430,19 +491,41 @@ const TCCSFormPage = () => {
                   <div key={i} className="flex gap-2 items-center bg-slate-50/50 p-1.5 rounded-xl border hover:border-slate-200">
                     <select value={c.type} onChange={(e) => updateInArray('heavyMetalCriteria', i, 'type', e.target.value as any)} className="w-16 px-1 py-2 bg-white rounded-lg text-[10px] font-bold outline-none border border-slate-100 shadow-sm"><option value="NUMBER">Số</option><option value="TEXT">Chữ</option></select>
                     <input placeholder="Tên chỉ tiêu" value={c.name} onChange={(e) => updateInArray('heavyMetalCriteria', i, 'name', e.target.value)} className="flex-[2] px-3 py-2 bg-white rounded-lg text-xs font-bold outline-none border shadow-sm" list="criteria-name-suggestions" />
-                    <input placeholder="ĐVT" value={c.unit} onChange={(e) => updateInArray('heavyMetalCriteria', i, 'unit', e.target.value)} className="w-16 px-3 py-2 bg-white rounded-lg text-xs font-bold outline-none text-center border shadow-sm" />
+                    <input placeholder="ĐVT" value={c.unit} onChange={(e) => updateInArray('heavyMetalCriteria', i, 'unit', e.target.value)} className="w-16 px-3 py-2 bg-white rounded-lg text-xs font-bold outline-none text-center border shadow-sm" list="criteria-unit-suggestions" />
                     {c.type === CriterionType.NUMBER ? (<div className="flex items-center gap-2 bg-white px-3 w-32 border shadow-sm rounded-lg"><span className="text-[10px] font-bold text-slate-400">≤</span><input type="text" inputMode="decimal" placeholder="Max" value={c.max ?? ''} onChange={(e) => { const v = autoFormatInput(e.target.value); updateInArray('heavyMetalCriteria', i, 'max', v === '' ? undefined : v as any); }} onBlur={(e) => { const v = e.target.value; const n = parseNumberFromText(v); if (v !== '' && !isNaN(n) && !v.trim().endsWith('.')) updateInArray('heavyMetalCriteria', i, 'max', n); }} className="w-full bg-transparent py-2 text-xs font-bold outline-none text-right font-mono" /></div>
                     ) : (<input type="text" placeholder="Giới hạn" value={c.expectedText || ''} onChange={(e) => updateInArray('heavyMetalCriteria', i, 'expectedText', e.target.value)} className="flex-[2] px-3 py-2 bg-white rounded-lg text-xs font-bold outline-none border shadow-sm" />)}
                     <button type="button" onClick={() => removeFromArray('heavyMetalCriteria', i)} className="p-2 text-slate-300 hover:text-red-500"><X size={16}/></button>
                   </div>
                 ))}
               </div>
+
+              {/* 5. Độc tố vi nấm & Khác */}
+              <div className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center gap-2 text-amber-600 font-black text-[10px] uppercase tracking-widest"><ShieldCheck size={14}/> 5. Độc tố vi nấm & Chỉ tiêu An toàn khác</div>
+                  <button type="button" onClick={() => addToArray('mycotoxinCriteria', { name: '', unit: '', max: undefined, type: CriterionType.NUMBER, notes: '' })} className="p-2 bg-amber-50 text-amber-600 rounded-lg hover:bg-amber-100 transition-colors"><Plus size={16}/></button>
+                </div>
+                {(formValues.mycotoxinCriteria || []).length === 0 ? (
+                  <p className="text-xs text-slate-400 italic bg-slate-50 p-3 rounded-xl">Chưa có chỉ tiêu độc tố vi nấm / dư lượng nào. Nhấn dấu (+) để thêm nếu sản phẩm yêu cầu.</p>
+                ) : (
+                  (formValues.mycotoxinCriteria || []).map((c, i) => (
+                    <div key={i} className="flex gap-2 items-center bg-slate-50/50 p-1.5 rounded-xl border hover:border-slate-200">
+                      <select value={c.type} onChange={(e) => updateInArray('mycotoxinCriteria', i, 'type', e.target.value as any)} className="w-16 px-1 py-2 bg-white rounded-lg text-[10px] font-bold outline-none border border-slate-100 shadow-sm"><option value="NUMBER">Số</option><option value="TEXT">Chữ</option></select>
+                      <input placeholder="Tên chỉ tiêu (VD: Aflatoxin B1...)" value={c.name} onChange={(e) => updateInArray('mycotoxinCriteria', i, 'name', e.target.value)} className="flex-[2] px-3 py-2 bg-white rounded-lg text-xs font-bold outline-none border shadow-sm" list="criteria-name-suggestions" />
+                      <input placeholder="ĐVT" value={c.unit} onChange={(e) => updateInArray('mycotoxinCriteria', i, 'unit', e.target.value)} className="w-16 px-3 py-2 bg-white rounded-lg text-xs font-bold outline-none text-center border shadow-sm" list="criteria-unit-suggestions" />
+                      {c.type === CriterionType.NUMBER ? (<div className="flex items-center gap-2 bg-white px-3 w-32 border shadow-sm rounded-lg"><span className="text-[10px] font-bold text-slate-400">≤</span><input type="text" inputMode="decimal" placeholder="Max" value={c.max ?? ''} onChange={(e) => { const v = autoFormatInput(e.target.value); updateInArray('mycotoxinCriteria', i, 'max', v === '' ? undefined : v as any); }} onBlur={(e) => { const v = e.target.value; const n = parseNumberFromText(v); if (v !== '' && !isNaN(n) && !v.trim().endsWith('.')) updateInArray('mycotoxinCriteria', i, 'max', n); }} className="w-full bg-transparent py-2 text-xs font-bold outline-none text-right font-mono" /></div>
+                      ) : (<input type="text" placeholder="Giới hạn" value={c.expectedText || ''} onChange={(e) => updateInArray('mycotoxinCriteria', i, 'expectedText', e.target.value)} className="flex-[2] px-3 py-2 bg-white rounded-lg text-xs font-bold outline-none border shadow-sm" />)}
+                      <button type="button" onClick={() => removeFromArray('mycotoxinCriteria', i)} className="p-2 text-slate-300 hover:text-red-500"><X size={16}/></button>
+                    </div>
+                  ))
+                )}
+              </div>
             </div>
 
-            {/* 5. Điều kiện thay thế */}
+            {/* 6. Điều kiện thay thế */}
             <div className="space-y-3 pt-4 border-t border-slate-100">
               <div className="flex justify-between items-center">
-                <div className="flex items-center gap-2 text-indigo-600 font-black text-[10px] uppercase tracking-widest"><ArrowRightLeft size={14}/> 5. Điều kiện thay thế (Tự động Pass)</div>
+                <div className="flex items-center gap-2 text-indigo-600 font-black text-[10px] uppercase tracking-widest"><ArrowRightLeft size={14}/> 6. Điều kiện thay thế (Tự động Pass)</div>
                 <button type="button" onClick={() => addToArray('alternateRules', { main: '', alt: '' })} className="p-2 bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-100 transition-colors"><Plus size={16}/></button>
               </div>
               {formValues.alternateRules.map((rule, i) => (
