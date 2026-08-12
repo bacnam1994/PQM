@@ -150,6 +150,22 @@ export interface AILearnedMapping {
   frequency: number;      // Số lần ánh xạ này được người dùng xác nhận
 }
 
+/**
+ * CriteriaAlias — Bảng ánh xạ tên chỉ tiêu TCCS.
+ * Lưu các tên cũ/alias của một chỉ tiêu để đảm bảo tương thích ngược
+ * với phiếu kiểm nghiệm đã nhập trước khi TCCS được chỉnh sửa.
+ */
+export interface CriteriaAlias {
+  id: string;
+  tccsId: string;           // ID của TCCS chứa chỉ tiêu chuẩn
+  canonicalName: string;    // Tên chuẩn HIỆN TẠI trong TCCS
+  aliases: string[];        // Các tên cũ / biến thể (đã lowercase-trim)
+  autoDetected: boolean;    // true nếu do hệ thống tự phát hiện khi updateTCCS
+  confirmedByAdmin: boolean; // true nếu Admin đã xác nhận ánh xạ
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface QualityAnomaly {
   type: 'DRIFT' | 'EXPIRY' | 'HIGH_FAIL_RATE' | 'MISSING_DATA';
   severity: 'HIGH' | 'MEDIUM' | 'LOW';
@@ -170,4 +186,5 @@ export interface AppState {
   lastSync: string | null;
   aiLearnedMappings: AILearnedMapping[];
   qualityAlerts: QualityAnomaly[];
+  criteriaAliases: CriteriaAlias[];
 }

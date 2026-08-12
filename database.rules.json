@@ -81,6 +81,14 @@
       "$mapping_id": {
         ".write": "auth != null"
       }
+    },
+
+    "criteria_aliases": {
+      ".read": "auth != null",
+      ".indexOn": ["tccsId"],
+      "$alias_id": {
+        ".write": "auth != null && root.child('users/admins/' + auth.uid).exists()"
+      }
     }
   }
 }

@@ -32,14 +32,30 @@ export const deleteProductService = async (id: string) => {
   // 1. Xóa Sản phẩm
   updates[`products/${id}`] = null;
 
-  // 2. Xóa TCCS liên quan
+  // 2. Xóa Công thức sản phẩm
+  const formulaQuery = query(ref(db, 'product_formulas'), orderByChild('productId'), equalTo(id));
+  const formulaSnap = await get(formulaQuery);
+  if (formulaSnap.exists()) {
+    Object.keys(formulaSnap.val()).forEach(key => updates[`product_formulas/${key}`] = null);
+  }
+
+  // 3. Xóa TCCS liên quan và các Criteria Alias của TCCS đó
   const tccsQuery = query(ref(db, 'tccs'), orderByChild('productId'), equalTo(id));
   const tccsSnap = await get(tccsQuery);
   if (tccsSnap.exists()) {
-     Object.keys(tccsSnap.val()).forEach(key => updates[`tccs/${key}`] = null);
+    const tccsKeys = Object.keys(tccsSnap.val());
+    for (const tKey of tccsKeys) {
+      updates[`tccs/${tKey}`] = null;
+      // Tìm và xóa alias của TCCS này
+      const aliasQuery = query(ref(db, 'criteria_aliases'), orderByChild('tccsId'), equalTo(tKey));
+      const aliasSnap = await get(aliasQuery);
+      if (aliasSnap.exists()) {
+        Object.keys(aliasSnap.val()).forEach(aKey => updates[`criteria_aliases/${aKey}`] = null);
+      }
+    }
   }
 
-  // 3. Xóa Lô và dữ liệu con của Lô (Kết quả, Kho)
+  // 4. Xóa Lô và dữ liệu con của Lô (Kết quả, Kho)
   const batchesQuery = query(ref(db, 'batches'), orderByChild('productId'), equalTo(id));
   const batchesSnap = await get(batchesQuery);
   

@@ -1,7 +1,9 @@
 import React, { memo, useMemo } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { TestResult, Batch, Product, TCCS, TestResultEntry, ProductFormula, FormulaIngredient, Criterion } from '../../types';
-import { TEST_RESULT_STATUS, parseNumberFromText, formatDateStandard, calculateOverallStatus } from '../../utils';
+import { TEST_RESULT_STATUS, parseNumberFromText, formatDateStandard, calculateOverallStatus, getActiveLocale } from '../../utils';
+import { useCriteriaResolver } from '../../hooks/useCriteriaResolver';
+import { normalizeName } from '../../services/criteriaAliasService';
 
 interface ExtraTestResultEntry extends TestResultEntry {
   limit?: string;
@@ -74,17 +76,22 @@ const formatScientific = (value: string | number, limitText?: string) => {
     formatOptions.maximumFractionDigits = fractionDigits;
   }
 
-  return `${prefix.trim()}${prefix ? ' ' : ''}${num.toLocaleString('vi-VN', formatOptions)}`;
+  const locale = getActiveLocale();
+  return `${prefix.trim()}${prefix ? ' ' : ''}${num.toLocaleString(locale, formatOptions)}`;
 };
 
 const CoAReport = memo(({ res, batch, product, tccs, formula }: CoAReportProps) => {
   const coaUrl = typeof window !== 'undefined' ? window.location.href : '';
 
+  // Hook giải mã tên chỉ tiêu qua bảng alias — hỗ trợ cả tên cũ lẫn tên mới
+  const resolver = useCriteriaResolver(tccs);
+
+  // Map tên chuẩn (normalize) → Criterion — duyën mới chỉ dùng tên chuẩn hiện tại làm key
   const allCriteriaMap = useMemo(() => {
     const map = new Map<string, Criterion>();
     if (tccs) {
-      (tccs.mainQualityCriteria || []).forEach(c => c && c.name && c.name.trim() !== '' && map.set(c.name.trim().toLowerCase(), c));
-      (tccs.safetyCriteria || []).forEach(c => c && c.name && c.name.trim() !== '' && map.set(c.name.trim().toLowerCase(), c));
+      (tccs.mainQualityCriteria || []).forEach(c => c && c.name && c.name.trim() !== '' && map.set(normalizeName(c.name), c));
+      (tccs.safetyCriteria || []).forEach(c => c && c.name && c.name.trim() !== '' && map.set(normalizeName(c.name), c));
     }
     return map;
   }, [tccs]);
@@ -92,44 +99,47 @@ const CoAReport = memo(({ res, batch, product, tccs, formula }: CoAReportProps) 
   const formulaItemMap = useMemo(() => {
     const map = new Map<string, FormulaIngredient>();
     if (formula) {
-      (formula.ingredients || []).forEach(ing => ing && ing.name && map.set(ing.name.trim().toLowerCase(), ing));
-      (formula.excipients || []).forEach(exc => exc && exc.name && map.set(exc.name.trim().toLowerCase(), exc));
+      (formula.ingredients || []).forEach(ing => ing && ing.name && map.set(normalizeName(ing.name), ing));
+      (formula.excipients || []).forEach(exc => exc && exc.name && map.set(normalizeName(exc.name), exc));
     }
     return map;
   }, [formula]);
 
   // Lọc và loại bỏ các chỉ tiêu trùng lặp (khi gộp từ nhiều phiếu kiểm nghiệm)
-  // Ưu tiên giữ lại kết quả ĐẠT nếu có sự sai khác giữa các lần kiểm tra
+  // Ư u tiên giữ lại kết quả ĐẠT nếu có sự sai khác giữa các lần kiểm tra
+  // [ALIAS FIX] Dùng resolveKey làm key dedup — "Độ am" và "Độ ẩm" sẽ gộp lại thành 1 entry
   const deduplicatedResults = useMemo(() => {
     if (!res.results) return [];
     const uniqueMap = new Map<string, TestResultEntry>();
     res.results.forEach(r => {
-      const rName = (r.criteriaName || '').trim().toLowerCase();
+      const rName = (r.criteriaName || '').trim();
       if (!rName) return;
-      const existing = uniqueMap.get(rName);
+      // Dùng resolveKey để normalize + resolve alias làm key
+      const rKey = resolver.resolveKey(rName);
+      const existing = uniqueMap.get(rKey);
       if (!existing || (r.isPass === true && existing.isPass !== true)) {
-        uniqueMap.set(rName, r);
+        uniqueMap.set(rKey, r);
       }
     });
 
     // Tự động nội suy các chỉ tiêu "Miễn kiểm" bị thiếu (Dành cho bản in phiếu cũ chưa có dữ liệu DB)
     if (tccs) {
         const rulesMap = new Map<string, any>();
-        (tccs.alternateRules || []).forEach(r => { if (r && r.alt && r.alt.trim() !== '') rulesMap.set(r.alt.trim().toLowerCase(), r); });
+        (tccs.alternateRules || []).forEach(r => { if (r && r.alt && r.alt.trim() !== '') rulesMap.set(resolver.resolveKey(r.alt), r); });
 
         const allCriteria = [...(tccs.mainQualityCriteria || []), ...(tccs.safetyCriteria || [])].filter(c => c && c.name && c.name.trim() !== '');
         allCriteria.forEach(c => {
-            const cName = c.name.trim().toLowerCase();
-            const existingEntry = uniqueMap.get(cName);
+            const cKey = normalizeName(c.name);
+            const existingEntry = uniqueMap.get(cKey);
 
             // Nội suy nếu chỉ tiêu bị thiếu, hoặc có tồn tại nhưng rỗng (dữ liệu cũ)
             const isMissingOrEmpty = !existingEntry || (existingEntry.value === null || existingEntry.value === undefined || String(existingEntry.value).trim() === '');
 
             if (isMissingOrEmpty) {
-                const rule = rulesMap.get(cName);
+                const rule = rulesMap.get(cKey);
                 if (rule) {
-                    const mainName = (rule.main || '').trim().toLowerCase();
-                    const mainEntry = uniqueMap.get(mainName);
+                    const mainKey = resolver.resolveKey(rule.main || '');
+                    const mainEntry = uniqueMap.get(mainKey);
                     if (mainEntry && mainEntry.isPass === true && mainEntry.value !== undefined && String(mainEntry.value).trim() !== '') {
                         let ruleSatisfied = false;
                         if (rule.type === 'CONDITIONAL_CHECK') {
@@ -146,7 +156,7 @@ const CoAReport = memo(({ res, batch, product, tccs, formula }: CoAReportProps) 
                             ruleSatisfied = true;
                         }
                         if (ruleSatisfied) {
-                            uniqueMap.set(cName, { criteriaName: c.name, value: 'Miễn kiểm', isPass: true, isExtra: false, unit: c.unit });
+                            uniqueMap.set(cKey, { criteriaName: c.name, value: 'Miễn kiểm', isPass: true, isExtra: false, unit: c.unit });
                         }
                     }
                 }
@@ -155,7 +165,7 @@ const CoAReport = memo(({ res, batch, product, tccs, formula }: CoAReportProps) 
     }
 
     return Array.from(uniqueMap.values());
-  }, [res.results, tccs]);
+  }, [res.results, tccs, resolver]);
 
   const groupedResults = useMemo(() => {
     if (!deduplicatedResults.length) return [];
@@ -225,8 +235,8 @@ const CoAReport = memo(({ res, batch, product, tccs, formula }: CoAReportProps) 
     
     if (!tccs) return 'Theo TCCS';
     
-    const rName = r.criteriaName.trim().toLowerCase();
-    const c = allCriteriaMap.get(rName);
+    // [ALIAS FIX] Dùng resolver.lookupCriterion để tra cứu qua alias
+    const c = resolver.lookupCriterion(r.criteriaName, allCriteriaMap);
     
     if (!c) return 'Theo TCCS';
     
@@ -245,8 +255,8 @@ const CoAReport = memo(({ res, batch, product, tccs, formula }: CoAReportProps) 
   const getUnitText = (r: TestResultEntry) => {
     // Ưu tiên đơn vị từ TCCS gốc của phiếu kết quả
     if (tccs) {
-      const rName = r.criteriaName.trim().toLowerCase();
-      const c = allCriteriaMap.get(rName);
+      // [ALIAS FIX] Dùng resolver.lookupCriterion để tra cứu qua alias
+      const c = resolver.lookupCriterion(r.criteriaName, allCriteriaMap);
       if (c && c.unit) return c.unit;
     }
     
@@ -269,14 +279,20 @@ const CoAReport = memo(({ res, batch, product, tccs, formula }: CoAReportProps) 
         ...(tccs.safetyCriteria || [])
       ].filter(c => c && c.name);
 
-      const testedNames = new Set(deduplicatedResults.map(r => r.criteriaName.trim().toLowerCase()));
-      const isComplete = mandatoryCriteria.every(c => testedNames.has(c.name.trim().toLowerCase()));
+      // [ALIAS FIX] buildResolvedTestedSet chuẩn hóa tên qua alias trước khi so sánh
+      const resolvedTestedSet = resolver.buildResolvedTestedSet(
+        deduplicatedResults.map(r => r.criteriaName)
+      );
+
+      const isComplete = mandatoryCriteria.every(c =>
+        resolvedTestedSet.has(normalizeName(c.name))
+      );
 
       if (!isComplete) return { label: 'CHƯA HOÀN THIỆN', color: 'bg-amber-500' };
     }
 
     return { label: 'ĐẠT', color: 'bg-emerald-600' };
-  }, [deduplicatedResults, tccs]);
+  }, [deduplicatedResults, tccs, resolver]);
 
   return (
     <div id="coa-report-container" className="bg-white p-10 text-slate-900 max-w-[21cm] mx-auto print:shadow-none print:border-0 print:p-0 print:max-w-none print:mx-0" style={{ fontFamily: "'Times New Roman', Times, serif" }}>

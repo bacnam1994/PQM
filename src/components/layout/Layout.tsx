@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Package, FileText, ClipboardCheck, Settings, 
   Menu, X, Leaf, Cloud, CloudOff, RefreshCw, Layers,
   LogOut, User as UserIcon, FlaskConical, Users, Activity,
-  ChevronDown, Search, Moon, Sun, ShieldAlert, TrendingUp
+  ChevronDown, Search, Moon, Sun, ShieldAlert, TrendingUp, Link2
 } from 'lucide-react';
 import { useAppStore } from '../../store/useAppStore';
 import { useShallow } from 'zustand/react/shallow';
@@ -47,6 +47,7 @@ const navItems = [
     icon: Settings,
     children: [
       { name: 'Người dùng', path: '/users', icon: Users, adminOnly: true },
+      { name: 'Liên kết chỉ tiêu', path: '/criteria-aliases', icon: Link2, adminOnly: true },
       { name: 'Cấu hình', path: '/settings', icon: Settings },
     ]
   }

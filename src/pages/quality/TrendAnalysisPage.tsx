@@ -11,6 +11,8 @@ import {
 } from 'lucide-react';
 import { PageHeader, DSCard } from '../../components';
 import { formatDateStandard } from '../../utils';
+import { useCriteriaResolver } from '../../hooks/useCriteriaResolver';
+import { normalizeName } from '../../services/criteriaAliasService';
 import * as XLSX from 'xlsx';
 
 // ─── SPC Statistical Helpers ──────────────────────────────────────────────────
@@ -123,6 +125,8 @@ const TrendAnalysisPage: React.FC = () => {
   const selectedCriteria = useMemo(() =>
     criteriaList.find((c: any) => c.name === selectedCriteriaName), [criteriaList, selectedCriteriaName]);
 
+  const resolver = useCriteriaResolver(activeTccs);
+
   const chartData = useMemo(() => {
     if (!selectedProductId || !selectedCriteriaName) return [];
     const filteredBatches = batches
@@ -140,15 +144,20 @@ const TrendAnalysisPage: React.FC = () => {
         const map = new Map<string, any>();
         [...batchResults].sort((a: any, b: any) => a.testDate.localeCompare(b.testDate)).forEach((r: any) => {
           (r.results || []).forEach((entry: any) => {
-            if (entry?.criteriaName) map.set(entry.criteriaName.trim().toLowerCase(), entry);
+            if (entry?.criteriaName) {
+              const canonicalKey = normalizeName(resolver.resolve(entry.criteriaName));
+              map.set(canonicalKey, entry);
+              map.set(normalizeName(entry.criteriaName), entry);
+            }
           });
         });
-        const entry = map.get(selectedCriteriaName.trim().toLowerCase());
+        const targetKey = normalizeName(selectedCriteriaName);
+        const entry = map.get(targetKey);
         const value = entry ? parseNum(entry.value) : null;
         return value !== null ? { batchNo: batch.batchNo, mfgDate: batch.mfgDate, value } : null;
       })
       .filter(Boolean) as { batchNo: string; mfgDate: string; value: number }[];
-  }, [selectedProductId, selectedCriteriaName, batches, testResults, dateFrom, dateTo]);
+  }, [selectedProductId, selectedCriteriaName, batches, testResults, dateFrom, dateTo, resolver]);
 
   const spcStats = useMemo(() => {
     const vals = chartData.map(d => d.value);

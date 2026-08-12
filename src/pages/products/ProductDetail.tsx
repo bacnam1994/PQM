@@ -9,7 +9,9 @@ import {
 } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { ProductStatus } from '../../types';
-import { parseNumberFromText, formatDateStandard } from '../../utils';
+import { parseNumberFromText, formatDateStandard, getActiveLocale } from '../../utils';
+import { useCriteriaResolver } from '../../hooks/useCriteriaResolver';
+import { normalizeName } from '../../services/criteriaAliasService';
 
 // Helper: Format số sang dạng mũ (VD: 1000 -> 10³)
 const formatScientific = (value: string | number) => {
@@ -32,7 +34,7 @@ const formatScientific = (value: string | number) => {
       </span>
     );
   }
-  return num.toLocaleString('vi-VN');
+  return num.toLocaleString(getActiveLocale());
 };
 
 const ProductDetail: React.FC = () => {
@@ -68,12 +70,16 @@ const ProductDetail: React.FC = () => {
     return Array.from(names);
   }, [productTCCSList]);
 
+  const activeTCCS = productTCCSList.find(t => t.isActive) || productTCCSList[0];
+  const resolver = useCriteriaResolver(activeTCCS);
+
   const analyticsData = useMemo(() => {
     if (!selectedCriterion) return [];
     const batchMap = new Map<string, any>();
     [...productResults].reverse().forEach(res => {
       const batch = batches.find(b => b.id === res.batchId);
-      const match = res.results.find(r => r.criteriaName === selectedCriterion);
+      // [ALIAS FIX] Dùng resolver.isMatch thay vì exact equality
+      const match = res.results.find(r => resolver.isMatch(r.criteriaName, selectedCriterion));
       if (match && batch) {
         const numVal = typeof match.value === 'number' ? match.value : parseNumberFromText(match.value);
         if (!isNaN(numVal)) {
@@ -84,7 +90,7 @@ const ProductDetail: React.FC = () => {
       }
     });
     return Array.from(batchMap.values());
-  }, [productResults, selectedCriterion, batches]);
+  }, [productResults, selectedCriterion, batches, resolver]);
 
   const labs: string[] = Array.from(new Set(productResults.map(r => r.labName)));
   const labColors = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#ec4899'];

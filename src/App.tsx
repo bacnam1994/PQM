@@ -63,6 +63,7 @@ const QualitySummaryReport = lazyWithRetry(() => import('./pages/quality/Quality
 const TrendAnalysisPage = lazyWithRetry(() => import('./pages/quality/TrendAnalysisPage'));
 const UnauthorizedPage = lazyWithRetry(() => import('./pages/auth/UnauthorizedPage'));
 const WelcomePage = lazyWithRetry(() => import('./pages/auth/WelcomePage'));
+const CriteriaAliasManager = lazyWithRetry(() => import('./pages/system/CriteriaAliasManager'));
 
 const ProtectedRoute: React.FC = () => {
   const { user, role, authLoading } = useAppStore(useShallow(s => ({
@@ -196,6 +197,7 @@ const AppRoutes: React.FC = () => {
           <Route path="/account" element={<AccountPage />} />
           <Route path="/search" element={<SearchPage />} />
           <Route path="/users" element={<AdminRoute><UserManagement /></AdminRoute>} />
+          <Route path="/criteria-aliases" element={<AdminRoute><CriteriaAliasManager /></AdminRoute>} />
         </Route>
 
         <Route path="*" element={<NotFoundPage />} />

@@ -3,7 +3,7 @@ import { ref, push, serverTimestamp } from 'firebase/database';
 
 export interface AuditLogEntry {
   action: 'CREATE' | 'UPDATE' | 'DELETE' | 'IMPORT' | 'RESTORE' | 'LOGIN';
-  collection: 'PRODUCTS' | 'BATCHES' | 'TCCS' | 'TEST_RESULTS' | 'SYSTEM';
+  collection: 'PRODUCTS' | 'BATCHES' | 'TCCS' | 'TEST_RESULTS' | 'SYSTEM' | 'CRITERIA_ALIASES';
   documentId?: string;
   details: string;
   performedBy: string; // Email người thực hiện

@@ -23,9 +23,10 @@ export const useFirebaseSync = () => {
     const initializeData = async () => {
       // Tải cache từ IndexedDB trước
       try {
-        const [cachedProducts, cachedBatches, cachedTccs, cachedFormulas, cachedMaterials, cachedTestResults, cachedAiMappings, cachedQualityAlerts] = await Promise.all([
+        const [cachedProducts, cachedBatches, cachedTccs, cachedFormulas, cachedMaterials, cachedTestResults, cachedAiMappings, cachedQualityAlerts, cachedCriteriaAliases] = await Promise.all([
           getFromCache('products'), getFromCache('batches'), getFromCache('tccs'), getFromCache('productFormulas'),
-          getFromCache('rawMaterials'), getFromCache('testResults'), getFromCache('aiLearnedMappings'), getFromCache('qualityAlerts')
+          getFromCache('rawMaterials'), getFromCache('testResults'), getFromCache('aiLearnedMappings'), getFromCache('qualityAlerts'),
+          getFromCache('criteriaAliases')
         ]);
 
         if (!isMounted) return;
@@ -39,6 +40,7 @@ export const useFirebaseSync = () => {
           testResults: cachedTestResults.length > 0 ? cachedTestResults.sort((a: any, b: any) => new Date(b.testDate).getTime() - new Date(a.testDate).getTime()) : currentState.testResults,
           aiLearnedMappings: cachedAiMappings?.length > 0 ? cachedAiMappings : currentState.aiLearnedMappings,
           qualityAlerts: cachedQualityAlerts?.length > 0 ? cachedQualityAlerts : currentState.qualityAlerts,
+          criteriaAliases: cachedCriteriaAliases?.length > 0 ? cachedCriteriaAliases : currentState.criteriaAliases,
         });
       } catch (error) {
         console.error("Lỗi nạp cache:", error);
@@ -54,6 +56,7 @@ export const useFirebaseSync = () => {
         productFormulas: ref(db, 'product_formulas'),
         rawMaterials: ref(db, 'raw_materials'),
         aiLearnedMappings: ref(db, 'ai_learned_mappings'),
+        criteriaAliases: ref(db, 'criteria_aliases'),
       };
 
       Object.entries(standardRefs).forEach(([key, reference]) => {
@@ -63,7 +66,10 @@ export const useFirebaseSync = () => {
           useAppStore.getState().setAppState({ [key]: list, lastSync: new Date().toISOString() });
 
           if (list.length > 0) {
-            const storeName = key === 'tccsList' ? 'tccs' : (key === 'aiLearnedMappings' ? 'aiLearnedMappings' : key);
+            const storeName = key === 'tccsList' ? 'tccs'
+              : key === 'aiLearnedMappings' ? 'aiLearnedMappings'
+              : key === 'criteriaAliases' ? 'criteriaAliases'
+              : key;
             const saveTask = () => saveToCache(storeName, list);
             if ('requestIdleCallback' in window) {
               window.requestIdleCallback(saveTask);

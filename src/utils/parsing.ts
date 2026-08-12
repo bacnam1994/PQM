@@ -24,14 +24,33 @@ export const parseFlexibleValue = (input: string | number): number | null => {
   if (input === null || input === undefined) return null;
   if (typeof input === 'number') return input;
 
-  // Standardize input based on locale settings
-  let separator = getDecimalSeparator();
+  let str = input.toString().trim().replace(/[–—]/g, '-');
+  if (str === '') return null;
 
-  let str = input.toString().trim();
-  if (separator === 'comma') {
-    str = str.replace(/\./g, '').replace(/,/g, '.');
-  } else {
-    str = str.replace(/,/g, '');
+  // Chuẩn hóa thông minh dấu thập phân (. hoặc ,)
+  const hasDot = str.includes('.');
+  const hasComma = str.includes(',');
+
+  if (hasDot && hasComma) {
+    const lastDotIndex = str.lastIndexOf('.');
+    const lastCommaIndex = str.lastIndexOf(',');
+    if (lastDotIndex > lastCommaIndex) {
+      str = str.replace(/,/g, '');
+    } else {
+      str = str.replace(/\./g, '').replace(/,/g, '.');
+    }
+  } else if (hasComma && !hasDot) {
+    const commaCount = (str.match(/,/g) || []).length;
+    if (commaCount > 1) {
+      str = str.replace(/,/g, '');
+    } else {
+      str = str.replace(',', '.');
+    }
+  } else if (hasDot && !hasComma) {
+    const dotCount = (str.match(/\./g) || []).length;
+    if (dotCount > 1) {
+      str = str.replace(/\./g, '');
+    }
   }
 
   if (str === '') return null;

@@ -6,7 +6,7 @@ import { ProductFormula, FormulaIngredient } from '../../types';
 import { PageHeader, Modal, Pagination, DSFilterBar, DSSearchInput, DSTable, DSViewToggle, DSCard, AddButton, ActionButtons, DeleteModal, DSEmptyState } from '../../components';
 import { useCrud, useDebounce } from '../../hooks';
 import { useUIStore } from '../../store/useUIStore';
-import { parseNumberFromText, normalizeSearch, formatDateStandard } from '../../utils';
+import { parseNumberFromText, normalizeSearch, formatDateStandard, getActiveLocale } from '../../utils';
 
 // Helper: Format số sang dạng mũ (VD: 1000 -> 10³)
 const formatScientific = (value: string | number) => {
@@ -41,7 +41,8 @@ const formatScientific = (value: string | number) => {
       </span>
     );
   }
-  return `${prefix.trim()}${prefix ? ' ' : ''}${num.toLocaleString('vi-VN', { maximumFractionDigits: 10 })}`;
+  const locale = getActiveLocale();
+  return `${prefix.trim()}${prefix ? ' ' : ''}${num.toLocaleString(locale, { maximumFractionDigits: 10 })}`;
 };
 
 const ProductFormulaList: React.FC = () => {

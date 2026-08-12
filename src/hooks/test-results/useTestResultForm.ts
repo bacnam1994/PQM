@@ -23,6 +23,7 @@ import { useTestResultSave } from './useTestResultSave';
 import { calculateOverallStatus, TEST_RESULT_STATUS, BATCH_STATUS, CRITERION_TYPE_CONST, evaluateCriterionSmart, generateId, parseNumberFromText, ensureArray, getFromCache, checkRuleExemption, calculateCompletionStatus, parseDateToISO } from '../../utils';
 import { ref, query, orderByChild, equalTo, get } from 'firebase/database';
 import { db } from '../../firebase';
+import { buildAliasLookupMap, resolveCriteriaName, normalizeName } from '../../services/criteriaAliasService';
 interface ExtraTestResultEntry extends TestResultEntry {
   limit?: string;
 }
@@ -258,13 +259,44 @@ export const useTestResultForm = (onInitialBatchSelect?: (batchNo: string) => vo
     return hydratedBatches.find(b => b.id === formValues.batchId);
   }, [hydratedBatches, formValues.batchId]);
 
+  const criteriaAliases = useAppStore(state => state.criteriaAliases);
+
   // Hàm chuyên dụng để nạp dữ liệu vào form khi mở Edit (Gọi trong useEffect của Page)
   const populateFormForEdit = useCallback((res: HydratedTestResult) => {
     const map: Record<string, string | number> = {};
     const extras: typeof initialTestResultFormState.extraCriteria = [];
     
+    // 1. Tìm TCCS áp dụng cho lô hàng này
+    const batch = hydratedBatches.find(b => b.id === res.batchId) || batches.find(b => b.id === res.batchId);
+    let targetTCCS = tccsList.find(t => t.id === batch?.tccsId);
+    if (!targetTCCS && batch) {
+      const productTccs = tccsList.filter(t => t.productId === batch.productId)
+        .sort((a, b) => new Date(b.issueDate).getTime() - new Date(a.issueDate).getTime());
+      targetTCCS = productTccs[0];
+    }
+
+    const allCriteria = targetTCCS
+      ? [...(targetTCCS.mainQualityCriteria || []), ...(targetTCCS.safetyCriteria || [])].filter(c => c && c.name)
+      : [];
+
+    const aliasLookupMap = targetTCCS ? buildAliasLookupMap(criteriaAliases, targetTCCS.id) : new Map<string, string>();
+
+    // 2. Phân loại và gán kết quả vào form, tự động resolve alias
     res.results.forEach(r => {
-      if (r.isExtra) {
+      if (!r || !r.criteriaName) return;
+
+      if (targetTCCS) {
+        const canonical = resolveCriteriaName(r.criteriaName, targetTCCS, aliasLookupMap);
+        const matchedCriterion = allCriteria.find(c => normalizeName(c.name) === normalizeName(canonical) || normalizeName(c.name) === normalizeName(r.criteriaName));
+
+        if (matchedCriterion) {
+          map[matchedCriterion.name] = r.value;
+          return;
+        }
+      }
+
+      // Nếu không khớp với chỉ tiêu nào trong TCCS (kể cả qua alias), giữ ở mục Extra
+      if (r.isExtra || !targetTCCS) {
         extras.push({
           id: generateId('extra'),
           name: r.criteriaName,
@@ -287,12 +319,13 @@ export const useTestResultForm = (onInitialBatchSelect?: (batchNo: string) => vo
       attachments: res.attachments || [],
     });
     
-    const batch = hydratedBatches.find(b => b.id === res.batchId);
-    setBatchSearch(batch ? `${batch.batchNo} - ${batch.product?.name}` : '');
+    const hydratedBatch = hydratedBatches.find(b => b.id === res.batchId);
+    const productName = hydratedBatch?.product?.name || '';
+    setBatchSearch(batch ? (productName ? `${batch.batchNo} - ${productName}` : batch.batchNo) : '');
     
     // Clear AI Origin Map khi mở form để edit
     aiOriginMapRef.current = {};
-  }, [hydratedBatches, setFormValues]);
+  }, [hydratedBatches, batches, tccsList, criteriaAliases, setFormValues]);
 
   const switchToEditMode = useCallback((res: TestResult) => {
     navigate(`/test-results/edit/${res.id}`);

@@ -2,9 +2,11 @@ import React, { useMemo, useEffect, useState } from 'react';
 import { useAppStore } from '../../store/useAppStore';
 import { TestResultEntry, TestResult, Criterion, FormulaIngredient } from '../../types';
 import { CheckCircle2, XCircle, Loader2 } from 'lucide-react';
-import { ensureArray, formatScientific, getFromCache, parseNumberFromText, formatDateStandard } from '../../utils';
+import { ensureArray, formatScientific, getFromCache, parseNumberFromText, formatDateStandard, getActiveLocale } from '../../utils';
 import { ref, query, orderByChild, equalTo, get } from 'firebase/database';
 import { db } from '../../firebase';
+import { useCriteriaResolver } from '../../hooks/useCriteriaResolver';
+import { normalizeName } from '../../services/criteriaAliasService';
 
 interface BatchCriteriaHistoryProps {
   batchId: string;
@@ -76,10 +78,9 @@ const BatchCriteriaHistory: React.FC<BatchCriteriaHistoryProps> = ({ batchId }) 
     return () => { isMounted = false; };
   }, [batchId]);
 
-  const { tccs, historyData, extraData } = useMemo(() => {
-    try {
+  const { activeTCCS, batch } = useMemo(() => {
     const batch = batches.find(b => b.id === batchId);
-    if (!batch) return { tccs: null, historyData: [], extraData: [] };
+    if (!batch) return { activeTCCS: null, batch: null };
 
     // 1. Xác định TCCS đang áp dụng
     let activeTCCS = tccsList.find(t => t.id === batch.tccsId);
@@ -99,7 +100,15 @@ const BatchCriteriaHistory: React.FC<BatchCriteriaHistoryProps> = ({ batchId }) 
         }
     }
 
-    if (!activeTCCS) return { tccs: null, historyData: [], extraData: [] };
+    return { activeTCCS, batch };
+  }, [batchId, batches, tccsList]);
+
+  // Khởi tạo resolver cho TCCS của lô
+  const resolver = useCriteriaResolver(activeTCCS ?? undefined);
+
+  const { tccs, historyData, extraData } = useMemo(() => {
+    try {
+      if (!batch || !activeTCCS) return { tccs: null, historyData: [], extraData: [] };
 
     // 2. Lấy danh sách kết quả của lô, sắp xếp mới nhất trước
     // Ưu tiên dùng allTestResults (nơi chứa dữ liệu vừa được fetch)
@@ -118,7 +127,8 @@ const BatchCriteriaHistory: React.FC<BatchCriteriaHistoryProps> = ({ batchId }) 
         const history: HistoryEntry[] = [];
         
         batchResults.forEach(res => {
-            const match = ensureArray(res.results).find(r => r && r.criteriaName?.trim().toLowerCase() === criterion.name.trim().toLowerCase());
+            // [ALIAS FIX] Dùng resolver.isMatch thay vì exact string compare
+            const match = ensureArray(res.results).find(r => r && resolver.isMatch(r.criteriaName, criterion.name));
             if (match) {
                 history.push({
                     ...match,
@@ -139,9 +149,10 @@ const BatchCriteriaHistory: React.FC<BatchCriteriaHistoryProps> = ({ batchId }) 
     const extraMap = new Map<string, HistoryEntry[]>();
     batchResults.forEach(res => {
         ensureArray(res.results).forEach(r => {
-            // Nếu không nằm trong danh sách chỉ tiêu của TCCS thì coi là Extra
+            // Nếu không nằm trong danh sách chỉ tiêu của TCCS (kể cả qua Alias) thì coi là Extra
             if (!r || !r.criteriaName) return;
-            if (!tccsCriteria.some(c => c && c.name === r.criteriaName)) {
+            const isMatchedInTCCS = tccsCriteria.some(c => c && resolver.isMatch(r.criteriaName, c.name));
+            if (!isMatchedInTCCS) {
                  if (!extraMap.has(r.criteriaName)) extraMap.set(r.criteriaName, []);
                  extraMap.get(r.criteriaName)?.push({
                     ...r,
@@ -163,7 +174,7 @@ const BatchCriteriaHistory: React.FC<BatchCriteriaHistoryProps> = ({ batchId }) 
       console.error("Lỗi kết xuất Lịch sử Tổng hợp:", err);
       return { tccs: null, historyData: [], extraData: [] };
     }
-  }, [batchId, batches, testResults, allTestResults, tccsList]);
+  }, [batchId, batch, activeTCCS, testResults, allTestResults, resolver]);
 
   // Build formula lookup maps cho % hàm lượng
   const { allCriteriaMap, formulaItemMap } = useMemo(() => {
@@ -186,10 +197,12 @@ const BatchCriteriaHistory: React.FC<BatchCriteriaHistoryProps> = ({ batchId }) 
   // - Chỉ tiêu trong TCCS mainQualityCriteria: dùng declaredContent TCCS hoặc công thức
   // - Chỉ tiêu ngoài TCCS nhưng tên khớp với thành phần công thức: vẫn tính %
   const getContentPercent = (criteriaName: string, value: string | number): string | null => {
-    const rName = criteriaName.trim().toLowerCase();
-    const isMainCriteria = ensureArray(tccs?.mainQualityCriteria).some((c: any) => c && c.name && c.name.trim().toLowerCase() === rName);
+    // [ALIAS FIX] Resolve criteriaName sang tên chuẩn trước khi tra cứu
+    const resolvedName = resolver.resolve(criteriaName);
+    const rName = normalizeName(resolvedName);
+    const isMainCriteria = ensureArray(tccs?.mainQualityCriteria).some((c: any) => c && c.name && normalizeName(c.name) === rName);
 
-    const criterion = allCriteriaMap.get(rName);
+    const criterion = resolver.lookupCriterion(criteriaName, allCriteriaMap);
     let basis: number | undefined;
 
     if (isMainCriteria) {
@@ -197,9 +210,9 @@ const BatchCriteriaHistory: React.FC<BatchCriteriaHistoryProps> = ({ batchId }) 
       if (criterion?.declaredContent != null) {
         basis = typeof criterion.declaredContent === 'string' ? parseNumberFromText(criterion.declaredContent as any) : criterion.declaredContent;
       } else {
-        let formulaItem = formulaItemMap.get(rName);
+        let formulaItem = formulaItemMap.get(rName) || formulaItemMap.get(normalizeName(criteriaName));
         if (criterion?.formulaIngredientId) {
-          const linked = formulaItemMap.get(criterion.formulaIngredientId.trim().toLowerCase());
+          const linked = formulaItemMap.get(normalizeName(criterion.formulaIngredientId));
           if (linked) formulaItem = linked;
         }
         if (!formulaItem) return null;
@@ -232,7 +245,7 @@ const BatchCriteriaHistory: React.FC<BatchCriteriaHistoryProps> = ({ batchId }) 
     const actual = parseNumberFromText(String(value));
     if (!basis || basis <= 0 || !actual || actual <= 0) return null;
     const pct = (actual / basis) * 100;
-    return pct.toLocaleString('en-US', { maximumFractionDigits: 2 }) + '%';
+    return pct.toLocaleString(getActiveLocale(), { maximumFractionDigits: 2 }) + '%';
   };
 
   if (isLoading) {

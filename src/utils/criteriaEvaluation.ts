@@ -1,7 +1,7 @@
 import { evaluateCriterion } from './parsing';
 import { useUIStore } from '../store/useUIStore';
 
-const getIsCommaDecimal = (): boolean => {
+export const getIsCommaDecimal = (): boolean => {
   try {
     return typeof window !== 'undefined' && useUIStore.getState().decimalSeparator === 'comma';
   } catch {
@@ -9,12 +9,65 @@ const getIsCommaDecimal = (): boolean => {
   }
 };
 
+/**
+ * Lấy locale tương ứng với tùy chọn decimalSeparator của người dùng:
+ * - 'dot' (Mặc định chuẩn Dược): Dấu chấm thập phân (VD: 1,234.56) -> locale 'en-US'
+ * - 'comma': Dấu phẩy thập phân (VD: 1.234,56) -> locale 'vi-VN'
+ */
+export const getActiveLocale = (): string => {
+  try {
+    const sep = typeof window !== 'undefined' ? useUIStore.getState().decimalSeparator : 'dot';
+    return sep === 'comma' ? 'vi-VN' : 'en-US';
+  } catch {
+    return 'en-US';
+  }
+};
+
+/**
+ * Định dạng số hiển thị thống nhất trên toàn hệ thống theo cài đặt decimalSeparator của người dùng
+ */
+export const formatNumber = (
+  value: number | string | null | undefined,
+  options?: Intl.NumberFormatOptions
+): string => {
+  if (value === null || value === undefined || value === '') return '';
+  const num = typeof value === 'number' ? value : parseNumberFromText(value);
+  if (isNaN(num)) return String(value);
+  const locale = getActiveLocale();
+  return num.toLocaleString(locale, options);
+};
+
+/**
+ * Chuẩn hóa thông minh chuỗi số / giới hạn kiểm nghiệm:
+ * - Thay thế các dấu phẩy thập phân (VD: "0,5" -> "0.5", "5,0 - 10,0" -> "5.0 - 10.0", "1.5x10^3" -> "1.5x10^3")
+ * - Xử lý đúng phân cách hàng nghìn (VD: "1,000,000" -> "1000000", "1.000.000" -> "1000000")
+ */
+export const standardizeDecimalString = (str: string | number | null | undefined): string => {
+  if (str === null || str === undefined) return '';
+  let s = String(str).trim().replace(/[–—]/g, '-');
+
+  // 1. Số có cả chấm và phẩy (VD: 1,234.56 hoặc 1.234,56)
+  s = s.replace(/(\d{1,3}(?:,\d{3})+)\.(\d+)/g, (_, p1, p2) => p1.replace(/,/g, '') + '.' + p2);
+  s = s.replace(/(\d{1,3}(?:\.\d{3})+),(\d+)/g, (_, p1, p2) => p1.replace(/\./g, '') + '.' + p2);
+
+  // 2. Số có nhiều dấu phẩy/chấm phân cách hàng nghìn (VD: 1,000,000 hoặc 1.000.000)
+  s = s.replace(/(\d{1,3}(?:,\d{3}){2,})/g, (match) => match.replace(/,/g, ''));
+  s = s.replace(/(\d{1,3}(?:\.\d{3}){2,})/g, (match) => match.replace(/\./g, ''));
+
+  // 3. Đổi các dấu phẩy đơn lẻ giữa 2 số thành dấu chấm thập phân (VD: "0,5" -> "0.5", "10,0" -> "10.0")
+  s = s.replace(/(\d+),(\d+)/g, '$1.$2');
+
+  return s;
+};
+
 // Invalidate cache khi setting thay đổi (gọi trong SettingsPage khi save)
 export const invalidateDecimalCache = () => {};
 export const safeParseFloat = (str: string): number => {
   if (!str) return NaN;
+  // Chuẩn hóa dấu phân cách trước khi parse
+  const standardized = standardizeDecimalString(str);
   // CHÚ Ý: Phải giữ lại e, E và + để không làm hỏng các số định dạng khoa học (VD: 1.5e-5)
-  const cleaned = str.trim().replace(/[^\d.eE+-]/g, '');
+  const cleaned = standardized.trim().replace(/[^\d.eE+-]/g, '');
   const num = parseFloat(cleaned);
   return isNaN(num) ? NaN : num;
 };
@@ -24,20 +77,7 @@ export const safeParseFloat = (str: string): number => {
  */
 export const normalizeNumericString = (value: string | number | null | undefined): string => {
   if (value === null || value === undefined) return '';
-  let str = String(value);
-
-  let isComma = getIsCommaDecimal();
-
-  // Normalize dashes (en-dash, em-dash to hyphen)
-  str = str.replace(/[–—]/g, '-');
-
-  if (isComma) {
-    // Nếu dùng dấu phẩy là thập phân: Xóa dấu chấm (hàng nghìn) -> Thay phẩy bằng chấm
-    str = str.replace(/\./g, '').replace(/,/g, '.');
-  } else {
-    // Nếu dùng dấu chấm là thập phân (mặc định): Xóa dấu phẩy (hàng nghìn)
-    str = str.replace(/,/g, '');
-  }
+  let str = standardizeDecimalString(value);
 
   // 2. Chuyển đổi ký tự số mũ đặc biệt về định dạng tiêu chuẩn (^)
   const superscripts: Record<string, string> = {
@@ -423,8 +463,9 @@ export const formatScientific = (value: string | number): string => {
     if (roundedMantissa !== 1) return `${roundedMantissa} × 10${expStr}`;
     return `10${expStr}`;
   }
-  // Chặn lỗi toLocaleString tự động cắt xén chuỗi nếu vượt quá 3 chữ số thập phân
-  return num.toLocaleString('vi-VN', { maximumFractionDigits: 10 });
+  // Định dạng số theo chuẩn locale tương ứng với decimalSeparator (en-US cho dot, vi-VN cho comma)
+  const locale = getActiveLocale();
+  return num.toLocaleString(locale, { maximumFractionDigits: 10 });
 };
 
 // Tối ưu 4: Đưa các mảng hằng số ra ngoài hàm (Module scope) 

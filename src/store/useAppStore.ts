@@ -1,11 +1,12 @@
 import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
-import { AppState, SyncStatus, Product, Batch, TCCS, TestResult, ProductFormula, RawMaterial, AILearnedMapping } from '../types';
+import { AppState, SyncStatus, Product, Batch, TCCS, TestResult, ProductFormula, RawMaterial, AILearnedMapping, CriteriaAlias } from '../types';
 import { ref, set as firebaseSet, remove as firebaseRemove, update as firebaseUpdate, get as firebaseGet } from 'firebase/database';
 import { db } from '../firebase';
 import { User, getAuth, signInWithEmailAndPassword, signOut, createUserWithEmailAndPassword, updatePassword, reauthenticateWithCredential, EmailAuthProvider, sendPasswordResetEmail } from 'firebase/auth';
 import { parseNumberFromText } from '../utils';
 import { logAuditAction } from '../services/auditService';
+import { detectCriteriaChanges, normalizeName, mergeAliases, createAliasRecord } from '../services/criteriaAliasService';
 
 export type ToastType = 'SUCCESS' | 'ERROR' | 'INFO' | 'WARNING';
 export interface ToastMessage {
@@ -139,6 +140,7 @@ interface AppStoreState extends AppState {
   testResultLimit: number;
   theme: 'light' | 'dark';
   aiLearnedMappings: AILearnedMapping[];
+  criteriaAliases: CriteriaAlias[];
 }
 
 interface AppStoreActions {
@@ -197,6 +199,13 @@ interface AppStoreActions {
   setTheme: (theme: 'light' | 'dark') => void;
   addAiLearnedMapping: (originalName: string, systemName: string) => Promise<void>;
   syncQualityAlerts: () => Promise<void>;
+
+  // CriteriaAlias Actions
+  addCriteriaAlias: (alias: CriteriaAlias) => Promise<void>;
+  updateCriteriaAlias: (alias: CriteriaAlias) => Promise<void>;
+  deleteCriteriaAlias: (id: string) => Promise<void>;
+  confirmCriteriaAlias: (id: string) => Promise<void>;
+  addAliasToExisting: (aliasId: string, newAlias: string) => Promise<void>;
 }
 
 export const useAppStore = create<AppStoreState & AppStoreActions>()(devtools((set, get) => ({
@@ -210,6 +219,7 @@ export const useAppStore = create<AppStoreState & AppStoreActions>()(devtools((s
   allTestResults: [],
   aiLearnedMappings: [],
   qualityAlerts: [],
+  criteriaAliases: [],
   lastSync: null,
   syncStatus: 'IDLE',
   user: null,
@@ -313,7 +323,20 @@ export const useAppStore = create<AppStoreState & AppStoreActions>()(devtools((s
 
   addRawMaterial: (rm) => _handleSave('raw_materials', rm, get),
   updateRawMaterial: (rm) => _handleSave('raw_materials', rm, get),
-  deleteRawMaterial: (id) => _handleDelete('raw_materials', id, get),
+  deleteRawMaterial: async (id: string) => {
+    const state = get();
+    const material = state.rawMaterials.find(m => m.id === id);
+    // Kiểm tra xem nguyên liệu có đang được dùng trong công thức sản phẩm nào không
+    const isUsedInFormula = state.productFormulas.some(f => 
+      (f.ingredients || []).some(ing => ing.materialId === id || (material && ing.name?.trim().toLowerCase() === material.name?.trim().toLowerCase())) ||
+      (f.excipients || []).some(exc => exc.materialId === id || (material && exc.name?.trim().toLowerCase() === material.name?.trim().toLowerCase()))
+    );
+    if (isUsedInFormula) {
+      get().notify({ type: 'WARNING', title: 'Không thể xóa', message: 'Nguyên liệu này đang được sử dụng trong Công thức sản phẩm. Vui lòng cập nhật công thức trước.' });
+      throw new Error("Material is in use");
+    }
+    await _handleDelete('raw_materials', id, get);
+  },
 
   addBatch: async (b) => {
     await _handleSave('batches', b, get);
@@ -377,12 +400,89 @@ export const useAppStore = create<AppStoreState & AppStoreActions>()(devtools((s
       throw error;
     }
   },
-  updateTCCS: async (t) => get().addTCCS(t),
+  updateTCCS: async (t) => {
+    // 1. Phát hiện thay đổi tên chỉ tiêu so với TCCS cũ → tự động tạo alias
+    try {
+      const state = get();
+      const oldTCCS = state.tccsList.find(item => item.id === t.id);
+      if (oldTCCS) {
+        const oldNames = [
+          ...(oldTCCS.mainQualityCriteria || []),
+          ...(oldTCCS.safetyCriteria || []),
+        ].filter(c => c?.name).map(c => c.name);
+
+        const newNames = [
+          ...(t.mainQualityCriteria || []),
+          ...(t.safetyCriteria || []),
+        ].filter(c => c?.name).map(c => c.name);
+
+        const changes = detectCriteriaChanges(oldNames, newNames);
+
+        if (changes.length > 0) {
+          const aliasUpdates: Record<string, any> = {};
+          const existingAliases = state.criteriaAliases;
+          let autoConfirmCount = 0;
+
+          for (const change of changes) {
+            // Tìm alias record đã có cho tên mới này
+            const existing = existingAliases.find(
+              a => a.tccsId === t.id && normalizeName(a.canonicalName) === normalizeName(change.newName)
+            );
+
+            if (existing) {
+              // Merge alias cũ vào record đã có
+              const merged = mergeAliases(existing, [change.oldName]);
+              if (change.autoConfirm) merged.confirmedByAdmin = true;
+              aliasUpdates[`criteria_aliases/${existing.id}`] = removeUndefined(merged);
+            } else {
+              // Tạo alias record mới
+              const newId = `ca_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+              const newAlias: CriteriaAlias = {
+                id: newId,
+                ...createAliasRecord(t.id, change.newName, [change.oldName], true, change.autoConfirm),
+              };
+              aliasUpdates[`criteria_aliases/${newId}`] = removeUndefined(newAlias);
+            }
+            if (change.autoConfirm) autoConfirmCount++;
+          }
+
+          if (Object.keys(aliasUpdates).length > 0) {
+            await executeOfflineOptimistic(firebaseUpdate(ref(db), aliasUpdates), get);
+            const pendingCount = changes.length - autoConfirmCount;
+            get().notify({
+              type: 'INFO',
+              title: '🔗 Alias tự động tạo',
+              message: `Phát hiện ${changes.length} chỉ tiêu đổi tên. Đã tạo ${autoConfirmCount} alias tự động${
+                pendingCount > 0 ? `, ${pendingCount} cần Admin xác nhận.` : '.'
+              }`,
+            });
+          }
+        }
+      }
+    } catch (aliasError) {
+      console.warn('Lỗi khi phát hiện alias TCCS (không ảnh hưởng đến việc lưu TCCS):', aliasError);
+    }
+
+    // 2. Lưu TCCS bình thường
+    return get().addTCCS(t);
+  },
   deleteTCCS: async (id) => {
     const isUsed = get().batches.some(b => b.tccsId === id);
     if (isUsed) {
       get().notify({ type: 'WARNING', title: 'Không thể xóa', message: 'TCCS này đang được sử dụng bởi các Lô hàng. Vui lòng xóa Lô trước.' });
       throw new Error("TCCS is in use");
+    }
+    // Dọn dẹp các Criteria Alias gắn liền với TCCS này để tránh orphan records
+    const state = get();
+    const relatedAliases = state.criteriaAliases.filter(a => a.tccsId === id);
+    if (relatedAliases.length > 0) {
+      const aliasUpdates: Record<string, any> = {};
+      relatedAliases.forEach(a => { aliasUpdates[`criteria_aliases/${a.id}`] = null; });
+      try {
+        await executeOfflineOptimistic(firebaseUpdate(ref(db), aliasUpdates), get);
+      } catch (e) {
+        console.warn("Lỗi dọn dẹp alias khi xóa TCCS:", e);
+      }
     }
     await _handleDelete('tccs', id, get, true);
   },
@@ -415,10 +515,15 @@ export const useAppStore = create<AppStoreState & AppStoreActions>()(devtools((s
 
   fetchAllTestResultsForDashboard: async () => {
     try {
+      const state = get();
+      // Nếu đã có dữ liệu và vừa tải trong vòng 60 giây, không cần fetch lại
+      if (state.allTestResults && state.allTestResults.length > 0 && (state as any)._lastFetchTestResultsTime && (Date.now() - (state as any)._lastFetchTestResultsTime < 60000)) {
+        return;
+      }
       const snapshot = await firebaseGet(ref(db, 'testResults'));
       if (snapshot.exists()) {
         const list = Object.values(snapshot.val()) as TestResult[];
-        set({ allTestResults: list }, false, 'fetchAllTestResultsForDashboard');
+        set({ allTestResults: list, _lastFetchTestResultsTime: Date.now() } as any, false, 'fetchAllTestResultsForDashboard');
       }
     } catch (e) {
       console.error("Lỗi tải toàn bộ dữ liệu cho Dashboard:", e);
@@ -436,7 +541,8 @@ export const useAppStore = create<AppStoreState & AppStoreActions>()(devtools((s
         tccs: {
           'demo_t1': { id: 'demo_t1', productId: 'demo_p1', code: 'TCCS 01:2024', name: 'TCCS Mẫu A', issueDate: new Date().toISOString(), createdAt: new Date().toISOString() }
         },
-      batches: {}, testResults: {}, inventoryIn: {}, inventoryOut: {}, raw_materials: {}
+        batches: {}, testResults: {}, inventoryIn: {}, inventoryOut: {}, raw_materials: {},
+        criteria_aliases: {}, ai_learned_mappings: {}
       };
       await executeOfflineOptimistic(firebaseSet(ref(db), demoData), get);
       get().notify({ type: 'SUCCESS', message: 'Nạp dữ liệu mẫu thành công!' });
@@ -465,8 +571,14 @@ export const useAppStore = create<AppStoreState & AppStoreActions>()(devtools((s
         return map;
       };
       const restoreData = {
-        products: toMap(data.products), batches: toMap(data.batches), product_formulas: toMap(data.productFormulas),
-        tccs: toMap(data.tccsList), testResults: toMap(data.testResults), raw_materials: toMap(data.rawMaterials), ai_learned_mappings: toMap(data.aiLearnedMappings)
+        products: toMap(data.products), 
+        batches: toMap(data.batches), 
+        product_formulas: toMap(data.productFormulas),
+        tccs: toMap(data.tccsList), 
+        testResults: toMap(data.testResults), 
+        raw_materials: toMap(data.rawMaterials), 
+        ai_learned_mappings: toMap(data.aiLearnedMappings || (data as any).ai_learned_mappings),
+        criteria_aliases: toMap(data.criteriaAliases || (data as any).criteria_aliases),
       };
       await executeOfflineOptimistic(firebaseSet(ref(db), restoreData), get);
       get().notify({ type: 'SUCCESS', title: 'Thành công', message: 'Khôi phục dữ liệu hoàn tất.' });
@@ -496,6 +608,41 @@ export const useAppStore = create<AppStoreState & AppStoreActions>()(devtools((s
     } catch (e) {
       console.error("Lỗi cập nhật AI Learned Mapping:", e);
     }
+  },
+
+  // --- CRITERIA ALIAS ACTIONS ---
+  addCriteriaAlias: async (alias: CriteriaAlias) => {
+    await _handleSave('criteria_aliases', alias, get);
+    logAuditAction({ action: 'CREATE', collection: 'CRITERIA_ALIASES', documentId: alias.id, details: `Tạo alias: "${alias.aliases.join(', ')}" → "${alias.canonicalName}" (TCCS: ${alias.tccsId})`, performedBy: get().user?.email || 'unknown' });
+  },
+
+  updateCriteriaAlias: async (alias: CriteriaAlias) => {
+    const updated = { ...alias, updatedAt: new Date().toISOString() };
+    await _handleSave('criteria_aliases', updated, get);
+    logAuditAction({ action: 'UPDATE', collection: 'CRITERIA_ALIASES', documentId: alias.id, details: `Cập nhật alias cho "${alias.canonicalName}"`, performedBy: get().user?.email || 'unknown' });
+  },
+
+  deleteCriteriaAlias: async (id: string) => {
+    const alias = get().criteriaAliases.find(a => a.id === id);
+    await _handleDelete('criteria_aliases', id, get);
+    logAuditAction({ action: 'DELETE', collection: 'CRITERIA_ALIASES', documentId: id, details: `Xóa alias cho "${alias?.canonicalName || id}"`, performedBy: get().user?.email || 'unknown' });
+  },
+
+  confirmCriteriaAlias: async (id: string) => {
+    const alias = get().criteriaAliases.find(a => a.id === id);
+    if (!alias) return;
+    const updated = { ...alias, confirmedByAdmin: true, updatedAt: new Date().toISOString() };
+    await _handleSave('criteria_aliases', updated, get);
+    get().notify({ type: 'SUCCESS', message: `Đã xác nhận alias cho "${alias.canonicalName}"` });
+  },
+
+  addAliasToExisting: async (aliasId: string, newAlias: string) => {
+    const alias = get().criteriaAliases.find(a => a.id === aliasId);
+    if (!alias) return;
+    const merged = mergeAliases(alias, [newAlias]);
+    merged.confirmedByAdmin = true;
+    await _handleSave('criteria_aliases', merged, get);
+    get().notify({ type: 'SUCCESS', message: `Đã thêm alias "${newAlias}" cho "${alias.canonicalName}"` });
   },
 
   syncQualityAlerts: async () => {
