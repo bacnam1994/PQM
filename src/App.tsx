@@ -60,6 +60,7 @@ const CriteriaFormPage = lazyWithRetry(() => import('./pages/qa/CriteriaFormPage
 const NotFoundPage = lazyWithRetry(() => import('./pages/system/NotFoundPage'));
 const AlertsPage = lazyWithRetry(() => import('./pages/quality/AlertsPage'));
 const QualitySummaryReport = lazyWithRetry(() => import('./pages/quality/QualitySummaryReport'));
+const TrendAnalysisPage = lazyWithRetry(() => import('./pages/quality/TrendAnalysisPage'));
 const UnauthorizedPage = lazyWithRetry(() => import('./pages/auth/UnauthorizedPage'));
 const WelcomePage = lazyWithRetry(() => import('./pages/auth/WelcomePage'));
 
@@ -189,6 +190,7 @@ const AppRoutes: React.FC = () => {
           <Route path="/test-results/new" element={<AdminRoute><TestResultFormPage /></AdminRoute>} />
           <Route path="/test-results/edit/:id" element={<AdminRoute><TestResultFormPage /></AdminRoute>} />
           <Route path="/reports/quality-summary" element={<QualitySummaryReport />} />
+          <Route path="/reports/trend-analysis" element={<TrendAnalysisPage />} />
           <Route path="/alerts" element={<AlertsPage />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/account" element={<AccountPage />} />

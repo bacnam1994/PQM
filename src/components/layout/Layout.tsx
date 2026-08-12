@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Package, FileText, ClipboardCheck, Settings, 
   Menu, X, Leaf, Cloud, CloudOff, RefreshCw, Layers,
   LogOut, User as UserIcon, FlaskConical, Users, Activity,
-  ChevronDown, Search, Moon, Sun, ShieldAlert
+  ChevronDown, Search, Moon, Sun, ShieldAlert, TrendingUp
 } from 'lucide-react';
 import { useAppStore } from '../../store/useAppStore';
 import { useShallow } from 'zustand/react/shallow';
@@ -39,6 +39,7 @@ const navItems = [
       { name: 'Quản lý Lô', path: '/batches', icon: Layers },
       { name: 'Kiểm soát Lab', path: '/test-results', icon: ClipboardCheck },
       { name: 'Báo cáo tổng hợp', path: '/reports/quality-summary', icon: FileText },
+      { name: 'Phân tích xu hướng', path: '/reports/trend-analysis', icon: TrendingUp },
     ]
   },
   { 

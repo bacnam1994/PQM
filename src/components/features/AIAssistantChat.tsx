@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { UploadCloud, Loader2, Sparkles, Send, CheckCircle2, User, AlertCircle, X, Settings, Brain } from 'lucide-react';
+import { UploadCloud, Loader2, Sparkles, Send, CheckCircle2, User, AlertCircle, X, Settings, Brain, Trash2 } from 'lucide-react';
 import { geminiService } from '../../services/ai/geminiService';
 import { buildExtractionPrompt } from '../../services/ai/prompts';
 import { useAppStore } from '../../store/useAppStore';
@@ -90,7 +90,9 @@ export const AIAssistantChat: React.FC = () => {
     toast.success(enabled ? 'Đã bật hiển thị quy trình suy luận' : 'Đã tắt hiển thị quy trình suy luận');
   };
 
-  // --- State cho Mapping Modal ---
+  const [isBatchProcessing, setIsBatchProcessing] = useState(false);
+  const [batchProgress, setBatchProgress] = useState<{ current: number; total: number } | null>(null);
+
   const [isMappingModalOpen, setIsMappingModalOpen] = useState(false);
   const [pendingHighItems, setPendingHighItems] = useState<AIExtractedItem[]>([]);
   const [pendingLowItems, setPendingLowItems] = useState<AIExtractedItem[]>([]);
@@ -211,9 +213,70 @@ export const AIAssistantChat: React.FC = () => {
     }
   };
 
-  /**
-   * Phân loại kết quả AI → high/low confidence → mở modal hoặc điền thẳng
-   */
+  /** Xử lý batch nhiều file OCR tuần tự */
+  const processFiles = async (files: File[]) => {
+    if (files.length === 0) return;
+
+    // Kiểm tra toàn bộ file trước khi bắt đầu
+    const { validateOCRFile } = await import('../../services/ai/geminiService');
+    const invalidFiles = files.filter(f => !validateOCRFile(f).valid);
+    if (invalidFiles.length > 0) {
+      const errors = invalidFiles.map(f => {
+        const v = validateOCRFile(f);
+        return `• ${f.name}: ${v.error}`;
+      }).join('\n');
+      toast.error(`Có ${invalidFiles.length} file không hợp lệ:\n${errors}`, { duration: 5000 });
+      return;
+    }
+
+    if (files.length === 1) {
+      // Single file → dùng flow cũ
+      await processFile(files[0]);
+      return;
+    }
+
+    // Batch processing
+    setIsBatchProcessing(true);
+    addMessage({
+      sender: 'system',
+      text: `🗂️ **Batch OCR:** Bắt đầu xử lý **${files.length} file** phiếu kiểm nghiệm tuần tự...`
+    });
+
+    let successCount = 0;
+    let failCount = 0;
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      setBatchProgress({ current: i + 1, total: files.length });
+      addMessage({
+        sender: 'system',
+        text: `⏳ Đang xử lý file **${i + 1}/${files.length}**: ${file.name}`
+      });
+
+      try {
+        await processFile(file);
+        successCount++;
+      } catch {
+        failCount++;
+        addMessage({
+          sender: 'ai',
+          text: `❌ Lỗi xử lý file **${file.name}**. Bỏ qua và tiếp tục...`
+        });
+      }
+
+      // Delay nhỏ giữa các file để tránh rate limit
+      if (i < files.length - 1) await new Promise(r => setTimeout(r, 800));
+    }
+
+    setBatchProgress(null);
+    setIsBatchProcessing(false);
+    addMessage({
+      sender: 'system',
+      text: `✅ **Hoàn tất Batch OCR:** ${successCount} thành công${failCount > 0 ? ` | ${failCount} lỗi` : ''}`
+    });
+  };
+
+
   const openMappingStep = (result: any, context: { batchNo: string; matchedBatch: any }) => {
     const rawItems: AIExtractedItem[] = (result.testResults || []).map((r: any) => ({
       criteriaName: r.criteriaName || '',
@@ -505,6 +568,18 @@ export const AIAssistantChat: React.FC = () => {
               </div>
           </div>
           <div className="flex items-center gap-1.5">
+            {/* Clear history button */}
+            <button
+              onClick={() => {
+                sessionStorage.removeItem('pqm_ai_chat_history');
+                setMessages([WELCOME_MESSAGE]);
+                toast.success('Đã xóa lịch sử trò chuyện');
+              }}
+              className="p-1.5 rounded-lg text-white/70 hover:text-white hover:bg-white/10 transition-colors"
+              title="Xóa lịch sử chat"
+            >
+              <Trash2 size={16} />
+            </button>
             <button 
               onClick={() => setShowConfig(!showConfig)}
               className={`p-1.5 rounded-lg transition-colors ${showConfig ? 'bg-white/20 text-white' : 'text-white/70 hover:text-white hover:bg-white/10'}`}
@@ -720,14 +795,32 @@ export const AIAssistantChat: React.FC = () => {
             ref={fileInputRef} 
             className="hidden" 
             accept="image/*,application/pdf"
+            multiple
             onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file) {
-                processFile(file);
+              const files = Array.from(e.target.files || []);
+              if (files.length > 0) {
+                processFiles(files);
                 e.target.value = ''; 
               }
             }}
           />
+          {/* Batch progress indicator */}
+          {batchProgress && (
+            <div className="absolute bottom-[70px] left-3 right-3 bg-indigo-600 text-white text-[11px] font-bold px-3 py-1.5 rounded-lg flex items-center gap-2 shadow-lg animate-in slide-in-from-bottom duration-200">
+              <div className="flex-1">
+                <div className="flex justify-between mb-1">
+                  <span>🗂️ Batch OCR: {batchProgress.current}/{batchProgress.total}</span>
+                  <span>{Math.round((batchProgress.current / batchProgress.total) * 100)}%</span>
+                </div>
+                <div className="w-full bg-white/30 rounded-full h-1">
+                  <div 
+                    className="bg-white rounded-full h-1 transition-all duration-500"
+                    style={{ width: `${(batchProgress.current / batchProgress.total) * 100}%` }}
+                  />
+                </div>
+              </div>
+            </div>
+          )}
           <button 
             type="button"
             disabled={isLoading}
