@@ -1,5 +1,5 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useAppStore } from '../../store/useAppStore';
 import { 
@@ -12,6 +12,8 @@ import { ProductStatus } from '../../types';
 import { parseNumberFromText, formatDateStandard, getActiveLocale } from '../../utils';
 import { useCriteriaResolver } from '../../hooks/useCriteriaResolver';
 import { normalizeName } from '../../services/criteriaAliasService';
+import { fetchTestResultsByProductId } from '../../services/testResultService';
+import { Loader2 } from 'lucide-react';
 
 // Helper: Format số sang dạng mũ (VD: 1000 -> 10³)
 const formatScientific = (value: string | number) => {
@@ -52,12 +54,46 @@ const ProductDetail: React.FC = () => {
   const productTCCSList = tccsList.filter(t => t.productId === id).sort((a, b) => new Date(b.issueDate).getTime() - new Date(a.issueDate).getTime());
   const productFormula = productFormulas.find(f => f.productId === id);
   
+  // Kết quả từ Store (bị giới hạn 50 phiếu gần nhất)
   const productResults = useMemo(() => 
     testResults.filter(r => {
       const b = batches.find(batch => batch.id === r.batchId);
       return b?.productId === id;
     }).sort((a, b) => new Date(b.testDate).getTime() - new Date(a.testDate).getTime())
   , [testResults, batches, id]);
+
+  // Toàn bộ lịch sử đầy đủ (tải từ Firebase khi vào tab lịch sử)
+  const [allProductResults, setAllProductResults] = useState(productResults);
+  const [isFetchingAll, setIsFetchingAll] = useState(false);
+  const [hasFetchedAll, setHasFetchedAll] = useState(false);
+
+  const fetchAllResults = useCallback(async () => {
+    if (!id || hasFetchedAll || isFetchingAll) return;
+    setIsFetchingAll(true);
+    try {
+      const results = await fetchTestResultsByProductId(id);
+      setAllProductResults(results);
+      setHasFetchedAll(true);
+    } catch (e) {
+      console.error('Lỗi tải toàn bộ lịch sử kiểm nghiệm:', e);
+    } finally {
+      setIsFetchingAll(false);
+    }
+  }, [id, hasFetchedAll, isFetchingAll]);
+
+  // Khi chuyển sang tab Lịch sử hoặc Biến động → tải đầy đủ từ Firebase
+  useEffect(() => {
+    if (activeTab === 'history' || activeTab === 'analytics') {
+      fetchAllResults();
+    }
+  }, [activeTab, fetchAllResults]);
+
+  // Khi store cập nhật thêm dữ liệu (do loadMore), đồng bộ lại nếu chưa fetch riêng
+  useEffect(() => {
+    if (!hasFetchedAll) {
+      setAllProductResults(productResults);
+    }
+  }, [productResults, hasFetchedAll]);
 
   const [selectedCriterion, setSelectedCriterion] = useState<string>('');
   
@@ -76,10 +112,10 @@ const ProductDetail: React.FC = () => {
   const analyticsData = useMemo(() => {
     if (!selectedCriterion) return [];
     const batchMap = new Map<string, any>();
-    [...productResults].reverse().forEach(res => {
+    [...allProductResults].reverse().forEach(res => {
       const batch = batches.find(b => b.id === res.batchId);
       // [ALIAS FIX] Dùng resolver.isMatch thay vì exact equality
-      const match = res.results.find(r => resolver.isMatch(r.criteriaName, selectedCriterion));
+      const match = (res.results || []).find(r => resolver.isMatch(r.criteriaName, selectedCriterion));
       if (match && batch) {
         const numVal = typeof match.value === 'number' ? match.value : parseNumberFromText(match.value);
         if (!isNaN(numVal)) {
@@ -90,9 +126,9 @@ const ProductDetail: React.FC = () => {
       }
     });
     return Array.from(batchMap.values());
-  }, [productResults, selectedCriterion, batches, resolver]);
+  }, [allProductResults, selectedCriterion, batches, resolver]);
 
-  const labs: string[] = Array.from(new Set(productResults.map(r => r.labName)));
+  const labs: string[] = Array.from(new Set(allProductResults.map(r => r.labName)));
   const labColors = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#ec4899'];
 
   const getStatusBadge = (status: ProductStatus) => {
@@ -292,39 +328,56 @@ const ProductDetail: React.FC = () => {
         )}
 
         {activeTab === 'history' && (
-           <table className="w-full text-left text-sm">
-            <thead className="border-b border-slate-100">
-              <tr className="text-slate-400 font-bold uppercase text-[10px] tracking-widest">
-                <th className="py-4">Lô hàng</th>
-                <th className="py-4">Ngày kiểm</th>
-                <th className="py-4 text-center">Kết quả</th>
-                <th className="py-4 text-right">Thao tác</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-50">
-              {productResults.map(res => {
-                const batch = batches.find(b => b.id === res.batchId);
-                return (
-                  <tr key={res.id} className="hover:bg-slate-50 transition-colors">
-                    <td className="py-4 font-bold text-slate-700 uppercase">
-                      {batch ? <Link to={`/batches/${batch.id}`} className="hover:text-indigo-600 hover:underline">{batch.batchNo}</Link> : '---'}
-                    </td>
-                    <td className="py-4 text-zinc-500">{formatDateStandard(res.testDate)}</td>
-                    <td className="py-4 text-center">
-                      <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase ${res.overallStatus === 'PASS' ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'}`}>
-                        {res.overallStatus}
-                      </span>
-                    </td>
-                    <td className="py-4 text-right">
-                      {isAdmin && (
-                        <button onClick={() => navigate(`/test-results/edit/${res.id}`)} title="Sửa kết quả" className="text-indigo-600 hover:bg-indigo-50 p-2 rounded-lg transition-all"><ArrowRight size={18} /></button>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-           </table>
+          <div className="space-y-3">
+            {isFetchingAll && (
+              <div className="flex items-center gap-2 text-xs text-indigo-500 font-bold bg-indigo-50 px-4 py-2 rounded-lg">
+                <Loader2 size={14} className="animate-spin" /> Đang tải đầy đủ lịch sử kiểm nghiệm từ cơ sở dữ liệu...
+              </div>
+            )}
+            {hasFetchedAll && !isFetchingAll && (
+              <div className="text-[10px] text-emerald-600 font-bold bg-emerald-50 px-4 py-2 rounded-lg">
+                ✓ Đã tải đầy đủ {allProductResults.length} phiếu kiểm nghiệm
+              </div>
+            )}
+            <table className="w-full text-left text-sm">
+              <thead className="border-b border-slate-100">
+                <tr className="text-slate-400 font-bold uppercase text-[10px] tracking-widest">
+                  <th className="py-4">Lô hàng</th>
+                  <th className="py-4">Ngày kiểm</th>
+                  <th className="py-4">Phòng Lab</th>
+                  <th className="py-4 text-center">Kết quả</th>
+                  <th className="py-4 text-right">Thao tác</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-50">
+                {allProductResults.map(res => {
+                  const batch = batches.find(b => b.id === res.batchId);
+                  return (
+                    <tr key={res.id} className="hover:bg-slate-50 transition-colors">
+                      <td className="py-4 font-bold text-slate-700 uppercase">
+                        {batch ? <Link to={`/batches/${batch.id}`} className="hover:text-indigo-600 hover:underline">{batch.batchNo}</Link> : <span className="text-slate-400 italic text-xs">{res.batchId?.slice(-6)}</span>}
+                      </td>
+                      <td className="py-4 text-zinc-500">{formatDateStandard(res.testDate)}</td>
+                      <td className="py-4 text-zinc-500 text-xs">{res.labName}</td>
+                      <td className="py-4 text-center">
+                        <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase ${res.overallStatus === 'PASS' ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'}`}>
+                          {res.overallStatus}
+                        </span>
+                      </td>
+                      <td className="py-4 text-right">
+                        {isAdmin && (
+                          <button onClick={() => navigate(`/test-results/edit/${res.id}`)} title="Sửa kết quả" className="text-indigo-600 hover:bg-indigo-50 p-2 rounded-lg transition-all"><ArrowRight size={18} /></button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+                {!isFetchingAll && allProductResults.length === 0 && (
+                  <tr><td colSpan={5} className="py-12 text-center text-slate-400 italic text-sm">Chưa có phiếu kiểm nghiệm nào cho sản phẩm này.</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         )}
 
         {activeTab === 'analytics' && (

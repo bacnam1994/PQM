@@ -134,4 +134,106 @@ export const fetchTestResultById = async (idOrSuffix: string): Promise<TestResul
   } catch (e) { console.error('Firebase lookup failed:', e); }
 
   return null;
+};
+
+/**
+ * Lấy TOÀN BỘ lịch sử kiểm nghiệm của một sản phẩm (bất kể giới hạn 50 phiếu trong store).
+ * Dùng cho trang Chi tiết Sản phẩm (tab Lịch sử & Biến động Chất lượng).
+ * Chiến lược: Lấy toàn bộ lô hàng của sản phẩm → fetch kết quả kiểm nghiệm cho từng lô.
+ * @param productId ID của sản phẩm cần xem
+ * @returns Mảng đầy đủ TestResult[], sắp xếp mới nhất lên đầu
+ */
+export const fetchTestResultsByProductId = async (productId: string): Promise<TestResult[]> => {
+  if (!productId) return [];
+
+  try {
+    // 1. Lấy danh sách lô hàng thuộc sản phẩm từ store và Firebase
+    const appState = useAppStore.getState();
+    let productBatches = appState.batches.filter(b => b.productId === productId);
+
+    // Nếu store chưa có đủ dữ liệu, fetch toàn bộ lô từ Firebase và lọc
+    if (productBatches.length === 0) {
+      try {
+        const { get: firebaseGet, ref: firebaseRef, query: firebaseQuery, orderByChild: fbOrderBy, equalTo: fbEqualTo } = await import('firebase/database');
+        const { db: firebaseDb } = await import('../firebase');
+        const batchQuery = firebaseQuery(firebaseRef(firebaseDb, 'batches'), fbOrderBy('productId'), fbEqualTo(productId));
+        const snap = await firebaseGet(batchQuery);
+        if (snap.exists()) {
+          productBatches = Object.values(snap.val()) as any[];
+        }
+      } catch (e) {
+        // Fallback: Lấy từ store không filter
+        console.warn('Lỗi tìm lô theo productId từ Firebase:', e);
+      }
+    }
+
+    if (productBatches.length === 0) return [];
+
+    const batchIds = productBatches.map(b => b.id);
+
+    // 2. Tra cứu kết quả kiểm nghiệm có sẵn trong store và cache trước (không cần fetch riêng lẻ)
+    const allAvailableResults = [
+      ...(appState.allTestResults || []),
+      ...(appState.testResults || []),
+    ];
+
+    const batchIdSet = new Set(batchIds);
+    const fromStore = allAvailableResults.filter(r => r && batchIdSet.has(r.batchId));
+
+    // Kiểm tra các lô chưa có dữ liệu kiểm nghiệm trong store
+    const batchIdsInStore = new Set(fromStore.map(r => r.batchId));
+    const missingBatchIds = batchIds.filter(id => !batchIdsInStore.has(id));
+
+    // 3. Fetch các lô còn thiếu từ Firebase
+    let fromFirebase: TestResult[] = [];
+    if (missingBatchIds.length > 0) {
+      try {
+        const { get: firebaseGet, ref: firebaseRef, query: firebaseQuery, orderByChild: fbOrderBy, equalTo: fbEqualTo } = await import('firebase/database');
+        const { db: firebaseDb } = await import('../firebase');
+
+        // Nếu chỉ vài lô bị thiếu → fetch từng lô riêng lẻ
+        if (missingBatchIds.length <= 5) {
+          const results = await Promise.all(
+            missingBatchIds.map(async bId => {
+              try {
+                const q = firebaseQuery(firebaseRef(firebaseDb, 'testResults'), fbOrderBy('batchId'), fbEqualTo(bId));
+                const snap = await firebaseGet(q);
+                return snap.exists() ? (Object.values(snap.val()) as TestResult[]) : [];
+              } catch (e) { return []; }
+            })
+          );
+          fromFirebase = results.flat();
+        } else {
+          // Nhiều lô thiếu → quét toàn bộ testResults một lần duy nhất (hiệu quả hơn N queries)
+          const snap = await firebaseGet(firebaseRef(firebaseDb, 'testResults'));
+          if (snap.exists()) {
+            const all = Object.values(snap.val()) as TestResult[];
+            fromFirebase = all.filter(r => r && batchIdSet.has(r.batchId));
+          }
+        }
+      } catch (e) {
+        console.warn('Lỗi fetch testResults cho sản phẩm từ Firebase:', e);
+      }
+    }
+
+    // 4. Gộp và loại trùng
+    const merged = new Map<string, TestResult>();
+    [...fromStore, ...fromFirebase].forEach(r => {
+      if (r && r.id) merged.set(r.id, r);
+    });
+
+    const finalResults = Array.from(merged.values());
+
+    // Bơm dữ liệu mới vào store
+    if (fromFirebase.length > 0 && appState.mergeTestResults) {
+      appState.mergeTestResults(finalResults);
+    }
+
+    return finalResults.sort((a, b) =>
+      new Date(b.testDate || 0).getTime() - new Date(a.testDate || 0).getTime()
+    );
+  } catch (error) {
+    console.error(`Lỗi tải toàn bộ lịch sử kiểm nghiệm cho sản phẩm ${productId}:`, error);
+    return [];
+  }
 };
