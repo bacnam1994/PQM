@@ -4,7 +4,8 @@
 
 - **GitHub**: Chỉ dùng để **sao lưu mã nguồn**. Không phải môi trường hosting.
 - **Firebase Hosting**: Là nơi **deploy và host ứng dụng thực tế**.
-  - URL sản xuất: `https://pqm-xxx.web.app` (hoặc custom domain nếu có)
+  - URL sản xuất: `https://v-biotech.web.app`
+  - Firebase project ID: `v-biotech`
   - File cấu hình: `firebase.json` (thư mục `dist` là output build)
   - Quy tắc RTDB: `database.rules.json`
   - Quy tắc Storage: `storage.rules`
