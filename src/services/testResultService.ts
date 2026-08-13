@@ -154,10 +154,8 @@ export const fetchTestResultsByProductId = async (productId: string): Promise<Te
     // Nếu store chưa có đủ dữ liệu, fetch toàn bộ lô từ Firebase và lọc
     if (productBatches.length === 0) {
       try {
-        const { get: firebaseGet, ref: firebaseRef, query: firebaseQuery, orderByChild: fbOrderBy, equalTo: fbEqualTo } = await import('firebase/database');
-        const { db: firebaseDb } = await import('../firebase');
-        const batchQuery = firebaseQuery(firebaseRef(firebaseDb, 'batches'), fbOrderBy('productId'), fbEqualTo(productId));
-        const snap = await firebaseGet(batchQuery);
+        const batchQuery = query(ref(db, 'batches'), orderByChild('productId'), equalTo(productId));
+        const snap = await get(batchQuery);
         if (snap.exists()) {
           productBatches = Object.values(snap.val()) as any[];
         }
@@ -188,16 +186,13 @@ export const fetchTestResultsByProductId = async (productId: string): Promise<Te
     let fromFirebase: TestResult[] = [];
     if (missingBatchIds.length > 0) {
       try {
-        const { get: firebaseGet, ref: firebaseRef, query: firebaseQuery, orderByChild: fbOrderBy, equalTo: fbEqualTo } = await import('firebase/database');
-        const { db: firebaseDb } = await import('../firebase');
-
         // Nếu chỉ vài lô bị thiếu → fetch từng lô riêng lẻ
         if (missingBatchIds.length <= 5) {
           const results = await Promise.all(
             missingBatchIds.map(async bId => {
               try {
-                const q = firebaseQuery(firebaseRef(firebaseDb, 'testResults'), fbOrderBy('batchId'), fbEqualTo(bId));
-                const snap = await firebaseGet(q);
+                const q = query(ref(db, 'testResults'), orderByChild('batchId'), equalTo(bId));
+                const snap = await get(q);
                 return snap.exists() ? (Object.values(snap.val()) as TestResult[]) : [];
               } catch (e) { return []; }
             })
@@ -205,7 +200,7 @@ export const fetchTestResultsByProductId = async (productId: string): Promise<Te
           fromFirebase = results.flat();
         } else {
           // Nhiều lô thiếu → quét toàn bộ testResults một lần duy nhất (hiệu quả hơn N queries)
-          const snap = await firebaseGet(firebaseRef(firebaseDb, 'testResults'));
+          const snap = await get(ref(db, 'testResults'));
           if (snap.exists()) {
             const all = Object.values(snap.val()) as TestResult[];
             fromFirebase = all.filter(r => r && batchIdSet.has(r.batchId));

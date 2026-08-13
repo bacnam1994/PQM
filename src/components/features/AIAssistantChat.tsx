@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { UploadCloud, Loader2, Sparkles, Send, CheckCircle2, User, AlertCircle, X, Settings, Brain, Trash2 } from 'lucide-react';
-import { geminiService } from '../../services/ai/geminiService';
+import { geminiService, validateOCRFile } from '../../services/ai/geminiService';
 import { buildExtractionPrompt } from '../../services/ai/prompts';
 import { useAppStore } from '../../store/useAppStore';
 import { useDataGraph } from '../../hooks/useDataGraph';
@@ -164,7 +164,6 @@ export const AIAssistantChat: React.FC = () => {
 
   const processFile = async (file: File) => {
     // [SECURITY] Dùng hàm validateOCRFile đã chuẩn hóa (kiểm tra kích thước + MIME type)
-    const { validateOCRFile } = await import('../../services/ai/geminiService');
     const validation = validateOCRFile(file);
     if (!validation.valid) {
       toast.error(validation.error || 'File không hợp lệ.');
@@ -218,7 +217,6 @@ export const AIAssistantChat: React.FC = () => {
     if (files.length === 0) return;
 
     // Kiểm tra toàn bộ file trước khi bắt đầu
-    const { validateOCRFile } = await import('../../services/ai/geminiService');
     const invalidFiles = files.filter(f => !validateOCRFile(f).valid);
     if (invalidFiles.length > 0) {
       const errors = invalidFiles.map(f => {

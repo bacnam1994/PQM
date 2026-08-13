@@ -7,6 +7,8 @@ import { User, getAuth, signInWithEmailAndPassword, signOut, createUserWithEmail
 import { parseNumberFromText } from '../utils';
 import { logAuditAction } from '../services/auditService';
 import { detectCriteriaChanges, normalizeName, mergeAliases, createAliasRecord } from '../services/criteriaAliasService';
+import { deleteProductService, deleteBatchService } from '../services/databaseService';
+import { detectQualityAnomalies } from '../services/reportService';
 
 export type ToastType = 'SUCCESS' | 'ERROR' | 'INFO' | 'WARNING';
 export interface ToastMessage {
@@ -307,7 +309,6 @@ export const useAppStore = create<AppStoreState & AppStoreActions>()(devtools((s
       throw new Error("Permission denied");
     }
     const product = get().products.find(p => p.id === id);
-    const { deleteProductService } = await import('../services/databaseService');
     await executeOfflineOptimistic(deleteProductService(id), get);
     await get().syncQualityAlerts();
     logAuditAction({ action: 'DELETE', collection: 'PRODUCTS', documentId: id, details: `Xóa sản phẩm: ${product?.name || id}`, performedBy: get().user?.email || 'unknown' });
@@ -360,7 +361,6 @@ export const useAppStore = create<AppStoreState & AppStoreActions>()(devtools((s
       throw new Error("Permission denied");
     }
     const batch = get().batches.find(b => b.id === id);
-    const { deleteBatchService } = await import('../services/databaseService');
     await executeOfflineOptimistic(deleteBatchService(id), get);
     await get().syncQualityAlerts();
     logAuditAction({ action: 'DELETE', collection: 'BATCHES', documentId: id, details: `Xóa lô: ${batch?.batchNo || id}`, performedBy: get().user?.email || 'unknown' });
@@ -666,7 +666,6 @@ export const useAppStore = create<AppStoreState & AppStoreActions>()(devtools((s
     try {
       const state = get();
       if (!state.user) return;
-      const { detectQualityAnomalies } = await import('../services/reportService');
       const anomalies = detectQualityAnomalies({
         products: state.products,
         batches: state.batches,
