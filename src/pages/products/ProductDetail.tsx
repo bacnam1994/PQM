@@ -95,38 +95,56 @@ const ProductDetail: React.FC = () => {
     }
   }, [productResults, hasFetchedAll]);
 
-  const [selectedCriterion, setSelectedCriterion] = useState<string>('');
-  
-  const allCriteriaNames = useMemo(() => {
+  // Chỉ lấy chỉ tiêu chất lượng chính (không bao gồm chỉ tiêu an toàn)
+  const allQualityCriteriaNames = useMemo(() => {
     const names = new Set<string>();
     productTCCSList.forEach(t => {
       (t.mainQualityCriteria || []).forEach(c => c && c.name && names.add(c.name));
-      (t.safetyCriteria || []).forEach(c => c && c.name && names.add(c.name));
     });
-    return Array.from(names);
+    return Array.from(names).sort();
   }, [productTCCSList]);
+
+  // Nhiều chỉ tiêu được chọn (Set)
+  const [selectedCriteria, setSelectedCriteria] = useState<Set<string>>(new Set());
+
+  const toggleCriterion = useCallback((name: string) => {
+    setSelectedCriteria(prev => {
+      const next = new Set(prev);
+      if (next.has(name)) next.delete(name); else next.add(name);
+      return next;
+    });
+  }, []);
+
+  const selectAllCriteria = useCallback(() => {
+    setSelectedCriteria(new Set(allQualityCriteriaNames));
+  }, [allQualityCriteriaNames]);
+
+  const clearAllCriteria = useCallback(() => setSelectedCriteria(new Set()), []);
 
   const activeTCCS = productTCCSList.find(t => t.isActive) || productTCCSList[0];
   const resolver = useCriteriaResolver(activeTCCS);
 
-  const analyticsData = useMemo(() => {
-    if (!selectedCriterion) return [];
-    const batchMap = new Map<string, any>();
-    [...allProductResults].reverse().forEach(res => {
-      const batch = batches.find(b => b.id === res.batchId);
-      // [ALIAS FIX] Dùng resolver.isMatch thay vì exact equality
-      const match = (res.results || []).find(r => resolver.isMatch(r.criteriaName, selectedCriterion));
-      if (match && batch) {
-        const numVal = typeof match.value === 'number' ? match.value : parseNumberFromText(match.value);
-        if (!isNaN(numVal)) {
-          const existing = batchMap.get(batch.batchNo) || { name: batch.batchNo };
-          existing[res.labName] = numVal;
-          batchMap.set(batch.batchNo, existing);
+  // Tính dữ liệu biểu đồ cho từng chỉ tiêu được chọn
+  const analyticsDataMap = useMemo(() => {
+    const result: Record<string, any[]> = {};
+    selectedCriteria.forEach(criterionName => {
+      const batchMap = new Map<string, any>();
+      [...allProductResults].reverse().forEach(res => {
+        const batch = batches.find(b => b.id === res.batchId);
+        const match = (res.results || []).find(r => resolver.isMatch(r.criteriaName, criterionName));
+        if (match && batch) {
+          const numVal = typeof match.value === 'number' ? match.value : parseNumberFromText(match.value);
+          if (!isNaN(numVal)) {
+            const existing = batchMap.get(batch.batchNo) || { name: batch.batchNo };
+            existing[res.labName] = numVal;
+            batchMap.set(batch.batchNo, existing);
+          }
         }
-      }
+      });
+      result[criterionName] = Array.from(batchMap.values());
     });
-    return Array.from(batchMap.values());
-  }, [allProductResults, selectedCriterion, batches, resolver]);
+    return result;
+  }, [allProductResults, selectedCriteria, batches, resolver]);
 
   const labs: string[] = Array.from(new Set(allProductResults.map(r => r.labName)));
   const labColors = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#ec4899'];
@@ -381,40 +399,102 @@ const ProductDetail: React.FC = () => {
         )}
 
         {activeTab === 'analytics' && (
-           <div className="space-y-6">
-              <div className="flex items-center gap-4 bg-slate-50 p-4 rounded-xl border border-slate-100">
-                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Chỉ tiêu đối soát:</label>
-                <select 
-                  value={selectedCriterion}
-                  onChange={(e) => setSelectedCriterion(e.target.value)}
-                  className="bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500"
-                >
-                  <option value="">-- Chọn chỉ tiêu --</option>
-                  {allCriteriaNames.map(name => <option key={name} value={name}>{name}</option>)}
-                </select>
-              </div>
-
-              {selectedCriterion && analyticsData.length > 0 ? (
-                <div className="h-[400px] w-full pt-4">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={analyticsData}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                      <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 11 }} />
-                      <YAxis axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 11 }} />
-                      <Tooltip contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }} />
-                      <Legend iconType="circle" />
-                      {labs.map((lab, index) => (
-                        <Line key={lab} type="monotone" dataKey={lab} stroke={labColors[index % labColors.length]} strokeWidth={3} dot={{ r: 4 }} />
-                      ))}
-                    </LineChart>
-                  </ResponsiveContainer>
+          <div className="space-y-6">
+            {/* Panel chọn chỉ tiêu */}
+            <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 space-y-3">
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-black text-slate-500 uppercase tracking-widest">Chọn chỉ tiêu chất lượng để phân tích:</p>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={selectAllCriteria}
+                    className="text-[10px] font-black text-indigo-600 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-lg transition-all uppercase tracking-wider"
+                  >
+                    Chọn tất cả
+                  </button>
+                  <button
+                    onClick={clearAllCriteria}
+                    className="text-[10px] font-black text-slate-500 bg-white hover:bg-slate-100 border border-slate-200 px-3 py-1.5 rounded-lg transition-all uppercase tracking-wider"
+                  >
+                    Bỏ chọn
+                  </button>
                 </div>
+              </div>
+              {allQualityCriteriaNames.length === 0 ? (
+                <p className="text-xs text-slate-400 italic">Chưa có TCCS nào được khai báo chỉ tiêu chất lượng.</p>
               ) : (
-                <div className="h-[300px] flex flex-col items-center justify-center text-slate-300 italic">
-                  Vui lòng chọn chỉ tiêu định lượng để bắt đầu phân tích.
+                <div className="flex flex-wrap gap-2">
+                  {allQualityCriteriaNames.map(name => (
+                    <button
+                      key={name}
+                      onClick={() => toggleCriterion(name)}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${
+                        selectedCriteria.has(name)
+                          ? 'bg-indigo-600 text-white border-indigo-600 shadow-md shadow-indigo-100'
+                          : 'bg-white text-slate-600 border-slate-200 hover:border-indigo-300 hover:text-indigo-600'
+                      }`}
+                    >
+                      {selectedCriteria.has(name) && <span className="text-[10px]">✓</span>}
+                      {name}
+                    </button>
+                  ))}
                 </div>
               )}
-           </div>
+            </div>
+
+            {/* Biểu đồ cho từng chỉ tiêu đã chọn */}
+            {selectedCriteria.size === 0 ? (
+              <div className="h-[200px] flex flex-col items-center justify-center text-slate-300 italic text-sm gap-2">
+                <BarChart3 size={36} className="text-slate-200" />
+                Chọn ít nhất một chỉ tiêu để xem biểu đồ biến động.
+              </div>
+            ) : (
+              <div className="space-y-8">
+                {Array.from(selectedCriteria).map(criterionName => {
+                  const data = analyticsDataMap[criterionName] || [];
+                  return (
+                    <div key={criterionName} className="bg-white border border-slate-100 rounded-2xl p-4 shadow-sm">
+                      <div className="flex items-center gap-2 mb-4">
+                        <div className="w-2 h-2 rounded-full bg-indigo-500" />
+                        <h4 className="text-sm font-black text-slate-700 uppercase tracking-tight">{criterionName}</h4>
+                        <span className="text-[10px] text-slate-400 font-bold">({data.length} lô có dữ liệu)</span>
+                      </div>
+                      {data.length > 0 ? (
+                        <div className="h-[260px]">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <LineChart data={data}>
+                              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                              <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 10 }} />
+                              <YAxis axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 10 }} width={45} />
+                              <Tooltip
+                                contentStyle={{ borderRadius: '10px', border: 'none', boxShadow: '0 8px 16px -4px rgb(0 0 0 / 0.12)', fontSize: 12 }}
+                                formatter={(val: any) => [val, '']}
+                              />
+                              <Legend iconType="circle" wrapperStyle={{ fontSize: 11 }} />
+                              {labs.map((lab, index) => (
+                                <Line
+                                  key={lab}
+                                  type="monotone"
+                                  dataKey={lab}
+                                  stroke={labColors[index % labColors.length]}
+                                  strokeWidth={2.5}
+                                  dot={{ r: 4, fill: labColors[index % labColors.length] }}
+                                  connectNulls
+                                />
+                              ))}
+                            </LineChart>
+                          </ResponsiveContainer>
+                        </div>
+                      ) : (
+                        <div className="h-[80px] flex items-center justify-center text-slate-300 italic text-xs">
+                          Không có dữ liệu số cho chỉ tiêu này.
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         )}
       </div>
     </div>
