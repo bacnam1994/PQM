@@ -302,8 +302,14 @@ export const useAppStore = create<AppStoreState & AppStoreActions>()(devtools((s
     logAuditAction({ action: 'UPDATE', collection: 'PRODUCTS', documentId: p.id, details: `Cập nhật sản phẩm: ${p.name} (${p.code})`, performedBy: get().user?.email || 'unknown' });
   },
   deleteProduct: async (id) => {
+    if (!get().isAdmin) {
+      get().notify({ type: 'ERROR', title: 'Từ chối truy cập', message: 'Chỉ Quản trị viên mới có quyền xóa dữ liệu này.' });
+      throw new Error("Permission denied");
+    }
     const product = get().products.find(p => p.id === id);
-    await _handleDelete('products', id, get, true);
+    const { deleteProductService } = await import('../services/databaseService');
+    await executeOfflineOptimistic(deleteProductService(id), get);
+    await get().syncQualityAlerts();
     logAuditAction({ action: 'DELETE', collection: 'PRODUCTS', documentId: id, details: `Xóa sản phẩm: ${product?.name || id}`, performedBy: get().user?.email || 'unknown' });
   },
   bulkAddProducts: async (products) => {
@@ -349,8 +355,13 @@ export const useAppStore = create<AppStoreState & AppStoreActions>()(devtools((s
     logAuditAction({ action: 'UPDATE', collection: 'BATCHES', documentId: b.id, details: `Cập nhật lô: ${b.batchNo} -> trạng thái: ${b.status}`, performedBy: get().user?.email || 'unknown' });
   },
   deleteBatch: async (id) => {
+    if (!get().isAdmin) {
+      get().notify({ type: 'ERROR', title: 'Từ chối truy cập', message: 'Chỉ Quản trị viên mới có quyền xóa dữ liệu này.' });
+      throw new Error("Permission denied");
+    }
     const batch = get().batches.find(b => b.id === id);
-    await _handleDelete('batches', id, get, true);
+    const { deleteBatchService } = await import('../services/databaseService');
+    await executeOfflineOptimistic(deleteBatchService(id), get);
     await get().syncQualityAlerts();
     logAuditAction({ action: 'DELETE', collection: 'BATCHES', documentId: id, details: `Xóa lô: ${batch?.batchNo || id}`, performedBy: get().user?.email || 'unknown' });
   },
@@ -541,7 +552,7 @@ export const useAppStore = create<AppStoreState & AppStoreActions>()(devtools((s
         tccs: {
           'demo_t1': { id: 'demo_t1', productId: 'demo_p1', code: 'TCCS 01:2024', name: 'TCCS Mẫu A', issueDate: new Date().toISOString(), createdAt: new Date().toISOString() }
         },
-        batches: {}, testResults: {}, inventoryIn: {}, inventoryOut: {}, raw_materials: {},
+        batches: {}, testResults: {}, raw_materials: {},
         criteria_aliases: {}, ai_learned_mappings: {}
       };
       await executeOfflineOptimistic(firebaseSet(ref(db), demoData), get);
@@ -589,11 +600,15 @@ export const useAppStore = create<AppStoreState & AppStoreActions>()(devtools((s
     try {
       const state = get();
       const existing = state.aiLearnedMappings.find(m => m.originalName === originalName && m.systemName === systemName);
+      const now = new Date().toISOString();
       
       if (existing) {
-        // Tăng tần suất sử dụng
-        const updated = { ...existing, frequency: existing.frequency + 1 };
-        await executeOfflineOptimistic(firebaseUpdate(ref(db, `ai_learned_mappings/${existing.id}`), { frequency: updated.frequency }), get);
+        // Tăng tần suất sử dụng và cập nhật timestamp
+        const updated = { ...existing, frequency: existing.frequency + 1, updatedAt: now };
+        await executeOfflineOptimistic(firebaseUpdate(ref(db, `ai_learned_mappings/${existing.id}`), { 
+          frequency: updated.frequency,
+          updatedAt: updated.updatedAt
+        }), get);
       } else {
         // Tạo mapping mới
         const newId = `aim_${Date.now()}`;
@@ -601,7 +616,9 @@ export const useAppStore = create<AppStoreState & AppStoreActions>()(devtools((s
           id: newId,
           originalName,
           systemName,
-          frequency: 1
+          frequency: 1,
+          createdAt: now,
+          updatedAt: now
         };
         await executeOfflineOptimistic(firebaseSet(ref(db, `ai_learned_mappings/${newId}`), newMapping), get);
       }

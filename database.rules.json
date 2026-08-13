@@ -30,7 +30,7 @@
 
     "batches": {
       ".read": "auth != null",
-      ".indexOn": ["createdAt", "status"],
+      ".indexOn": ["createdAt", "status", "productId"],
       "$item_id": {
         ".write": "auth != null && root.child('users/admins/' + auth.uid).exists() && newData.exists()"
       }
@@ -38,6 +38,7 @@
 
     "tccs": {
       ".read": "auth != null",
+      ".indexOn": ["productId"],
       "$item_id": {
         ".write": "auth != null && root.child('users/admins/' + auth.uid).exists() && newData.exists()"
       }
@@ -45,21 +46,12 @@
     
     "product_formulas": { 
       ".read": "auth != null", 
+      ".indexOn": ["productId"],
       ".write": "auth != null && root.child('users/admins/' + auth.uid).exists() && newData.exists()" 
     },
 
     "raw_materials": { 
-      ".read": "auth != null && root.child('users/admins/' + auth.uid).exists()", 
-      ".write": "auth != null && root.child('users/admins/' + auth.uid).exists() && newData.exists()" 
-    },
-
-    "inventoryIn": { 
-      ".read": "auth != null && root.child('users/admins/' + auth.uid).exists()", 
-      ".write": "auth != null && root.child('users/admins/' + auth.uid).exists() && newData.exists()" 
-    },
-
-    "inventoryOut": { 
-      ".read": "auth != null && root.child('users/admins/' + auth.uid).exists()", 
+      ".read": "auth != null", 
       ".write": "auth != null && root.child('users/admins/' + auth.uid).exists() && newData.exists()" 
     },
 

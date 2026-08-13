@@ -1,5 +1,5 @@
 const DB_NAME = 'QA_Manager_DB';
-const DB_VERSION = 2; // Tăng version để trình duyệt cập nhật thêm bảng mới
+const DB_VERSION = 3; // v3: xóa stores inventoryIn, inventoryOut (tính năng kho đã bỏ)
 
 /**
  * Khởi tạo IndexedDB và tạo các bảng lưu trữ (Object Stores)
@@ -18,9 +18,10 @@ export const initDB = (): Promise<IDBDatabase> => {
         'batches', 
         'tccs', 
         'productFormulas', 
-        'rawMaterials', 
-        'inventoryIn', 
-        'inventoryOut'
+        'rawMaterials',
+        'aiLearnedMappings',
+        'qualityAlerts',
+        'criteriaAliases'
       ];
       stores.forEach(storeName => {
         if (!db.objectStoreNames.contains(storeName)) {
@@ -44,8 +45,14 @@ export const saveToCache = async (storeName: string, items: any[]) => {
     // Đảm bảo cache Offline luôn là bản sao chính xác 1:1 của Firebase
     store.clear();
     
-    items.forEach(item => {
-      if (item && item.id) store.put(item);
+    items.forEach((item, index) => {
+      if (item) {
+        if (!item.id) {
+          store.put({ ...item, id: `${storeName}_${index}_${Date.now()}` });
+        } else {
+          store.put(item);
+        }
+      }
     });
     return new Promise((resolve) => { tx.oncomplete = resolve; });
   } catch (error) {
@@ -78,7 +85,8 @@ export const clearEntireCache = async (): Promise<void> => {
     const db = await initDB();
     const stores = [
       'testResults', 'products', 'batches', 'tccs', 
-      'productFormulas', 'rawMaterials', 'inventoryIn', 'inventoryOut'
+      'productFormulas', 'rawMaterials',
+      'aiLearnedMappings', 'qualityAlerts', 'criteriaAliases'
     ];
     const tx = db.transaction(stores, 'readwrite');
     

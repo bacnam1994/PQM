@@ -236,7 +236,7 @@ const SettingsPage: React.FC = () => {
       // Giả lập lại fullData để tương thích với cấu trúc Export cũ
       const fullData: any = { testResults: allTestResults };
       const currentState = useAppStore.getState();
-      ['products', 'batches', 'tccsList', 'productFormulas', 'rawMaterials', 'inventoryIn', 'inventoryOut', 'criteriaAliases', 'aiLearnedMappings'].forEach(key => {
+      ['products', 'batches', 'tccsList', 'productFormulas', 'rawMaterials', 'criteriaAliases', 'aiLearnedMappings'].forEach(key => {
         fullData[key] = currentState[key as keyof typeof currentState];
       });
 

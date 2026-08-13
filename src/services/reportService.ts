@@ -4,6 +4,7 @@
  * Hỗ trợ báo cáo tháng/quý với định dạng chuyên nghiệp, nhiều sheet, màu sắc chuẩn.
  */
 import * as XLSX from 'xlsx';
+import { QualityAnomaly } from '../types';
 
 /**
  * Định dạng ngày tháng sang DD/MM/YYYY
@@ -226,14 +227,7 @@ function applyColumnWidths(ws: XLSX.WorkSheet) {
  * - Lô sắp hết hạn trong N ngày
  * - Sản phẩm có tỷ lệ thất bại cao bất thường
  */
-export interface QualityAnomaly {
-  type: 'DRIFT' | 'EXPIRY' | 'HIGH_FAIL_RATE' | 'MISSING_DATA';
-  severity: 'HIGH' | 'MEDIUM' | 'LOW';
-  title: string;
-  detail: string;
-  productName?: string;
-  batchNo?: string;
-}
+export type { QualityAnomaly };
 
 export const detectQualityAnomalies = (appContext: any, daysAhead = 30): QualityAnomaly[] => {
   const batches = appContext.batches || [];
@@ -251,6 +245,7 @@ export const detectQualityAnomalies = (appContext: any, daysAhead = 30): Quality
       const product = products.find((p: any) => p.id === b.productId);
       const daysLeft = Math.ceil((exp.getTime() - now.getTime()) / (24 * 60 * 60 * 1000));
       anomalies.push({
+        id: `qa_exp_${b.id || b.batchNo}`,
         type: 'EXPIRY',
         severity: daysLeft <= 7 ? 'HIGH' : daysLeft <= 14 ? 'MEDIUM' : 'LOW',
         title: `Lô sắp hết hạn: ${b.batchNo}`,
@@ -300,6 +295,7 @@ export const detectQualityAnomalies = (appContext: any, daysAhead = 30): Quality
         const changeRate = Math.abs(((v1 - v3) / (v3 || 1)) * 100).toFixed(1);
         // FIX 6: Hiển thị đúng chiều thời gian cũ→mới: v3 (cũ nhất) → v2 → v1 (mới nhất)
         anomalies.push({
+          id: `qa_drift_${pid}_${criteriaName}`,
           type: 'DRIFT',
           severity: parseFloat(changeRate) > 20 ? 'HIGH' : 'MEDIUM',
           title: `Xu hướng trôi: ${criteriaName}`,
@@ -318,6 +314,7 @@ export const detectQualityAnomalies = (appContext: any, daysAhead = 30): Quality
     if (failRate >= 0.3) {
       const product = products.find((p: any) => p.id === pid);
       anomalies.push({
+        id: `qa_fail_${pid}`,
         type: 'HIGH_FAIL_RATE',
         severity: failRate >= 0.5 ? 'HIGH' : 'MEDIUM',
         title: `Tỷ lệ thất bại cao: ${product?.name || pid}`,
