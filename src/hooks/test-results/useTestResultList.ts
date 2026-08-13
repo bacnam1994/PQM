@@ -6,6 +6,8 @@ import { useCrud } from '../useCrud';
 import { TestResult } from '../../types';
 import { HydratedTestResult } from '../useDataGraph';
 
+import { getAppUrl } from '../../utils';
+
 export const useTestResultList = () => {
   const navigate = useNavigate();
   const crud = useCrud<TestResult>();
@@ -50,8 +52,9 @@ export const useTestResultList = () => {
   }, [crud, deleteTestResult, notify, batches, user]);
 
   const handlePrint = useCallback((res: HydratedTestResult) => {
-    // Rút gọn URL chỉ dùng 6 ký tự cuối của ID
-    window.open(`/test-results/print/${res.id.slice(-6)}`, '_blank');
+    // Rút gọn URL chỉ dùng 6 ký tự cuối của ID và nối đúng BASE_URL
+    const targetUrl = getAppUrl(`/test-results/print/${res.id.slice(-6)}`);
+    window.open(targetUrl, '_blank');
   }, []);
 
   const handleOpenAdd = useCallback(() => {

@@ -117,7 +117,16 @@ const TestResultListItem = memo(({ res, onEdit, onDelete, onPrint, isAdmin }: {
   );
 });
 
-const TestResultDataList = ({ viewMode, data, onEdit, onDelete, onPrint, isAdmin }: any) => {
+const TestResultDataList = ({ viewMode, data, onEdit, onDelete, onPrint, isAdmin, isLoading }: any) => {
+  if (isLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 gap-3 bg-white dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm">
+        <Loader2 className="animate-spin text-cyan-600 dark:text-cyan-400" size={32} />
+        <p className="text-xs font-bold text-slate-500 dark:text-slate-400">Đang tải dữ liệu kết quả kiểm nghiệm...</p>
+      </div>
+    );
+  }
+
   if (data.length === 0) {
      return <DSEmptyState icon={FileSearch} title="Không có phiếu kiểm nghiệm" message="Hệ thống chưa ghi nhận kết quả kiểm nghiệm nào khớp với thông tin tìm kiếm." />;
   }
@@ -303,6 +312,7 @@ const TestResultList: React.FC = () => {
         onDelete={handleDeleteClick}
         onPrint={handlePrint}
         isAdmin={isAdmin}
+        isLoading={hydratedResults.length === 0 && syncStatus === 'SAVING'}
       />
 
       <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />

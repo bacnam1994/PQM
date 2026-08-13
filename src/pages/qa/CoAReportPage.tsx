@@ -23,32 +23,52 @@ const CoAReportPage = () => {
   const [formula, setFormula] = useState<any>(null);
   
   useEffect(() => {
+    let isMounted = true;
+
     const loadData = async () => {
       setLoading(true);
+      setNotFound(false);
       try {
+        const appState = useAppStore.getState();
+        const storeBatches = appState.batches || [];
+        const storeProducts = appState.products || [];
+        const storeTccsList = appState.tccsList || [];
+        const storeFormulas = (appState as any).productFormulas || [];
+
         if (id) {
           // 1. In Phiếu riêng lẻ
-          // Bước 1: Tìm trong store (nhanh, ưu tiên)
+          // Bước 1: Tìm trong Store hoặc Cache hoặc Firebase
+          let rawResult: TestResult | null = null;
+          
           const sourceData = allTestResultsHydrated.length > 0 ? allTestResultsHydrated : hydratedResults;
-          const resFromStore = sourceData.find(r => r.id === id || r.id.endsWith(id));
-
-          let finalResult: HydratedTestResult | null = null;
-          let hydratedBatch: HydratedBatch | undefined = undefined;
+          const resFromStore = sourceData.find(r => r && (r.id === id || r.id.endsWith(id)));
 
           if (resFromStore) {
-            finalResult = resFromStore as HydratedTestResult;
-            hydratedBatch = finalResult.batch;
+            rawResult = resFromStore;
           } else {
-            // Bước 2: Fallback – fetch trực tiếp từ Firebase (khi mở tab mới, store chưa load)
-            const rawResult = await fetchTestResultById(id);
-            if (rawResult) {
-              // Hydrate batch: ưu tiên store, fallback Firebase
-              hydratedBatch = batches.find(b => b.id === rawResult.batchId);
-              let batchProduct = hydratedBatch?.product;
-              let batchTccs = hydratedBatch?.tccs;
+            rawResult = await fetchTestResultById(id);
+          }
 
-              if (!hydratedBatch) {
-                // Store chưa load batch → fetch trực tiếp
+          if (!isMounted) return;
+
+          if (!rawResult) {
+            setNotFound(true);
+            return;
+          }
+
+          // Bước 2: Hydrate Batch, Product, TCCS đầy đủ
+          let hydratedBatch: HydratedBatch | undefined = undefined;
+          let batchProduct = undefined;
+          let batchTccs: TCCS | undefined = undefined;
+
+          // Tìm Batch
+          if (rawResult.batchId) {
+            hydratedBatch = batches.find(b => b.id === rawResult!.batchId || b.id.endsWith(rawResult!.batchId));
+            if (!hydratedBatch) {
+              const localBatch = storeBatches.find(b => b.id === rawResult!.batchId || b.id.endsWith(rawResult!.batchId));
+              if (localBatch) {
+                hydratedBatch = { ...localBatch };
+              } else {
                 try {
                   const batchSnap = await get(ref(db, `batches/${rawResult.batchId}`));
                   if (batchSnap.exists()) {
@@ -56,17 +76,30 @@ const CoAReportPage = () => {
                   }
                 } catch (e) { console.warn('Batch fetch failed:', e); }
               }
+            }
+          }
 
-              if (hydratedBatch) {
-                if (!batchProduct && hydratedBatch.productId) {
-                  try {
-                    const productSnap = await get(ref(db, `products/${hydratedBatch.productId}`));
-                    if (productSnap.exists()) {
-                      batchProduct = productSnap.val();
-                    }
-                  } catch (e) { console.warn('Product fetch failed:', e); }
-                }
-                if (!batchTccs && hydratedBatch.tccsId) {
+          // Tìm Product
+          if (hydratedBatch) {
+            batchProduct = hydratedBatch.product;
+            if (!batchProduct && hydratedBatch.productId) {
+              batchProduct = storeProducts.find(p => p.id === hydratedBatch!.productId);
+              if (!batchProduct) {
+                try {
+                  const productSnap = await get(ref(db, `products/${hydratedBatch.productId}`));
+                  if (productSnap.exists()) {
+                    batchProduct = productSnap.val();
+                  }
+                } catch (e) { console.warn('Product fetch failed:', e); }
+              }
+            }
+
+            // Tìm TCCS
+            batchTccs = hydratedBatch.tccs;
+            if (!batchTccs) {
+              if (hydratedBatch.tccsId) {
+                batchTccs = storeTccsList.find(t => t.id === hydratedBatch!.tccsId);
+                if (!batchTccs) {
                   try {
                     const tccsSnap = await get(ref(db, `tccs/${hydratedBatch.tccsId}`));
                     if (tccsSnap.exists()) {
@@ -74,111 +107,139 @@ const CoAReportPage = () => {
                     }
                   } catch (e) { console.warn('TCCS fetch failed:', e); }
                 }
-                hydratedBatch.product = batchProduct;
-                hydratedBatch.tccs = batchTccs;
               }
 
-              finalResult = {
-                ...rawResult,
-                batch: hydratedBatch,
-                product: batchProduct,
-              } as HydratedTestResult;
-            } else {
-              setNotFound(true);
+              // Nếu vẫn chưa có TCCS, tìm theo productId và ngày sản xuất
+              if (!batchTccs && hydratedBatch.productId) {
+                const productTccs = storeTccsList
+                  .filter(t => t.productId === hydratedBatch!.productId)
+                  .sort((a, b) => new Date(b.issueDate).getTime() - new Date(a.issueDate).getTime());
+                if (productTccs.length > 0) {
+                  if (hydratedBatch.mfgDate) {
+                    const mfgTime = new Date(hydratedBatch.mfgDate).getTime();
+                    const match = productTccs.find(t => new Date(t.issueDate).getTime() <= mfgTime);
+                    batchTccs = match || productTccs[productTccs.length - 1];
+                  } else {
+                    batchTccs = productTccs[0];
+                  }
+                }
+              }
             }
+
+            hydratedBatch.product = batchProduct;
+            hydratedBatch.tccs = batchTccs;
           }
 
-          if (finalResult) {
+          const finalResult: HydratedTestResult = {
+            ...rawResult,
+            batch: hydratedBatch,
+            product: batchProduct || (rawResult as any).product,
+          };
+
+          if (isMounted) {
             setResult(finalResult);
-            // Tải công thức sản phẩm liên quan
-            const prodId = finalResult.batch?.productId;
-            if (prodId) {
-              let fetchedFormula = productFormulas.find((f: any) => f.productId === prodId);
-              if (!fetchedFormula) {
-                try {
-                  const formulaQuery = query(ref(db, 'product_formulas'), orderByChild('productId'), equalTo(prodId));
-                  const formulaSnap = await get(formulaQuery);
-                  if (formulaSnap.exists()) {
-                    const formulas = Object.values(formulaSnap.val());
-                    if (formulas.length > 0) {
-                      fetchedFormula = formulas[0];
-                    }
+          }
+
+          // Tải công thức sản phẩm liên quan
+          const prodId = hydratedBatch?.productId;
+          if (prodId) {
+            let fetchedFormula = storeFormulas.find((f: any) => f.productId === prodId);
+            if (!fetchedFormula) {
+              try {
+                const formulaQuery = query(ref(db, 'product_formulas'), orderByChild('productId'), equalTo(prodId));
+                const formulaSnap = await get(formulaQuery);
+                if (formulaSnap.exists()) {
+                  const formulas = Object.values(formulaSnap.val());
+                  if (formulas.length > 0) {
+                    fetchedFormula = formulas[0];
                   }
-                } catch (e) { console.warn('Formula fetch failed:', e); }
-              }
+                }
+              } catch (e) { console.warn('Formula fetch failed:', e); }
+            }
+            if (isMounted) {
               setFormula(fetchedFormula || null);
             }
           }
         } else if (batchId) {
           // 2. In CoA Tổng hợp
           let batch = batches.find(b => b.id === batchId || b.id.endsWith(batchId));
-          let batchProduct = batch?.product;
-          let batchTccs = batch?.tccs;
-
           if (!batch) {
-            try {
-              const batchSnap = await get(ref(db, `batches/${batchId}`));
-              if (batchSnap.exists()) {
-                batch = batchSnap.val() as HydratedBatch;
-              }
-            } catch (e) { console.warn('Batch fetch failed:', e); }
+            const localBatch = storeBatches.find(b => b.id === batchId || b.id.endsWith(batchId));
+            if (localBatch) {
+              batch = { ...localBatch };
+            } else {
+              try {
+                const batchSnap = await get(ref(db, `batches/${batchId}`));
+                if (batchSnap.exists()) {
+                  batch = batchSnap.val() as HydratedBatch;
+                }
+              } catch (e) { console.warn('Batch fetch failed:', e); }
+            }
           }
 
           if (!batch) {
-            setNotFound(true);
+            if (isMounted) setNotFound(true);
             return;
           }
 
-          // Tải thông tin sản phẩm và TCCS nếu thiếu
+          // Tải thông tin sản phẩm nếu thiếu
+          let batchProduct = batch.product;
           if (!batchProduct && batch.productId) {
-            try {
-              const productSnap = await get(ref(db, `products/${batch.productId}`));
-              if (productSnap.exists()) {
-                batchProduct = productSnap.val();
-              }
-            } catch (e) { console.warn('Product fetch failed:', e); }
+            batchProduct = storeProducts.find(p => p.id === batch!.productId);
+            if (!batchProduct) {
+              try {
+                const productSnap = await get(ref(db, `products/${batch.productId}`));
+                if (productSnap.exists()) {
+                  batchProduct = productSnap.val();
+                }
+              } catch (e) { console.warn('Product fetch failed:', e); }
+            }
           }
 
+          // Tải TCCS nếu thiếu
+          let batchTccs = batch.tccs;
           if (!batchTccs) {
             if (batch.tccsId) {
-              try {
-                const tccsSnap = await get(ref(db, `tccs/${batch.tccsId}`));
-                if (tccsSnap.exists()) {
-                  batchTccs = tccsSnap.val();
-                }
-              } catch (e) { console.warn('TCCS fetch failed:', e); }
-            } else {
-              // Tải tất cả TCCS cho sản phẩm này và chọn cái phù hợp với ngày sản xuất
-              try {
-                const tccsQuery = query(ref(db, 'tccs'), orderByChild('productId'), equalTo(batch.productId));
-                const tccsSnap = await get(tccsQuery);
-                if (tccsSnap.exists()) {
-                  const productTCCSList = Object.values(tccsSnap.val()) as TCCS[];
-                  const availableTCCSForBatch = productTCCSList.sort((a, b) => new Date(b.issueDate).getTime() - new Date(a.issueDate).getTime());
-                  if (availableTCCSForBatch.length > 0) {
-                    if (batch.mfgDate) {
-                      const mfgTime = new Date(batch.mfgDate).getTime();
-                      const match = availableTCCSForBatch.find(t => new Date(t.issueDate).getTime() <= mfgTime);
-                      batchTccs = match || availableTCCSForBatch[availableTCCSForBatch.length - 1];
-                    } else {
-                      batchTccs = availableTCCSForBatch[0];
-                    }
+              batchTccs = storeTccsList.find(t => t.id === batch!.tccsId);
+              if (!batchTccs) {
+                try {
+                  const tccsSnap = await get(ref(db, `tccs/${batch.tccsId}`));
+                  if (tccsSnap.exists()) {
+                    batchTccs = tccsSnap.val();
                   }
+                } catch (e) { console.warn('TCCS fetch failed:', e); }
+              }
+            }
+
+            if (!batchTccs && batch.productId) {
+              const productTccs = storeTccsList
+                .filter(t => t.productId === batch!.productId)
+                .sort((a, b) => new Date(b.issueDate).getTime() - new Date(a.issueDate).getTime());
+              if (productTccs.length > 0) {
+                if (batch.mfgDate) {
+                  const mfgTime = new Date(batch.mfgDate).getTime();
+                  const match = productTccs.find(t => new Date(t.issueDate).getTime() <= mfgTime);
+                  batchTccs = match || productTccs[productTccs.length - 1];
+                } else {
+                  batchTccs = productTccs[0];
                 }
-              } catch (e) { console.warn('TCCS query failed:', e); }
+              }
             }
           }
 
           batch.product = batchProduct;
           batch.tccs = batchTccs;
 
+          // Lấy toàn bộ kết quả kiểm nghiệm của Lô
           const fetchedResults = await fetchTestResultsByBatchId(batchId);
-          const resultsForBatch = fetchedResults.reverse(); // Đảo ngược để phiếu cũ lên trước (nạp dữ liệu đè lên nhau)
-          if (resultsForBatch.length === 0) {
+          if (!isMounted) return;
+
+          if (fetchedResults.length === 0) {
             setNotFound(true);
             return;
           }
 
+          const resultsForBatch = [...fetchedResults].reverse(); // Đảo ngược để phiếu cũ lên trước (nạp dữ liệu đè lên nhau)
           const consolidatedResultsMap = new Map<string, TestResultEntry>();
           resultsForBatch.forEach((res: TestResult) => {
             ensureArray(res.results).forEach(entry => {
@@ -193,28 +254,24 @@ const CoAReportPage = () => {
           const latestResult = resultsForBatch[resultsForBatch.length - 1];
 
           let tccsForEvaluation = batch.tccs || null;
-          if (!tccsForEvaluation && tccsList.length > 0) {
-            const availableTCCSForBatch = tccsList.filter(t => t.productId === batch.productId).sort((a, b) => new Date(b.issueDate).getTime() - new Date(a.issueDate).getTime());
-            if (availableTCCSForBatch.length > 0) {
-              if (batch.mfgDate) {
-                const mfgTime = new Date(batch.mfgDate).getTime();
-                const match = availableTCCSForBatch.find(t => new Date(t.issueDate).getTime() <= mfgTime);
-                tccsForEvaluation = match || availableTCCSForBatch[availableTCCSForBatch.length - 1];
-              } else {
-                tccsForEvaluation = availableTCCSForBatch[0];
-              }
-            }
+
+          if (isMounted) {
+            setResult({
+              id: `consolidated-${batchId}`,
+              batchId: batchId,
+              labName: 'Tổng hợp',
+              testDate: latestResult.testDate,
+              results: finalResults,
+              overallStatus: calculateOverallStatus(finalResults, tccsForEvaluation),
+              notes: `Phiếu tổng hợp từ ${resultsForBatch.length} kết quả.`,
+              createdAt: new Date().toISOString(),
+              batch: { ...batch, tccs: tccsForEvaluation },
+              product: batch.product,
+            } as HydratedTestResult);
           }
 
-          setResult({
-            id: `consolidated-${batchId}`, batchId: batchId, labName: 'Tổng hợp', testDate: latestResult.testDate,
-            results: finalResults, overallStatus: calculateOverallStatus(finalResults, tccsForEvaluation),
-            notes: `Phiếu tổng hợp từ ${resultsForBatch.length} kết quả.`, createdAt: new Date().toISOString(),
-            batch: { ...batch, tccs: tccsForEvaluation }, product: batch.product,
-          } as HydratedTestResult);
-
           // Tải công thức sản phẩm liên quan
-          let fetchedFormula = productFormulas.find((f: any) => f.productId === batch.productId);
+          let fetchedFormula = storeFormulas.find((f: any) => f.productId === batch!.productId);
           if (!fetchedFormula && batch.productId) {
             try {
               const formulaQuery = query(ref(db, 'product_formulas'), orderByChild('productId'), equalTo(batch.productId));
@@ -227,12 +284,21 @@ const CoAReportPage = () => {
               }
             } catch (e) { console.warn('Formula fetch failed:', e); }
           }
-          setFormula(fetchedFormula || null);
+          if (isMounted) {
+            setFormula(fetchedFormula || null);
+          }
         }
-      } catch (err) { console.error(err); } finally { setLoading(false); }
+      } catch (err) {
+        console.error("Lỗi nạp dữ liệu CoA:", err);
+        if (isMounted) setNotFound(true);
+      } finally {
+        if (isMounted) setLoading(false);
+      }
     };
+
     loadData();
-  }, [id, batchId, batches, hydratedResults, allTestResultsHydrated, tccsList, productFormulas]);
+    return () => { isMounted = false; };
+  }, [id, batchId]);
 
   if (notFound) {
     return (

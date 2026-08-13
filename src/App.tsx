@@ -65,6 +65,18 @@ const UnauthorizedPage = lazyWithRetry(() => import('./pages/auth/UnauthorizedPa
 const WelcomePage = lazyWithRetry(() => import('./pages/auth/WelcomePage'));
 const CriteriaAliasManager = lazyWithRetry(() => import('./pages/system/CriteriaAliasManager'));
 
+const LoadingFallback = () => (
+  <div className="flex items-center justify-center h-screen w-full bg-transparent transition-colors duration-300">
+    <div className="flex flex-col items-center gap-6 w-full max-w-sm px-4">
+      <Skeleton className="w-16 h-16 rounded-full bg-primary-100 dark:bg-primary-900/50" />
+      <div className="space-y-3 w-full">
+        <Skeleton className="h-4 w-3/4 mx-auto bg-slate-200 dark:bg-slate-700/50" />
+        <Skeleton className="h-3 w-1/2 mx-auto bg-slate-200 dark:bg-slate-700/50" />
+      </div>
+    </div>
+  </div>
+);
+
 const ProtectedRoute: React.FC = () => {
   const { user, role, authLoading } = useAppStore(useShallow(s => ({
     user: s.user,
@@ -116,7 +128,7 @@ const PrintRoute: React.FC = () => {
     authLoading: s.authLoading
   })));
 
-  if (authLoading) return null;
+  if (authLoading) return <LoadingFallback />;
   if (!user) return <Navigate to="/login" replace />;
 
   return <Outlet />;
@@ -131,18 +143,6 @@ const AppRoutes: React.FC = () => {
       if (loader) loader.remove();
     }
   }, [authLoading]);
-
-  const LoadingFallback = () => (
-    <div className="flex items-center justify-center h-screen w-full bg-transparent transition-colors duration-300">
-      <div className="flex flex-col items-center gap-6 w-full max-w-sm px-4">
-        <Skeleton className="w-16 h-16 rounded-full bg-primary-100 dark:bg-primary-900/50" />
-        <div className="space-y-3 w-full">
-          <Skeleton className="h-4 w-3/4 mx-auto bg-slate-200 dark:bg-slate-700/50" />
-          <Skeleton className="h-3 w-1/2 mx-auto bg-slate-200 dark:bg-slate-700/50" />
-        </div>
-      </div>
-    </div>
-  );
 
   return (
     <Suspense fallback={<LoadingFallback />}>

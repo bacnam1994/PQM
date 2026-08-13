@@ -11,3 +11,4 @@ export * from './parsing';
 export * from './searchUtils';
 export * from './offlineCache';
 export * from './testResultEvaluation';
+export * from './urlUtils';

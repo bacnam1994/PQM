@@ -1,10 +1,11 @@
-import React, { useEffect, useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useTestResultForm } from '../../hooks/test-results/useTestResultForm';
 import { useAppStore } from '../../store/useAppStore';
 import { useDataGraph } from '../../hooks/useDataGraph';
-import { ArrowLeft, Search, CheckCircle2, Package, Hash, Calendar, Clock, AlertCircle, Printer, History, Beaker, FlaskConical, ShieldCheck, ListPlus, Plus, Trash2, Loader2, Sparkles } from 'lucide-react';
-import { formatDateStandard, TEST_RESULT_STATUS, BATCH_STATUS, normalizeSearch, parseDateToISO } from '../../utils';
+import { ArrowLeft, Search, CheckCircle2, Package, Hash, Calendar, Clock, AlertCircle, Printer, History, Beaker, FlaskConical, ShieldCheck, ListPlus, Plus, Trash2, Loader2, Sparkles, AlertTriangle } from 'lucide-react';
+import { formatDateStandard, TEST_RESULT_STATUS, BATCH_STATUS, normalizeSearch, parseDateToISO, getAppUrl } from '../../utils';
+import { fetchTestResultById } from '../../services/testResultService';
 import { DSFormInput, CriteriaInputGroup, SpecialCharToolbar, DSDateInput } from '../../components';
 import { mapAIExtractedResultsToCriteria, isCriteriaMatch } from '../../utils/aiMapping';
 import { geminiService } from '../../services/ai/geminiService';
@@ -169,21 +170,64 @@ const TestResultFormPage = () => {
     return Array.from(names).sort();
   }, [rawTccsList]);
 
+  // State theo dõi trạng thái tải phiếu kiểm nghiệm khi ở chế độ Chỉnh sửa
+  const [isLoadingEditItem, setIsLoadingEditItem] = useState(false);
+  const [editItemNotFound, setEditItemNotFound] = useState(false);
+
   // Khởi tạo State: Xác định đang ở chế độ Thêm mới hay Chỉnh sửa
   useEffect(() => {
+    let isMounted = true;
     if (id) {
-      const sourceResults = allTestResults.length > 0 ? allTestResults : testResults;
-      const resToEdit = sourceResults.find(r => r.id === id);
-      if (resToEdit) {
-        logic.crud.openEdit(resToEdit);
-        // Đổ dữ liệu cũ vào các ô Input
-        logic.populateFormForEdit(resToEdit as any);
-      }
+      setIsLoadingEditItem(true);
+      setEditItemNotFound(false);
+
+      const loadItem = async () => {
+        try {
+          // 1. Tìm trong store trước
+          const sourceResults = allTestResults.length > 0 ? allTestResults : testResults;
+          let resToEdit = sourceResults.find(r => r && (r.id === id || r.id.endsWith(id)));
+
+          // 2. Fallback fetch từ Firebase / IndexedDB nếu chưa có trong store (hoặc khi F5 / mở link trực tiếp)
+          if (!resToEdit) {
+            resToEdit = await fetchTestResultById(id);
+          }
+
+          if (!isMounted) return;
+
+          if (resToEdit) {
+            logic.crud.openEdit(resToEdit);
+            // Đổ dữ liệu cũ vào các ô Input
+            logic.populateFormForEdit(resToEdit as any);
+          } else {
+            setEditItemNotFound(true);
+          }
+        } catch (error) {
+          console.error("Lỗi nạp dữ liệu phiếu kiểm nghiệm:", error);
+          if (isMounted) setEditItemNotFound(true);
+        } finally {
+          if (isMounted) setIsLoadingEditItem(false);
+        }
+      };
+
+      loadItem();
     } else {
       logic.crud.openAdd();
+      setIsLoadingEditItem(false);
+      setEditItemNotFound(false);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id]);
+    return () => { isMounted = false; };
+  }, [id, allTestResults, testResults, logic.crud.openEdit, logic.crud.openAdd, logic.populateFormForEdit]);
+
+  // Đồng bộ lại tên Lô hàng vào ô tìm kiếm khi danh sách Lô được nạp từ Server
+  useEffect(() => {
+    if (formValues.batchId && !batchSearch) {
+      const matchedBatch = hydratedBatches.find(b => b.id === formValues.batchId);
+      if (matchedBatch) {
+        setBatchSearch(matchedBatch.product?.name ? `${matchedBatch.batchNo} - ${matchedBatch.product.name}` : matchedBatch.batchNo);
+      }
+    }
+  }, [formValues.batchId, batchSearch, hydratedBatches, setBatchSearch]);
+
 
   // Logic tìm kiếm lô hàng cho Dropdown
   const availableBatchesForDropdown = useMemo(() => {
@@ -676,6 +720,35 @@ const TestResultFormPage = () => {
     }
   };
 
+  if (id && editItemNotFound) {
+    return (
+      <div className="min-h-[70vh] flex items-center justify-center p-4">
+        <div className="bg-white dark:bg-slate-800 p-8 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 flex flex-col items-center gap-3 text-center max-w-md w-full">
+          <AlertTriangle size={40} className="text-amber-500" />
+          <h2 className="font-black text-slate-800 dark:text-slate-100 text-lg uppercase tracking-tight">Không tìm thấy phiếu kiểm nghiệm</h2>
+          <p className="text-sm text-slate-500 dark:text-slate-400">Phiếu kết quả kiểm nghiệm này không tồn tại hoặc đã bị xóa khỏi hệ thống.</p>
+          <button 
+            type="button" 
+            onClick={() => navigate('/test-results')} 
+            className="mt-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-xs uppercase tracking-wider transition-all shadow-md shadow-indigo-100 dark:shadow-none"
+          >
+            Quay lại danh sách
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (id && isLoadingEditItem) {
+    return (
+      <div className="min-h-[70vh] flex items-center justify-center p-4">
+        <div className="bg-white dark:bg-slate-800 p-8 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 flex items-center gap-3 text-slate-600 dark:text-slate-300 font-bold text-sm">
+          <Loader2 className="animate-spin text-indigo-600 dark:text-indigo-400" size={24} /> Đang tải dữ liệu phiếu kiểm nghiệm...
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="p-6 max-w-7xl mx-auto animate-in fade-in duration-500 space-y-6">
       <div className="flex items-center gap-4">
@@ -838,7 +911,7 @@ const TestResultFormPage = () => {
                        <p className="text-[10px] font-black text-amber-600 uppercase tracking-widest flex items-center gap-2">
                          <AlertCircle size={12}/> Lô này đã có {existingResultsForBatch.length} phiếu kết quả:
                        </p>
-                       <button type="button" onClick={() => window.open(`/test-results/coa/${formValues.batchId}`, '_blank')} className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-[10px] font-black uppercase hover:bg-indigo-700 transition-colors shadow-md shadow-indigo-100">
+                       <button type="button" onClick={() => window.open(getAppUrl(`/test-results/coa/${formValues.batchId}`), '_blank')} className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-[10px] font-black uppercase hover:bg-indigo-700 transition-colors shadow-md shadow-indigo-100">
                           <Printer size={12} /> Xem CoA Tổng hợp
                        </button>
                      </div>

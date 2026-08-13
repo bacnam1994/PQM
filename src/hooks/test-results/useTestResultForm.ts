@@ -272,17 +272,23 @@ export const useTestResultForm = (onInitialBatchSelect?: (batchNo: string) => vo
     if (!targetTCCS && batch) {
       const productTccs = tccsList.filter(t => t.productId === batch.productId)
         .sort((a, b) => new Date(b.issueDate).getTime() - new Date(a.issueDate).getTime());
-      targetTCCS = productTccs[0];
+      if (batch.mfgDate && productTccs.length > 0) {
+        const mfgTime = new Date(batch.mfgDate).getTime();
+        const match = productTccs.find(t => new Date(t.issueDate).getTime() <= mfgTime);
+        targetTCCS = match || productTccs[productTccs.length - 1];
+      } else if (productTccs.length > 0) {
+        targetTCCS = productTccs[0];
+      }
     }
 
     const allCriteria = targetTCCS
-      ? [...(targetTCCS.mainQualityCriteria || []), ...(targetTCCS.safetyCriteria || [])].filter(c => c && c.name)
+      ? [...ensureArray(targetTCCS.mainQualityCriteria), ...ensureArray(targetTCCS.safetyCriteria)].filter(c => c && c.name)
       : [];
 
     const aliasLookupMap = targetTCCS ? buildAliasLookupMap(criteriaAliases, targetTCCS.id) : new Map<string, string>();
 
     // 2. Phân loại và gán kết quả vào form, tự động resolve alias
-    res.results.forEach(r => {
+    ensureArray(res.results).forEach(r => {
       if (!r || !r.criteriaName) return;
 
       if (targetTCCS) {
@@ -319,9 +325,11 @@ export const useTestResultForm = (onInitialBatchSelect?: (batchNo: string) => vo
       attachments: res.attachments || [],
     });
     
-    const hydratedBatch = hydratedBatches.find(b => b.id === res.batchId);
-    const productName = hydratedBatch?.product?.name || '';
-    setBatchSearch(batch ? (productName ? `${batch.batchNo} - ${productName}` : batch.batchNo) : '');
+    const hydratedBatch = hydratedBatches.find(b => b.id === res.batchId) || batches.find(b => b.id === res.batchId);
+    const productName = (hydratedBatch as any)?.product?.name || '';
+    if (hydratedBatch) {
+      setBatchSearch(productName ? `${hydratedBatch.batchNo} - ${productName}` : hydratedBatch.batchNo);
+    }
     
     // Clear AI Origin Map khi mở form để edit
     aiOriginMapRef.current = {};
