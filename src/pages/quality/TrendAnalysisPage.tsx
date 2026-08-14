@@ -58,17 +58,30 @@ const CpkBadge: React.FC<{ value: number | null }> = ({ value }) => {
   );
 };
 
-const CustomTooltip = ({ active, payload, label }: any) => {
+const CustomTooltip = ({ active, payload, label, unit }: any) => {
   if (!active || !payload?.length) return null;
   return (
-    <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 rounded-xl shadow-lg p-3 text-xs space-y-1 max-w-[220px]">
+    <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 rounded-xl shadow-lg p-3 text-xs space-y-1.5 max-w-[240px]">
       <p className="font-black text-slate-700 dark:text-zinc-200 text-[11px] border-b border-slate-100 dark:border-zinc-800 pb-1 mb-1">{label}</p>
-      {payload.map((p: any) => (
-        <div key={p.dataKey} className="flex justify-between gap-3">
-          <span className="text-slate-500 dark:text-zinc-400 truncate">{p.name}</span>
-          <span className="font-bold" style={{ color: p.color }}>{typeof p.value === 'number' ? p.value.toFixed(4) : p.value}</span>
-        </div>
-      ))}
+      {payload.map((p: any) => {
+        const pct = p.payload?.percent;
+        return (
+          <div key={p.dataKey} className="space-y-0.5">
+            <div className="flex justify-between gap-3">
+              <span className="text-slate-500 dark:text-zinc-400 truncate">{p.name}</span>
+              <span className="font-bold" style={{ color: p.color }}>
+                {typeof p.value === 'number' ? p.value.toFixed(4) : p.value} {unit}
+              </span>
+            </div>
+            {pct !== null && pct !== undefined && (
+              <div className="flex justify-between gap-3 text-[11px]">
+                <span className="text-slate-400">% so với công bố:</span>
+                <span className="font-black text-indigo-600 dark:text-indigo-400 font-mono">{pct.toFixed(1)}%</span>
+              </div>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 };
@@ -77,13 +90,14 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 
 const TrendAnalysisPage: React.FC = () => {
   const {
-    products, batches, tccsList,
+    products, batches, tccsList, productFormulas,
     testResultsRealtime, allTestResults,
     fetchAllTestResultsForDashboard, theme
   } = useAppStore(useShallow(s => ({
     products: s.products,
     batches: s.batches,
     tccsList: s.tccsList,
+    productFormulas: s.productFormulas || [],
     testResultsRealtime: s.testResults || [],
     allTestResults: s.allTestResults || [],
     fetchAllTestResultsForDashboard: s.fetchAllTestResultsForDashboard,
@@ -116,6 +130,11 @@ const TrendAnalysisPage: React.FC = () => {
     return pTccs.find(t => t.isActive) || [...pTccs].sort((a, b) => b.issueDate.localeCompare(a.issueDate))[0];
   }, [selectedProductId, tccsList]);
 
+  const activeFormula = useMemo(() => {
+    if (!selectedProductId) return undefined;
+    return productFormulas.find(f => f.productId === selectedProductId);
+  }, [selectedProductId, productFormulas]);
+
   const criteriaList = useMemo(() => activeTccs?.mainQualityCriteria || [], [activeTccs]);
 
   useEffect(() => {
@@ -126,6 +145,30 @@ const TrendAnalysisPage: React.FC = () => {
     criteriaList.find((c: any) => c.name === selectedCriteriaName), [criteriaList, selectedCriteriaName]);
 
   const resolver = useCriteriaResolver(activeTccs);
+
+  // Xác định hàm lượng công bố / chuẩn cơ sở cho chỉ tiêu được chọn
+  const declaredBasis = useMemo(() => {
+    if (!selectedCriteria) return undefined;
+    if (selectedCriteria.declaredContent != null && selectedCriteria.declaredContent !== '') {
+      const parsed = typeof selectedCriteria.declaredContent === 'string'
+        ? parseNum(selectedCriteria.declaredContent)
+        : Number(selectedCriteria.declaredContent);
+      if (parsed && parsed > 0) return parsed;
+    }
+    if (activeFormula) {
+      const formulaItem = activeFormula.ingredients?.find((i: any) => resolver.isMatch(i.name, selectedCriteria.name)) ||
+        activeFormula.excipients?.find((e: any) => resolver.isMatch(e.name, selectedCriteria.name));
+      if (formulaItem) {
+        const dc = typeof formulaItem.declaredContent === 'string' ? parseNum(formulaItem.declaredContent) : Number(formulaItem.declaredContent);
+        const ec = formulaItem.elementalContent != null
+          ? (typeof formulaItem.elementalContent === 'string' ? parseNum(formulaItem.elementalContent) : Number(formulaItem.elementalContent))
+          : undefined;
+        if (selectedCriteria.calculationBasis === 'ELEMENTAL' && ec && ec > 0) return ec;
+        if (dc && dc > 0) return dc;
+      }
+    }
+    return undefined;
+  }, [selectedCriteria, activeFormula, resolver]);
 
   const chartData = useMemo(() => {
     if (!selectedProductId || !selectedCriteriaName) return [];
@@ -154,10 +197,13 @@ const TrendAnalysisPage: React.FC = () => {
         const targetKey = normalizeName(selectedCriteriaName);
         const entry = map.get(targetKey);
         const value = entry ? parseNum(entry.value) : null;
-        return value !== null ? { batchNo: batch.batchNo, mfgDate: batch.mfgDate, value } : null;
+        const percent = (value !== null && declaredBasis && declaredBasis > 0)
+          ? (value / declaredBasis) * 100
+          : null;
+        return value !== null ? { batchNo: batch.batchNo, mfgDate: batch.mfgDate, value, percent } : null;
       })
-      .filter(Boolean) as { batchNo: string; mfgDate: string; value: number }[];
-  }, [selectedProductId, selectedCriteriaName, batches, testResults, dateFrom, dateTo, resolver]);
+      .filter(Boolean) as { batchNo: string; mfgDate: string; value: number; percent: number | null }[];
+  }, [selectedProductId, selectedCriteriaName, batches, testResults, dateFrom, dateTo, resolver, declaredBasis]);
 
   const spcStats = useMemo(() => {
     const vals = chartData.map(d => d.value);
@@ -166,14 +212,15 @@ const TrendAnalysisPage: React.FC = () => {
     const std = calcStdDev(vals, mean);
     const ucl = mean + 3 * std;
     const lcl = mean - 3 * std;
-    const usl = selectedCriteria ? parseNum((selectedCriteria as any).upperLimit) ?? undefined : undefined;
-    const lsl = selectedCriteria ? parseNum((selectedCriteria as any).lowerLimit) ?? undefined : undefined;
+    const usl = selectedCriteria?.max !== undefined ? selectedCriteria.max : (selectedCriteria ? parseNum((selectedCriteria as any).upperLimit) ?? undefined : undefined);
+    const lsl = selectedCriteria?.min !== undefined ? selectedCriteria.min : (selectedCriteria ? parseNum((selectedCriteria as any).lowerLimit) ?? undefined : undefined);
     const cpk = calcCpk(mean, std, usl, lsl);
     const outOfControl = chartData.filter(d => d.value > ucl || d.value < lcl);
     const outOfSpec = chartData.filter(d =>
       (usl !== undefined && d.value > usl) || (lsl !== undefined && d.value < lsl));
-    return { mean, std, ucl, lcl, usl, lsl, cpk, outOfControl, outOfSpec, cv: std / mean * 100 };
-  }, [chartData, selectedCriteria]);
+    const meanPercent = (declaredBasis && declaredBasis > 0) ? (mean / declaredBasis) * 100 : null;
+    return { mean, std, ucl, lcl, usl, lsl, cpk, outOfControl, outOfSpec, cv: std / mean * 100, meanPercent, declaredBasis };
+  }, [chartData, selectedCriteria, declaredBasis]);
 
   const enrichedData = useMemo(() =>
     chartData.map((d, i) => ({
@@ -195,6 +242,8 @@ const TrendAnalysisPage: React.FC = () => {
     const rows = enrichedData.map(d => ({
       'STT': d.index, 'Số lô': d.batchNo, 'Ngày SX': d.mfgDate,
       'Chỉ tiêu': selectedCriteriaName, 'Giá trị': d.value,
+      'Đơn vị': selectedCriteria?.unit || '',
+      'Tỉ lệ % công bố': d.percent !== null ? `${d.percent.toFixed(1)}%` : '---',
       'UCL': spcStats?.ucl.toFixed(4), 'LCL': spcStats?.lcl.toFixed(4),
       'Trung bình': spcStats?.mean.toFixed(4),
       'Ngoài kiểm soát': d.isOOC ? 'Có' : 'Không',
@@ -292,7 +341,23 @@ const TrendAnalysisPage: React.FC = () => {
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             {[
               { label: 'Số lô phân tích', value: <span className="text-2xl font-black text-slate-800 dark:text-zinc-100">{chartData.length}</span> },
-              { label: 'Trung bình (X̄)', value: <><span className="text-2xl font-black text-indigo-600 dark:text-indigo-400">{spcStats.mean.toFixed(3)}</span><p className="text-[11px] text-slate-400 mt-0.5">σ={spcStats.std.toFixed(3)} | CV={spcStats.cv.toFixed(1)}%</p></> },
+              {
+                label: 'Trung bình (X̄)',
+                value: (
+                  <>
+                    <div className="flex items-baseline gap-1.5 font-mono">
+                      <span className="text-2xl font-black text-indigo-600 dark:text-indigo-400">{spcStats.mean.toFixed(3)}</span>
+                      {selectedCriteria?.unit && <span className="text-xs text-slate-400 font-bold">{selectedCriteria.unit}</span>}
+                    </div>
+                    {spcStats.meanPercent !== null && (
+                      <p className="text-xs font-black text-indigo-600 dark:text-indigo-300 mt-0.5 font-mono">
+                        = {spcStats.meanPercent.toFixed(1)}% <span className="font-normal text-[10px] opacity-75">công bố</span>
+                      </p>
+                    )}
+                    <p className="text-[11px] text-slate-400 mt-0.5 font-mono">σ={spcStats.std.toFixed(3)} | CV={spcStats.cv.toFixed(1)}%</p>
+                  </>
+                )
+              },
               { label: 'Năng lực quá trình', value: <div className="mt-1"><CpkBadge value={spcStats.cpk} /></div> },
               { label: 'Ngoài kiểm soát', value: <><span className={`text-2xl font-black ${spcStats.outOfControl.length > 0 ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400'}`}>{spcStats.outOfControl.length}</span><p className="text-[11px] text-slate-400 mt-0.5">{spcStats.outOfSpec.length > 0 ? `${spcStats.outOfSpec.length} ngoài tiêu chuẩn` : 'Không lô nào ngoài spec'}</p></> },
             ].map(({ label, value }) => (
@@ -309,6 +374,7 @@ const TrendAnalysisPage: React.FC = () => {
               <div>
                 <h3 className="font-black text-slate-800 dark:text-zinc-100 text-base">
                   Biểu đồ kiểm soát — <span className="text-indigo-600 dark:text-indigo-400">{selectedCriteriaName}</span>
+                  {selectedCriteria?.unit ? ` (${selectedCriteria.unit})` : ''}
                 </h3>
                 <p className="text-xs text-slate-400 dark:text-zinc-500 mt-0.5 font-mono">
                   UCL={spcStats.ucl.toFixed(4)} | X̄={spcStats.mean.toFixed(4)} | LCL={spcStats.lcl.toFixed(4)}
@@ -329,7 +395,7 @@ const TrendAnalysisPage: React.FC = () => {
                 <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
                 <XAxis dataKey="batchNo" tick={{ fontSize: 10, fill: axisColor }} interval="preserveStartEnd" angle={-25} textAnchor="end" height={50} />
                 <YAxis tick={{ fontSize: 10, fill: axisColor }} width={58} />
-                <Tooltip content={<CustomTooltip />} />
+                <Tooltip content={<CustomTooltip unit={selectedCriteria?.unit || ''} />} />
                 <Legend iconType="line" wrapperStyle={{ fontSize: 11 }} />
                 <ReferenceLine y={spcStats.ucl} stroke="#f87171" strokeDasharray="5 3" strokeWidth={1.5} label={{ value: 'UCL', position: 'insideTopRight', fontSize: 10, fill: '#f87171' }} />
                 <ReferenceLine y={spcStats.mean} stroke="#818cf8" strokeDasharray="4 2" strokeWidth={1} label={{ value: 'X̄', position: 'insideTopRight', fontSize: 10, fill: '#818cf8' }} />
@@ -379,7 +445,7 @@ const TrendAnalysisPage: React.FC = () => {
               <table className="w-full text-xs">
                 <thead>
                   <tr className="bg-slate-50 dark:bg-zinc-900/50">
-                    {['#', 'Số lô', 'Ngày SX', 'Giá trị đo', 'Trạng thái SPC'].map(h => (
+                    {['#', 'Số lô', 'Ngày SX', `Giá trị đo (${selectedCriteria?.unit || 'Số'})`, 'Tỉ lệ % công bố', 'Trạng thái SPC'].map(h => (
                       <th key={h} className="px-4 py-2.5 text-left font-bold text-slate-500 dark:text-zinc-400 whitespace-nowrap">{h}</th>
                     ))}
                   </tr>
@@ -388,10 +454,13 @@ const TrendAnalysisPage: React.FC = () => {
                   {enrichedData.map(d => (
                     <tr key={d.batchNo}
                       className={`hover:bg-slate-50 dark:hover:bg-zinc-900/30 transition-colors ${d.isOOS ? 'bg-red-50/60 dark:bg-red-900/10' : d.isOOC ? 'bg-orange-50/60 dark:bg-orange-900/10' : ''}`}>
-                      <td className="px-4 py-2 text-slate-400 dark:text-zinc-600">{d.index}</td>
+                      <td className="px-4 py-2 text-slate-400 dark:text-zinc-600 font-mono">{d.index}</td>
                       <td className="px-4 py-2 font-bold text-slate-700 dark:text-zinc-200">{d.batchNo}</td>
-                      <td className="px-4 py-2 text-slate-500 dark:text-zinc-400">{d.mfgDate ? formatDateStandard(d.mfgDate) : '---'}</td>
+                      <td className="px-4 py-2 text-slate-500 dark:text-zinc-400 font-mono">{d.mfgDate ? formatDateStandard(d.mfgDate) : '---'}</td>
                       <td className="px-4 py-2 font-mono font-bold text-slate-800 dark:text-zinc-100">{d.value.toFixed(4)}</td>
+                      <td className="px-4 py-2 font-mono font-black text-indigo-600 dark:text-indigo-400">
+                        {d.percent !== null ? `${d.percent.toFixed(1)}%` : '---'}
+                      </td>
                       <td className="px-4 py-2">
                         {d.isOOS
                           ? <span className="inline-flex items-center gap-1 text-red-600 dark:text-red-400 font-bold"><XCircle size={12} /> Ngoài spec</span>
