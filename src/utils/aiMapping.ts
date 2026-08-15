@@ -175,7 +175,33 @@ export const PHARMA_TERM_DICTIONARY: Record<string, string[]> = {
     'natri', 'sodium', 'na', 'natri (na)', 'sodium (na)', 'natri clorid', 'sodium chloride', 'nacl'
   ],
 
-  // === Vi sinh vật ===
+  // === Vi sinh vật & Men vi sinh (Probiotics) ===
+  'Tổng số lợi khuẩn Bacillus': [
+    'probiotics',
+    'probiotic',
+    'probiotics (lactobacillus sporogenes, bacillus clausii, bacillus subtilis)',
+    'probiotics (bacillus clausii, bacillus subtilis)',
+    'bacillus clausii',
+    'bacillus subtilis',
+    'bacillus sporogenes',
+    'lactobacillus sporogenes',
+    'bào tử lợi khuẩn',
+    'bào tử bacillus',
+    'lợi khuẩn bacillus',
+    'tổng số bào tử bacillus',
+    'tổng số bào tử lợi khuẩn',
+    'tổng số bào tử lợi khuẩn bacillus',
+    'tổng số lợi khuẩn',
+    'tổng số lợi khuẩn bacillus',
+    'tong so loi khuan bacillus',
+    'tong so bao tu bacillus',
+    'bacillus spp',
+    'bacillus spp.',
+    'bacillus count',
+    'probiotics count',
+    'spore count',
+    'men vi sinh'
+  ],
   'Tổng số vi khuẩn hiếu khí': [
     'tổng vi khuẩn hiếu khí', 'tvkhk', 'aerobic microbial count', 'total aerobic microbial count',
     'total viable count', 'tvc', 'total plate count', 'tpc', 'aerobic plate count', 'apc',
@@ -186,6 +212,18 @@ export const PHARMA_TERM_DICTIONARY: Record<string, string[]> = {
     'nấm mốc nấm men', 'tsnm', 'yeast and mould', 'yeast & mould', 'fungi',
     'mold and yeast', 'total combined yeast and mould count', 'tymc', 'tymcl',
     'nấm mốc', 'nấm men', 'yeast mold count', 'yeasts and moulds', 'fungal count'
+  ],
+  'Lactobacillus': [
+    'lactobacillus', 'lactobacillus acidophilus', 'l. acidophilus', 'lactobacillus plantarum',
+    'l. plantarum', 'lactobacillus rhamnosus', 'l. rhamnosus', 'lactobacillus reuteri',
+    'l. reuteri', 'lactobacillus casei', 'l. casei'
+  ],
+  'Bifidobacterium': [
+    'bifidobacterium', 'bifidobacterium animalis', 'bifidobacterium lactis',
+    'bifidobacterium longum', 'bifidobacterium bifidum', 'b. lactis', 'b. longum', 'b. bifidum'
+  ],
+  'Saccharomyces boulardii': [
+    'saccharomyces boulardii', 's. boulardii', 'saccharomyces', 'men saccharomyces'
   ],
   'E. coli': ['e.coli', 'e. coli', 'escherichia coli', 'coliform', 'coliforms', 'faecal coliforms'],
   'Salmonella': ['salmonella', 'salmonella spp', 'salmonella spp.', 'salmonella species'],
@@ -283,31 +321,45 @@ export const normalizeString = (str: string) => {
 /**
  * Tra cứu thuật ngữ trong PHARMA_TERM_DICTIONARY.
  * Trả về tên chuẩn trong hệ thống nếu tìm thấy, hoặc null nếu không.
+ * Ưu tiên: Khớp chính xác 100% → Khớp chuỗi dài nhất (Longest Substring Match).
  */
 export const lookupPharmaTerm = (aiName: string): string | null => {
   const normAi = normalizeString(aiName);
   if (!normAi) return null;
 
+  // 1. Ưu tiên khớp chính xác tuyệt đối trước
   for (const [systemName, aliases] of Object.entries(PHARMA_TERM_DICTIONARY)) {
     const normSystem = normalizeString(systemName);
-    // 1. Khớp tên chuẩn
-    if (normSystem === normAi || (normSystem.length >= 3 && normAi.includes(normSystem))) {
-      return systemName;
+    if (normSystem === normAi) return systemName;
+    for (const alias of aliases) {
+      if (normalizeString(alias) === normAi) return systemName;
+    }
+  }
+
+  // 2. Khớp bao hàm: Tìm ứng viên có độ dài chuỗi khớp dài nhất (Longest Substring Match)
+  // để tránh các từ ngắn (như 'iot' dài 3 ký tự) vô tình bắt nhầm từ dài (như 'probiotics')
+  let bestMatch: { systemName: string; matchLength: number } | null = null;
+
+  for (const [systemName, aliases] of Object.entries(PHARMA_TERM_DICTIONARY)) {
+    const normSystem = normalizeString(systemName);
+    if (normSystem.length >= 3 && normAi.includes(normSystem)) {
+      if (!bestMatch || normSystem.length > bestMatch.matchLength) {
+        bestMatch = { systemName, matchLength: normSystem.length };
+      }
     }
 
-    // 2. Khớp trong danh sách aliases
     for (const alias of aliases) {
       const normAlias = normalizeString(alias);
-      if (!normAlias) continue;
-      if (normAi === normAlias) return systemName;
-      // Khớp bao hàm cho alias có độ dài từ 3 ký tự (hoặc 2 ký tự với exact/token match)
-      if (normAlias.length >= 3 && normAi.includes(normAlias)) {
-        return systemName;
+      if (!normAlias || normAlias.length < 3) continue;
+      if (normAi.includes(normAlias)) {
+        if (!bestMatch || normAlias.length > bestMatch.matchLength) {
+          bestMatch = { systemName, matchLength: normAlias.length };
+        }
       }
     }
   }
 
-  return null;
+  return bestMatch ? bestMatch.systemName : null;
 };
 
 /**

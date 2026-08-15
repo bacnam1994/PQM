@@ -50,4 +50,40 @@ describe('aiMapping - Elemental vs Salt form matching', () => {
     expect(moisture).toBeDefined();
     expect(moisture?.value).toBe('6.8');
   });
+
+  it('tự động khớp thành phần Probiotics / Bacillus phức tạp vào chỉ tiêu Tổng số lợi khuẩn Bacillus', () => {
+    // Trường hợp theo câu hỏi của user:
+    // Thành phần: "probiotics (lactobacillus sporogenes, bacillus clausii, bacillus subtilis)"
+    // Chỉ tiêu TCCS: "Tổng số lợi khuẩn Bacillus"
+    expect(
+      isCriteriaMatch(
+        'probiotics (lactobacillus sporogenes, bacillus clausii, bacillus subtilis)',
+        'Tổng số lợi khuẩn Bacillus'
+      )
+    ).toBe(true);
+
+    expect(isCriteriaMatch('Bacillus clausii', 'Tổng số lợi khuẩn Bacillus')).toBe(true);
+    expect(isCriteriaMatch('Bacillus subtilis', 'Tổng số lợi khuẩn Bacillus')).toBe(true);
+    expect(isCriteriaMatch('Lactobacillus sporogenes', 'Tổng số lợi khuẩn Bacillus')).toBe(true);
+    expect(isCriteriaMatch('Bào tử lợi khuẩn Bacillus', 'Tổng số lợi khuẩn Bacillus')).toBe(true);
+    expect(isCriteriaMatch('Tổng số bào tử Bacillus', 'Tổng số lợi khuẩn Bacillus')).toBe(true);
+
+    const mockTccsCriteria: Criterion[] = [
+      { name: 'Tổng số lợi khuẩn Bacillus', unit: 'CFU/g', type: CriterionType.NUMBER, min: 1000000000 }
+    ];
+
+    const aiExtractedResults = [
+      {
+        criteriaName: 'probiotics (lactobacillus sporogenes, bacillus clausii, bacillus subtilis)',
+        value: '1.5 x 10^9',
+        unit: 'CFU/g'
+      }
+    ];
+
+    const mapped = mapAIExtractedResultsToCriteria(aiExtractedResults, mockTccsCriteria);
+    expect(mapped.length).toBe(1);
+    expect(mapped[0].criteriaName).toBe('Tổng số lợi khuẩn Bacillus');
+    expect(mapped[0].value).toBe('1.5 x 10^9');
+  });
 });
+
