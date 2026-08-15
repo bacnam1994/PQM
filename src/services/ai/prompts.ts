@@ -139,6 +139,9 @@ ${tccsNames.map((n, i) => `  ${i + 1}. "${n}"`).join('\n')}
 NHIỆM VỤ MAP TÊN & SUY LUẬN SẮC BÉN:
 - Với mỗi chỉ tiêu đọc được từ phiếu, hãy thực hiện suy luận ngữ nghĩa và đối chiếu viết tắt, từ đồng nghĩa tiếng Anh/Việt để tìm tên tương ứng TRONG DANH SÁCH TCCS trên.
 - Áp dụng BẢNG QUY ƯỚC VÀ VIẾT TẮT để nhận diện thuật ngữ tương đương.
+- QUY TẮC NGUYÊN TỐ & DẠNG MUỐI (Elemental vs Salt form):
+  * Nếu Phiếu ghi dạng nguyên tố (ví dụ: "Kẽm (Zn)", "Hàm lượng Kẽm", "Zinc") nhưng TCCS ghi dạng "Kẽm (Kẽm gluconat)" hoặc "Kẽm gluconat (tính theo Kẽm)" -> Map ngay về chỉ tiêu đó trong TCCS (confidence = "high").
+  * Tương tự với Sắt (Sắt fumarat/Sắt sulfat), Canxi (Canxi carbonat/Canxi glucoheptonat), Magie (Magnesi lactat/Magnesi oxyd), Đồng, Mangan, Selen...
 - Quy trình suy luận logic (Self-Reasoning):
   * Xác định bản chất chỉ tiêu (Ví dụ: LOD = Loss on Drying = Hàm lượng nước bốc hơi -> tương đương "Độ ẩm").
   * Đối chiếu phương pháp thử nếu có (Ví dụ: Assay by HPLC -> tương đương chỉ tiêu định lượng của hoạt chất chính tương ứng).
@@ -146,17 +149,19 @@ NHIỆM VỤ MAP TÊN & SUY LUẬN SẮC BÉN:
 - Nếu tìm được tên khớp thông qua suy luận hợp lý, điền vào field "mappedName" đúng tên TCCS chuẩn và "confidence" = "high".
 - Nếu KHÔNG tìm được tên khớp hoặc không chắc chắn, để "mappedName" = "" và "confidence" = "low".
 
-VÍ DỤ MAPPING (10 ví dụ cụ thể):
-- Phiếu ghi "Moisture content (%)" mappedName = "Độ ẩm", confidence = "high"
-- Phiếu ghi "LOD (%)" mappedName = "Độ ẩm", confidence = "high"
-- Phiếu ghi "Loss on Drying" mappedName = "Độ ẩm", confidence = "high"
-- Phiếu ghi "As (Asen)" hoặc "Arsenic" mappedName = "Asen", confidence = "high"
-- Phiếu ghi "Assay (by HPLC)" hoặc "Assay by GC" mappedName = tên chỉ tiêu định lượng phù hợp trong TCCS, confidence = "high"
-- Phiếu ghi "Related substances (RS)" mappedName = "Tạp chất liên quan", confidence = "high"
-- Phiếu ghi "TAMC" hoặc "TPC (Total Plate Count)" mappedName = "Tổng số vi khuẩn hiếu khí", confidence = "high"
-- Phiếu ghi "TYMC" hoặc "Yeast & Mould" mappedName = "Tổng số nấm mốc và nấm men", confidence = "high"
-- Phiếu ghi "Dissolution (Q, 45 min)" mappedName = "Độ hòa tan", confidence = "high"
-- Phiếu ghi "XYZ Specific test" mà không có trong TCCS mappedName = "", confidence = "low"
+VÍ DỤ MAPPING (Cụ thể & Đầy đủ):
+- Phiếu ghi "Kẽm (Zn)" hoặc "Hàm lượng Kẽm" → mappedName = "Kẽm (Kẽm gluconat)" (nếu TCCS có tên này), confidence = "high"
+- Phiếu ghi "Sắt (Fe)" hoặc "Iron content" → mappedName = "Sắt (Sắt fumarat)", confidence = "high"
+- Phiếu ghi "Canxi (Ca)" hoặc "Calcium" → mappedName = "Canxi (Canxi carbonat)", confidence = "high"
+- Phiếu ghi "Magnesi (Mg)" hoặc "Magnesium" → mappedName = "Magnesi (Magnesi lactat)", confidence = "high"
+- Phiếu ghi "Moisture content (%)" hoặc "LOD (%)" hoặc "Loss on Drying" → mappedName = "Độ ẩm", confidence = "high"
+- Phiếu ghi "As (Asen)" hoặc "Arsenic" → mappedName = "Asen", confidence = "high"
+- Phiếu ghi "Assay (by HPLC)" hoặc "Assay by GC" → mappedName = tên chỉ tiêu định lượng phù hợp trong TCCS, confidence = "high"
+- Phiếu ghi "Related substances (RS)" → mappedName = "Tạp chất liên quan", confidence = "high"
+- Phiếu ghi "TAMC" hoặc "TPC (Total Plate Count)" → mappedName = "Tổng số vi khuẩn hiếu khí", confidence = "high"
+- Phiếu ghi "TYMC" hoặc "Yeast & Mould" → mappedName = "Tổng số nấm mốc và nấm men", confidence = "high"
+- Phiếu ghi "Dissolution (Q, 45 min)" → mappedName = "Độ hòa tan", confidence = "high"
+- Phiếu ghi "XYZ Specific test" mà không có trong TCCS → mappedName = "", confidence = "low"
 `
     : `
 LƯU Ý: Không có danh sách TCCS. Hãy trích xuất tên chỉ tiêu nguyên bản từ phiếu, để "mappedName" = "" và "confidence" = "low" cho tất cả.

@@ -51,7 +51,7 @@ const TestResultGridItem = memo(({ res, onEdit, onDelete, onPrint, isAdmin }: {
             {res.overallStatus === TEST_RESULT_STATUS.PASS ? <CheckCircle2 size={24} /> : <AlertCircle size={24} />}
           </div>
           <div className="flex flex-col">
-            <h3 className={`font-black text-slate-800 dark:text-slate-100 text-base leading-tight transition-colors line-clamp-1 group-hover/link:${res.overallStatus === TEST_RESULT_STATUS.PASS ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>{res.batch?.batchNo}</h3>
+            <h3 className={`font-black text-slate-800 dark:text-slate-100 text-base leading-tight transition-colors line-clamp-1 group-hover/link:${res.overallStatus === TEST_RESULT_STATUS.PASS ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>{res.batch?.batchNo || `Lô ${res.batchId || 'N/A'}`}</h3>
             <p className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mt-1">Phiếu số: {res.id.slice(-6)}</p>
           </div>
         </div>
@@ -96,8 +96,8 @@ const TestResultListItem = memo(({ res, onEdit, onDelete, onPrint, isAdmin }: {
   return (
     <tr className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
       <td className="px-4 py-3 font-bold text-slate-700 dark:text-slate-300 text-xs">{formatDateStandard(res.testDate)}</td>
-      <td className="px-4 py-3 font-black text-slate-800 dark:text-slate-200">{res.batch?.batchNo}</td>
-      <td className="px-4 py-3 text-xs font-medium text-slate-600 dark:text-slate-400">{res.product?.name}</td>
+      <td className="px-4 py-3 font-black text-slate-800 dark:text-slate-200">{res.batch?.batchNo || `Lô ${res.batchId || 'N/A'}`}</td>
+      <td className="px-4 py-3 text-xs font-medium text-slate-600 dark:text-slate-400">{res.product?.name || 'Sản phẩm đã xóa'}</td>
       <td className="px-4 py-3 text-xs text-indigo-600 dark:text-indigo-400 font-bold">{res.labName}</td>
       <td className="px-4 py-3 text-center">
         <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase ${res.overallStatus === TEST_RESULT_STATUS.PASS ? 'bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400' : 'bg-red-100 dark:bg-red-950/40 text-red-700 dark:text-red-400'}`}>

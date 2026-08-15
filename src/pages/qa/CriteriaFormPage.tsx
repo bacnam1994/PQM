@@ -19,7 +19,7 @@ const CriteriaFormPage: React.FC = () => {
   const navigate = useNavigate();
 
   // App Store States
-  const { tccsList, products, testResults, criteriaAliases, updateTCCS, updateTestResult, addCriteriaAlias, notify, isAdmin, user } = useAppStore();
+  const { tccsList, products, batches, testResults, criteriaAliases, updateTCCS, updateTestResult, addCriteriaAlias, notify, isAdmin, user } = useAppStore();
 
   const [selectedName, setSelectedName] = useState<string>('');
   const [newName, setNewName] = useState<string>('');
@@ -35,7 +35,7 @@ const CriteriaFormPage: React.FC = () => {
 
     tccsList.forEach((tccs) => {
       const product = productMap.get(tccs.productId);
-      const productName = product ? product.name : 'Unknown Product';
+      const productName = product ? product.name : (tccs.productId ? `Sản phẩm đã xóa (${tccs.productId.slice(-6)})` : 'Chưa gán sản phẩm');
 
       const processList = (list: any[], type: string) => {
         (list || []).forEach((c) => {
@@ -199,8 +199,12 @@ const CriteriaFormPage: React.FC = () => {
       });
 
       // 2. Cập nhật các phiếu kiểm nghiệm liên quan
+      const batchMap = new Map(batches.map(b => [b.id, b]));
       testResults.forEach(result => {
-        if (renameScope === 'product' && result.batch?.productId !== targetProductId) return;
+        if (renameScope === 'product') {
+          const batch = (result.batchId ? batchMap.get(result.batchId) : null) || result.batch;
+          if (!batch || batch.productId !== targetProductId) return;
+        }
 
         let hasChange = false;
         const newEntries = (result.results || []).map(entry => {

@@ -15,9 +15,8 @@ export const PHARMA_TERM_DICTIONARY: Record<string, string[]> = {
     'moisture and volatile matter', 'loss on drying (%)', 'water activity', 'aw'
   ],
   'Định lượng': [
-    'assay', 'content', 'ham luong', 'hàm lượng', 'purity', 'potency',
-    'active content', 'active ingredient content', 'dinh luong', 'label claim',
-    'active substance content', 'drug content', 'strength'
+    'assay', 'purity', 'potency', 'active content', 'active ingredient content',
+    'dinh luong', 'định lượng', 'label claim', 'active substance content', 'drug content'
   ],
   'Độ pH': [
     'ph', 'ph value', 'hydrogen ion concentration', 'do ph', 'ph (20°c)', 'ph (25°c)',
@@ -135,10 +134,46 @@ export const PHARMA_TERM_DICTIONARY: Record<string, string[]> = {
   'Vitamin D3': ['vitamin d3', 'cholecalciferol', 'colecalciferol'],
   'Vitamin E': ['vitamin e', 'tocopherol', 'alpha-tocopherol', 'd-alpha tocopherol'],
   'Vitamin K': ['vitamin k', 'vitamin k1', 'phylloquinone', 'phytomenadione'],
-  'Kẽm': ['zinc', 'zinc sulfate', 'zinc gluconate', 'zinc acetate', 'zn'],
-  'Sắt': ['iron', 'ferrous', 'ferric', 'fe', 'ferrous sulfate', 'ferrous gluconate'],
-  'Magie': ['magnesium', 'mg', 'magnesium oxide', 'magnesium stearate'],
-  'Canxi': ['calcium', 'ca', 'calcium carbonate', 'calcium gluconate', 'calcium citrate'],
+  // === Định lượng khoáng chất & dạng muối tương ứng ===
+  'Kẽm': [
+    'kẽm', 'zinc', 'zn', 'kẽm (zn)', 'zinc (zn)', 'hàm lượng kẽm', 'định lượng kẽm',
+    'kẽm gluconat', 'zinc gluconate', 'kẽm sulfat', 'zinc sulfate', 'kẽm acetat', 'zinc acetate',
+    'kẽm oxyd', 'zinc oxide', 'kẽm picolinat', 'zinc picolinate', 'kẽm bisglycinat'
+  ],
+  'Sắt': [
+    'sắt', 'iron', 'fe', 'sắt (fe)', 'iron (fe)', 'hàm lượng sắt', 'định lượng sắt',
+    'sắt fumarat', 'ferrous fumarate', 'sắt sulfat', 'ferrous sulfate', 'sắt gluconat', 'ferrous gluconate',
+    'sắt bisglycinat', 'ferrous bisglycinate', 'iron polymaltose', 'ipc'
+  ],
+  'Magie': [
+    'magie', 'magnesi', 'magnesium', 'mg', 'magie (mg)', 'magnesi (mg)', 'magnesium (mg)',
+    'magnesi lactat', 'magnesium lactate', 'magnesi oxyd', 'magnesium oxide',
+    'magnesi citrat', 'magnesium citrate', 'magnesi stearat', 'magnesium stearate'
+  ],
+  'Canxi': [
+    'canxi', 'calci', 'calcium', 'ca', 'canxi (ca)', 'calci (ca)', 'calcium (ca)',
+    'canxi carbonat', 'calcium carbonate', 'calci gluconat', 'calcium gluconate',
+    'calci glucoheptonat', 'calcium glucoheptonate', 'calci citrat', 'calcium citrate',
+    'canxi nano', 'calcium nano', 'tricalcium phosphate'
+  ],
+  'Đồng': [
+    'đồng', 'copper', 'cu', 'đồng (cu)', 'copper (cu)', 'đồng sulfat', 'copper sulfate', 'cupric sulfate'
+  ],
+  'Mangan': [
+    'mangan', 'manganese', 'mn', 'mangan (mn)', 'manganese (mn)', 'mangan sulfat', 'manganese sulfate', 'mangan gluconat'
+  ],
+  'Selen': [
+    'selen', 'selenium', 'se', 'selen (se)', 'selenium (se)', 'sodium selenite', 'selenomethionine', 'men selen', 'selenium yeast'
+  ],
+  'Iod': [
+    'iod', 'iốt', 'iodine', 'i', 'iod (i)', 'potassium iodide', 'kali iodid', 'ki'
+  ],
+  'Kali': [
+    'kali', 'potassium', 'k', 'kali (k)', 'potassium (k)', 'kali clorid', 'potassium chloride', 'kcl'
+  ],
+  'Natri': [
+    'natri', 'sodium', 'na', 'natri (na)', 'sodium (na)', 'natri clorid', 'sodium chloride', 'nacl'
+  ],
 
   // === Vi sinh vật ===
   'Tổng số vi khuẩn hiếu khí': [
@@ -170,7 +205,6 @@ export const PHARMA_TERM_DICTIONARY: Record<string, string[]> = {
   'Thủy ngân': ['thủy ngân', 'mercury', 'hg', 'mercury (hg)', 'hg (mercury)', 'thuy ngan', 'total mercury'],
   'Cadmi': ['cadmi', 'cadmium', 'cd', 'cadmium (cd)', 'cd (cadmium)', 'cadimi', 'total cadmium'],
   'Kim loại nặng': ['heavy metals', 'kim loai nang', 'heavy metal total', 'total heavy metals'],
-  'Đồng': ['copper', 'cu', 'copper (cu)'],
   'Krom': ['chromium', 'cr', 'chrome'],
   'Niken': ['nickel', 'ni'],
 };
@@ -255,15 +289,19 @@ export const lookupPharmaTerm = (aiName: string): string | null => {
   if (!normAi) return null;
 
   for (const [systemName, aliases] of Object.entries(PHARMA_TERM_DICTIONARY)) {
-    // Kiểm tra tên chuẩn chính
-    if (normalizeString(systemName) === normAi) return systemName;
+    const normSystem = normalizeString(systemName);
+    // 1. Khớp tên chuẩn
+    if (normSystem === normAi || (normSystem.length >= 3 && normAi.includes(normSystem))) {
+      return systemName;
+    }
 
-    // Kiểm tra trong danh sách aliases
+    // 2. Khớp trong danh sách aliases
     for (const alias of aliases) {
-      if (normalizeString(alias) === normAi) return systemName;
-      // Khớp bao hàm cho alias ngắn (như "ph", "lod")
       const normAlias = normalizeString(alias);
-      if (normAlias.length >= 2 && (normAi === normAlias || normAi.startsWith(normAlias + ' ') || normAi.endsWith(' ' + normAlias))) {
+      if (!normAlias) continue;
+      if (normAi === normAlias) return systemName;
+      // Khớp bao hàm cho alias có độ dài từ 3 ký tự (hoặc 2 ký tự với exact/token match)
+      if (normAlias.length >= 3 && normAi.includes(normAlias)) {
         return systemName;
       }
     }
@@ -292,10 +330,31 @@ export const isCriteriaMatch = (
     }
   }
 
-  // 2. Tra cứu từ điển thuật ngữ dược khoa
-  const dictResult = lookupPharmaTerm(aiCriteriaName);
-  if (dictResult && normalizeString(dictResult) === normalizeString(systemCriteriaName)) {
+  // 2. Tra cứu từ điển thuật ngữ dược khoa (Song phương)
+  const dictAi = lookupPharmaTerm(aiCriteriaName);
+  const dictSystem = lookupPharmaTerm(systemCriteriaName);
+
+  // 2.1. Cả 2 bên đều quy về cùng một nhóm hoạt chất / nguyên tố trong từ điển (Ví dụ: "Hàm lượng Kẽm (Zn)" và "Kẽm (Kẽm gluconat)")
+  if (dictAi && dictSystem && dictAi === dictSystem) {
     return true;
+  }
+
+  // 2.2. Nhóm từ điển của AI trùng với tên hệ thống hoặc nằm trong tên hệ thống
+  if (dictAi) {
+    const normDictAi = normalizeString(dictAi);
+    const normSystem = normalizeString(systemCriteriaName);
+    if (normDictAi === normSystem || (normDictAi.length >= 3 && normSystem.includes(normDictAi))) {
+      return true;
+    }
+  }
+
+  // 2.3. Nhóm từ điển của System chứa trong AI name
+  if (dictSystem) {
+    const normDictSystem = normalizeString(dictSystem);
+    const normAI = normalizeString(aiCriteriaName);
+    if (normDictSystem === normAI || (normDictSystem.length >= 3 && normAI.includes(normDictSystem))) {
+      return true;
+    }
   }
 
   // 3. Fallback về phương pháp so khớp chuỗi truyền thống
