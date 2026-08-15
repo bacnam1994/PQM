@@ -10,9 +10,10 @@ import {
   CheckCircle2, XCircle, Info, Download
 } from 'lucide-react';
 import { PageHeader, DSCard } from '../../components';
-import { formatDateStandard } from '../../utils';
+import { formatDateStandard, parseNumberFromText } from '../../utils';
 import { useCriteriaResolver } from '../../hooks/useCriteriaResolver';
 import { normalizeName } from '../../services/criteriaAliasService';
+import { isCriteriaMatch } from '../../utils/aiMapping';
 import * as XLSX from 'xlsx';
 
 // ─── SPC Statistical Helpers ──────────────────────────────────────────────────
@@ -151,22 +152,42 @@ const TrendAnalysisPage: React.FC = () => {
     if (!selectedCriteria) return undefined;
     if (selectedCriteria.declaredContent != null && selectedCriteria.declaredContent !== '') {
       const parsed = typeof selectedCriteria.declaredContent === 'string'
-        ? parseNum(selectedCriteria.declaredContent)
+        ? parseNumberFromText(selectedCriteria.declaredContent)
         : Number(selectedCriteria.declaredContent);
-      if (parsed && parsed > 0) return parsed;
+      if (!isNaN(parsed) && parsed > 0) return parsed;
     }
     if (activeFormula) {
-      const formulaItem = activeFormula.ingredients?.find((i: any) => resolver.isMatch(i.name, selectedCriteria.name)) ||
+      let formulaItem = activeFormula.ingredients?.find((i: any) => resolver.isMatch(i.name, selectedCriteria.name)) ||
         activeFormula.excipients?.find((e: any) => resolver.isMatch(e.name, selectedCriteria.name));
+      if (selectedCriteria.formulaIngredientId) {
+        const linkedId = selectedCriteria.formulaIngredientId.trim().toLowerCase();
+        const linked = activeFormula.ingredients?.find((i: any) => i.id === linkedId || resolver.isMatch(i.name, linkedId)) ||
+          activeFormula.excipients?.find((e: any) => e.id === linkedId || resolver.isMatch(e.name, linkedId));
+        if (linked) formulaItem = linked;
+      }
       if (formulaItem) {
-        const dc = typeof formulaItem.declaredContent === 'string' ? parseNum(formulaItem.declaredContent) : Number(formulaItem.declaredContent);
+        const dc = typeof formulaItem.declaredContent === 'string' ? parseNumberFromText(formulaItem.declaredContent) : Number(formulaItem.declaredContent);
         const ec = formulaItem.elementalContent != null
-          ? (typeof formulaItem.elementalContent === 'string' ? parseNum(formulaItem.elementalContent) : Number(formulaItem.elementalContent))
+          ? (typeof formulaItem.elementalContent === 'string' ? parseNumberFromText(formulaItem.elementalContent) : Number(formulaItem.elementalContent))
           : undefined;
-        if (selectedCriteria.calculationBasis === 'ELEMENTAL' && ec && ec > 0) return ec;
-        if (dc && dc > 0) return dc;
+        if (selectedCriteria.calculationBasis === 'ELEMENTAL' && ec && !isNaN(ec) && ec > 0) return ec;
+        if (!isNaN(dc) && dc > 0) return dc;
       }
     }
+
+    // Fallback sang mức yêu cầu Min / Max của TCCS nếu không có declaredContent (VD: Men vi sinh ≥ 10^9 CFU/g)
+    const minVal = selectedCriteria.min !== undefined && selectedCriteria.min !== null
+      ? (typeof selectedCriteria.min === 'string' ? parseNumberFromText(selectedCriteria.min) : Number(selectedCriteria.min))
+      : undefined;
+    const maxVal = selectedCriteria.max !== undefined && selectedCriteria.max !== null
+      ? (typeof selectedCriteria.max === 'string' ? parseNumberFromText(selectedCriteria.max) : Number(selectedCriteria.max))
+      : undefined;
+    if (minVal !== undefined && !isNaN(minVal) && maxVal !== undefined && !isNaN(maxVal) && minVal > 0 && maxVal > 0) {
+      return (minVal + maxVal) / 2;
+    }
+    if (minVal !== undefined && !isNaN(minVal) && minVal > 0) return minVal;
+    if (maxVal !== undefined && !isNaN(maxVal) && maxVal > 0) return maxVal;
+
     return undefined;
   }, [selectedCriteria, activeFormula, resolver]);
 
@@ -191,12 +212,22 @@ const TrendAnalysisPage: React.FC = () => {
               const canonicalKey = normalizeName(resolver.resolve(entry.criteriaName));
               map.set(canonicalKey, entry);
               map.set(normalizeName(entry.criteriaName), entry);
+              map.set(entry.criteriaName.trim().toLowerCase(), entry);
             }
           });
         });
         const targetKey = normalizeName(selectedCriteriaName);
-        const entry = map.get(targetKey);
-        const value = entry ? parseNum(entry.value) : null;
+        let entry = map.get(targetKey) || map.get(selectedCriteriaName.trim().toLowerCase());
+        if (!entry) {
+          for (const [, e] of map.entries()) {
+            if (e?.criteriaName && (resolver.isMatch(e.criteriaName, selectedCriteriaName) || isCriteriaMatch(e.criteriaName, selectedCriteriaName))) {
+              entry = e;
+              break;
+            }
+          }
+        }
+        const val = entry?.value !== undefined && entry?.value !== null ? parseNumberFromText(entry.value) : NaN;
+        const value = isNaN(val) ? null : val;
         const percent = (value !== null && declaredBasis && declaredBasis > 0)
           ? (value / declaredBasis) * 100
           : null;
@@ -212,8 +243,12 @@ const TrendAnalysisPage: React.FC = () => {
     const std = calcStdDev(vals, mean);
     const ucl = mean + 3 * std;
     const lcl = mean - 3 * std;
-    const usl = selectedCriteria?.max !== undefined ? selectedCriteria.max : (selectedCriteria ? parseNum((selectedCriteria as any).upperLimit) ?? undefined : undefined);
-    const lsl = selectedCriteria?.min !== undefined ? selectedCriteria.min : (selectedCriteria ? parseNum((selectedCriteria as any).lowerLimit) ?? undefined : undefined);
+    const usl = selectedCriteria?.max !== undefined
+      ? (typeof selectedCriteria.max === 'string' ? parseNumberFromText(selectedCriteria.max) : Number(selectedCriteria.max))
+      : (selectedCriteria ? parseNumberFromText((selectedCriteria as any).upperLimit) ?? undefined : undefined);
+    const lsl = selectedCriteria?.min !== undefined
+      ? (typeof selectedCriteria.min === 'string' ? parseNumberFromText(selectedCriteria.min) : Number(selectedCriteria.min))
+      : (selectedCriteria ? parseNumberFromText((selectedCriteria as any).lowerLimit) ?? undefined : undefined);
     const cpk = calcCpk(mean, std, usl, lsl);
     const outOfControl = chartData.filter(d => d.value > ucl || d.value < lcl);
     const outOfSpec = chartData.filter(d =>

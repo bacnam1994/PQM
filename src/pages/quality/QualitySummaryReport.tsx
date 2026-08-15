@@ -16,7 +16,7 @@ import {
   PageHeader, DSFilterBar, DSSelect, DSCard,
   DSEmptyState, StatusBadge
 } from '../../components';
-import { formatDateStandard, parseNumberFromText } from '../../utils';
+import { formatDateStandard, parseNumberFromText, checkRange } from '../../utils';
 import { Criterion, ProductFormula, TestResult, Batch } from '../../types';
 import { useCriteriaResolver } from '../../hooks/useCriteriaResolver';
 import { normalizeName } from '../../services/criteriaAliasService';
@@ -290,9 +290,10 @@ const QualitySummaryReport: React.FC = () => {
 
         let basis: number | undefined = undefined;
         if (criterion.declaredContent != null && criterion.declaredContent !== '') {
-          basis = typeof criterion.declaredContent === 'string'
+          const parsed = typeof criterion.declaredContent === 'string'
             ? parseNumberFromText(criterion.declaredContent)
             : Number(criterion.declaredContent);
+          if (!isNaN(parsed) && parsed > 0) basis = parsed;
         } else if (activeFormula) {
           let formulaItem = activeFormula.ingredients?.find(i => resolver.isMatch(i.name, criterion.name)) ||
             activeFormula.excipients?.find(e => resolver.isMatch(e.name, criterion.name));
@@ -303,12 +304,30 @@ const QualitySummaryReport: React.FC = () => {
             if (linkedItem) formulaItem = linkedItem;
           }
           if (formulaItem) {
-            const dc = typeof formulaItem.declaredContent === 'string' ? parseNumberFromText(formulaItem.declaredContent) : formulaItem.declaredContent;
+            const dc = typeof formulaItem.declaredContent === 'string' ? parseNumberFromText(formulaItem.declaredContent) : Number(formulaItem.declaredContent);
             const ec = formulaItem.elementalContent != null
-              ? (typeof formulaItem.elementalContent === 'string' ? parseNumberFromText(formulaItem.elementalContent) : formulaItem.elementalContent)
+              ? (typeof formulaItem.elementalContent === 'string' ? parseNumberFromText(formulaItem.elementalContent) : Number(formulaItem.elementalContent))
               : undefined;
-            if (criterion.calculationBasis === 'ELEMENTAL' && ec != null && ec > 0) basis = ec;
-            else basis = dc;
+            if (criterion.calculationBasis === 'ELEMENTAL' && ec != null && !isNaN(ec) && ec > 0) basis = ec;
+            else if (!isNaN(dc) && dc > 0) basis = dc;
+          }
+        }
+
+        const minVal = criterion.min !== undefined && criterion.min !== null
+          ? (typeof criterion.min === 'string' ? parseNumberFromText(criterion.min) : Number(criterion.min))
+          : undefined;
+        const maxVal = criterion.max !== undefined && criterion.max !== null
+          ? (typeof criterion.max === 'string' ? parseNumberFromText(criterion.max) : Number(criterion.max))
+          : undefined;
+
+        // Fallback sang mức yêu cầu Min / Max của TCCS nếu không có declaredContent (VD: Men vi sinh ≥ 10^9 CFU/g)
+        if (basis === undefined) {
+          if (minVal !== undefined && !isNaN(minVal) && maxVal !== undefined && !isNaN(maxVal) && minVal > 0 && maxVal > 0) {
+            basis = (minVal + maxVal) / 2;
+          } else if (minVal !== undefined && !isNaN(minVal) && minVal > 0) {
+            basis = minVal;
+          } else if (maxVal !== undefined && !isNaN(maxVal) && maxVal > 0) {
+            basis = maxVal;
           }
         }
 
@@ -316,18 +335,26 @@ const QualitySummaryReport: React.FC = () => {
         const numericValue = isNaN(actualVal) ? null : actualVal;
 
         let percent: number | null = null;
-        if (!isNaN(actualVal) && basis && basis > 0 && actualVal > 0) {
-          percent = (actualVal / basis) * 100;
+        if (numericValue !== null && basis && basis > 0 && numericValue > 0) {
+          percent = (numericValue / basis) * 100;
         }
 
         // Evaluate pass/fail based on criterion limits
         let isPass: boolean | null = null;
         if (numericValue !== null) {
-          const hasMin = criterion.min !== undefined && criterion.min !== null;
-          const hasMax = criterion.max !== undefined && criterion.max !== null;
-          if (hasMin && hasMax) isPass = numericValue >= criterion.min! && numericValue <= criterion.max!;
-          else if (hasMin) isPass = numericValue >= criterion.min!;
-          else if (hasMax) isPass = numericValue <= criterion.max!;
+          if (minVal !== undefined && !isNaN(minVal) && maxVal !== undefined && !isNaN(maxVal)) {
+            isPass = numericValue >= minVal && numericValue <= maxVal;
+          } else if (minVal !== undefined && !isNaN(minVal)) {
+            isPass = numericValue >= minVal;
+          } else if (maxVal !== undefined && !isNaN(maxVal)) {
+            isPass = numericValue <= maxVal;
+          } else if (entry.limit) {
+            isPass = checkRange(entry.limit, rawValueText);
+          } else {
+            isPass = entry.isPass !== false;
+          }
+        } else if (entry.isPass !== undefined) {
+          isPass = entry.isPass;
         }
 
         criteriaResults[criterion.name] = { value: rawValueText, numericValue, percent, unit, isPass };

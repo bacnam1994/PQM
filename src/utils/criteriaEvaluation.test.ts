@@ -103,6 +103,16 @@ describe('checkRange()', () => {
       expect(checkRange('nlt 90', '90')).toBe(true);
     });
   });
+
+  describe('8. Định dạng lũy thừa & số khoa học (Probiotics / Vi sinh)', () => {
+    it('Đánh giá đúng các yêu cầu và kết quả chứa 10^9, 1.5 x 10^9 CFU/g', () => {
+      expect(checkRange('≥ 10^9 CFU/g', '1.5 x 10^9 CFU/g')).toBe(true);
+      expect(checkRange('≥ 10^9', '1.5 x 10^9')).toBe(true);
+      expect(checkRange('≥ 10^9', '8.0 x 10^8')).toBe(false);
+      expect(checkRange('10^9 - 2.5 x 10^9', '1.5 x 10^9')).toBe(true);
+      expect(checkRange('≥ 10⁸', '1.2 x 10⁸')).toBe(true);
+    });
+  });
 });
 
 describe('evaluateCriterionWithAlternates()', () => {
