@@ -4,6 +4,7 @@ import { ArrowLeft, Loader2, Save, Activity, Package, FileText, CheckCircle2, Al
 import { useAppStore } from '../../store/useAppStore';
 import { DSFormInput, SpecialCharToolbar, DSCard, PageHeader } from '../../components';
 import { normalizeName, createAliasRecord } from '../../services/criteriaAliasService';
+import { bulkRenameCriteriaInAllTestResults } from '../../services/testResultService';
 import { logAuditAction } from '../../services/auditService';
 
 interface CriterionUsageInfo {
@@ -19,7 +20,20 @@ const CriteriaFormPage: React.FC = () => {
   const navigate = useNavigate();
 
   // App Store States
-  const { tccsList, products, batches, testResults, criteriaAliases, updateTCCS, updateTestResult, addCriteriaAlias, notify, isAdmin, user } = useAppStore();
+  const { 
+    tccsList, 
+    products, 
+    batches, 
+    testResults, 
+    allTestResults, 
+    fetchAllTestResultsForDashboard, 
+    criteriaAliases, 
+    updateTCCS, 
+    addCriteriaAlias, 
+    notify, 
+    isAdmin, 
+    user 
+  } = useAppStore();
 
   const [selectedName, setSelectedName] = useState<string>('');
   const [newName, setNewName] = useState<string>('');
@@ -28,7 +42,12 @@ const CriteriaFormPage: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [autoCreateAlias, setAutoCreateAlias] = useState(true);
 
-  // 1. Tổng hợp toàn bộ danh mục chỉ tiêu từ TCCS và TestResults
+  // Tự động nạp toàn bộ danh sách phiếu kiểm nghiệm từ DB để thống kê chính xác
+  useEffect(() => {
+    fetchAllTestResultsForDashboard().catch(() => {});
+  }, [fetchAllTestResultsForDashboard]);
+
+  // 1. Tổng hợp toàn bộ danh mục chỉ tiêu từ TCCS và TestResults (quét toàn bộ kho dữ liệu)
   const criteriaMap = useMemo(() => {
     const map = new Map<string, CriterionUsageInfo>();
     const productMap = new Map(products.map(p => [p.id, p]));
@@ -68,8 +87,9 @@ const CriteriaFormPage: React.FC = () => {
       processList(tccs.safetyCriteria, 'An toàn');
     });
 
-    // Đếm số lô kiểm nghiệm
-    testResults.forEach((result) => {
+    // Đếm số lô kiểm nghiệm từ toàn bộ danh sách testResults (kết hợp allTestResults nếu có)
+    const effectiveTestResults = allTestResults && allTestResults.length > 0 ? allTestResults : testResults;
+    effectiveTestResults.forEach((result) => {
       (result.results || []).forEach(r => {
         if (!r || !r.criteriaName) return;
         const trimmed = r.criteriaName.trim();
@@ -81,7 +101,7 @@ const CriteriaFormPage: React.FC = () => {
     });
 
     return map;
-  }, [tccsList, products, testResults]);
+  }, [tccsList, products, testResults, allTestResults]);
 
   const allCriteriaNames = useMemo(() => {
     return Array.from(criteriaMap.keys()).sort((a, b) => a.localeCompare(b));
@@ -151,7 +171,6 @@ const CriteriaFormPage: React.FC = () => {
       const oldName = selectedName;
       const targetName = newName.trim();
       const tccsUpdates: Promise<void>[] = [];
-      const testResultUpdates: Promise<void>[] = [];
 
       // 1. Cập nhật các TCCS liên quan
       tccsList.forEach(tccs => {
@@ -198,45 +217,27 @@ const CriteriaFormPage: React.FC = () => {
         }
       });
 
-      // 2. Cập nhật các phiếu kiểm nghiệm liên quan
-      const batchMap = new Map(batches.map(b => [b.id, b]));
-      testResults.forEach(result => {
-        if (renameScope === 'product') {
-          const batch = (result.batchId ? batchMap.get(result.batchId) : null) || result.batch;
-          if (!batch || batch.productId !== targetProductId) return;
-        }
+      // 2. Cập nhật 100% các phiếu kiểm nghiệm liên quan trên TOÀN BỘ CƠ SỞ DỮ LIỆU
+      const { updatedCount } = await bulkRenameCriteriaInAllTestResults(
+        oldName, 
+        targetName, 
+        renameScope === 'product' ? targetProductId : undefined
+      );
 
-        let hasChange = false;
-        const newEntries = (result.results || []).map(entry => {
-          if (entry && entry.criteriaName && entry.criteriaName.trim() === oldName) {
-            hasChange = true;
-            return { ...entry, criteriaName: targetName };
-          }
-          return entry;
-        });
-
-        if (hasChange) {
-          testResultUpdates.push(updateTestResult({
-            ...result,
-            results: newEntries
-          }));
-        }
-      });
-
-      await Promise.all([...tccsUpdates, ...testResultUpdates]);
+      await Promise.all(tccsUpdates);
 
       logAuditAction({
         action: 'UPDATE',
         collection: 'CRITERIA_ALIASES',
         documentId: targetName,
-        details: `Đổi tên chỉ tiêu "${oldName}" thành "${targetName}" (Phạm vi: ${renameScope === 'global' ? 'Toàn hệ thống' : `Sản phẩm ${targetProductId}`})`,
+        details: `Đổi tên chỉ tiêu "${oldName}" thành "${targetName}" (Phạm vi: ${renameScope === 'global' ? 'Toàn hệ thống' : `Sản phẩm ${targetProductId}`}, Đã cập nhật ${updatedCount} phiếu kiểm nghiệm)`,
         performedBy: user?.email || 'unknown'
       });
 
       notify({
         type: 'SUCCESS',
-        title: 'Thành công',
-        message: `Đã cập nhật chỉ tiêu thành "${targetName}" trên ${tccsUpdates.length} hồ sơ TCCS.`
+        title: 'Đổi tên thành công',
+        message: `Đã cập nhật chỉ tiêu thành "${targetName}" trên ${tccsUpdates.length} hồ sơ TCCS và ${updatedCount} phiếu kiểm nghiệm.`
       });
 
       setSelectedName(targetName);

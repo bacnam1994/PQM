@@ -15,6 +15,7 @@ import React, { useState, useMemo, useCallback } from 'react';
 import { useAppStore } from '../../store/useAppStore';
 import { CriteriaAlias } from '../../types';
 import { detectDataMismatches, normalizeName, createAliasRecord } from '../../services/criteriaAliasService';
+import { fetchAllTestResultsRaw } from '../../services/testResultService';
 
 // =============================================================================
 // ICONS (inline SVG)
@@ -90,23 +91,24 @@ const CriteriaAliasManager: React.FC = () => {
     [tccsList]
   );
 
-  // Quét toàn bộ dữ liệu
+  // Quét toàn bộ dữ liệu (tải 100% phiếu từ Database để quét)
   const handleScan = useCallback(async () => {
     setIsScanning(true);
     try {
-      const reports = detectDataMismatches(testResults, tccsList, criteriaAliases);
+      const allResults = await fetchAllTestResultsRaw();
+      const reports = detectDataMismatches(allResults, tccsList, criteriaAliases);
       setScanResults(reports);
       if (reports.length === 0) {
         notify({ type: 'SUCCESS', title: 'Quét hoàn tất', message: 'Không phát hiện mismatch nào trong dữ liệu.' });
       } else {
-        notify({ type: 'INFO', title: 'Phát hiện mismatch', message: `Tìm thấy ${reports.length} nhóm chỉ tiêu có tên không khớp.` });
+        notify({ type: 'INFO', title: 'Phát hiện mismatch', message: `Tìm thấy ${reports.length} nhóm chỉ tiêu có tên không khớp trong ${allResults.length} phiếu kiểm nghiệm.` });
       }
     } catch (e) {
       notify({ type: 'ERROR', title: 'Lỗi quét', message: 'Không thể quét dữ liệu.' });
     } finally {
       setIsScanning(false);
     }
-  }, [testResults, tccsList, criteriaAliases, notify]);
+  }, [tccsList, criteriaAliases, notify]);
 
   // Xác nhận alias từ kết quả quét
   const handleConfirmFromScan = useCallback(async (tccsId: string, canonicalName: string, rawName: string) => {

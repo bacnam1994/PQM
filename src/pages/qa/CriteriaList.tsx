@@ -1,8 +1,9 @@
-import React, { useState, useMemo, memo, useCallback } from 'react';
+import React, { useState, useMemo, memo, useCallback, useEffect } from 'react';
 import { Activity, Edit, Save, AlertCircle, Loader2, ChevronLeft, ChevronRight, LayoutGrid, List, FileText } from 'lucide-react';
 import { useAppStore } from '../../store/useAppStore';
 import { DSFilterBar, DSSearchInput, DSTable, DSFormInput, DSViewToggle, DSCard, PageHeader, Modal } from '../../components';
 import { useUIStore } from '../../store/useUIStore';
+import { bulkRenameCriteriaInAllTestResults } from '../../services/testResultService';
 
 interface CriteriaSummary {
   id: string;
@@ -119,7 +120,8 @@ const CriteriaList = () => {
   const notify = useAppStore(state => state.notify);
   const isAdmin = useAppStore(state => state.isAdmin);
   const testResults = useAppStore(state => state.testResults);
-  const updateTestResult = useAppStore(state => state.updateTestResult);
+  const allTestResults = useAppStore(state => state.allTestResults);
+  const fetchAllTestResultsForDashboard = useAppStore(state => state.fetchAllTestResultsForDashboard);
   const batches = useAppStore(state => state.batches);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCriteria, setSelectedCriteria] = useState<CriteriaSummary | null>(null);
@@ -130,6 +132,11 @@ const CriteriaList = () => {
   const viewMode = useUIStore(s => s.criteriaViewMode);
   const setViewMode = useUIStore(s => s.setCriteriaViewMode);
   
+  // Tự động tải đầy đủ phiếu kiểm nghiệm để thống kê danh mục chỉ tiêu 100% chính xác
+  useEffect(() => {
+    fetchAllTestResultsForDashboard().catch(() => {});
+  }, [fetchAllTestResultsForDashboard]);
+
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = viewMode === 'grid' ? 12 : 15;
@@ -140,6 +147,7 @@ const CriteriaList = () => {
     const productMap = new Map(products.map(p => [p.id, p]));
     const batchMap = new Map(batches.map(b => [b.id, b]));
     const tccsMap = new Map(tccsList.map(t => [t.id, t]));
+    const effectiveTestResults = allTestResults && allTestResults.length > 0 ? allTestResults : testResults;
 
     // 1.1. Duyệt qua toàn bộ TCCS hiện có
     tccsList.forEach((tccs) => {
@@ -183,7 +191,7 @@ const CriteriaList = () => {
     });
 
     // 1.2. Thêm các chỉ tiêu từ Phiếu kiểm nghiệm (Test Results)
-    testResults.forEach((result) => {
+    effectiveTestResults.forEach((result) => {
       // Tra cứu batch qua batchMap vì result.batch là virtual join trên UI
       const batch = (result.batchId ? batchMap.get(result.batchId) : null) || result.batch;
       
@@ -237,7 +245,7 @@ const CriteriaList = () => {
 
     // Chuyển Map thành Array và sắp xếp A-Z
     return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
-  }, [tccsList, products, testResults, batches]);
+  }, [tccsList, products, testResults, allTestResults, batches]);
 
   // 2. Lọc dữ liệu theo tìm kiếm
   const filteredList = useMemo(() => {
@@ -308,7 +316,6 @@ const CriteriaList = () => {
       const oldName = selectedCriteria.name;
       const targetName = newName.trim();
       const tccsUpdates: Promise<void>[] = [];
-      const testResultUpdates: Promise<void>[] = [];
 
       // Duyệt qua tất cả TCCS để tìm và thay thế
       tccsList.forEach((tccs) => {
@@ -345,41 +352,21 @@ const CriteriaList = () => {
         }
       });
       
-      // Duyệt qua tất cả Test Results để tìm và thay thế
-      testResults.forEach(result => {
-        if (renameScope === 'product') {
-          const batch = batches.find(b => b.id === result.batchId);
-          if (!batch || batch.productId !== targetProductId) {
-            return;
-          }
-        }
+      // Cập nhật 100% phiếu kiểm nghiệm liên quan trên toàn bộ database
+      const { updatedCount } = await bulkRenameCriteriaInAllTestResults(
+        oldName,
+        targetName,
+        renameScope === 'product' ? targetProductId : undefined
+      );
 
-        let hasChange = false;
-        const newResults = (result.results || []).map(entry => {
-          if (entry.criteriaName === oldName) {
-            hasChange = true;
-            return { ...entry, criteriaName: targetName };
-          }
-          return entry;
-        });
-
-        if (hasChange) {
-          // updateTestResult expects the full object, not just the changed part
-          testResultUpdates.push(updateTestResult({
-            ...result,
-            results: newResults,
-          }));
-        }
-      });
-
-      await Promise.all([...tccsUpdates, ...testResultUpdates]);
+      await Promise.all(tccsUpdates);
       
       notify({
         type: 'SUCCESS',
         title: 'Đổi tên thành công',
         message: renameScope === 'product'
-          ? `Đã cập nhật chỉ tiêu từ "${oldName}" thành "${targetName}" cho sản phẩm được chọn (${tccsUpdates.length} hồ sơ TCCS, ${testResultUpdates.length} phiếu kết quả).`
-          : `Đã cập nhật "${oldName}" thành "${targetName}" trên toàn hệ thống (${tccsUpdates.length} hồ sơ TCCS và ${testResultUpdates.length} phiếu kết quả).`
+          ? `Đã cập nhật chỉ tiêu từ "${oldName}" thành "${targetName}" cho sản phẩm được chọn (${tccsUpdates.length} hồ sơ TCCS, ${updatedCount} phiếu kiểm nghiệm).`
+          : `Đã cập nhật "${oldName}" thành "${targetName}" trên toàn hệ thống (${tccsUpdates.length} hồ sơ TCCS và ${updatedCount} phiếu kiểm nghiệm).`
       });
       
       setSelectedCriteria(null);

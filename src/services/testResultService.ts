@@ -1,7 +1,7 @@
-import { ref, query, orderByChild, equalTo, get } from 'firebase/database';
+import { ref, query, orderByChild, equalTo, get, update } from 'firebase/database';
 import { db } from '../firebase';
 import { TestResult } from '../types';
-import { getFromCache } from '../utils/offlineCache';
+import { getFromCache, saveToCache } from '../utils/offlineCache';
 import { useAppStore } from '../store/useAppStore';
 
 /**
@@ -231,4 +231,146 @@ export const fetchTestResultsByProductId = async (productId: string): Promise<Te
     console.error(`Lỗi tải toàn bộ lịch sử kiểm nghiệm cho sản phẩm ${productId}:`, error);
     return [];
   }
-};
+};
+
+/**
+ * Lấy TOÀN BỘ danh sách phiếu kiểm nghiệm từ Firebase RTDB (fallback cache & store)
+ */
+export const fetchAllTestResultsRaw = async (): Promise<TestResult[]> => {
+  try {
+    const snapshot = await get(ref(db, 'testResults'));
+    if (snapshot.exists()) {
+      const data = snapshot.val();
+      return Object.values(data) as TestResult[];
+    }
+  } catch (err) {
+    console.warn('[testResultService] Không thể fetch testResults từ Firebase, thử cache:', err);
+  }
+
+  // Fallback: IndexedDB cache
+  try {
+    const cached = await getFromCache('testResults');
+    if (cached && Array.isArray(cached) && cached.length > 0) {
+      return cached as TestResult[];
+    }
+  } catch (err) {
+    console.warn('[testResultService] Fallback cache testResults thất bại:', err);
+  }
+
+  // Fallback: Global store
+  const state = useAppStore.getState();
+  return [
+    ...(state.allTestResults || []),
+    ...(state.testResults || [])
+  ];
+};
+
+/**
+ * Đổi tên chỉ tiêu trên 100% phiếu kiểm nghiệm trong toàn bộ cơ sở dữ liệu (Atomic Multi-path Update).
+ * Đảm bảo mọi phiếu cũ và mới đều được đổi tên đồng bộ.
+ * 
+ * @param oldName Tên chỉ tiêu cũ cần đổi
+ * @param newName Tên chỉ tiêu mới
+ * @param targetProductId (Tùy chọn) Chỉ áp dụng cho các lô thuộc 1 sản phẩm cụ thể
+ * @returns { updatedCount: number; totalScanned: number }
+ */
+export const bulkRenameCriteriaInAllTestResults = async (
+  oldName: string,
+  newName: string,
+  targetProductId?: string
+): Promise<{ updatedCount: number; totalScanned: number }> => {
+  const normOld = (oldName || '').trim().toLowerCase();
+  const targetName = (newName || '').trim();
+  if (!normOld || !targetName || normOld === targetName.toLowerCase()) {
+    return { updatedCount: 0, totalScanned: 0 };
+  }
+
+  // 1. Quét toàn bộ phiếu kiểm nghiệm từ Database
+  const allResults = await fetchAllTestResultsRaw();
+  if (allResults.length === 0) return { updatedCount: 0, totalScanned: 0 };
+
+  // 2. Lấy danh sách lô để lọc theo targetProductId nếu có chỉ định phạm vi
+  let validBatchIdSet: Set<string> | null = null;
+  if (targetProductId) {
+    const appState = useAppStore.getState();
+    let allBatches = appState.batches;
+    if (!allBatches || allBatches.length === 0) {
+      try {
+        const snap = await get(ref(db, 'batches'));
+        if (snap.exists()) allBatches = Object.values(snap.val()) as any[];
+      } catch (e) {
+        console.warn('[bulkRename] Lỗi lấy danh sách lô:', e);
+      }
+    }
+    const filtered = (allBatches || []).filter(b => b && b.productId === targetProductId);
+    validBatchIdSet = new Set(filtered.map(b => b.id));
+  }
+
+  // 3. Tìm các phiếu có chỉ tiêu cần đổi
+  const updates: Record<string, any> = {};
+  const modifiedResults: TestResult[] = [];
+  const now = new Date().toISOString();
+
+  allResults.forEach(result => {
+    if (!result || !result.id) return;
+
+    // Lọc theo sản phẩm nếu có
+    if (validBatchIdSet) {
+      const bId = result.batchId || (result as any).batch?.id;
+      if (!bId || !validBatchIdSet.has(bId)) return;
+    }
+
+    let hasChange = false;
+    const newEntries = (result.results || []).map(entry => {
+      if (entry && entry.criteriaName && entry.criteriaName.trim().toLowerCase() === normOld) {
+        hasChange = true;
+        return { ...entry, criteriaName: targetName };
+      }
+      return entry;
+    });
+
+    if (hasChange) {
+      const updatedResult: TestResult = {
+        ...result,
+        results: newEntries,
+        updatedAt: now
+      };
+      updates[`testResults/${result.id}/results`] = newEntries;
+      updates[`testResults/${result.id}/updatedAt`] = now;
+      modifiedResults.push(updatedResult);
+    }
+  });
+
+  const updatedCount = modifiedResults.length;
+
+  // 4. Thực hiện Atomic Multi-path Update lên Firebase
+  if (updatedCount > 0) {
+    await update(ref(db), updates);
+
+    // Cập nhật State trong Store
+    const appState = useAppStore.getState();
+    if (appState.mergeTestResults) {
+      appState.mergeTestResults(modifiedResults);
+    }
+    if (appState.allTestResults && appState.allTestResults.length > 0) {
+      const modifiedMap = new Map(modifiedResults.map(r => [r.id, r]));
+      const newAll = appState.allTestResults.map(r => modifiedMap.get(r.id) || r);
+      useAppStore.setState({ allTestResults: newAll });
+    }
+
+    // Cập nhật IndexedDB Cache
+    try {
+      const cached = await getFromCache('testResults');
+      if (cached && Array.isArray(cached)) {
+        const modifiedMap = new Map(modifiedResults.map(r => [r.id, r]));
+        const newCached = cached.map((r: any) => modifiedMap.get(r.id) || r);
+        await saveToCache('testResults', newCached);
+      }
+    } catch (e) {
+      console.warn('[bulkRename] Lỗi cập nhật cache IndexedDB:', e);
+    }
+  }
+
+  return { updatedCount, totalScanned: allResults.length };
+};
+

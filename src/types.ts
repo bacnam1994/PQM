@@ -144,6 +144,7 @@ export interface TestResult {
   notes?: string;
   attachments?: Attachment[];
   createdAt: string;
+  updatedAt?: string;
 }
 
 export interface AILearnedMapping {

@@ -56,4 +56,11 @@ describe('testResultService', () => {
     expect(found).not.toBeNull();
     expect(found?.id).toBe('tr_20260815_abc999');
   });
+
+  it('bulkRenameCriteriaInAllTestResults bỏ qua khi tên cũ và tên mới trùng nhau', async () => {
+    const { bulkRenameCriteriaInAllTestResults } = await import('./testResultService');
+    const res = await bulkRenameCriteriaInAllTestResults('Độ ẩm', 'Độ ẩm');
+    expect(res.updatedCount).toBe(0);
+  });
 });
+
