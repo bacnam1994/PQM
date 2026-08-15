@@ -6,6 +6,7 @@ import { useAppStore } from '../store/useAppStore';
 import { useShallow } from 'zustand/react/shallow';
 import { useAuthSync } from '../hooks/useAuthSync';
 import { useFirebaseSync } from '../hooks/useFirebaseSync';
+import { getPendingMutationsCount } from '../utils/offlineMutationQueue';
 
 // --- TOAST NOTIFICATION COMPONENT ---
 const GlobalToastContainer = () => {
@@ -54,15 +55,26 @@ const GlobalToastContainer = () => {
 export const SyncIndicator = () => {
   const status = useAppStore(state => state.syncStatus);
   const [visible, setVisible] = useState(true);
+  const [pendingCount, setPendingCount] = useState(0);
 
   useEffect(() => {
-    if (status === 'IDLE') {
+    const updateCount = async () => {
+      const count = await getPendingMutationsCount();
+      setPendingCount(count);
+    };
+    updateCount();
+    const interval = setInterval(updateCount, 2500);
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    if (status === 'IDLE' && pendingCount === 0) {
       const timer = setTimeout(() => setVisible(false), 3000);
       return () => clearTimeout(timer);
     } else {
       setVisible(true);
     }
-  }, [status]);
+  }, [status, pendingCount]);
 
   let icon = <Cloud size={14} />;
   let text = 'Sẵn sàng';
@@ -71,12 +83,16 @@ export const SyncIndicator = () => {
   if (status === 'SAVING') { icon = <RefreshCw size={14} className="animate-spin" />; text = 'Đang lưu...'; colorClass = 'bg-blue-50 text-blue-600 border-blue-100'; }
   else if (status === 'SAVED') { icon = <CheckCircle2 size={14} />; text = 'Đã lưu'; colorClass = 'bg-emerald-50 text-emerald-600 border-emerald-100'; }
   else if (status === 'ERROR') { icon = <AlertCircle size={14} />; text = 'Lỗi đồng bộ'; colorClass = 'bg-red-50 text-red-600 border-red-100'; }
-  else if (status === 'OFFLINE') { icon = <CloudOff size={14} />; text = 'Mất kết nối'; colorClass = 'bg-slate-800 text-white border-slate-700 shadow-lg'; }
+  else if (status === 'OFFLINE') { 
+    icon = <CloudOff size={14} />; 
+    text = pendingCount > 0 ? `Ngoại tuyến (${pendingCount} chờ gửi)` : 'Mất kết nối'; 
+    colorClass = 'bg-slate-800 text-white border-slate-700 shadow-lg'; 
+  }
 
   return (
     <div 
       onClick={() => (status === 'OFFLINE' || status === 'ERROR') && goOnline(db)}
-      title={status === 'OFFLINE' ? "Bấm để kết nối lại" : ""}
+      title={status === 'OFFLINE' ? "Bấm để kết nối lại và đồng bộ dữ liệu" : ""}
       className={`fixed bottom-4 right-4 z-[100] flex items-center gap-2 px-3 py-1.5 rounded-full border shadow-sm text-[10px] font-bold uppercase tracking-wider transition-all duration-500 ${colorClass} ${visible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 pointer-events-none'} ${status === 'OFFLINE' ? 'cursor-pointer hover:bg-slate-700' : ''}`}
     >
       {icon} <span>{text}</span>

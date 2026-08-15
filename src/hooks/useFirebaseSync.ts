@@ -3,6 +3,7 @@ import { ref, onValue, query, limitToLast, orderByChild, goOnline } from 'fireba
 import { db } from '../firebase';
 import { useAppStore } from '../store/useAppStore';
 import { getFromCache, saveToCache } from '../utils';
+import { replayOfflineMutations } from '../utils/offlineMutationQueue';
 
 export const useFirebaseSync = () => {
   const user = useAppStore(state => state.user);
@@ -15,7 +16,10 @@ export const useFirebaseSync = () => {
     let isMounted = true;
     const unsubscribes: (() => void)[] = [];
 
-    const handleOnline = () => goOnline(db);
+    const handleOnline = () => {
+      goOnline(db);
+      replayOfflineMutations().catch(err => console.warn('[Sync] Replay offline mutations error:', err));
+    };
     const handleOffline = () => useAppStore.getState().setSyncStatus('OFFLINE');
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
@@ -109,6 +113,7 @@ export const useFirebaseSync = () => {
       if (snap.val() === true) {
         const currentStatus = useAppStore.getState().syncStatus;
         if (currentStatus === 'ERROR' || currentStatus === 'OFFLINE') useAppStore.getState().setSyncStatus('IDLE');
+        replayOfflineMutations().catch(() => {});
       } else {
         useAppStore.getState().setSyncStatus('OFFLINE');
       }

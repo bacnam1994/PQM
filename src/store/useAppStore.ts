@@ -7,8 +7,10 @@ import { User, getAuth, signInWithEmailAndPassword, signOut, createUserWithEmail
 import { parseNumberFromText } from '../utils';
 import { logAuditAction } from '../services/auditService';
 import { detectCriteriaChanges, normalizeName, mergeAliases, createAliasRecord } from '../services/criteriaAliasService';
-import { deleteProductService, deleteBatchService } from '../services/databaseService';
+import { deleteProductService, deleteBatchService, deleteTestResultService } from '../services/databaseService';
 import { detectQualityAnomalies } from '../services/reportService';
+
+import { enqueueOfflineMutation, replayOfflineMutations, getPendingMutationsCount } from '../utils/offlineMutationQueue';
 
 export type ToastType = 'SUCCESS' | 'ERROR' | 'INFO' | 'WARNING';
 export interface ToastMessage {
@@ -30,7 +32,17 @@ if (typeof window !== 'undefined') {
   });
 }
 
-const executeOfflineOptimistic = async (task: Promise<any>, get: any) => {
+export interface MutationMeta {
+  path: string;
+  operation: 'SET' | 'UPDATE' | 'REMOVE';
+  data?: any;
+}
+
+const executeOfflineOptimistic = async (
+  task: Promise<any>,
+  get: any,
+  meta?: MutationMeta
+) => {
   get().setSyncStatus('SAVING');
   pendingWritesCount++;
   try {
@@ -42,8 +54,13 @@ const executeOfflineOptimistic = async (task: Promise<any>, get: any) => {
     get().setSyncStatus('SAVED');
     setTimeout(() => get().setSyncStatus('IDLE'), 2000);
   } catch (e: any) {
-    if (e.message === 'TIMEOUT_OFFLINE') {
+    if (e.message === 'TIMEOUT_OFFLINE' || e.code === 'unavailable' || !navigator.onLine) {
       get().setSyncStatus('OFFLINE');
+      if (meta) {
+        enqueueOfflineMutation(meta).catch(err => {
+          console.warn('[Store] Lỗi đưa mutation vào hàng đợi ngoại tuyến:', err);
+        });
+      }
       task.then(() => {
         pendingWritesCount--;
         get().setSyncStatus('SAVED');
@@ -77,7 +94,12 @@ const _handleSave = async (path: string, item: any, get: any) => {
   if (!item || !item.id) throw new Error("Dữ liệu không hợp lệ (Thiếu ID)");
   try {
     const cleanItem = removeUndefined(item);
-    await executeOfflineOptimistic(firebaseSet(ref(db, `${path}/${item.id}`), cleanItem), get);
+    const targetPath = `${path}/${item.id}`;
+    await executeOfflineOptimistic(
+      firebaseSet(ref(db, targetPath), cleanItem),
+      get,
+      { path: targetPath, operation: 'SET', data: cleanItem }
+    );
   } catch (error: any) {
     if (error.message && (error.message.toLowerCase().includes("permission denied") || error.code === "PERMISSION_DENIED")) {
       get().notify({ type: 'ERROR', title: 'Lỗi phân quyền', message: `Lưu thất bại! Bạn không có quyền thực hiện hoặc dữ liệu vi phạm bảo mật.` });
@@ -96,7 +118,12 @@ const _handleDelete = async (path: string, id: string, get: any, requireAdmin: b
     throw new Error("Permission denied");
   }
   try {
-    await executeOfflineOptimistic(firebaseRemove(ref(db, `${path}/${id}`)), get);
+    const targetPath = `${path}/${id}`;
+    await executeOfflineOptimistic(
+      firebaseRemove(ref(db, targetPath)),
+      get,
+      { path: targetPath, operation: 'REMOVE' }
+    );
   } catch (error: any) {
     if (error.message && (error.message.toLowerCase().includes("permission denied") || error.code === "PERMISSION_DENIED")) {
       get().notify({ type: 'ERROR', title: 'Xóa thất bại', message: 'Bạn không có quyền xóa dữ liệu này.' });
@@ -509,7 +536,7 @@ export const useAppStore = create<AppStoreState & AppStoreActions>()(devtools((s
     logAuditAction({ action: 'UPDATE', collection: 'TEST_RESULTS', documentId: r.id, details: `Cập nhật phiếu KN: ${r.id}, Kết quả: ${r.overallStatus}`, performedBy: get().user?.email || 'unknown' });
   },
   deleteTestResult: async (id) => {
-    await _handleDelete('testResults', id, get);
+    await executeOfflineOptimistic(deleteTestResultService(id), get);
     await get().syncQualityAlerts();
     logAuditAction({ action: 'DELETE', collection: 'TEST_RESULTS', documentId: id, details: `Xóa phiếu KN: ${id}`, performedBy: get().user?.email || 'unknown' });
   },

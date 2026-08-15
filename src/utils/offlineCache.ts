@@ -1,5 +1,5 @@
 const DB_NAME = 'QA_Manager_DB';
-const DB_VERSION = 3; // v3: xóa stores inventoryIn, inventoryOut (tính năng kho đã bỏ)
+const DB_VERSION = 4; // v4: thêm store offlineMutations phục vụ hàng đợi ghi ngoại tuyến
 
 /**
  * Khởi tạo IndexedDB và tạo các bảng lưu trữ (Object Stores)
@@ -21,7 +21,8 @@ export const initDB = (): Promise<IDBDatabase> => {
         'rawMaterials',
         'aiLearnedMappings',
         'qualityAlerts',
-        'criteriaAliases'
+        'criteriaAliases',
+        'offlineMutations'
       ];
       stores.forEach(storeName => {
         if (!db.objectStoreNames.contains(storeName)) {

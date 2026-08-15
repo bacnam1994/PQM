@@ -10,6 +10,8 @@ import { useAppStore } from '../../store/useAppStore';
 import { useShallow } from 'zustand/react/shallow';
 import { AIAssistantChat } from '../features/AIAssistantChat';
 import { useQualityAlerts } from '../../hooks/useQualityAlerts';
+import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcuts';
+import { GlobalCommandPalette } from './GlobalCommandPalette';
 
 // Tối ưu 1: Đưa cấu hình Menu tĩnh ra ngoài Component
 // Tránh việc mảng bị khởi tạo lại liên tục mỗi khi chuyển trang hoặc gõ tìm kiếm
@@ -76,16 +78,8 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     rawMaterials: s.rawMaterials
   })));
 
-  React.useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
-        e.preventDefault();
-        searchInputRef.current?.focus();
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  // Kích hoạt hệ thống phím tắt toàn cục (Ctrl+K, Esc, Ctrl+S)
+  useKeyboardShortcuts();
 
   const searchResults = React.useMemo(() => {
     if (!searchTerm.trim()) return null;
@@ -240,23 +234,35 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
           
           <div className="tb-right">
             {role !== 'GUEST' && (
-              <div className="search-box relative group">
-                <Search className="text-zinc-400 group-focus-within:text-zinc-900 dark:group-focus-within:text-zinc-100 transition-colors" size={15} />
-                <form onSubmit={handleSearch} className="w-full">
-                  <input 
-                    ref={searchInputRef}
-                    type="text" 
-                    value={searchTerm}
-                    onChange={(e) => {
-                      setSearchTerm(e.target.value);
-                      setShowDropdown(true);
-                    }}
-                    onFocus={() => setShowDropdown(true)}
-                    onBlur={() => setTimeout(() => setShowDropdown(false), 200)}
-                    placeholder="Tìm số lô, sản phẩm, chỉ tiêu…" 
-                    className="w-full bg-transparent border-none outline-none text-xs text-zinc-800 dark:text-zinc-100 placeholder:text-zinc-400 focus:ring-0 focus:outline-none"
-                  />
-                </form>
+              <>
+                <button
+                  type="button"
+                  onClick={() => window.dispatchEvent(new CustomEvent('pqm:toggle-command-palette'))}
+                  className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-900/60 hover:bg-slate-100 dark:hover:bg-slate-800/80 text-xs font-medium text-slate-500 dark:text-slate-400 transition-all cursor-pointer shadow-xs"
+                  title="Mở tìm kiếm nhanh (Ctrl+K)"
+                >
+                  <Search size={14} className="text-primary-600 dark:text-primary-400" />
+                  <span>Tìm kiếm nhanh</span>
+                  <kbd className="px-1.5 py-0.5 text-[10px] font-bold bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-slate-400 dark:text-slate-500 shadow-2xs">Ctrl K</kbd>
+                </button>
+
+                <div className="search-box relative group md:hidden">
+                  <Search className="text-zinc-400 group-focus-within:text-zinc-900 dark:group-focus-within:text-zinc-100 transition-colors" size={15} />
+                  <form onSubmit={handleSearch} className="w-full">
+                    <input 
+                      ref={searchInputRef}
+                      type="text" 
+                      value={searchTerm}
+                      onChange={(e) => {
+                        setSearchTerm(e.target.value);
+                        setShowDropdown(true);
+                      }}
+                      onFocus={() => setShowDropdown(true)}
+                      onBlur={() => setTimeout(() => setShowDropdown(false), 200)}
+                      placeholder="Tìm kiếm…" 
+                      className="w-full bg-transparent border-none outline-none text-xs text-zinc-800 dark:text-zinc-100 placeholder:text-zinc-400 focus:ring-0 focus:outline-none"
+                    />
+                  </form>
                 {/* Search Dropdown */}
                 {showDropdown && searchResults && (
                   <div className="absolute top-full right-0 mt-2 w-72 bg-white dark:bg-zinc-950 rounded-xl shadow-lg border border-zinc-200/50 dark:border-zinc-800/80 overflow-hidden z-50 animate-in fade-in slide-in-from-top-2 duration-150 p-1">
@@ -306,9 +312,10 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                   </div>
                 )}
               </div>
-            )}
+            </>
+          )}
 
-            <button onClick={toggleTheme} className="icon-btn" title="Chế độ tối/sáng">
+          <button onClick={toggleTheme} className="icon-btn" title="Chế độ tối/sáng">
               {theme === 'dark' ? <Sun size={17} /> : <Moon size={17} />}
             </button>
 
@@ -336,6 +343,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       </div>
 
       {role !== 'GUEST' && <AIAssistantChat />}
+      <GlobalCommandPalette />
     </div>
   );
 };

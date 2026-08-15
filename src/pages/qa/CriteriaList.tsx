@@ -134,16 +134,19 @@ const CriteriaList = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = viewMode === 'grid' ? 12 : 15;
 
-  // 1. Tổng hợp dữ liệu chỉ tiêu từ tất cả TCCS
+  // 1. Tổng hợp dữ liệu chỉ tiêu từ tất cả TCCS và Phiếu kiểm nghiệm
   const criteriaList = useMemo(() => {
     const map = new Map<string, CriteriaSummary>();
     const productMap = new Map(products.map(p => [p.id, p]));
+    const batchMap = new Map(batches.map(b => [b.id, b]));
+    const tccsMap = new Map(tccsList.map(t => [t.id, t]));
 
+    // 1.1. Duyệt qua toàn bộ TCCS hiện có
     tccsList.forEach((tccs) => {
       const product = productMap.get(tccs.productId);
-      const productName = product ? product.name : 'Unknown Product';
+      const productName = product ? product.name : (tccs.productId ? `Sản phẩm đã xóa (${tccs.productId.slice(-6)})` : 'Chưa gán sản phẩm');
 
-      // Helper để xử lý danh sách chỉ tiêu
+      // Helper để xử lý danh sách chỉ tiêu trong TCCS
       const processCriteria = (list: any[], type: string) => {
         if (!list) return;
         list.forEach((c) => {
@@ -152,7 +155,7 @@ const CriteriaList = () => {
           
           if (!map.has(normalizedName)) {
             map.set(normalizedName, {
-              id: normalizedName, // Dùng tên làm ID tạm
+              id: normalizedName,
               name: normalizedName,
               count: 0,
               relatedTCCS: [],
@@ -164,7 +167,6 @@ const CriteriaList = () => {
           entry.count++;
           entry.types.add(type);
           
-          // Chỉ thêm vào danh sách liên quan nếu chưa có (tránh duplicate nếu 1 TCCS dùng 2 lần - hiếm nhưng có thể)
           if (!entry.relatedTCCS.some(r => r.id === tccs.id)) {
             entry.relatedTCCS.push({
               id: tccs.id,
@@ -180,10 +182,22 @@ const CriteriaList = () => {
       processCriteria(tccs.safetyCriteria, 'SAFETY');
     });
 
-    // Thêm các chỉ tiêu bổ sung (isExtra) từ Test Results
+    // 1.2. Thêm các chỉ tiêu từ Phiếu kiểm nghiệm (Test Results)
     testResults.forEach((result) => {
-      const product = result.batch?.productId ? productMap.get(result.batch.productId) : null;
-      const productName = product ? product.name : 'Sản phẩm không rõ';
+      // Tra cứu batch qua batchMap vì result.batch là virtual join trên UI
+      const batch = (result.batchId ? batchMap.get(result.batchId) : null) || result.batch;
+      
+      let productId = batch?.productId;
+      if (!productId && batch?.tccsId) {
+        const linkedTccs = tccsMap.get(batch.tccsId);
+        productId = linkedTccs?.productId;
+      }
+
+      const product = productId ? productMap.get(productId) : null;
+      const batchNo = batch?.batchNo || 'Không rõ số lô';
+      const productName = product 
+        ? product.name 
+        : (productId ? `Sản phẩm đã xóa (${productId.slice(-6)})` : `Lô ${batchNo}`);
       
       (result.results || []).forEach(entry => {
         if (!entry || !entry.criteriaName) return;
@@ -204,19 +218,16 @@ const CriteriaList = () => {
           mapEntry.types.add('EXTRA');
         }
 
-        // Nếu chỉ tiêu này chưa được map vào TCCS hoặc Phiếu này, ta thêm nó vào relatedTCCS
-        // Để không trùng lặp nếu nó đã có trong TCCS của lô này
-        const tccsId = result.batch?.tccsId;
+        const tccsId = batch?.tccsId;
         const existingTCCS = tccsId ? mapEntry.relatedTCCS.find(r => r.id === tccsId) : null;
         
         if (!existingTCCS) {
-           // Đảm bảo không add lặp phiếu
            if (!mapEntry.relatedTCCS.some(r => r.id === result.id)) {
               mapEntry.relatedTCCS.push({
                  id: result.id,
-                 code: `Phiếu lô: ${result.batch?.batchNo || 'N/A'}`,
+                 code: `Phiếu: Lô ${batchNo}`,
                  product: productName,
-                 productId: result.batch?.productId
+                 productId: productId
               });
               mapEntry.count++;
            }
@@ -226,7 +237,7 @@ const CriteriaList = () => {
 
     // Chuyển Map thành Array và sắp xếp A-Z
     return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
-  }, [tccsList, products, testResults]);
+  }, [tccsList, products, testResults, batches]);
 
   // 2. Lọc dữ liệu theo tìm kiếm
   const filteredList = useMemo(() => {
