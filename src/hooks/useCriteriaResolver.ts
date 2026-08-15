@@ -17,6 +17,7 @@ import {
   FUZZY_THRESHOLD,
   AliasLookupMap,
 } from '../services/criteriaAliasService';
+import { isCriteriaMatch } from '../utils/aiMapping';
 import { TCCS } from '../types';
 
 // =============================================================================
@@ -94,7 +95,8 @@ export const useCriteriaResolver = (tccs: TCCS | undefined) => {
   const isMatch = (rawName: string, criterionName: string): boolean => {
     if (!rawName || !criterionName) return false;
     const resolvedKey = resolveKey(rawName);
-    return resolvedKey === normalizeName(criterionName);
+    if (resolvedKey === normalizeName(criterionName)) return true;
+    return isCriteriaMatch(rawName, criterionName);
   };
 
   /**
@@ -106,18 +108,22 @@ export const useCriteriaResolver = (tccs: TCCS | undefined) => {
   const findCanonicalName = (rawName: string): string | undefined => {
     if (!rawName || !tccs) return undefined;
 
-    // 1. Exact match qua alias
+    // 1. Exact match qua alias & resolver
     const resolved = resolve(rawName);
     const resolvedNorm = normalizeName(resolved);
     if (currentNormNames.has(resolvedNorm)) {
       return canonicalNameMap.get(resolvedNorm);
     }
 
-    // 2. Fuzzy fallback (không lưu tự động, chỉ dùng cho hiển thị)
+    // 2. Tra cứu qua Từ điển Dược khoa / AI Mapping
     const all = [
       ...(tccs.mainQualityCriteria || []),
       ...(tccs.safetyCriteria || []),
     ];
+    const dictMatch = all.find(c => c?.name && isCriteriaMatch(rawName, c.name));
+    if (dictMatch) return dictMatch.name;
+
+    // 3. Fuzzy fallback (không lưu tự động, chỉ dùng cho hiển thị)
     let bestScore = 0;
     let bestName: string | undefined;
     all.forEach(c => {

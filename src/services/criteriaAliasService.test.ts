@@ -118,5 +118,29 @@ describe('criteriaAliasService', () => {
       const resolved = resolveCriteriaName('Hàm lượng Curcumin', mockTCCS, lookupMap);
       expect(resolved).toBe('Curcuminoid toàn phần');
     });
+
+    it('tự động nhận diện tên chỉ tiêu cũ (Probiotics) về tên mới (Tổng số lợi khuẩn Bacillus) qua từ điển dược khoa ngay cả khi chưa có alias thủ công', () => {
+      const emptyLookupMap = new Map();
+      const mockTCCS: TCCS = {
+        id: 'tccs_probiotics',
+        productId: 'p_men',
+        code: 'TCCS Men vi sinh',
+        issueDate: '2026-01-01',
+        isActive: true,
+        mainQualityCriteria: [
+          { name: 'Tổng số lợi khuẩn Bacillus', unit: 'CFU/g', type: CriterionType.NUMBER, min: 1000000000 }
+        ],
+        safetyCriteria: [],
+        createdAt: '2026-01-01'
+      };
+
+      const resolved = resolveCriteriaName(
+        'probiotics (lactobacillus sporogenes, bacillus clausii, bacillus subtilis)',
+        mockTCCS,
+        emptyLookupMap
+      );
+      expect(resolved).toBe('Tổng số lợi khuẩn Bacillus');
+    });
   });
 });
+

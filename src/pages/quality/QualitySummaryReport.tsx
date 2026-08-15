@@ -18,6 +18,9 @@ import {
 } from '../../components';
 import { formatDateStandard, parseNumberFromText } from '../../utils';
 import { Criterion, ProductFormula, TestResult, Batch } from '../../types';
+import { useCriteriaResolver } from '../../hooks/useCriteriaResolver';
+import { normalizeName } from '../../services/criteriaAliasService';
+import { isCriteriaMatch } from '../../utils/aiMapping';
 import * as XLSX from 'xlsx';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -211,6 +214,8 @@ const QualitySummaryReport: React.FC = () => {
     return activeTccs.mainQualityCriteria || [];
   }, [activeTccs]);
 
+  const resolver = useCriteriaResolver(activeTccs);
+
   // Set default SPC criteria when criteria change
   useEffect(() => {
     if (mainCriteria.length > 0 && !spcCriteriaName) {
@@ -240,6 +245,9 @@ const QualitySummaryReport: React.FC = () => {
         .forEach(r => {
           (r.results || []).forEach(entry => {
             if (entry && entry.criteriaName) {
+              const canonicalName = resolver.resolve(entry.criteriaName);
+              consolidatedMap.set(normalizeName(canonicalName), entry);
+              consolidatedMap.set(normalizeName(entry.criteriaName), entry);
               consolidatedMap.set(entry.criteriaName.trim().toLowerCase(), entry);
             }
           });
@@ -254,8 +262,18 @@ const QualitySummaryReport: React.FC = () => {
       const criteriaResults: Record<string, { value: string; numericValue: number | null; percent: number | null; unit: string; isPass: boolean | null }> = {};
 
       mainCriteria.forEach(criterion => {
-        const key = criterion.name.trim().toLowerCase();
-        const entry = consolidatedMap.get(key);
+        const normKey = normalizeName(criterion.name);
+        let entry = consolidatedMap.get(normKey) || consolidatedMap.get(criterion.name.trim().toLowerCase());
+
+        // Fallback tra cứu qua Resolver & Từ điển Dược khoa
+        if (!entry) {
+          for (const [, e] of consolidatedMap.entries()) {
+            if (e?.criteriaName && (resolver.isMatch(e.criteriaName, criterion.name) || isCriteriaMatch(e.criteriaName, criterion.name))) {
+              entry = e;
+              break;
+            }
+          }
+        }
 
         if (!entry || entry.value === undefined || entry.value === null || String(entry.value).trim() === '') {
           criteriaResults[criterion.name] = { value: '---', numericValue: null, percent: null, unit: criterion.unit || '', isPass: null };
@@ -276,12 +294,12 @@ const QualitySummaryReport: React.FC = () => {
             ? parseNumberFromText(criterion.declaredContent)
             : Number(criterion.declaredContent);
         } else if (activeFormula) {
-          let formulaItem = activeFormula.ingredients?.find(i => i.name.trim().toLowerCase() === key) ||
-            activeFormula.excipients?.find(e => e.name.trim().toLowerCase() === key);
+          let formulaItem = activeFormula.ingredients?.find(i => resolver.isMatch(i.name, criterion.name)) ||
+            activeFormula.excipients?.find(e => resolver.isMatch(e.name, criterion.name));
           if (criterion.formulaIngredientId) {
-            const linkedName = criterion.formulaIngredientId.trim().toLowerCase();
-            const linkedItem = activeFormula.ingredients?.find(i => i.name.trim().toLowerCase() === linkedName) ||
-              activeFormula.excipients?.find(e => e.name.trim().toLowerCase() === linkedName);
+            const linkedName = criterion.formulaIngredientId;
+            const linkedItem = activeFormula.ingredients?.find(i => resolver.isMatch(i.name, linkedName)) ||
+              activeFormula.excipients?.find(e => resolver.isMatch(e.name, linkedName));
             if (linkedItem) formulaItem = linkedItem;
           }
           if (formulaItem) {
@@ -317,7 +335,7 @@ const QualitySummaryReport: React.FC = () => {
 
       return { batchId: batch.id, batchNo: batch.batchNo, mfgDate: batch.mfgDate, expDate: batch.expDate, overallStatus, criteriaResults };
     });
-  }, [selectedProductId, batches, dateRange, testResults, mainCriteria, activeFormula]);
+  }, [selectedProductId, batches, dateRange, testResults, mainCriteria, activeFormula, resolver]);
 
   // ─── SPC Statistics per Criteria ────────────────────────────────────────────
   const criteriaStats = useMemo<Record<string, CriteriaStat>>(() => {

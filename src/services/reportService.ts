@@ -5,6 +5,7 @@
  */
 import * as XLSX from 'xlsx';
 import { QualityAnomaly } from '../types';
+import { lookupPharmaTerm } from '../utils/aiMapping';
 
 /**
  * Định dạng ngày tháng sang DD/MM/YYYY
@@ -276,8 +277,9 @@ export const detectQualityAnomalies = (appContext: any, daysAhead = 30): Quality
       (tr.results || []).forEach((entry: any) => {
         const numVal = parseFloat(String(entry.value || '').replace(',', '.'));
         if (isNaN(numVal)) return;
-        if (!criteriaValues[entry.criteriaName]) criteriaValues[entry.criteriaName] = [];
-        criteriaValues[entry.criteriaName].push(numVal);
+        const canonicalName = lookupPharmaTerm(entry.criteriaName) || entry.criteriaName;
+        if (!criteriaValues[canonicalName]) criteriaValues[canonicalName] = [];
+        criteriaValues[canonicalName].push(numVal);
       });
     });
 

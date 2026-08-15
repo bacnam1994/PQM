@@ -9,6 +9,7 @@
  */
 
 import { CriteriaAlias, TCCS, TestResult } from '../types';
+import { isCriteriaMatch } from '../utils/aiMapping';
 
 // =============================================================================
 // 1. CHUẨN HÓA CHUỖI
@@ -133,7 +134,8 @@ export const buildAliasLookupMap = (
  * Thứ tự ưu tiên:
  * 1. Khớp exact (sau normalize) với tên chuẩn hiện tại → dùng ngay
  * 2. Khớp qua bảng alias đã lưu → trả về canonical
- * 3. Không khớp → trả về rawName gốc (để CoA vẫn hiển thị được)
+ * 3. Khớp qua Từ điển Dược khoa & AI Semantic Mapping (PHARMA_TERM_DICTIONARY)
+ * 4. Không khớp → trả về rawName gốc (để CoA vẫn hiển thị được)
  */
 export const resolveCriteriaName = (
   rawName: string,
@@ -157,6 +159,13 @@ export const resolveCriteriaName = (
   // 2. Tra cứu trong alias map
   const resolved = aliasLookupMap.get(normalized);
   if (resolved) return resolved;
+
+  // 3. Tra cứu qua Từ điển Dược khoa & AI Semantic Mapping
+  for (const c of allCurrent) {
+    if (c?.name && isCriteriaMatch(rawName, c.name)) {
+      return c.name;
+    }
+  }
 
   return rawName; // không tìm thấy → trả về gốc
 };
