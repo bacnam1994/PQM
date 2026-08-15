@@ -18,34 +18,39 @@ import * as XLSX from 'xlsx';
 
 // ─── SPC Statistical Helpers ──────────────────────────────────────────────────
 
-const calcMean = (vals: number[]) =>
-  vals.length === 0 ? 0 : vals.reduce((a, b) => a + b, 0) / vals.length;
+const calcMean = (vals: number[]) => {
+  const valid = vals.filter(v => typeof v === 'number' && !isNaN(v));
+  return valid.length === 0 ? 0 : valid.reduce((a, b) => a + b, 0) / valid.length;
+};
 
 const calcStdDev = (vals: number[], mean: number) => {
-  if (vals.length < 2) return 0;
-  return Math.sqrt(vals.reduce((acc, v) => acc + Math.pow(v - mean, 2), 0) / (vals.length - 1));
+  const valid = vals.filter(v => typeof v === 'number' && !isNaN(v));
+  if (valid.length < 2) return 0;
+  return Math.sqrt(valid.reduce((acc, v) => acc + Math.pow(v - mean, 2), 0) / (valid.length - 1));
 };
 
 const calcCpk = (mean: number, std: number, usl?: number, lsl?: number) => {
-  if (std === 0 || (usl === undefined && lsl === undefined)) return null;
-  if (usl !== undefined && lsl !== undefined)
-    return Math.min((usl - mean) / (3 * std), (mean - lsl) / (3 * std));
-  if (usl !== undefined) return (usl - mean) / (3 * std);
-  if (lsl !== undefined) return (mean - lsl) / (3 * std);
+  if (std === 0 || isNaN(std) || isNaN(mean) || (usl === undefined && lsl === undefined)) return null;
+  const validUsl = usl !== undefined && !isNaN(usl) ? usl : undefined;
+  const validLsl = lsl !== undefined && !isNaN(lsl) ? lsl : undefined;
+  if (validUsl === undefined && validLsl === undefined) return null;
+  if (validUsl !== undefined && validLsl !== undefined)
+    return Math.min((validUsl - mean) / (3 * std), (mean - validLsl) / (3 * std));
+  if (validUsl !== undefined) return (validUsl - mean) / (3 * std);
+  if (validLsl !== undefined) return (mean - validLsl) / (3 * std);
   return null;
 };
 
-const parseNum = (v: any): number | null => {
-  if (v === null || v === undefined || String(v).trim() === '') return null;
-  const s = String(v).trim().replace(/[–—]/g, '-').replace(/,/g, '');
-  const m = s.match(/[-+]?\d*\.?\d+(?:[eE][-+]?\d+)?/);
-  return m ? parseFloat(m[0]) : null;
+const parseCriterionBound = (val: any): number | undefined => {
+  if (val === undefined || val === null || val === '') return undefined;
+  const num = typeof val === 'string' ? parseNumberFromText(val) : Number(val);
+  return isNaN(num) ? undefined : num;
 };
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
 const CpkBadge: React.FC<{ value: number | null }> = ({ value }) => {
-  if (value === null) return <span className="text-zinc-400 text-xs italic">Chưa đủ dữ liệu</span>;
+  if (value === null || value === undefined || isNaN(value)) return <span className="text-zinc-400 text-xs italic">Chưa đủ dữ liệu</span>;
   const cls = value >= 1.33
     ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800'
     : value >= 1.0
@@ -71,10 +76,10 @@ const CustomTooltip = ({ active, payload, label, unit }: any) => {
             <div className="flex justify-between gap-3">
               <span className="text-slate-500 dark:text-zinc-400 truncate">{p.name}</span>
               <span className="font-bold" style={{ color: p.color }}>
-                {typeof p.value === 'number' ? p.value.toFixed(4) : p.value} {unit}
+                {typeof p.value === 'number' && !isNaN(p.value) ? p.value.toFixed(4) : p.value} {unit}
               </span>
             </div>
-            {pct !== null && pct !== undefined && (
+            {pct !== null && pct !== undefined && !isNaN(pct) && (
               <div className="flex justify-between gap-3 text-[11px]">
                 <span className="text-slate-400">% so với công bố:</span>
                 <span className="font-black text-indigo-600 dark:text-indigo-400 font-mono">{pct.toFixed(1)}%</span>
@@ -112,9 +117,22 @@ const TrendAnalysisPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    const load = async () => { setLoading(true); await fetchAllTestResultsForDashboard(); setLoading(false); };
+    let isMounted = true;
+    const load = async () => {
+      try {
+        setLoading(true);
+        if (fetchAllTestResultsForDashboard) {
+          await fetchAllTestResultsForDashboard();
+        }
+      } catch (err) {
+        console.error('Error fetching data for trend analysis:', err);
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    };
     load();
-  }, []);
+    return () => { isMounted = false; };
+  }, [fetchAllTestResultsForDashboard]);
 
   const testResults = useMemo(() => {
     const map = new Map<string, any>();
@@ -237,24 +255,28 @@ const TrendAnalysisPage: React.FC = () => {
   }, [selectedProductId, selectedCriteriaName, batches, testResults, dateFrom, dateTo, resolver, declaredBasis]);
 
   const spcStats = useMemo(() => {
-    const vals = chartData.map(d => d.value);
+    const vals = chartData.map(d => d.value).filter(v => typeof v === 'number' && !isNaN(v));
     if (vals.length < 2) return null;
     const mean = calcMean(vals);
     const std = calcStdDev(vals, mean);
+    if (isNaN(mean) || isNaN(std)) return null;
     const ucl = mean + 3 * std;
     const lcl = mean - 3 * std;
-    const usl = selectedCriteria?.max !== undefined
-      ? (typeof selectedCriteria.max === 'string' ? parseNumberFromText(selectedCriteria.max) : Number(selectedCriteria.max))
-      : (selectedCriteria ? parseNumberFromText((selectedCriteria as any).upperLimit) ?? undefined : undefined);
-    const lsl = selectedCriteria?.min !== undefined
-      ? (typeof selectedCriteria.min === 'string' ? parseNumberFromText(selectedCriteria.min) : Number(selectedCriteria.min))
-      : (selectedCriteria ? parseNumberFromText((selectedCriteria as any).lowerLimit) ?? undefined : undefined);
+    const rawUsl = selectedCriteria?.max !== undefined
+      ? parseCriterionBound(selectedCriteria.max)
+      : (selectedCriteria ? parseCriterionBound((selectedCriteria as any).upperLimit) : undefined);
+    const rawLsl = selectedCriteria?.min !== undefined
+      ? parseCriterionBound(selectedCriteria.min)
+      : (selectedCriteria ? parseCriterionBound((selectedCriteria as any).lowerLimit) : undefined);
+    const usl = (rawUsl === 0 && rawLsl === 0) ? undefined : rawUsl;
+    const lsl = (rawUsl === 0 && rawLsl === 0) ? undefined : rawLsl;
     const cpk = calcCpk(mean, std, usl, lsl);
     const outOfControl = chartData.filter(d => d.value > ucl || d.value < lcl);
     const outOfSpec = chartData.filter(d =>
       (usl !== undefined && d.value > usl) || (lsl !== undefined && d.value < lsl));
-    const meanPercent = (declaredBasis && declaredBasis > 0) ? (mean / declaredBasis) * 100 : null;
-    return { mean, std, ucl, lcl, usl, lsl, cpk, outOfControl, outOfSpec, cv: std / mean * 100, meanPercent, declaredBasis };
+    const meanPercent = (declaredBasis && declaredBasis > 0 && !isNaN(declaredBasis)) ? (mean / declaredBasis) * 100 : null;
+    const cv = (mean !== 0 && !isNaN(mean) && !isNaN(std)) ? (std / mean) * 100 : 0;
+    return { mean, std, ucl, lcl, usl, lsl, cpk, outOfControl, outOfSpec, cv, meanPercent, declaredBasis };
   }, [chartData, selectedCriteria, declaredBasis]);
 
   const enrichedData = useMemo(() =>
@@ -432,11 +454,21 @@ const TrendAnalysisPage: React.FC = () => {
                 <YAxis tick={{ fontSize: 10, fill: axisColor }} width={58} />
                 <Tooltip content={<CustomTooltip unit={selectedCriteria?.unit || ''} />} />
                 <Legend iconType="line" wrapperStyle={{ fontSize: 11 }} />
-                <ReferenceLine y={spcStats.ucl} stroke="#f87171" strokeDasharray="5 3" strokeWidth={1.5} label={{ value: 'UCL', position: 'insideTopRight', fontSize: 10, fill: '#f87171' }} />
-                <ReferenceLine y={spcStats.mean} stroke="#818cf8" strokeDasharray="4 2" strokeWidth={1} label={{ value: 'X̄', position: 'insideTopRight', fontSize: 10, fill: '#818cf8' }} />
-                <ReferenceLine y={spcStats.lcl} stroke="#f87171" strokeDasharray="5 3" strokeWidth={1.5} label={{ value: 'LCL', position: 'insideBottomRight', fontSize: 10, fill: '#f87171' }} />
-                {spcStats.usl !== undefined && <ReferenceLine y={spcStats.usl} stroke="#fb923c" strokeWidth={1.5} label={{ value: 'USL', position: 'insideTopLeft', fontSize: 10, fill: '#fb923c' }} />}
-                {spcStats.lsl !== undefined && <ReferenceLine y={spcStats.lsl} stroke="#fb923c" strokeWidth={1.5} label={{ value: 'LSL', position: 'insideBottomLeft', fontSize: 10, fill: '#fb923c' }} />}
+                {!isNaN(spcStats.ucl) && (
+                  <ReferenceLine y={spcStats.ucl} stroke="#f87171" strokeDasharray="5 3" strokeWidth={1.5} label={{ value: 'UCL', position: 'insideTopRight', fontSize: 10, fill: '#f87171' }} />
+                )}
+                {!isNaN(spcStats.mean) && (
+                  <ReferenceLine y={spcStats.mean} stroke="#818cf8" strokeDasharray="4 2" strokeWidth={1} label={{ value: 'X̄', position: 'insideTopRight', fontSize: 10, fill: '#818cf8' }} />
+                )}
+                {!isNaN(spcStats.lcl) && (
+                  <ReferenceLine y={spcStats.lcl} stroke="#f87171" strokeDasharray="5 3" strokeWidth={1.5} label={{ value: 'LCL', position: 'insideBottomRight', fontSize: 10, fill: '#f87171' }} />
+                )}
+                {spcStats.usl !== undefined && !isNaN(spcStats.usl) && (
+                  <ReferenceLine y={spcStats.usl} stroke="#fb923c" strokeWidth={1.5} label={{ value: 'USL', position: 'insideTopLeft', fontSize: 10, fill: '#fb923c' }} />
+                )}
+                {spcStats.lsl !== undefined && !isNaN(spcStats.lsl) && (
+                  <ReferenceLine y={spcStats.lsl} stroke="#fb923c" strokeWidth={1.5} label={{ value: 'LSL', position: 'insideBottomLeft', fontSize: 10, fill: '#fb923c' }} />
+                )}
                 <Line
                   type="monotone" dataKey="value" name={selectedCriteriaName}
                   stroke="#6366f1" strokeWidth={2}
