@@ -73,20 +73,29 @@ export const Modal: React.FC<{ isOpen: boolean; onClose: () => void; title: stri
 };
 
 // --- TIÊU ĐỀ TRANG DÙNG CHUNG ---
-export const PageHeader: React.FC<{ title: string; subtitle: string; icon: any; action?: React.ReactNode }> = ({ title, subtitle, icon: Icon, action }) => (
-  <div className="flex flex-col md:flex-row md:items-center justify-between gap-5 mb-7">
-    <div>
-      <h1 className="text-[22px] font-display font-bold text-zinc-900 dark:text-zinc-50 tracking-tight flex items-center gap-3">
-        <div className="p-2 rounded-xl text-emerald-600 dark:text-emerald-400" style={{ background: 'linear-gradient(135deg, rgba(16,185,129,0.12), rgba(5,150,105,0.06))' }}>
-          <Icon className="w-5 h-5" />
-        </div>
-        {title}
-      </h1>
-      <p className="text-zinc-400 dark:text-zinc-500 font-medium text-xs uppercase tracking-widest mt-2 pl-1">{subtitle}</p>
+export const PageHeader: React.FC<{ title: string; subtitle: string; icon: any; action?: React.ReactNode }> = ({ title, subtitle, icon, action }) => {
+  const renderIcon = () => {
+    if (!icon) return null;
+    if (React.isValidElement(icon)) return icon;
+    const IconComp = icon;
+    return <IconComp className="w-5 h-5" />;
+  };
+
+  return (
+    <div className="flex flex-col md:flex-row md:items-center justify-between gap-5 mb-7">
+      <div>
+        <h1 className="text-[22px] font-display font-bold text-zinc-900 dark:text-zinc-50 tracking-tight flex items-center gap-3">
+          <div className="p-2 rounded-xl text-emerald-600 dark:text-emerald-400" style={{ background: 'linear-gradient(135deg, rgba(16,185,129,0.12), rgba(5,150,105,0.06))' }}>
+            {renderIcon()}
+          </div>
+          {title}
+        </h1>
+        <p className="text-zinc-400 dark:text-zinc-500 font-medium text-xs uppercase tracking-widest mt-2 pl-1">{subtitle}</p>
+      </div>
+      {action && <div className="flex gap-2.5">{action}</div>}
     </div>
-    {action && <div className="flex gap-2.5">{action}</div>}
-  </div>
-);
+  );
+};
 
 // --- COMPONENT PHÂN TRANG DÙNG CHUNG ---
 export const Pagination: React.FC<{

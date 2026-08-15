@@ -317,7 +317,7 @@ const TrendAnalysisPage: React.FC = () => {
       <PageHeader
         title="Phân tích xu hướng chất lượng"
         subtitle="Statistical Process Control (SPC) — Biểu đồ kiểm soát quá trình sản xuất"
-        icon={<Activity className="text-indigo-500" size={24} />}
+        icon={Activity}
         action={
           chartData.length > 0 ? (
             <button onClick={handleExport} className="btn-secondary flex items-center gap-1.5 text-sm">
