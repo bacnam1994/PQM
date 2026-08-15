@@ -67,6 +67,35 @@ const calcCpk = (
   return { value: null, type: null };
 };
 
+const parseCriterionBound = (val: any): number | undefined => {
+  if (val === undefined || val === null || val === '') return undefined;
+  const num = typeof val === 'string' ? parseNumberFromText(val) : Number(val);
+  return isNaN(num) ? undefined : num;
+};
+
+const getCriterionLimitText = (criterion: Criterion, entryLimit?: string): string => {
+  const minVal = parseCriterionBound(criterion.min);
+  const maxVal = parseCriterionBound(criterion.max);
+  const unit = criterion.unit || '';
+
+  if (minVal !== undefined && maxVal !== undefined && !(minVal === 0 && maxVal === 0)) {
+    return `${minVal} – ${maxVal} ${unit}`.trim();
+  }
+  if (maxVal !== undefined && maxVal > 0) {
+    return `≤ ${maxVal} ${unit}`.trim();
+  }
+  if (minVal !== undefined && minVal > 0) {
+    return `≥ ${minVal} ${unit}`.trim();
+  }
+  if (entryLimit && entryLimit !== '---' && !/^0\s*[-–]\s*0/.test(entryLimit)) {
+    return entryLimit;
+  }
+  if (criterion.declaredContent) {
+    return `${criterion.declaredContent} ${unit}`.trim();
+  }
+  return '---';
+};
+
 // ─── CpkBadge Component ───────────────────────────────────────────────────────
 
 const CpkBadge: React.FC<{ value: number | null; type: string | null }> = ({ value, type }) => {
@@ -313,20 +342,19 @@ const QualitySummaryReport: React.FC = () => {
           }
         }
 
-        const minVal = criterion.min !== undefined && criterion.min !== null
-          ? (typeof criterion.min === 'string' ? parseNumberFromText(criterion.min) : Number(criterion.min))
-          : undefined;
-        const maxVal = criterion.max !== undefined && criterion.max !== null
-          ? (typeof criterion.max === 'string' ? parseNumberFromText(criterion.max) : Number(criterion.max))
-          : undefined;
+        const rawMin = parseCriterionBound(criterion.min);
+        const rawMax = parseCriterionBound(criterion.max);
+        const isBothZero = rawMin === 0 && rawMax === 0;
+        const minVal = isBothZero ? undefined : rawMin;
+        const maxVal = isBothZero ? undefined : rawMax;
 
         // Fallback sang mức yêu cầu Min / Max của TCCS nếu không có declaredContent (VD: Men vi sinh ≥ 10^9 CFU/g)
         if (basis === undefined) {
-          if (minVal !== undefined && !isNaN(minVal) && maxVal !== undefined && !isNaN(maxVal) && minVal > 0 && maxVal > 0) {
+          if (minVal !== undefined && maxVal !== undefined && minVal > 0 && maxVal > 0) {
             basis = (minVal + maxVal) / 2;
-          } else if (minVal !== undefined && !isNaN(minVal) && minVal > 0) {
+          } else if (minVal !== undefined && minVal > 0) {
             basis = minVal;
-          } else if (maxVal !== undefined && !isNaN(maxVal) && maxVal > 0) {
+          } else if (maxVal !== undefined && maxVal > 0) {
             basis = maxVal;
           }
         }
@@ -342,22 +370,31 @@ const QualitySummaryReport: React.FC = () => {
         // Evaluate pass/fail based on criterion limits
         let isPass: boolean | null = null;
         if (numericValue !== null) {
-          if (minVal !== undefined && !isNaN(minVal) && maxVal !== undefined && !isNaN(maxVal)) {
+          if (minVal !== undefined && maxVal !== undefined) {
             isPass = numericValue >= minVal && numericValue <= maxVal;
-          } else if (minVal !== undefined && !isNaN(minVal)) {
+          } else if (minVal !== undefined && minVal > 0) {
             isPass = numericValue >= minVal;
-          } else if (maxVal !== undefined && !isNaN(maxVal)) {
+          } else if (maxVal !== undefined && maxVal > 0) {
             isPass = numericValue <= maxVal;
-          } else if (entry.limit) {
+          } else if (entry?.limit && entry.limit !== '---' && !/^0\s*[-–]\s*0/.test(entry.limit)) {
             isPass = checkRange(entry.limit, rawValueText);
+          } else if (entry?.isPass !== undefined && entry.isPass !== null) {
+            isPass = entry.isPass;
           } else {
-            isPass = entry.isPass !== false;
+            isPass = true;
           }
-        } else if (entry.isPass !== undefined) {
+        } else if (entry?.isPass !== undefined) {
           isPass = entry.isPass;
         }
 
-        criteriaResults[criterion.name] = { value: rawValueText, numericValue, percent, unit, isPass };
+        criteriaResults[criterion.name] = {
+          value: rawValueText,
+          numericValue,
+          percent,
+          unit,
+          isPass,
+          entryLimit: entry?.limit
+        } as any;
       });
 
       return { batchId: batch.id, batchNo: batch.batchNo, mfgDate: batch.mfgDate, expDate: batch.expDate, overallStatus, criteriaResults };
@@ -373,15 +410,12 @@ const QualitySummaryReport: React.FC = () => {
       const failBatches: { batchNo: string; value: number; limit: string }[] = [];
 
       reportData.forEach(row => {
-        const res = row.criteriaResults[criterion.name];
+        const res = row.criteriaResults[criterion.name] as any;
         if (!res || res.numericValue === null) return;
         values.push(res.numericValue);
         batchNos.push(row.batchNo);
         if (res.isPass === false) {
-          const limitText = criterion.min !== undefined && criterion.max !== undefined
-            ? `${criterion.min} – ${criterion.max} ${criterion.unit}`
-            : criterion.max !== undefined ? `≤ ${criterion.max} ${criterion.unit}`
-            : criterion.min !== undefined ? `≥ ${criterion.min} ${criterion.unit}` : '---';
+          const limitText = getCriterionLimitText(criterion, res.entryLimit);
           failBatches.push({ batchNo: row.batchNo, value: res.numericValue, limit: limitText });
         }
       });
@@ -396,7 +430,11 @@ const QualitySummaryReport: React.FC = () => {
       const cv = mean !== 0 ? (stdDev / mean) * 100 : 0;
       const ucl = mean + 3 * stdDev;
       const lcl = mean - 3 * stdDev;
-      const { value: cpk, type: cpkType } = calcCpk(mean, stdDev, criterion.max, criterion.min);
+      const rawMin = parseCriterionBound(criterion.min);
+      const rawMax = parseCriterionBound(criterion.max);
+      const effectiveMin = rawMin === 0 && rawMax === 0 ? undefined : rawMin;
+      const effectiveMax = rawMin === 0 && rawMax === 0 ? undefined : rawMax;
+      const { value: cpk, type: cpkType } = calcCpk(mean, stdDev, effectiveMax, effectiveMin);
 
       result[criterion.name] = {
         mean, stdDev, cv, cpk, cpkType,
@@ -473,10 +511,7 @@ const QualitySummaryReport: React.FC = () => {
       const failCount = stat.failBatches.length;
       const failRate = total > 0 ? (failCount / total) * 100 : 0;
       const criterion = mainCriteria.find(cr => cr.name === c.name);
-      const limitText = criterion?.min !== undefined && criterion?.max !== undefined
-        ? `${criterion.min} – ${criterion.max} ${criterion.unit}`
-        : criterion?.max !== undefined ? `\u2264 ${criterion.max} ${criterion.unit}`
-        : criterion?.min !== undefined ? `\u2265 ${criterion.min} ${criterion.unit}` : '---';
+      const limitText = criterion ? getCriterionLimitText(criterion) : '---';
       const avgFailValue = failCount > 0 ? calcMean(stat.failBatches.map(f => f.value)) : null;
       if (failCount > 0) {
         result.push({ name: c.name, unit: c.unit, total, failCount, failRate, avgFailValue, limitText });
