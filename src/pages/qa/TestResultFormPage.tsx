@@ -8,7 +8,7 @@ import { formatDateStandard, TEST_RESULT_STATUS, BATCH_STATUS, normalizeSearch, 
 import { fetchTestResultById } from '../../services/testResultService';
 import { DSFormInput, CriteriaInputGroup, SpecialCharToolbar, DSDateInput } from '../../components';
 import { mapAIExtractedResultsToCriteria, isCriteriaMatch } from '../../utils/aiMapping';
-import { geminiService } from '../../services/ai/geminiService';
+import { geminiService, formatGeminiError } from '../../services/ai/geminiService';
 import { buildExtractionPrompt } from '../../services/ai/prompts';
 import { MappingConfirmModal, AIExtractedItem, ConfirmedMapping } from '../../components/features/MappingConfirmModal';
 import { useUIStore } from '../../store/useUIStore';
@@ -374,7 +374,7 @@ const TestResultFormPage = () => {
         finalizeAiMapping(result, highItems, []);
       }
     } catch (error: any) {
-      toast.error('Lỗi phân tích AI: ' + error.message);
+      toast.error(formatGeminiError(error), { duration: 6000 });
     } finally {
       setIsAiProcessing(false);
       e.target.value = '';
@@ -714,7 +714,7 @@ const TestResultFormPage = () => {
       setFieldValue('attachments', [...(formValues.attachments || []), newAttachment]);
       toast.success(`Đã tự động đính kèm file quét từ Google Drive: ${file.name}`);
     } catch (error: any) {
-      toast.error('Lỗi phân tích AI: ' + error.message);
+      toast.error(formatGeminiError(error), { duration: 6000 });
     } finally {
       setIsAiProcessing(false);
     }

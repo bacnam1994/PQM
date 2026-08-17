@@ -1,6 +1,6 @@
 # 📘 TỔNG QUAN TOÀN DIỆN HỆ THỐNG PQM (PRODUCT QUALITY MANAGEMENT)
-> **Phiên bản tài liệu:** 1.1.0  
-> **Cập nhật lần cuối:** 2026-08-15  
+> **Phiên bản tài liệu:** 1.2.1  
+> **Cập nhật lần cuối:** 2026-08-17  
 > **Dự án:** Hệ thống Quản lý Chất lượng Sản phẩm & Kiểm nghiệm (PQM)
 
 ---
@@ -189,6 +189,7 @@ npm run test:e2e
 
 | Ngày | Phiên bản | Nội dung thay đổi | Người thực hiện |
 | :--- | :--- | :--- | :--- |
+| **2026-08-17** | `1.2.1` | **Khắc phục lỗi Gemini AI API Key & Cải thiện thông báo lỗi người dùng**: <br/>- Nâng cấp [geminiService.ts](file:///d:/26%20Kiem%20nghiem/PQM/src/services/ai/geminiService.ts) hỗ trợ đọc API Key cá nhân từ `localStorage` (`GEMINI_API_KEY`) ưu tiên hơn `.env`, cho phép người dùng cấu hình trực tiếp trong giao diện Cài đặt.<br/>- Bổ sung helper `formatGeminiError` chuyển các mã lỗi thô từ Google (`API_KEY_INVALID`, `RESOURCE_EXHAUSTED 429`, `503`...) thành hướng dẫn tiếng Việt rõ ràng, kèm liên kết tạo key miễn phí trên Google AI Studio.<br/>- Tích hợp `formatGeminiError` vào [AIAssistantChat.tsx](file:///d:/26%20Kiem%20nghiem/PQM/src/components/features/AIAssistantChat.tsx) và [TestResultFormPage.tsx](file:///d:/26%20Kiem%20nghiem/PQM/src/pages/qa/TestResultFormPage.tsx).<br/>- Đạt 46/46 tests passed 100% trong Vitest. | AI Pair Programmer |
 | **2026-08-15** | `1.2.0` | **Đồng bộ hóa triệt để 100% Phiếu kiểm nghiệm khi Đổi tên Chỉ tiêu TCCS**: <br/>- Bổ sung hàm `bulkRenameCriteriaInAllTestResults` và `fetchAllTestResultsRaw` trong [testResultService.ts](file:///d:/26%20Kiem%20nghiem/PQM/src/services/testResultService.ts).<br/>- Khắc phục triệt để hiện tượng chỉ đổi tên trên một vài phiếu gần nhất do giới hạn phân trang (50 phiếu) trong client store.<br/>- Khi đổi tên tại [CriteriaFormPage.tsx](file:///d:/26%20Kiem%20nghiem/PQM/src/pages/qa/CriteriaFormPage.tsx) và [CriteriaList.tsx](file:///d:/26%20Kiem%20nghiem/PQM/src/pages/qa/CriteriaList.tsx), hệ thống quét toàn bộ database Firebase và áp dụng Atomic Multi-path Update cập nhật 100% phiếu kiểm nghiệm liên quan kèm đồng bộ cache IndexedDB.<br/>- Đạt 46/46 tests passed 100% trong Vitest. | AI Pair Programmer |
 | **2026-08-15** | `1.1.9` | **Sửa lỗi React Minified Error #130 trong PageHeader**: <br/>- Sửa lỗi component `PageHeader` ([CommonUI.tsx](file:///d:/26%20Kiem%20nghiem/PQM/src/components/ui/CommonUI.tsx)) bị crash (React Error #130) khi nhận icon dạng React Element object (`icon={<Activity />}`) thay vì React Component function (`icon={Activity}`).<br/>- Nâng cấp `PageHeader` hỗ trợ tương thích an toàn cả 2 cú pháp component và element.<br/>- Đạt 45/45 tests passed 100% trong Vitest. | AI Pair Programmer |
 | **2026-08-15** | `1.1.8` | **Khắc phục triệt để lỗi truy cập Trang Phân tích xu hướng (Trend Analysis)**: <br/>- Bổ sung try-catch và cờ `isMounted` cho hàm fetch dữ liệu `fetchAllTestResultsForDashboard` trong [TrendAnalysisPage.tsx](file:///d:/26%20Kiem%20nghiem/PQM/src/pages/quality/TrendAnalysisPage.tsx).<br/>- Bổ sung an toàn tính toán SPC & lọc NaN cho `calcMean`, `calcStdDev`, `calcCpk`, `ReferenceLine` để đảm bảo Recharts không bị crash khi dữ liệu trống hoặc chứa giá trị không chuẩn.<br/>- Đạt 45/45 tests passed 100% trong Vitest. | AI Pair Programmer |

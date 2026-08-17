@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { UploadCloud, Loader2, Sparkles, Send, CheckCircle2, User, AlertCircle, X, Settings, Brain, Trash2 } from 'lucide-react';
-import { geminiService, validateOCRFile } from '../../services/ai/geminiService';
+import { geminiService, validateOCRFile, formatGeminiError } from '../../services/ai/geminiService';
 import { buildExtractionPrompt } from '../../services/ai/prompts';
 import { useAppStore } from '../../store/useAppStore';
 import { useDataGraph } from '../../hooks/useDataGraph';
@@ -201,10 +201,10 @@ export const AIAssistantChat: React.FC = () => {
       
       openMappingStep(result, { batchNo, matchedBatch });
 
-    } catch (error) {
+    } catch (error: any) {
       addMessage({
          sender: 'ai',
-         text: 'Xin lỗi, đã có lỗi xảy ra khi tôi cố gắng phân tích tài liệu này. Hãy thử lại nhé.'
+         text: `Xin lỗi, đã có lỗi xảy ra khi phân tích tài liệu:\n\n${formatGeminiError(error)}`
       });
       console.error(error);
     } finally {
@@ -517,7 +517,7 @@ export const AIAssistantChat: React.FC = () => {
       console.error("Chat Error:", error);
       addMessage({
         sender: 'ai',
-        text: `Xin lỗi, tôi gặp sự cố khi đọc dữ liệu lúc này (${error?.message || 'Lỗi không xác định'}). Hãy thử lại nhé.`
+        text: `Xin lỗi, tôi gặp sự cố:\n\n${formatGeminiError(error)}`
       });
     } finally {
       setIsLoading(false);
@@ -771,7 +771,7 @@ export const AIAssistantChat: React.FC = () => {
                     const aiResponse = await geminiService.chatWithAppContext(chip.prompt, appContextData, history as any, preferredModel);
                     addMessage({ sender: 'ai', text: aiResponse.text, thinking: aiResponse.thinking });
                   } catch (error: any) {
-                    addMessage({ sender: 'ai', text: `Xin lỗi, tôi gặp sự cố (${error?.message || 'Lỗi không xác định'}). Hãy thử lại nhé.` });
+                    addMessage({ sender: 'ai', text: `Xin lỗi, tôi gặp sự cố:\n\n${formatGeminiError(error)}` });
                   } finally {
                     setIsLoading(false);
                     setChatInputText('');

@@ -1,16 +1,33 @@
 import { GoogleGenerativeAI, SchemaType, Content } from "@google/generative-ai";
 import { GEMINI_TOOL_DECLARATIONS, executeTool } from './aiTools';
 
-// [BẢO MẬT] Chỉ lấy API key từ biến môi trường, KHÔNG lưu/lấy từ localStorage
-// để tránh rủi ro bị đánh cắp qua XSS attack.
-const getApiKey = (): string => {
+export const getApiKey = (): string => {
+  const localKey = typeof window !== 'undefined' ? localStorage.getItem('GEMINI_API_KEY')?.trim() : '';
+  if (localKey) return localKey;
   return import.meta.env.VITE_GEMINI_API_KEY || "";
+};
+
+export const formatGeminiError = (error: any): string => {
+  const msg = error?.message || String(error || '');
+  if (msg.includes('API_KEY_INVALID') || msg.includes('API key not valid') || msg.includes('API_KEY_SERVICE_BLOCKED')) {
+    return 'Khóa API Gemini không hợp lệ hoặc đã hết hạn. Vui lòng vào mục "Cài đặt" > "Cấu hình AI" để cập nhật API Key mới (lấy miễn phí tại https://aistudio.google.com/app/apikey) hoặc cập nhật file .env.local.';
+  }
+  if (msg.includes('RESOURCE_EXHAUSTED') || msg.includes('429')) {
+    return 'Đã vượt quá hạn mức truy vấn API của Google Gemini (Lỗi 429 - Rate Limit / Quota Exceeded). Vui lòng thử lại sau giây lát hoặc cấu hình API Key cá nhân trong Cài đặt.';
+  }
+  if (msg.includes('503') || msg.includes('Service Unavailable') || msg.includes('overloaded')) {
+    return 'Máy chủ Google AI hiện đang quá tải hoặc tạm thời gián đoạn (503). Vui lòng thử lại sau vài giây.';
+  }
+  if (msg.includes('SAFETY') || msg.includes('blocked due to safety')) {
+    return 'Yêu cầu bị từ chối do vi phạm bộ lọc an toàn nội dung của Google AI.';
+  }
+  return `Đã xảy ra sự cố khi giao tiếp với AI: ${msg}`;
 };
 
 const getGenAI = () => {
   const key = getApiKey();
   if (!key) {
-    throw new Error("Chưa cấu hình VITE_GEMINI_API_KEY. Vui lòng kiểm tra file .env của dự án.");
+    throw new Error("Chưa cấu hình Gemini API Key. Vui lòng nhập API Key trong phần Cài đặt hệ thống hoặc file .env của dự án.");
   }
   return new GoogleGenerativeAI(key);
 };
