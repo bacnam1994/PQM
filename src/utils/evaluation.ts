@@ -18,7 +18,9 @@ export const calculateOverallStatus = (results: TestResultEntry[], tccs: TCCS | 
     // Get alternate rules from TCCS, if available
     const rules = tccs?.alternateRules || [];
 
-    const failures = results.filter(r => !r.isPass);
+    // Lấy danh sách các chỉ tiêu thực sự KHÔNG ĐẠT (chỉ khi isPass === false)
+    // Các chỉ tiêu không có giới hạn hoặc mang tính thông tin (isPass === null / undefined) không tính là FAIL
+    const failures = results.filter(r => r.isPass === false);
 
     const isNameMatch = (nameA?: string, nameB?: string) => {
       if (!nameA || !nameB) return false;
@@ -35,8 +37,8 @@ export const calculateOverallStatus = (results: TestResultEntry[], tccs: TCCS | 
         const altResult = results.find(r => isNameMatch(r.criteriaName, rule.alt));
         
         // FIX: Không dùng !altResult.value vì số 0 (Zero) trong kiểm nghiệm là giá trị hợp lệ (VD: 0 CFU)
-        // Chỉ đánh FAIL nếu giá trị thực sự bị bỏ trống (undefined/rỗng) hoặc isPass = false
-        if (!altResult || altResult.value === undefined || altResult.value === '' || !altResult.isPass) {
+        // Chỉ đánh FAIL nếu giá trị thực sự bị bỏ trống (undefined/rỗng) hoặc isPass === false
+        if (!altResult || altResult.value === undefined || altResult.value === '' || altResult.isPass === false) {
           return TEST_RESULT_STATUS.FAIL;
         }
         // If altResult PASSES, this failure is ignored.

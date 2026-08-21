@@ -12,6 +12,7 @@ import {
   checkRuleExemption
 } from '../../utils';
 import { calculateOverallStatus } from './../../utils/evaluation';
+import { lookupPharmaTerm, isCriteriaMatch } from '../../utils/aiMapping';
 import { TestResultEntry, TestResult } from '../../types';
 
 interface ExtraTestResultEntry extends TestResultEntry {
@@ -103,7 +104,7 @@ export const useTestResultSave = ({
 
       formValues.extraCriteria.forEach((item: any) => {
         if (item.name && item.value) {
-          let isPass = null;
+          let isPass: boolean | null = null;
           
           if (item.limit) {
             const pseudoCriterion = {
@@ -112,6 +113,29 @@ export const useTestResultSave = ({
               expectedText: item.limit,
             };
             isPass = evaluateCriterionSmart(pseudoCriterion as any, item.value);
+          } else {
+            // Tự động tra cứu Công thức sản phẩm để đánh giá theo dải chấp nhận ±20%
+            const productFormulas = useAppStore.getState().productFormulas || [];
+            const formula = productFormulas.find(f => f.productId === currentBatch?.productId);
+            if (formula && formula.ingredients) {
+              const matchedIng = formula.ingredients.find(ing => 
+                isCriteriaMatch(item.name, ing.name) || 
+                (lookupPharmaTerm(item.name) && lookupPharmaTerm(item.name) === lookupPharmaTerm(ing.name))
+              );
+              if (matchedIng) {
+                let dc = matchedIng.declaredContent;
+                if (typeof dc === 'string') dc = parseNumberFromText(dc);
+                let ec = matchedIng.elementalContent;
+                if (typeof ec === 'string') ec = parseNumberFromText(ec);
+                const basis = (ec != null && ec > 0) ? ec : dc;
+                if (basis != null && basis > 0) {
+                  const actualVal = parseNumberFromText(String(item.value));
+                  if (!isNaN(actualVal) && actualVal > 0) {
+                    isPass = actualVal >= basis * 0.8 && actualVal <= basis * 1.2;
+                  }
+                }
+              }
+            }
           }
           
           const newEntry: ExtraTestResultEntry = { criteriaName: item.name, value: item.value, isPass, isExtra: true, unit: item.unit, limit: item.limit };

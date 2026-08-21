@@ -245,6 +245,156 @@ export const PHARMA_TERM_DICTIONARY: Record<string, string[]> = {
   'Kim loại nặng': ['heavy metals', 'kim loai nang', 'heavy metal total', 'total heavy metals'],
   'Krom': ['chromium', 'cr', 'chrome'],
   'Niken': ['nickel', 'ni'],
+
+  // === Amino acids (Axêt amin) ===
+  'L-Lysine': [
+    'l-lysine', 'lysine', 'l-lysine hcl', 'l-lysine hydrochloride',
+    'lysine hcl', 'lysine hydrochloride', 'l-lysine monohydrochloride',
+    'lysine monohydrochloride', 'l-lysin', 'lysin hcl', 'lysin hydrochloride'
+  ],
+  'L-Methionine': [
+    'l-methionine', 'methionine', 'dl-methionine', 'l-metionin', 'metionin'
+  ],
+  'L-Threonine': [
+    'l-threonine', 'threonine', 'l-threonin', 'threonin'
+  ],
+  'L-Tryptophan': [
+    'l-tryptophan', 'tryptophan', 'l-tryptofan', 'tryptofan'
+  ],
+  'L-Valine': [
+    'l-valine', 'valine', 'l-valin', 'valin'
+  ],
+  'L-Leucine': [
+    'l-leucine', 'leucine', 'l-leucin', 'leucin'
+  ],
+  'L-Isoleucine': [
+    'l-isoleucine', 'isoleucine', 'l-isoleusin', 'isoleusin'
+  ],
+  'L-Phenylalanine': [
+    'l-phenylalanine', 'phenylalanine', 'l-phenylalanil', 'phenylalanil'
+  ],
+  'L-Arginine': [
+    'l-arginine', 'arginine', 'l-arginin', 'arginin',
+    'l-arginine hcl', 'arginine hydrochloride', 'l-arginine hydrochloride'
+  ],
+  'L-Glutamine': [
+    'l-glutamine', 'glutamine', 'l-glutamin', 'glutamin'
+  ],
+  'L-Cysteine': [
+    'l-cysteine', 'cysteine', 'l-cystin', 'cystine',
+    'l-cysteine hcl', 'cysteine hydrochloride', 'n-acetyl cysteine', 'nac'
+  ],
+  'L-Tyrosine': [
+    'l-tyrosine', 'tyrosine', 'l-tyrosin', 'tyrosin'
+  ],
+  'L-Histidine': [
+    'l-histidine', 'histidine', 'l-histidin', 'histidin',
+    'l-histidine hcl', 'histidine hydrochloride'
+  ],
+  'Glycine': [
+    'glycine', 'gly', 'glycin', 'aminoacetic acid'
+  ],
+  'L-Proline': [
+    'l-proline', 'proline', 'l-prolin', 'prolin'
+  ],
+  'L-Serine': [
+    'l-serine', 'serine', 'l-serin', 'serin'
+  ],
+  'L-Alanine': [
+    'l-alanine', 'alanine', 'l-alanin', 'alanin', 'beta-alanine', 'beta-alanin'
+  ],
+  'L-Aspartic acid': [
+    'l-aspartic acid', 'aspartic acid', 'l-aspartate', 'aspartate'
+  ],
+  'L-Glutamic acid': [
+    'l-glutamic acid', 'glutamic acid', 'l-glutamate', 'glutamate'
+  ],
+  'BCAA': [
+    'bcaa', 'branched chain amino acids', 'amino acid'
+  ],
+
+  // === Hoạt chất supplement phổ biến ===
+  'L-Carnitine': [
+    'l-carnitine', 'carnitine', 'l-carnitin', 'carnitin',
+    'l-carnitine tartrate', 'acetyl-l-carnitine', 'alcar',
+    'l-carnitine l-tartrate', 'carnitine tartrate'
+  ],
+  'Taurine': [
+    'taurine', 'taurin', 'tau', '2-aminoethanesulfonic acid'
+  ],
+  'Coenzyme Q10': [
+    'coenzyme q10', 'coq10', 'ubiquinone', 'ubiquinol', 'co q10', 'coq-10',
+    'ubidecarenone', 'co-enzyme q10'
+  ],
+  'Collagen': [
+    'collagen', 'collagen peptide', 'hydrolyzed collagen', 'fish collagen',
+    'marine collagen', 'bovine collagen', 'collagen type i', 'collagen type ii',
+    'collagen type iii', 'collagen hydrolysate', 'collagen peptides'
+  ],
+  'Glucosamine': [
+    'glucosamine', 'glucosamine hcl', 'glucosamine hydrochloride',
+    'glucosamine sulfate', 'n-acetyl glucosamine'
+  ],
+  'Chondroitin': [
+    'chondroitin', 'chondroitin sulfate', 'chondroitin sulphate'
+  ],
+  'Hyaluronic acid': [
+    'hyaluronic acid', 'hyaluronate', 'sodium hyaluronate',
+    'ha', 'axit hyaluronic', 'acid hyaluronic'
+  ],
+  'Lutein': [
+    'lutein', 'lutein ester', 'zeaxanthin', 'marigold extract'
+  ],
+  'Lycopene': [
+    'lycopene', 'lycopen'
+  ],
+  'Resveratrol': [
+    'resveratrol', 'trans-resveratrol'
+  ],
+  'Curcumin': [
+    'curcumin', 'curcuminoid', 'turmeric extract', 'diferuloylmethane'
+  ],
+  'Omega-3': [
+    'omega-3', 'omega 3', 'dha', 'epa', 'dha+epa', 'fish oil',
+    'docosahexaenoic acid', 'eicosapentaenoic acid', 'omega-3 fatty acids'
+  ],
+  'DHA': [
+    'dha', 'docosahexaenoic acid', 'dha (docosahexaenoic acid)'
+  ],
+  'EPA': [
+    'epa', 'eicosapentaenoic acid', 'epa (eicosapentaenoic acid)'
+  ],
+  'Inositol': [
+    'inositol', 'myo-inositol', 'd-chiro-inositol'
+  ],
+  'Choline': [
+    'choline', 'choline bitartrate', 'choline chloride', 'alpha-gpc'
+  ],
+  'Biotin': [
+    'biotin', 'vitamin b7', 'vitamin h', 'd-biotin'
+  ],
+  'Alpha lipoic acid': [
+    'alpha lipoic acid', 'ala', 'lipoic acid', 'thioctic acid',
+    'r-lipoic acid', 'r-ala', 'alpha-lipoic acid'
+  ],
+  'Berberine': [
+    'berberine', 'berberine hcl', 'berberine hydrochloride', 'berberin'
+  ],
+  'Spirulina': [
+    'spirulina', 'spirulina powder', 'arthrospira platensis'
+  ],
+  'Chlorella': [
+    'chlorella', 'chlorella powder', 'chlorella vulgaris'
+  ],
+  'Melatonin': [
+    'melatonin', 'n-acetyl-5-methoxytryptamine'
+  ],
+  'GABA': [
+    'gaba', 'gamma-aminobutyric acid', 'gamma aminobutyric acid'
+  ],
+  '5-HTP': [
+    '5-htp', '5-hydroxytryptophan', '5 htp', 'griffonia simplicifolia'
+  ],
 };
 
 /**

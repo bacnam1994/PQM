@@ -3,7 +3,8 @@ import { QRCodeSVG } from 'qrcode.react';
 import { TestResult, Batch, Product, TCCS, TestResultEntry, ProductFormula, FormulaIngredient, Criterion } from '../../types';
 import { TEST_RESULT_STATUS, parseNumberFromText, formatDateStandard, calculateOverallStatus, getActiveLocale } from '../../utils';
 import { useCriteriaResolver } from '../../hooks/useCriteriaResolver';
-import { normalizeName } from '../../services/criteriaAliasService';
+import { normalizeName, diceScore } from '../../services/criteriaAliasService';
+import { lookupPharmaTerm, isCriteriaMatch } from '../../utils/aiMapping';
 
 interface ExtraTestResultEntry extends TestResultEntry {
   limit?: string;
@@ -81,7 +82,10 @@ const formatScientific = (value: string | number, limitText?: string) => {
 };
 
 const CoAReport = memo(({ res, batch, product, tccs, formula }: CoAReportProps) => {
-  const coaUrl = typeof window !== 'undefined' ? window.location.href : '';
+  // URL xác thực công khai khi quét mã QR trên CoA in ra
+  const coaUrl = typeof window !== 'undefined' 
+    ? `${window.location.origin}/verify/${res.id || (batch ? batch.id : '')}` 
+    : '';
 
   // Hook giải mã tên chỉ tiêu qua bảng alias — hỗ trợ cả tên cũ lẫn tên mới
   const resolver = useCriteriaResolver(tccs);
@@ -104,6 +108,63 @@ const CoAReport = memo(({ res, batch, product, tccs, formula }: CoAReportProps) 
     }
     return map;
   }, [formula]);
+
+  /**
+   * Tra cứu thành phần công thức theo 3 lớp:
+   * Lớp 1: Exact match tên (normalize)
+   * Lớp 2: PHARMA_TERM_DICTIONARY → canonical name → tìm lại trong công thức
+   * Lớp 3: isCriteriaMatch() fuzzy semantic — duyệt toàn bộ formulaItemMap
+   * Trả về { item, matchedByFormula: true } nếu tìm được, null nếu không
+   */
+  const lookupFormulaItem = useMemo(() => {
+    return (criteriaName: string): FormulaIngredient | null => {
+      const rNorm = normalizeName(criteriaName);
+
+      // Lớp 1: Exact match
+      const exactMatch = formulaItemMap.get(rNorm);
+      if (exactMatch) return exactMatch;
+
+      // Lớp 2: PHARMA_TERM_DICTIONARY — tìm canonical name của chỉ tiêu KN,
+      // sau đó duyệt formulaItemMap xem tên nào cùng canonical
+      const canonicalOfCriteria = lookupPharmaTerm(criteriaName);
+      if (canonicalOfCriteria) {
+        for (const [formulaKey, formulaItem] of formulaItemMap.entries()) {
+          const canonicalOfFormula = lookupPharmaTerm(formulaItem.name);
+          // Cùng nhóm canonical → match (VD: "Kẽm (Zn)" và "Kẽm gluconat" đều → "Kẽm")
+          if (canonicalOfFormula && canonicalOfFormula === canonicalOfCriteria) {
+            return formulaItem;
+          }
+          // Canonical của chỉ tiêu KN trùng tên normalize của thành phần công thức
+          if (normalizeName(canonicalOfCriteria) === formulaKey) {
+            return formulaItem;
+          }
+        }
+      }
+
+      // Lớp 3: Fuzzy semantic — isCriteriaMatch() duyệt toàn bộ map
+      for (const [, formulaItem] of formulaItemMap.entries()) {
+        if (isCriteriaMatch(criteriaName, formulaItem.name)) {
+          return formulaItem;
+        }
+      }
+
+      // Lớp 4: Dice coefficient — fallback cho các tên gần giống nhau về cơ sở hoạt chất
+      // nhưng khác phần muối/dạng (VD: "L-Lysine HCl" vs "L-Lysine hydrochloride")
+      // Ngưỡng 0.6 = đủ chặt để tránh false positive nhưng đủ rộng cho biến thể muối
+      let bestDiceItem: FormulaIngredient | null = null;
+      let bestDiceScore = 0.60; // ngưỡng tối thiểu
+      for (const [, formulaItem] of formulaItemMap.entries()) {
+        const score = diceScore(criteriaName, formulaItem.name);
+        if (score > bestDiceScore) {
+          bestDiceScore = score;
+          bestDiceItem = formulaItem;
+        }
+      }
+      if (bestDiceItem) return bestDiceItem;
+
+      return null;
+    };
+  }, [formulaItemMap]);
 
   // Lọc và loại bỏ các chỉ tiêu trùng lặp (khi gộp từ nhiều phiếu kiểm nghiệm)
   // Ư u tiên giữ lại kết quả ĐẠT nếu có sự sai khác giữa các lần kiểm tra
@@ -233,12 +294,22 @@ const CoAReport = memo(({ res, batch, product, tccs, formula }: CoAReportProps) 
   const getLimitText = (r: TestResultEntry) => {
     if (r.isExtra) return (r as ExtraTestResultEntry).limit || '';
     
-    if (!tccs) return 'Theo TCCS';
+    if (!tccs) {
+      // Không có TCCS: kiểm tra xem có trong công thức không
+      const fi = lookupFormulaItem(r.criteriaName);
+      if (fi) return '__FORMULA__'; // Sentinel — được render thành JSX bên dưới
+      return '';
+    }
     
     // [ALIAS FIX] Dùng resolver.lookupCriterion để tra cứu qua alias
     const c = resolver.lookupCriterion(r.criteriaName, allCriteriaMap);
     
-    if (!c) return 'Theo TCCS';
+    if (!c) {
+      // Không có trong TCCS: thử tra cứu công thức 3 lớp
+      const fi = lookupFormulaItem(r.criteriaName);
+      if (fi) return '__FORMULA__'; // Sentinel — được render thành JSX bên dưới
+      return '';
+    }
     
     // LUÔN ƯU TIÊN EXPECTED TEXT: Giúp giữ nguyên định dạng số chữ số thập phân 
     // (VD: "≤ 0.50" thay vì "≤ 0.5") hoặc các text mô tả đi kèm giới hạn số.
@@ -250,6 +321,19 @@ const CoAReport = memo(({ res, batch, product, tccs, formula }: CoAReportProps) 
       if (c.max != null) return `≤ ${c.max}`;
     }
     return c.expectedText || '';
+  };
+
+  /** Render cột "Yêu cầu" với hỗ trợ Sentinel '__FORMULA__' */
+  const renderLimitCell = (r: TestResultEntry) => {
+    const text = getLimitText(r);
+    if (text === '__FORMULA__') {
+      return (
+        <span className="italic text-slate-500 font-normal text-[11px]">
+          Theo công thức
+        </span>
+      );
+    }
+    return text;
   };
 
   const getUnitText = (r: TestResultEntry) => {
@@ -270,7 +354,34 @@ const CoAReport = memo(({ res, batch, product, tccs, formula }: CoAReportProps) 
   const conclusion = useMemo(() => {
     if (deduplicatedResults.length === 0) return { label: 'CHƯA HOÀN THIỆN', color: 'bg-amber-500' };
 
-    const overallStatus = calculateOverallStatus(deduplicatedResults, tccs ?? null);
+    // Tạo mảng kết quả có đánh giá effectiveIsPass cho từng chỉ tiêu (kể cả ngoài TCCS nhưng có trong công thức)
+    const effectiveResults = deduplicatedResults.map(r => {
+      let isPass = r.isPass;
+      const rName = r.criteriaName.trim().toLowerCase();
+      const isMainCriteria = tccs?.mainQualityCriteria?.some(c => c && c.name && c.name.trim().toLowerCase() === rName);
+      
+      if (!isMainCriteria) {
+        const extraFormulaItem = lookupFormulaItem(r.criteriaName);
+        if (extraFormulaItem) {
+          let dc = extraFormulaItem.declaredContent;
+          if (typeof dc === 'string') dc = parseNumberFromText(dc) as any;
+          let ec = extraFormulaItem.elementalContent;
+          if (typeof ec === 'string') ec = parseNumberFromText(ec as any) as any;
+          const basis = (ec != null && (ec as number) > 0) ? (ec as number) : (dc as number);
+          if (basis != null && basis > 0) {
+            const actualVal = parseNumberFromText(String(r.value));
+            if (!isNaN(actualVal) && actualVal > 0) {
+              const min = basis * 0.8;
+              const max = basis * 1.2;
+              isPass = actualVal >= min && actualVal <= max;
+            }
+          }
+        }
+      }
+      return { ...r, isPass };
+    });
+
+    const overallStatus = calculateOverallStatus(effectiveResults, tccs ?? null);
     if (overallStatus === TEST_RESULT_STATUS.FAIL) return { label: 'KHÔNG ĐẠT', color: 'bg-red-600' };
 
     if (tccs) {
@@ -452,8 +563,8 @@ const CoAReport = memo(({ res, batch, product, tccs, formula }: CoAReportProps) 
                     basisForCalculation = (elementalContent != null && elementalContent > 0) ? elementalContent : declaredContent as number;
                   }
                 } else {
-                  // Chỉ tiêu ngoài TCCS: tìm theo tên trong công thức, nếu có thì vẫn tính %
-                  const extraFormulaItem = formulaItemMap.get(rName);
+                  // Chỉ tiêu ngoài TCCS: tra cứu công thức 3 lớp (exact → pharma dict → fuzzy)
+                  const extraFormulaItem = lookupFormulaItem(r.criteriaName);
                   if (extraFormulaItem) {
                     let dc = extraFormulaItem.declaredContent;
                     if (typeof dc === 'string') dc = parseNumberFromText(dc) as any;
@@ -463,15 +574,32 @@ const CoAReport = memo(({ res, batch, product, tccs, formula }: CoAReportProps) 
                   }
                 }
 
+                // Giới hạn mặc định ±20% áp dụng khi chỉ tiêu KHÔNG có trong TCCS nhưng có trong Công thức
+                // Đây là dải chấp nhận theo thực hành GMP: 80% ~ 120% hàm lượng công bố
+                let formulaDefaultMin: number | undefined;
+                let formulaDefaultMax: number | undefined;
+                if (!isMainCriteria && basisForCalculation != null && basisForCalculation > 0) {
+                  formulaDefaultMin = basisForCalculation * 0.80;
+                  formulaDefaultMax = basisForCalculation * 1.20;
+                }
+
                 // Sử dụng parseNumberFromText để xử lý kết quả kiểm nghiệm (hỗ trợ số mũ 10^3, 1.5x10^5...)
                 const actualValue = parseNumberFromText(String(r.value));
                 let percentageView = null;
 
+                // Đánh giá lại isPass theo ±20% nếu chỉ tiêu không có TCCS nhưng có trong Công thức
+                let effectiveIsPass = r.isPass;
+                if (formulaDefaultMin !== undefined && formulaDefaultMax !== undefined && !isNaN(actualValue) && actualValue > 0) {
+                  effectiveIsPass = actualValue >= formulaDefaultMin && actualValue <= formulaDefaultMax;
+                }
+
                 // Đồng bộ hiển thị "Không phát hiện" nếu Yêu cầu là nhóm ND và người dùng nhập 0
                 const limitText = getLimitText(r);
-                const limitUpper = String(limitText).toUpperCase();
+                // Lọc sentinel '__FORMULA__' trước khi dùng vào các hàm xử lý chuỗi
+                const limitTextDisplay = limitText === '__FORMULA__' ? '' : limitText;
+                const limitUpper = String(limitTextDisplay).toUpperCase();
                 
-                let displayValue: React.ReactNode = formatScientific(r.value, String(limitText));
+                let displayValue: React.ReactNode = formatScientific(r.value, String(limitTextDisplay));
                 
                 // Định dạng hiển thị riêng cho trạng thái miễn kiểm, quy đổi các chuỗi cũ về chung 1 format
                 if (r.value === 'Miễn kiểm' || r.value === 'Đạt (theo quy tắc thay thế)' || r.value === 'Đạt (miễn kiểm theo điều kiện)') {
@@ -495,18 +623,35 @@ const CoAReport = memo(({ res, batch, product, tccs, formula }: CoAReportProps) 
                   );
                 }
 
+                // Nội dung cột "Yêu cầu": ưu tiên giới hạn ±20% từ Công thức nếu không có TCCS
+                let limitCellContent: React.ReactNode;
+                if (formulaDefaultMin !== undefined && formulaDefaultMax !== undefined) {
+                  const locale = getActiveLocale();
+                  const minStr = formulaDefaultMin.toLocaleString(locale, { maximumFractionDigits: 2 });
+                  const maxStr = formulaDefaultMax.toLocaleString(locale, { maximumFractionDigits: 2 });
+                  limitCellContent = (
+                    <span>
+                      {minStr} ~ {maxStr}
+                      <span className="block italic font-normal text-[10px] text-slate-400">(±20% hàm lượng)</span>
+                    </span>
+                  );
+                } else {
+                  limitCellContent = renderLimitCell(r);
+                }
+
                 return (
                   <tr key={r.criteriaName} className="border-b border-slate-800 break-inside-avoid">
                     <td className="py-2 print:py-1.5 px-3 print:px-2 border-r border-slate-800 font-medium">{r.criteriaName}</td>
-                    <td className="py-2 print:py-1.5 px-3 print:px-2 text-center border-r border-slate-800 font-bold">{limitText}</td>
+                    <td className="py-2 print:py-1.5 px-3 print:px-2 text-center border-r border-slate-800 font-bold">{limitCellContent}</td>
                     <td className="py-2 print:py-1.5 px-3 print:px-2 text-center border-r border-slate-800">{getUnitText(r)}</td>
                     <td className="py-2 print:py-1.5 px-3 print:px-2 text-center border-slate-800">
-                      <div className={`font-bold ${r.isPass ? 'text-slate-900' : 'text-red-600'}`}>{displayValue}</div>
+                      <div className={`font-bold ${effectiveIsPass ? 'text-slate-900' : 'text-red-600'}`}>{displayValue}</div>
                       {percentageView}
                     </td>
                   </tr>
                 );
               })()
+
             ))}
               </React.Fragment>
             ))}

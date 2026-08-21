@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Package, FileText, ClipboardCheck, Settings, 
   Menu, X, Leaf, Cloud, CloudOff, RefreshCw, Layers,
   LogOut, User as UserIcon, FlaskConical, Users, Activity,
-  ChevronDown, Search, Moon, Sun, ShieldAlert, TrendingUp, Link2
+  ChevronDown, Search, Moon, Sun, ShieldAlert, TrendingUp, Link2, History, Bell
 } from 'lucide-react';
 import { useAppStore } from '../../store/useAppStore';
 import { useShallow } from 'zustand/react/shallow';
@@ -13,9 +13,24 @@ import { useQualityAlerts } from '../../hooks/useQualityAlerts';
 import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcuts';
 import { GlobalCommandPalette } from './GlobalCommandPalette';
 
+interface NavItemChild {
+  name: string;
+  path: string;
+  icon: React.ComponentType<{ size?: number; className?: string }>;
+  adminOnly?: boolean;
+  isAlerts?: boolean;
+}
+
+interface NavGroup {
+  name: string;
+  path?: string;
+  icon: React.ComponentType<{ size?: number; className?: string }>;
+  children?: NavItemChild[];
+}
+
 // Tối ưu 1: Đưa cấu hình Menu tĩnh ra ngoài Component
 // Tránh việc mảng bị khởi tạo lại liên tục mỗi khi chuyển trang hoặc gõ tìm kiếm
-const navItems = [
+const navItems: NavGroup[] = [
   { name: 'Dashboard', path: '/', icon: LayoutDashboard },
   { 
     name: 'Danh mục', 
@@ -40,6 +55,7 @@ const navItems = [
     children: [
       { name: 'Quản lý Lô', path: '/batches', icon: Layers },
       { name: 'Kiểm soát Lab', path: '/test-results', icon: ClipboardCheck },
+      { name: 'Cảnh báo chất lượng', path: '/alerts', icon: ShieldAlert, isAlerts: true },
       { name: 'Báo cáo tổng hợp', path: '/reports/quality-summary', icon: FileText },
       { name: 'Phân tích xu hướng', path: '/reports/trend-analysis', icon: TrendingUp },
     ]
@@ -49,6 +65,7 @@ const navItems = [
     icon: Settings,
     children: [
       { name: 'Người dùng', path: '/users', icon: Users, adminOnly: true },
+      { name: 'Nhật ký kiểm toán', path: '/audit-logs', icon: History, adminOnly: true },
       { name: 'Liên kết chỉ tiêu', path: '/criteria-aliases', icon: Link2, adminOnly: true },
       { name: 'Cấu hình', path: '/settings', icon: Settings },
     ]
@@ -128,11 +145,13 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     if (pathname.startsWith('/settings')) return { title: 'Cấu hình', subtitle: 'Thông tin hệ thống và tùy chọn kết nối API AI' };
     if (pathname.startsWith('/account')) return { title: 'Tài khoản cá nhân', subtitle: 'Thông tin hồ sơ người dùng đang đăng nhập' };
     if (pathname.startsWith('/alerts')) return { title: 'Cảnh báo chất lượng', subtitle: 'Giám sát chỉ tiêu vượt ngưỡng cảnh báo' };
+    if (pathname.startsWith('/audit-logs')) return { title: 'Nhật ký kiểm toán', subtitle: 'Lịch sử thay đổi dữ liệu và truy vết hệ thống (Audit Trail)' };
     if (pathname.startsWith('/search')) return { title: 'Kết quả tìm kiếm', subtitle: 'Tìm kiếm dữ liệu toàn hệ thống' };
     return { title: 'Hệ thống QMS', subtitle: 'Nền tảng kiểm soát chất lượng V-Biotech' };
   };
 
   const headerInfo = getPageHeaderInfo(location.pathname);
+  const { totalCount: alertCount, hasAlerts } = useQualityAlerts(30);
 
   // Format current date dynamically
   const getFormattedDate = () => {
@@ -157,7 +176,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       <aside className={`sidebar ${isCollapsed ? 'collapsed' : ''} ${isMobileMenuOpen ? 'mobile-open' : ''} transition-all duration-300`} id="sidebar">
         <div className="sb-brand">
           <div className="sb-logo">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 2v6.5L4.5 17a2 2 0 0 0 1.8 3h11.4a2 2 0 0 0 1.8-3L15 8.5V2"/><path d="M9 2h6"/><path d="M7.5 14h9"/></svg>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 2v6.5L4.5 17a2 2 0 0 0 1.8 3h11.4a2 2 0 0 0 1.8-3L15 8.5V2"/><path d="M9 2h6"/><path d="M7.5 14h9"/></svg>
           </div>
           <div className="sb-word">
             <div className="name">V-Biotech</div>
@@ -173,7 +192,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
           </Link>
 
           {navItems.slice(1).map((group, idx) => {
-            const visibleChildren = group.children.filter(child => !child.adminOnly || role === 'ADMIN');
+            const visibleChildren = (group.children || []).filter(child => !child.adminOnly || role === 'ADMIN');
             if (visibleChildren.length === 0) return null;
             return (
               <React.Fragment key={idx}>
@@ -183,7 +202,12 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                   return (
                     <Link key={child.path} to={child.path} className={`sb-item ${isActive ? 'active' : ''}`} onClick={() => setMobileMenuOpen(false)}>
                       <child.icon size={18} />
-                      <span className="label">{child.name}</span>
+                      <span className="label flex-1">{child.name}</span>
+                      {child.isAlerts && hasAlerts && (
+                        <span className="px-1.5 py-0.2 text-[10px] font-black rounded-full bg-rose-500 text-white ml-auto shadow-xs animate-pulse">
+                          {alertCount}
+                        </span>
+                      )}
                     </Link>
                   );
                 })}
@@ -356,20 +380,22 @@ export default Layout;
  */
 const QualityAlertBadge: React.FC = () => {
   const location = useLocation();
-  const { totalCount, hasAlerts } = useQualityAlerts(30);
+  const { totalCount, hasAlerts, highCount } = useQualityAlerts(30);
   const isActive = location.pathname === '/alerts';
 
   return (
     <Link
       to="/alerts"
-      title={hasAlerts ? `${totalCount} cảnh báo chất lượng` : 'Không có cảnh báo'}
+      title={hasAlerts ? `${totalCount} cảnh báo chất lượng (${highCount} mức cao)` : 'Không có cảnh báo chất lượng'}
       className={`icon-btn relative ${
-        isActive ? 'border-red-500 text-red-500 dark:text-red-400' : ''
+        isActive ? 'border-rose-500 text-rose-600 dark:text-rose-400 bg-rose-50/50 dark:bg-rose-950/30' : ''
       }`}
     >
-      <ShieldAlert size={17} />
+      <ShieldAlert size={17} className={hasAlerts && highCount > 0 ? 'text-rose-500 animate-bounce' : ''} />
       {hasAlerts && (
-        <span className="dot-alert" />
+        <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 text-[10px] font-black rounded-full bg-rose-500 text-white flex items-center justify-center shadow-xs border-2 border-white dark:border-slate-900">
+          {totalCount > 99 ? '99+' : totalCount}
+        </span>
       )}
     </Link>
   );

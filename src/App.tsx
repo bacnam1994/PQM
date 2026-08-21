@@ -64,6 +64,8 @@ const TrendAnalysisPage = lazyWithRetry(() => import('./pages/quality/TrendAnaly
 const UnauthorizedPage = lazyWithRetry(() => import('./pages/auth/UnauthorizedPage'));
 const WelcomePage = lazyWithRetry(() => import('./pages/auth/WelcomePage'));
 const CriteriaAliasManager = lazyWithRetry(() => import('./pages/system/CriteriaAliasManager'));
+const AuditLogPage = lazyWithRetry(() => import('./pages/system/AuditLogPage'));
+const CoAVerifyPage = lazyWithRetry(() => import('./pages/public/CoAVerifyPage'));
 
 const LoadingFallback = () => (
   <div className="flex items-center justify-center h-screen w-full bg-transparent transition-colors duration-300">
@@ -151,6 +153,9 @@ const AppRoutes: React.FC = () => {
         <Route path="/signup" element={<SignupPage />} />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
         <Route path="/unauthorized" element={<UnauthorizedPage />} />
+        {/* [XÁC THỰC CÔNG KHAI] Route xác thực chứng chỉ CoA khi quét QR không cần đăng nhập */}
+        <Route path="/verify/:id" element={<CoAVerifyPage />} />
+
         {/* [BẢO MẬT] Route CoA đã được bảo vệ - yêu cầu đăng nhập trước khi xem báo cáo */}
         <Route element={<PrintRoute />}>
           <Route path="/test-results/coa/:batchId" element={<CoAReportPage />} />
@@ -197,6 +202,7 @@ const AppRoutes: React.FC = () => {
           <Route path="/account" element={<AccountPage />} />
           <Route path="/search" element={<SearchPage />} />
           <Route path="/users" element={<AdminRoute><UserManagement /></AdminRoute>} />
+          <Route path="/audit-logs" element={<AdminRoute><AuditLogPage /></AdminRoute>} />
           <Route path="/criteria-aliases" element={<AdminRoute><CriteriaAliasManager /></AdminRoute>} />
         </Route>
 

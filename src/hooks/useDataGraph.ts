@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { useAppStore } from '../store/useAppStore';
 import { useShallow } from 'zustand/react/shallow';
 import { Batch, Product, TCCS, TestResult } from '../types';
+import { calculateOverallStatus } from '../utils/evaluation';
 
 export interface HydratedBatch extends Batch {
   product?: Product;
@@ -40,9 +41,13 @@ export const useDataGraph = () => {
       const rawBatch = batchMap.get(res.batchId);
       const product = rawBatch ? productMap.get(rawBatch.productId) : undefined;
       const tccs = rawBatch ? tccsMap.get(rawBatch.tccsId) : undefined;
+      const overallStatus = (res.results && res.results.length > 0)
+        ? calculateOverallStatus(res.results, tccs || null)
+        : (res.overallStatus || 'PASS');
 
       return {
         ...res,
+        overallStatus,
         batch: rawBatch ? { ...rawBatch, product, tccs } : undefined,
         product: product
       };
@@ -55,9 +60,13 @@ export const useDataGraph = () => {
       const rawBatch = batchMap.get(res.batchId);
       const product = rawBatch ? productMap.get(rawBatch.productId) : undefined;
       const tccs = rawBatch ? tccsMap.get(rawBatch.tccsId) : undefined;
+      const overallStatus = (res.results && res.results.length > 0)
+        ? calculateOverallStatus(res.results, tccs || null)
+        : (res.overallStatus || 'PASS');
 
       return {
         ...res,
+        overallStatus,
         batch: rawBatch ? { ...rawBatch, product, tccs } : undefined,
         product: product
       };
