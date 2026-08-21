@@ -10,6 +10,7 @@ import { ProductFormula, FormulaIngredient } from '../../types';
 import { useUIStore } from '../../store/useUIStore';
 import { resetConsent } from '../../hooks/useCookieConsent';
 import { useShallow } from 'zustand/react/shallow';
+import { AVAILABLE_GEMINI_MODELS, DEFAULT_GEMINI_MODEL } from '../../services/ai/geminiService';
 
 /** Panel hiển thị trạng thái bộ lọc đã lưu và cho phép reset từng trang */
 const FilterStatusPanel: React.FC = () => {
@@ -174,7 +175,7 @@ const SettingsPage: React.FC = () => {
   const [apiKeySaved, setApiKeySaved] = useState(false);
 
   // ─── AI Model and Thinking Mode States ──────────────────────────────
-  const [defaultModel, setDefaultModel] = useState(() => localStorage.getItem('GEMINI_MODEL') || 'gemini-2.5-flash');
+  const [defaultModel, setDefaultModel] = useState(() => localStorage.getItem('GEMINI_MODEL') || DEFAULT_GEMINI_MODEL);
   const [isThinkingEnabled, setIsThinkingEnabled] = useState(() => localStorage.getItem('GEMINI_THINKING_ENABLED') !== 'false');
 
   const handleSaveModel = (model: string) => {
@@ -603,14 +604,37 @@ const SettingsPage: React.FC = () => {
               <select
                 value={defaultModel}
                 onChange={(e) => handleSaveModel(e.target.value)}
-                className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-semibold text-slate-700 text-xs outline-none focus:ring-2 focus:ring-indigo-100 cursor-pointer"
+                className="w-full p-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl font-semibold text-slate-700 dark:text-slate-200 text-xs outline-none focus:ring-2 focus:ring-indigo-100 dark:focus:ring-indigo-900/50 cursor-pointer"
               >
-                <option value="gemini-2.5-flash">⚡ Gemini 2.5 Flash (Mặc định - Nhanh)</option>
-                <option value="gemini-2.5-pro">🧠 Gemini 2.5 Pro (Suy luận chuyên sâu)</option>
+                <optgroup label="🚀 Gemini 3.x (Thế hệ mới nhất - Đề xuất)">
+                  {AVAILABLE_GEMINI_MODELS.filter(m => m.group.includes('3.x')).map(m => (
+                    <option key={m.id} value={m.id}>{m.badge} - {m.name}</option>
+                  ))}
+                </optgroup>
+                <optgroup label="⚡ Gemini 2.5 (Tiêu chuẩn)">
+                  {AVAILABLE_GEMINI_MODELS.filter(m => m.group.includes('2.5')).map(m => (
+                    <option key={m.id} value={m.id}>{m.badge}</option>
+                  ))}
+                </optgroup>
+                <optgroup label="📦 Gemini 2.0 (Tương thích)">
+                  {AVAILABLE_GEMINI_MODELS.filter(m => m.group.includes('2.0')).map(m => (
+                    <option key={m.id} value={m.id}>{m.badge}</option>
+                  ))}
+                </optgroup>
               </select>
-              <p className="text-[10px] text-slate-400 italic pl-1">
-                Pro cung cấp câu trả lời sắc sảo hơn nhưng phản hồi lâu hơn.
-              </p>
+
+              {(() => {
+                const activeModelInfo = AVAILABLE_GEMINI_MODELS.find(m => m.id === defaultModel);
+                return activeModelInfo ? (
+                  <div className="p-2.5 rounded-xl bg-indigo-50/70 dark:bg-indigo-950/30 border border-indigo-100 dark:border-indigo-900/40 text-[11px] text-indigo-700 dark:text-indigo-300 animate-in fade-in duration-200">
+                    <div className="font-bold flex items-center gap-1.5 mb-0.5">
+                      <Sparkles size={13} className="text-indigo-500" />
+                      {activeModelInfo.name} {activeModelInfo.isNew && <span className="px-1.5 py-0.2 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded text-[9px] font-black uppercase tracking-wider">Mới</span>}
+                    </div>
+                    <p className="text-[10px] text-slate-600 dark:text-slate-400 leading-relaxed">{activeModelInfo.description}</p>
+                  </div>
+                ) : null;
+              })()}
             </div>
             
             <div className="space-y-1.5 flex flex-col justify-between">

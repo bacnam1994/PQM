@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { UploadCloud, Loader2, Sparkles, Send, CheckCircle2, User, AlertCircle, X, Settings, Brain, Trash2 } from 'lucide-react';
-import { geminiService, validateOCRFile, formatGeminiError } from '../../services/ai/geminiService';
+import { geminiService, validateOCRFile, formatGeminiError, AVAILABLE_GEMINI_MODELS, DEFAULT_GEMINI_MODEL } from '../../services/ai/geminiService';
 import { buildExtractionPrompt } from '../../services/ai/prompts';
 import { useAppStore } from '../../store/useAppStore';
 import { useDataGraph } from '../../hooks/useDataGraph';
@@ -70,7 +70,7 @@ export const AIAssistantChat: React.FC = () => {
   const [isCreatingBatch, setIsCreatingBatch] = useState(false);
   const [chatInputText, setChatInputText] = useState('');
   const [showConfig, setShowConfig] = useState(false);
-  const [currentModel, setCurrentModel] = useState(() => localStorage.getItem('GEMINI_MODEL') || 'gemini-2.5-flash');
+  const [currentModel, setCurrentModel] = useState(() => localStorage.getItem('GEMINI_MODEL') || DEFAULT_GEMINI_MODEL);
   const [thinkingEnabled, setThinkingEnabled] = useState(() => localStorage.getItem('GEMINI_THINKING_ENABLED') !== 'false');
 
   // Lưu lịch sử chat vào sessionStorage mỗi khi messages thay đổi
@@ -81,7 +81,8 @@ export const AIAssistantChat: React.FC = () => {
   const handleModelChange = (model: string) => {
     setCurrentModel(model);
     localStorage.setItem('GEMINI_MODEL', model);
-    toast.success(`Đã chuyển sang mô hình ${model === 'gemini-2.5-pro' ? 'Gemini 2.5 Pro (Suy luận sâu)' : 'Gemini 2.5 Flash (Tiêu chuẩn)'}`);
+    const mInfo = AVAILABLE_GEMINI_MODELS.find(m => m.id === model);
+    toast.success(`Đã chuyển sang mô hình ${mInfo?.name || model}`);
   };
 
   const handleThinkingToggle = (enabled: boolean) => {
@@ -561,7 +562,7 @@ export const AIAssistantChat: React.FC = () => {
                   <h3 className="font-black text-white text-sm tracking-wide">V-Biotech AI</h3>
                   <span className="text-[10px] font-bold text-indigo-100 flex items-center gap-1">
                     <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse" />
-                    {currentModel === 'gemini-2.5-pro' ? 'Pro (Suy luận)' : 'Flash (Mặc định)'}
+                    {AVAILABLE_GEMINI_MODELS.find(m => m.id === currentModel)?.name.replace('Gemini ', '') || currentModel}
                   </span>
               </div>
           </div>
@@ -602,10 +603,23 @@ export const AIAssistantChat: React.FC = () => {
               <select
                 value={currentModel}
                 onChange={(e) => handleModelChange(e.target.value)}
-                className="bg-white dark:bg-zinc-950 border border-slate-200 dark:border-zinc-850 text-[10px] font-bold text-slate-700 dark:text-zinc-350 px-2 py-1 rounded outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer shadow-sm"
+                className="bg-white dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 text-[10px] font-bold text-slate-700 dark:text-zinc-300 px-2 py-1 rounded outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer shadow-sm max-w-[200px]"
               >
-                <option value="gemini-2.5-flash">⚡ Gemini 2.5 Flash</option>
-                <option value="gemini-2.5-pro">🧠 Gemini 2.5 Pro</option>
+                <optgroup label="🚀 Gemini 3.x (Mới nhất)">
+                  {AVAILABLE_GEMINI_MODELS.filter(m => m.group.includes('3.x')).map(m => (
+                    <option key={m.id} value={m.id}>{m.badge}</option>
+                  ))}
+                </optgroup>
+                <optgroup label="⚡ Gemini 2.5 (Tiêu chuẩn)">
+                  {AVAILABLE_GEMINI_MODELS.filter(m => m.group.includes('2.5')).map(m => (
+                    <option key={m.id} value={m.id}>{m.badge}</option>
+                  ))}
+                </optgroup>
+                <optgroup label="📦 Gemini 2.0">
+                  {AVAILABLE_GEMINI_MODELS.filter(m => m.group.includes('2.0')).map(m => (
+                    <option key={m.id} value={m.id}>{m.badge}</option>
+                  ))}
+                </optgroup>
               </select>
             </div>
             <div className="flex items-center justify-between">
