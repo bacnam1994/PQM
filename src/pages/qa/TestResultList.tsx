@@ -5,12 +5,13 @@ import {
   Plus, Search, ClipboardCheck, CheckCircle2, AlertCircle, Trash2,
   Calendar, Beaker, X, FileText,
   History, ListPlus, FlaskConical, Printer, Eye, Edit2, Loader2,
-  Package, Hash, Clock, Filter, ShieldCheck, LayoutGrid, List, ArrowUpDown, FileSearch, RefreshCcw
+  Package, Hash, Clock, Filter, ShieldCheck, LayoutGrid, List, ArrowUpDown, FileSearch, RefreshCcw, ShieldAlert
 } from 'lucide-react';
 import { TestResult, TestResultEntry } from '../../types';
 import { TEST_RESULT_STATUS, BATCH_STATUS, ensureArray, formatDateStandard, normalizeSearch } from '../../utils';
 const CoAReport = lazy(() => import('../../components/features/CoAReport'));
 import { PageHeader, DSFilterBar, DSSearchInput, DSSelect, DSCard, DSViewToggle, DSTable, ActionButtons, DeleteModal, AddButton, DSEmptyState, Pagination } from '../../components';
+import { OOSInvestigationModal } from '../../components/features/OOSInvestigationModal';
 import { useDataGraph, HydratedTestResult, useDebounce } from '../../hooks';
 import { useTestResultList } from '../../hooks/test-results/useTestResultList';
 import { useUIStore } from '../../store/useUIStore';
@@ -21,11 +22,12 @@ interface ExtraTestResultEntry extends TestResultEntry {
 }
 
 // --- SUB-COMPONENT: Grid Item (Memoized) ---
-const TestResultGridItem = memo(({ res, onEdit, onDelete, onPrint, isAdmin }: { 
+const TestResultGridItem = memo(({ res, onEdit, onDelete, onPrint, onOOS, isAdmin }: { 
   res: HydratedTestResult, 
   onEdit: (res: HydratedTestResult) => void, 
   onDelete: (res: HydratedTestResult) => void, 
   onPrint: (res: HydratedTestResult) => void,
+  onOOS: (res: HydratedTestResult) => void,
   isAdmin: boolean
 }) => {
   return (
@@ -77,20 +79,31 @@ const TestResultGridItem = memo(({ res, onEdit, onDelete, onPrint, isAdmin }: {
             onDelete={isAdmin ? () => onDelete(res) : undefined}
           />
         </div>
-        <button onClick={() => onPrint(res)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-bold text-[11px] bg-slate-50/80 dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-cyan-50 dark:hover:bg-cyan-950/30 hover:text-cyan-700 dark:hover:text-cyan-400 transition-all ml-auto border border-slate-200/50 dark:border-slate-700">
-          Xem phiếu <Printer size={14} className="opacity-0 group-hover:opacity-100 hidden" />
-        </button>
+        <div className="flex items-center gap-1.5 ml-auto">
+          {res.overallStatus !== TEST_RESULT_STATUS.PASS && (
+            <button 
+              onClick={() => onOOS(res)} 
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg font-bold text-[10px] bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 hover:bg-rose-100 border border-rose-200 dark:border-rose-900/60 transition-all uppercase tracking-wider shadow-2xs"
+            >
+              <ShieldAlert size={12} /> OOS (AI)
+            </button>
+          )}
+          <button onClick={() => onPrint(res)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-bold text-[11px] bg-slate-50/80 dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-cyan-50 dark:hover:bg-cyan-950/30 hover:text-cyan-700 dark:hover:text-cyan-400 transition-all border border-slate-200/50 dark:border-slate-700">
+            Xem phiếu <Printer size={14} className="opacity-0 group-hover:opacity-100 hidden" />
+          </button>
+        </div>
       </div>
     </DSCard>
   );
 });
 
 // --- SUB-COMPONENT: List Item (Memoized) ---
-const TestResultListItem = memo(({ res, onEdit, onDelete, onPrint, isAdmin }: { 
+const TestResultListItem = memo(({ res, onEdit, onDelete, onPrint, onOOS, isAdmin }: { 
   res: HydratedTestResult, 
   onEdit: (res: HydratedTestResult) => void, 
   onDelete: (res: HydratedTestResult) => void, 
   onPrint: (res: HydratedTestResult) => void,
+  onOOS: (res: HydratedTestResult) => void,
   isAdmin: boolean
 }) => {
   return (
@@ -105,7 +118,15 @@ const TestResultListItem = memo(({ res, onEdit, onDelete, onPrint, isAdmin }: {
         </span>
       </td>
       <td className="px-4 py-3 text-right">
-        <div className="flex justify-end gap-2">
+        <div className="flex justify-end items-center gap-2">
+          {res.overallStatus !== TEST_RESULT_STATUS.PASS && (
+            <button 
+              onClick={() => onOOS(res)} 
+              className="flex items-center gap-1 px-2.5 py-1 rounded-lg font-bold text-[10px] bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 hover:bg-rose-100 border border-rose-200 dark:border-rose-900/60 transition-all uppercase tracking-wider"
+            >
+              <ShieldAlert size={12} /> OOS
+            </button>
+          )}
           <ActionButtons 
             onView={() => onPrint(res)}
             onEdit={isAdmin ? () => onEdit(res) : undefined}
@@ -117,7 +138,7 @@ const TestResultListItem = memo(({ res, onEdit, onDelete, onPrint, isAdmin }: {
   );
 });
 
-const TestResultDataList = ({ viewMode, data, onEdit, onDelete, onPrint, isAdmin, isLoading }: any) => {
+const TestResultDataList = ({ viewMode, data, onEdit, onDelete, onPrint, onOOS, isAdmin, isLoading }: any) => {
   if (isLoading) {
     return (
       <div className="flex flex-col items-center justify-center py-16 gap-3 bg-white dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm">
@@ -135,7 +156,7 @@ const TestResultDataList = ({ viewMode, data, onEdit, onDelete, onPrint, isAdmin
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 no-print">
         {data.map((res: any) => (
-          <TestResultGridItem key={res.id} res={res} onEdit={onEdit} onDelete={onDelete} onPrint={onPrint} isAdmin={isAdmin} />
+          <TestResultGridItem key={res.id} res={res} onEdit={onEdit} onDelete={onDelete} onPrint={onPrint} onOOS={onOOS} isAdmin={isAdmin} />
         ))}
       </div>
     );
@@ -154,7 +175,7 @@ const TestResultDataList = ({ viewMode, data, onEdit, onDelete, onPrint, isAdmin
       </thead>
       <tbody className="divide-y divide-slate-50 dark:divide-slate-800/40">
         {data.map((res: any) => (
-          <TestResultListItem key={res.id} res={res} onEdit={onEdit} onDelete={onDelete} onPrint={onPrint} isAdmin={isAdmin} />
+          <TestResultListItem key={res.id} res={res} onEdit={onEdit} onDelete={onDelete} onPrint={onPrint} onOOS={onOOS} isAdmin={isAdmin} />
         ))}
       </tbody>
     </DSTable>
@@ -200,6 +221,43 @@ const TestResultList: React.FC = () => {
     handlePrint,
     handleOpenAdd,
   } = useTestResultList();
+
+  const [isOOSOpen, setIsOOSOpen] = useState(false);
+  const [oosModalData, setOosModalData] = useState<any>(null);
+
+  const handleOpenOOS = useCallback((res: HydratedTestResult) => {
+    const failedCriteria: { criteriaName: string; actualValue: string | number; specification: string; unit?: string }[] = [];
+    const passedCriteria: { criteriaName: string; actualValue: string | number }[] = [];
+
+    (res.results || []).forEach((item: any) => {
+      if (item.isPass === false) {
+        failedCriteria.push({
+          criteriaName: item.criteriaName,
+          actualValue: item.value,
+          specification: item.limit || 'Theo tiêu chuẩn',
+          unit: item.unit,
+        });
+      } else {
+        passedCriteria.push({
+          criteriaName: item.criteriaName,
+          actualValue: item.value,
+        });
+      }
+    });
+
+    const formula = productFormulas.find((f: any) => f.productId === res.batch?.productId);
+
+    setOosModalData({
+      productName: res.product?.name || 'Sản phẩm',
+      batchNo: res.batch?.batchNo || `Lô ${res.batchId}`,
+      mfgDate: res.batch?.mfgDate,
+      expDate: res.batch?.expDate,
+      failedCriteria: failedCriteria.length > 0 ? failedCriteria : [{ criteriaName: 'Chỉ tiêu kiểm nghiệm', actualValue: 'Không đạt', specification: 'TCCS' }],
+      passedCriteria,
+      formulaIngredients: formula?.ingredients || [],
+    });
+    setIsOOSOpen(true);
+  }, [productFormulas]);
 
   // Reset trang hiện tại khi thay đổi tìm kiếm, bộ lọc hoặc chế độ hiển thị
   useEffect(() => {
@@ -311,6 +369,7 @@ const TestResultList: React.FC = () => {
         onEdit={handleEditResult}
         onDelete={handleDeleteClick}
         onPrint={handlePrint}
+        onOOS={handleOpenOOS}
         isAdmin={isAdmin}
         isLoading={hydratedResults.length === 0 && syncStatus === 'SAVING'}
       />
@@ -343,6 +402,14 @@ const TestResultList: React.FC = () => {
         onConfirm={handleConfirmDelete} 
         itemName={crud.selectedItem?.batch?.batchNo}
       />
+
+      {isOOSOpen && oosModalData && (
+        <OOSInvestigationModal
+          isOpen={isOOSOpen}
+          onClose={() => setIsOOSOpen(false)}
+          initialData={oosModalData}
+        />
+      )}
 
     </div>
   );

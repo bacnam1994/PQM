@@ -6,7 +6,16 @@
  */
 
 import React, { useState } from 'react';
-import { AlertTriangle, CheckCircle2, Clock, TrendingUp, PackageX, RefreshCw, ShieldAlert } from 'lucide-react';
+import { 
+  ShieldAlert, 
+  TrendingUp, 
+  Clock, 
+  PackageX, 
+  AlertTriangle,
+  RefreshCw,
+  Activity,
+  CheckCircle2
+} from 'lucide-react';
 import { useQualityAlerts } from '../../hooks/useQualityAlerts';
 import type { QualityAnomaly } from '../../services/reportService';
 
@@ -37,11 +46,21 @@ const SEVERITY_CONFIG = {
   },
 };
 
-const TYPE_CONFIG = {
+const TYPE_CONFIG: Record<string, { label: string; icon: React.ReactNode; desc: string }> = {
   DRIFT: {
-    label: 'Xu hướng trôi',
+    label: 'Xu hướng trôi (OOT)',
     icon: <TrendingUp size={14} />,
     desc: 'Chỉ tiêu có xu hướng thay đổi liên tục qua nhiều lần kiểm.',
+  },
+  OOT_NEAR_LIMIT: {
+    label: 'Cận biên giới hạn (OOT)',
+    icon: <AlertTriangle size={14} className="text-amber-500" />,
+    desc: 'Chỉ tiêu tiệm cận sát biên dung sai tối đa/tối thiểu của TCCS.',
+  },
+  OOT_SIGMA_SHIFT: {
+    label: 'Lệch thống kê >2σ (OOT)',
+    icon: <Activity size={14} className="text-purple-500" />,
+    desc: 'Giá trị lô lệch đáng kể so với trung bình lịch sử của sản phẩm.',
   },
   EXPIRY: {
     label: 'Sắp hết hạn',
@@ -211,6 +230,12 @@ const AlertCard: React.FC<{ alert: QualityAnomaly }> = ({ alert }) => {
           className="text-xs text-slate-600 dark:text-slate-300 mt-1 leading-relaxed"
           dangerouslySetInnerHTML={{ __html: renderMarkdown(alert.detail) }}
         />
+        {alert.recommendation && (
+          <div className="mt-2.5 p-2.5 rounded-xl bg-white/60 dark:bg-slate-800/80 border border-slate-200/60 dark:border-slate-700/60 flex items-start gap-2 text-xs">
+            <span className="text-[10px] font-black uppercase text-cyan-600 dark:text-cyan-400 shrink-0 mt-0.5">Khuyến nghị AI:</span>
+            <span className="text-slate-700 dark:text-slate-300 font-medium">{alert.recommendation}</span>
+          </div>
+        )}
       </div>
     </div>
   );

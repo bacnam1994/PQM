@@ -6,6 +6,7 @@
 import * as XLSX from 'xlsx';
 import { QualityAnomaly } from '../types';
 import { lookupPharmaTerm } from '../utils/aiMapping';
+import { detectOOTForCriterion, BatchCriterionDataPoint } from '../utils/ootDetection';
 
 /**
  * Định dạng ngày tháng sang DD/MM/YYYY
@@ -257,7 +258,7 @@ export const detectQualityAnomalies = (appContext: any, daysAhead = 30): Quality
     }
   });
 
-  // ─── 2. Phát hiện xu hướng trôi (Drift) ─────────────────────────────
+  // ─── 2. Phát hiện xu hướng trôi (Drift & Out-of-Trend OOT) ─────────
   const productGroups: Record<string, any[]> = {};
   testResults.forEach((tr: any) => {
     const batch = batches.find((b: any) => b.id === tr.batchId);
@@ -267,44 +268,64 @@ export const detectQualityAnomalies = (appContext: any, daysAhead = 30): Quality
     productGroups[pid].push({ ...tr, batch });
   });
 
-  Object.entries(productGroups).forEach(([pid, results]) => {
-    results.sort((a, b) => new Date(b.testDate || 0).getTime() - new Date(a.testDate || 0).getTime());
-    const recent3 = results.slice(0, 3);
-    if (recent3.length < 3) return;
+  const tccsList = appContext.tccsList || [];
 
-    const criteriaValues: Record<string, number[]> = {};
-    recent3.forEach(tr => {
+  Object.entries(productGroups).forEach(([pid, results]) => {
+    const product = products.find((p: any) => p.id === pid);
+    const productTccs = tccsList.find((t: any) => t.productId === pid);
+    const allTccsCriteria = [
+      ...(productTccs?.mainQualityCriteria || []),
+      ...(productTccs?.safetyCriteria || [])
+    ];
+
+    // Gom dữ liệu điểm đo theo từng chỉ tiêu
+    const criteriaDataPointsMap: Record<string, BatchCriterionDataPoint[]> = {};
+
+    results.forEach(tr => {
+      const b = tr.batch;
       (tr.results || []).forEach((entry: any) => {
-        const numVal = parseFloat(String(entry.value || '').replace(',', '.'));
-        if (isNaN(numVal)) return;
+        if (!entry.criteriaName || entry.value === undefined || entry.value === null || entry.value === '') return;
         const canonicalName = lookupPharmaTerm(entry.criteriaName) || entry.criteriaName;
-        if (!criteriaValues[canonicalName]) criteriaValues[canonicalName] = [];
-        criteriaValues[canonicalName].push(numVal);
+        if (!criteriaDataPointsMap[canonicalName]) {
+          criteriaDataPointsMap[canonicalName] = [];
+        }
+
+        // Tìm limit trong TCCS nếu có
+        const matchedTccs = allTccsCriteria.find(c => c && c.name && (c.name.trim().toLowerCase() === entry.criteriaName.trim().toLowerCase() || lookupPharmaTerm(c.name) === canonicalName));
+
+        criteriaDataPointsMap[canonicalName].push({
+          batchId: b.id || tr.batchId,
+          batchNo: b.batchNo || `Lô ${tr.batchId}`,
+          testDate: tr.testDate || b.mfgDate || '',
+          value: entry.value,
+          criteriaName: entry.criteriaName,
+          unit: entry.unit,
+          minLimit: matchedTccs?.minLimit,
+          maxLimit: matchedTccs?.maxLimit,
+        });
       });
     });
 
-    Object.entries(criteriaValues).forEach(([criteriaName, values]) => {
-      if (values.length < 3) return;
-      // recent3 được sort descending: [0]=mới nhất, [1]=giữa, [2]=cũ nhất
-      // v1=mới nhất, v2=giữa, v3=cũ nhất
-      const [v1, v2, v3] = values;
-      const isIncreasing = v1 > v2 && v2 > v3;
-      const isDecreasing = v1 < v2 && v2 < v3;
+    // Chạy thuật toán OOT cho từng chỉ tiêu
+    Object.entries(criteriaDataPointsMap).forEach(([canonicalName, dataPoints]) => {
+      const ootAnomalies = detectOOTForCriterion(canonicalName, dataPoints);
+      ootAnomalies.forEach((oot, idx) => {
+        let anomalyType: QualityAnomaly['type'] = 'DRIFT';
+        if (oot.type === 'NEAR_SPEC_LIMIT') anomalyType = 'OOT_NEAR_LIMIT';
+        else if (oot.type === 'SIGMA_SHIFT') anomalyType = 'OOT_SIGMA_SHIFT';
 
-      if (isIncreasing || isDecreasing) {
-        const product = products.find((p: any) => p.id === pid);
-        const trend = isIncreasing ? 'tăng liên tục' : 'giảm liên tục';
-        const changeRate = Math.abs(((v1 - v3) / (v3 || 1)) * 100).toFixed(1);
-        // FIX 6: Hiển thị đúng chiều thời gian cũ→mới: v3 (cũ nhất) → v2 → v1 (mới nhất)
         anomalies.push({
-          id: `qa_drift_${pid}_${criteriaName}`,
-          type: 'DRIFT',
-          severity: parseFloat(changeRate) > 20 ? 'HIGH' : 'MEDIUM',
-          title: `Xu hướng trôi: ${criteriaName}`,
-          detail: `Sản phẩm **${product?.name || pid}** — chỉ tiêu **${criteriaName}** đang **${trend}** qua 3 lần kiểm gần nhất (cũ→mới): ${v3.toFixed(3)} → ${v2.toFixed(3)} → ${v1.toFixed(3)} (thay đổi ${changeRate}%).`,
+          id: `qa_oot_${pid}_${canonicalName}_${idx}`,
+          type: anomalyType,
+          severity: oot.severity,
+          title: `${oot.title}: ${canonicalName}`,
+          detail: `Sản phẩm **${product?.name || pid}** — ${oot.description}`,
           productName: product?.name,
+          batchNo: oot.affectedBatches.slice(-1)[0],
+          criteriaName: canonicalName,
+          recommendation: oot.recommendation,
         });
-      }
+      });
     });
   });
 

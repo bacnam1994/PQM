@@ -174,12 +174,14 @@ export interface CriteriaAlias {
 
 export interface QualityAnomaly {
   id?: string;
-  type: 'DRIFT' | 'EXPIRY' | 'HIGH_FAIL_RATE' | 'MISSING_DATA';
+  type: 'DRIFT' | 'EXPIRY' | 'HIGH_FAIL_RATE' | 'MISSING_DATA' | 'OOT_NEAR_LIMIT' | 'OOT_SIGMA_SHIFT';
   severity: 'HIGH' | 'MEDIUM' | 'LOW';
   title: string;
   detail: string;
   productName?: string;
   batchNo?: string;
+  criteriaName?: string;
+  recommendation?: string;
 }
 
 export interface AppState {

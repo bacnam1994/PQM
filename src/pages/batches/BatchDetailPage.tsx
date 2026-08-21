@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Loader2, FlaskConical, ClipboardCheck, Layers, Printer, CheckCircle2, X, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, Loader2, FlaskConical, ClipboardCheck, Layers, Printer, CheckCircle2, X, AlertTriangle, ShieldAlert, Sparkles } from 'lucide-react';
 import { useDataGraph } from '../../hooks/useDataGraph';
 import { useAppStore } from '../../store/useAppStore';
 import { formatDateStandard, ensureArray, parseNumberFromText } from '../../utils';
 import { fetchTestResultsByBatchId } from '../../services/testResultService';
 import { TestResult, Criterion, FormulaIngredient } from '../../types';
 import { CircularProgress, BatchCriteriaHistory } from '../../components';
+import { OOSInvestigationModal } from '../../components/features/OOSInvestigationModal';
 
 // Helper tính tiến độ lô
 const calculateBatchProgress = (batch: any, batchResults: TestResult[]) => {
@@ -67,8 +68,54 @@ const BatchDetailPage = () => {
   const [viewBatchResults, setViewBatchResults] = useState<TestResult[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [showHistoryTable, setShowHistoryTable] = useState(false);
+  const [isOOSOpen, setIsOOSOpen] = useState(false);
+  const [oosModalData, setOosModalData] = useState<any>(null);
 
   const batch = useMemo(() => batches.find(b => b.id === id), [batches, id]);
+
+  const handleOpenOOS = (res?: TestResult) => {
+    if (!batch) return;
+    const targetResults = res ? ensureArray(res.results) : viewBatchResults.flatMap(r => ensureArray(r.results));
+    const failedCriteria: { criteriaName: string; actualValue: string | number; specification: string; unit?: string }[] = [];
+    const passedCriteria: { criteriaName: string; actualValue: string | number }[] = [];
+
+    targetResults.forEach(item => {
+      if (!item || !item.criteriaName) return;
+      const cDef = allCriteriaMap.get(item.criteriaName.trim().toLowerCase());
+      const reqText = cDef
+        ? cDef.type === 'NUMBER'
+          ? (cDef.min != null && cDef.max != null ? `${cDef.min} ~ ${cDef.max}` : cDef.min != null ? `≥ ${cDef.min}` : cDef.max != null ? `≤ ${cDef.max}` : '')
+          : (cDef.expectedText || '')
+        : '';
+
+      if (item.isPass === false) {
+        failedCriteria.push({
+          criteriaName: item.criteriaName,
+          actualValue: item.value,
+          specification: reqText || 'Theo tiêu chuẩn',
+          unit: item.unit,
+        });
+      } else {
+        passedCriteria.push({
+          criteriaName: item.criteriaName,
+          actualValue: item.value,
+        });
+      }
+    });
+
+    const formula = productFormulas.find((f: any) => f.productId === batch.productId);
+
+    setOosModalData({
+      productName: batch.product?.name || 'Sản phẩm',
+      batchNo: batch.batchNo,
+      mfgDate: batch.mfgDate,
+      expDate: batch.expDate,
+      failedCriteria: failedCriteria.length > 0 ? failedCriteria : [{ criteriaName: 'Chỉ tiêu chất lượng', actualValue: 'Không đạt', specification: 'TCCS' }],
+      passedCriteria,
+      formulaIngredients: formula?.ingredients || [],
+    });
+    setIsOOSOpen(true);
+  };
 
   // Build lookup maps: TCCS criteria -> formula ingredient -> basis for % calculation
   const { allCriteriaMap, formulaItemMap } = useMemo(() => {
@@ -238,7 +285,17 @@ const BatchDetailPage = () => {
                         <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase ${res.overallStatus === 'PASS' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400' : 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400'}`}>{res.overallStatus === 'PASS' ? 'ĐẠT' : 'KHÔNG ĐẠT'}</span>
                         <div><p className="text-sm font-bold text-slate-700 dark:text-slate-200">{res.labName}</p><p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">{formatDateStandard(res.testDate)}</p></div>
                       </div>
-                      <button onClick={() => navigate(`/test-results/print/${res.id}`)} className="text-[10px] font-black text-indigo-600 bg-white dark:bg-slate-700 border border-indigo-100 dark:border-slate-600 px-4 py-2.5 rounded-lg shadow-sm hover:bg-indigo-50 hover:border-indigo-200 transition-all flex items-center gap-2 uppercase tracking-widest"><Printer size={14} /> In Phiếu này</button>
+                      <div className="flex items-center gap-2">
+                        {res.overallStatus !== 'PASS' && (
+                          <button 
+                            onClick={() => handleOpenOOS(res)} 
+                            className="text-[10px] font-black text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/60 px-3 py-2 rounded-lg shadow-sm hover:bg-rose-100 dark:hover:bg-rose-900/60 transition-all flex items-center gap-1.5 uppercase tracking-wider"
+                          >
+                            <ShieldAlert size={14} className="text-rose-500" /> Điều tra OOS (AI)
+                          </button>
+                        )}
+                        <button onClick={() => navigate(`/test-results/print/${res.id}`)} className="text-[10px] font-black text-indigo-600 bg-white dark:bg-slate-700 border border-indigo-100 dark:border-slate-600 px-4 py-2.5 rounded-lg shadow-sm hover:bg-indigo-50 hover:border-indigo-200 transition-all flex items-center gap-2 uppercase tracking-widest"><Printer size={14} /> In Phiếu này</button>
+                      </div>
                     </div>
                     <div className="overflow-x-auto">
                       <table className="w-full text-xs text-left"><thead className="bg-white dark:bg-slate-800/80 text-slate-400 dark:text-slate-500 font-bold border-b border-slate-50 dark:border-slate-700"><tr><th className="px-5 py-3">Chỉ tiêu</th><th className="px-4 py-3 text-center">Mức Y/C</th><th className="px-5 py-3 text-right">Kết quả</th><th className="px-4 py-3 text-center">ĐVT</th><th className="px-4 py-3 text-center">Đánh giá</th></tr></thead>
@@ -274,6 +331,14 @@ const BatchDetailPage = () => {
           )}
         </div>
       </div>
+
+      {isOOSOpen && oosModalData && (
+        <OOSInvestigationModal
+          isOpen={isOOSOpen}
+          onClose={() => setIsOOSOpen(false)}
+          initialData={oosModalData}
+        />
+      )}
     </div>
   );
 };
