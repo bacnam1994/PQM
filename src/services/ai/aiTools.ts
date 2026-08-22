@@ -1,6 +1,7 @@
-import { TestResult } from '../../types';
+﻿import { TestResult } from '../../types';
 import { generateQualityReport as _generateReport, detectQualityAnomalies as _detectAnomalies, QualityReportOptions } from '../reportService';
 import { generateRuleBasedOOSReport } from './oosInvestigationService';
+import { generateAIInsights } from './autoLearningService';
 
 // ============================================================
 // GEMINI TOOL DECLARATIONS
@@ -178,6 +179,20 @@ export const GEMINI_TOOL_DECLARATIONS = [
         }
       },
       required: ["batchNo"]
+    }
+  },
+  {
+    name: "getAIInsights",
+    description: "Sinh va tra ve danh sach phan tich chat luong chu dong (AI Insights). Su dung khi nguoi dung hoi ve tinh hinh chat luong, insights, hoac khoi dong buoi sang.",
+    parameters: {
+      type: "OBJECT",
+      properties: {
+        forceRefresh: {
+          type: "BOOLEAN",
+          description: "true neu muon tai phan tich, bo qua cache cu."
+        }
+      },
+      required: []
     }
   }
 ];
@@ -851,6 +866,24 @@ export const executeTool = async (
         action: 'REDIRECT',
         path: `/batches/${targetBatch.id}`
       };
+    }
+
+    case 'getAIInsights': {
+      try {
+        const { clearInsightCache } = await import('./autoLearningService');
+        if (args.forceRefresh) clearInsightCache();
+        const insights = await generateAIInsights(appContext, generateText || (async () => ''));
+        if (insights.length === 0) {
+          return { count: 0, message: 'He thong hoat dong tot. Khong phat hien van de chat luong nao dang chu y.' };
+        }
+        const insightLines = insights.map(i => {
+          const badge = i.severity === 'HIGH' ? '[CAO]' : i.severity === 'MEDIUM' ? '[TB]' : '[THAP]';
+          return badge + ' **' + i.title + '**\n' + i.detail;
+        }).join('\n\n---\n\n');
+        return { count: insights.length, message: '### AI Insights\n\n' + insightLines, insights };
+      } catch (e: any) {
+        return { error: e.message };
+      }
     }
 
     default:

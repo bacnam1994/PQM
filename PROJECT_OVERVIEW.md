@@ -1,6 +1,6 @@
 # 📘 TỔNG QUAN TOÀN DIỆN HỆ THỐNG PQM (PRODUCT QUALITY MANAGEMENT)
-> **Phiên bản tài liệu:** 1.3.1  
-> **Cập nhật lần cuối:** 2026-08-21  
+> **Phiên bản tài liệu:** 1.4.0  
+> **Cập nhật lần cuối:** 2026-08-22  
 > **Dự án:** Hệ thống Quản lý Chất lượng Sản phẩm & Kiểm nghiệm (PQM)
 
 ---
@@ -31,9 +31,9 @@
 - **Frontend Core**: React 19, TypeScript (~5.8), Vite (v6), TailwindCSS v3.
 - **State Management**: Zustand (tách biệt `useAppStore` cho dữ liệu nghiệp vụ & `useUIStore` cho giao diện/preferences).
 - **Backend / BaaS**: Firebase Realtime Database (RTDB), Firebase Authentication, Firebase Storage.
-- **Trí tuệ nhân tạo (AI)**: Google Generative AI SDK (`@google/generative-ai` - Gemini 2.0 Flash/Pro).
+- **Trí tuệ nhân tạo (AI)**: Google Generative AI SDK (`@google/generative-ai` - Gemini 2.5 Flash/Pro, Gemini 2.0 Flash).
 - **Trực quan hóa & Báo cáo**: Recharts (Biểu đồ xu hướng, phân bố), QRCode React, SheetJS/XLSX (Xuất Excel).
-- **Kiểm thử**: Vitest (Unit Test - 40 tests passed), Playwright (E2E Test).
+- **Kiểm thử**: Vitest (Unit Test - 63 tests passed 100%), Playwright (E2E Test).
 
 ### 2.2. Kiến trúc Triển khai (Deployment Rules)
 - **Môi trường Sản xuất**: Firebase Hosting (`https://v-biotech.web.app`) | Project ID: `v-biotech`.
@@ -141,17 +141,22 @@ src/
 
 ## 6. HỆ THỐNG TRÍ TUỆ NHÂN TẠO (AI INTELLIGENCE SUITE)
 
-Hệ thống AI dựa trên Google Gemini với 3 cấp độ:
+Hệ thống AI dựa trên Google Gemini với 4 cấp độ thông minh:
 
 1. **OCR & Extraction (Cấp độ 1)**:
    - Đọc trực tiếp file ảnh hoặc PDF phiếu kiểm nghiệm từ phòng Lab bên ngoài.
-   - Nhận diện bảng chỉ tiêu, đơn vị tính, phương pháp và kết quả đo.
+   - Nhận diện bảng chỉ tiêu, đơn vị tính, phương pháp và kết quả đo với cơ chế fallback và prompt động theo TCCS.
 2. **Semantic Mapping & Auto-evaluation (Cấp độ 2)**:
-   - Tự động đối chiếu tên chỉ tiêu tiếng Anh/Việt (ví dụ: *Moisture* -> *Độ ẩm*).
-   - Tự động so sánh với Min/Max trong TCCS để gắn cờ Đạt/Không Đạt.
+   - Tự động đối chiếu tên chỉ tiêu tiếng Anh/Việt qua từ điển dược học `PHARMA_TERM_DICTIONARY` và thuật toán Dice Coefficient/fuzzy semantic matching (ví dụ: *Moisture* -> *Độ ẩm*).
+   - Tự động so sánh với Min/Max trong TCCS hoặc công thức sản phẩm (±20%) để gắn cờ Đạt/Không Đạt.
 3. **Self-Learning & Action Agents (Cấp độ 3)**:
    - Học từ phản hồi người dùng: Khi user sửa mapping, AI tự lưu vào `aiLearnedMappings` để ghi nhớ cho các lần sau.
-   - Hỗ trợ AI Tools (`aiTools.ts`): Tự động tìm kiếm sản phẩm, kiểm tra tồn kho lô, phân tích cảnh báo và soạn thảo đề xuất xử lý.
+   - Hỗ trợ AI Tools (`aiTools.ts`): Tự động tìm kiếm sản phẩm, kiểm tra tồn kho lô, phân tích cảnh báo, điều tra OOS/CAPA và soạn thảo đề xuất xử lý.
+4. **Active & Autonomous Self-Learning (`autoLearningService.ts` - Cấp độ 4 Mới)**:
+   - **Post-OCR Auto-Learn**: Tự động học từ các ánh xạ nhận diện thành công (high-confidence) ngay khi OCR mà không cần chờ người dùng can thiệp thủ công.
+   - **Pattern Mining & Dictionary Suggestion**: Phát hiện các cặp ánh xạ có tần suất cao ($\ge 3$ lần) để gợi ý bổ sung vào từ điển tiêu chuẩn.
+   - **AI Quality Insight Engine**: Tự động phân tích toàn diện dữ liệu (tỷ lệ lỗi theo sản phẩm, trôi chỉ tiêu qua các lô, rủi ro hạn dùng) để sinh insight chủ động mỗi ngày (**AI Morning Briefing**).
+   - **Contextual Session Memory**: Tự động tóm tắt các cuộc hội thoại trước và duy trì ngữ cảnh liên phiên chat theo từng User ID.
 
 ---
 
@@ -176,7 +181,7 @@ npm run build
 # 3. Deploy lên Firebase Hosting
 npm run deploy
 
-# 4. Chạy Unit Test (Vitest - 40 tests)
+# 4. Chạy Unit Test (Vitest - 63 tests)
 npm run test -- --run
 
 # 5. Chạy End-to-End Test (Playwright)
@@ -187,6 +192,7 @@ npm run test:e2e
 
 ## 9. NHẬT KÝ CẬP NHẬT DỰ ÁN (PROJECT CHANGELOG)
 
+| **2026-08-22** | `1.4.0` | **Nâng cấp Hệ thống Tự học AI Chủ động (Active & Autonomous AI Self-Learning Engine)**: <br/>- **Post-OCR Auto-Learn ([autoLearningService.ts](file:///d:/26%20Kiem%20nghiem/PQM/src/services/ai/autoLearningService.ts))**: Tự động học và lưu lại các cặp mapping chỉ tiêu có confidence cao ngay khi AI đọc đúng mà không cần chờ người dùng phải bấm sửa.<br/>- **Pattern Mining & Dictionary Suggestion**: Phát hiện các mapping có tần suất xuất hiện $\ge 3$ lần để tự động nâng độ tin cậy và gợi ý đưa vào từ điển dược học cố định.<br/>- **AI Quality Insight Engine & Morning Briefing**: Tự động phân tích dữ liệu toàn hệ thống (xu hướng trôi chỉ tiêu 3 lô liên tiếp, tỷ lệ không đạt $\ge 30\%$, cảnh báo hạn dùng $\le 60$ ngày) và chủ động đẩy bản tin chào buổi sáng (*AI Morning Briefing*) khi mở Chatbot.<br/>- **Contextual Session Memory**: Tự động tóm tắt ngữ cảnh cuộc hội thoại trước đó khi đóng chat và nạp lại vào prompt hệ thống cho các phiên sau theo từng `user.uid`.<br/>- **AI Tools Integration**: Bổ sung tool `getAIInsights` trong [aiTools.ts](file:///d:/26%20Kiem%20nghiem/PQM/src/services/ai/aiTools.ts) cho phép trợ lý AI chủ động trả về các insight chất lượng khi được hỏi.<br/>- **Chuẩn hóa Model Selection**: Loại bỏ các tham chiếu đến Gemini 3.x chưa phát hành, thiết lập mặc định `gemini-2.5-flash` và hỗ trợ đầy đủ `gemini-2.5-pro` & `gemini-2.0-flash`.<br/>- **Build thành công 100%** (2348 modules, 0 errors). | AI Pair Programmer |
 | **2026-08-21** | `1.3.1` | **Bổ sung Cấu hình & Hỗ trợ Thế hệ AI Gemini 3.x**: <br/>- **Cấu hình Gemini 3.x Models**: Bổ sung `gemini-3.0-flash` (Thế hệ mới siêu tốc độ, nhận diện tài liệu đa phương thức, OCR phiếu kiểm nghiệm chính xác cao) và `gemini-3.0-pro` (Suy luận sâu đỉnh cao cho lập hồ sơ điều tra OOS, 5-Why và CAPA) trong [geminiService.ts](file:///d:/26%20Kiem%20nghiem/PQM/src/services/ai/geminiService.ts).<br/>- **Giao diện Cài đặt (Settings)**: Thêm phân nhóm mô hình (`optgroup`), thẻ preview trực quan mô tả ưu điểm và nhãn *"Mới"* cho các mô hình Gemini 3.x tại [SettingsPage.tsx](file:///d:/26%20Kiem%20nghiem/PQM/src/pages/system/SettingsPage.tsx).<br/>- **Bộ chuyển đổi Model nhanh trên Chatbot AI**: Hỗ trợ chuyển đổi tức thì giữa Gemini 3.0 Flash, 3.0 Pro, 2.5 Flash, 2.5 Pro và 2.0 Flash kèm hiển thị trạng thái trên Topbar của [AIAssistantChat.tsx](file:///d:/26%20Kiem%20nghiem/PQM/src/components/features/AIAssistantChat.tsx).<br/>- **Đạt 52/52 unit tests passed 100%** trong Vitest. | AI Pair Programmer |
 | **2026-08-21** | `1.3.0` | **Phase 1 AI Enhancement: AI OOS Investigation & Out-of-Trend Quality Drift Detection**: <br/>- **AI OOS (Out-of-Specification) Investigation & CAPA Wizard**: Tạo [oosInvestigationService.ts](file:///d:/26%20Kiem%20nghiem/PQM/src/services/ai/oosInvestigationService.ts) và [OOSInvestigationModal.tsx](file:///d:/26%20Kiem%20nghiem/PQM/src/components/features/OOSInvestigationModal.tsx) tự động lập hồ sơ điều tra sự cố chất lượng theo chuẩn FDA / PIC/S GMP: Điều tra Giai đoạn 1 (Phòng Kiểm nghiệm: chuẩn bị mẫu, thiết bị, dung dịch chuẩn), Giai đoạn 2 (Sản xuất: lô nguyên liệu, thông số quy trình, môi trường), Biểu đồ xương cá Ishikawa 6M (Man, Machine, Material, Method, Measurement, Milieu), Phân tích 5-Why tìm nguyên nhân gốc rễ và Kế hoạch CAPA 3 tầng (Correction, Corrective, Preventive Action) kèm biên bản in chuẩn GMP.<br/>- **Hệ thống Phát hiện Xu hướng trôi (OOT - Out of Trend)**: Tạo [ootDetection.ts](file:///d:/26%20Kiem%20nghiem/PQM/src/utils/ootDetection.ts) áp dụng quy tắc Nelson Rules dược phẩm (Trôi đơn điệu $\ge 3$ lô liên tiếp, Tiếp cận sát ngưỡng giới hạn $\pm 8\%$, Dịch chuyển thống kê $2\sigma$) và tích hợp vào `detectQualityAnomalies` ([reportService.ts](file:///d:/26%20Kiem%20nghiem/PQM/src/services/reportService.ts)) cùng [AlertsPage.tsx](file:///d:/26%20Kiem%20nghiem/PQM/src/pages/quality/AlertsPage.tsx).<br/>- **AI Assistant Chat Tool Integration**: Đăng ký tool `generateOOSInvestigation` vào [aiTools.ts](file:///d:/26%20Kiem%20nghiem/PQM/src/services/ai/aiTools.ts) cho phép chatbot AI kích hoạt điều tra OOS ngay trong hội thoại.<br/>- **Tích hợp nút kích hoạt OOS**: Gắn nút "🚨 Điều tra OOS (AI)" trực tiếp trên từng phiếu kiểm nghiệm không đạt tại [BatchDetailPage.tsx](file:///d:/26%20Kiem%20nghiem/PQM/src/pages/batches/BatchDetailPage.tsx) và [TestResultList.tsx](file:///d:/26%20Kiem%20nghiem/PQM/src/pages/qa/TestResultList.tsx).<br/>- **Đạt 52/52 unit tests passed 100%** trong Vitest. | AI Pair Programmer |
 | **2026-08-21** | `1.2.5` | **Sửa triệt để lỗi Phiếu kiểm nghiệm bị đánh FAIL oan do Chỉ tiêu ngoài TCCS**: <br/>- **Sửa logic `calculateOverallStatus` ([evaluation.ts](file:///d:/26%20Kiem%20nghiem/PQM/src/utils/evaluation.ts))**: Thay đổi điều kiện lọc failure từ `!r.isPass` sang `r.isPass === false`. Không còn đánh fail oan các chỉ tiêu không có giới hạn hoặc mang tính thông tin (`isPass === null / undefined`).<br/>- **Tự động đánh giá giới hạn công thức $\pm$20% khi Lưu & Kết luận**: Tích hợp tra cứu công thức sản phẩm vào [useTestResultSave.ts](file:///d:/26%20Kiem%20nghiem/PQM/src/hooks/test-results/useTestResultSave.ts) và `conclusion` trong [CoAReport.tsx](file:///d:/26%20Kiem%20nghiem/PQM/src/components/features/CoAReport.tsx). Khi chỉ tiêu ngoài TCCS đạt trong khoảng $\pm$20% hàm lượng công bố, chỉ tiêu được xác nhận `isPass = true` và toàn phiếu ra kết luận **ĐẠT (PASS)**.<br/>- **Đồng bộ hóa Derived State ([useDataGraph.ts](file:///d:/26%20Kiem%20nghiem/PQM/src/hooks/useDataGraph.ts))**: Tự động tính toán lại `overallStatus` động khi hiển thị thẻ phiếu trên danh sách kiểm nghiệm, giúp các phiếu cũ đã lưu tự động chuyển sang badge **PASS** xanh mà không cần sửa tay.<br/>- Đạt 48/48 unit tests passed 100%. | AI Pair Programmer |

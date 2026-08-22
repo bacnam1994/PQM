@@ -1,4 +1,4 @@
-import { GoogleGenerativeAI, SchemaType, Content } from "@google/generative-ai";
+﻿import { GoogleGenerativeAI, SchemaType, Content } from "@google/generative-ai";
 import { GEMINI_TOOL_DECLARATIONS, executeTool } from './aiTools';
 
 export const getApiKey = (): string => {
@@ -58,29 +58,11 @@ export interface GeminiModelOption {
   id: string;
   name: string;
   badge: string;
-  group: 'Gemini 3.x (Thế hệ mới)' | 'Gemini 2.5' | 'Gemini 2.0';
+  group: 'Gemini 2.5' | 'Gemini 2.0';
   description: string;
-  isNew?: boolean;
 }
 
 export const AVAILABLE_GEMINI_MODELS: GeminiModelOption[] = [
-  // --- THẾ HỆ GEMINI 3.X (MỚI NHẤT) ---
-  {
-    id: 'gemini-3.0-flash',
-    name: 'Gemini 3.0 Flash',
-    badge: '🚀 Mới (3.0 Flash)',
-    group: 'Gemini 3.x (Thế hệ mới)',
-    description: 'Thế hệ 3.x siêu tốc độ, nhận diện tài liệu đa phương thức, OCR và trích xuất chỉ tiêu kiểm nghiệm chính xác cao.',
-    isNew: true,
-  },
-  {
-    id: 'gemini-3.0-pro',
-    name: 'Gemini 3.0 Pro',
-    badge: '🧠 Mới (3.0 Pro)',
-    group: 'Gemini 3.x (Thế hệ mới)',
-    description: 'Mô hình 3.x suy luận logic cấp cao, chuyên sâu cho lập hồ sơ điều tra OOS, phân tích 5-Why và kế hoạch CAPA.',
-    isNew: true,
-  },
   // --- THẾ HỆ GEMINI 2.5 ---
   {
     id: 'gemini-2.5-flash',
@@ -106,7 +88,7 @@ export const AVAILABLE_GEMINI_MODELS: GeminiModelOption[] = [
   },
 ];
 
-export const DEFAULT_GEMINI_MODEL = 'gemini-3.0-flash';
+export const DEFAULT_GEMINI_MODEL = 'gemini-2.5-flash';
 
 export const getGeminiModel = (): string => {
   return localStorage.getItem('GEMINI_MODEL') || DEFAULT_GEMINI_MODEL;
@@ -302,7 +284,7 @@ export const geminiService = {
    * @param appContextData Object chứa toàn bộ dữ liệu ứng dụng
    * @param history Lịch sử đoạn chat trước đó để hỗ trợ Multi-turn
    */
-  chatWithAppContext: async (message: string, appContextData: any, history: Content[] = [], modelName?: string) => {
+  chatWithAppContext: async (message: string, appContextData: any, history: Content[] = [], modelName?: string, sessionMemoryPrompt?: string) => {
     const genAI = getGenAI();
     const activeModel = modelName || getGeminiModel();
     const isThinkingEnabled = getIsThinkingEnabled();
@@ -390,6 +372,7 @@ QUY TẮC:
 11. Nếu người dùng yêu cầu xuất báo cáo, tải file Excel, báo cáo tháng/quý → GỌI generateQualityReport với period phù hợp ('month', 'quarter', 'all').
 12. Nếu người dùng hỏi về cảnh báo chất lượng, rủi ro, lô sắp hết hạn, xu hướng trôi → GỌI detectQualityAnomalies.
 13. Nếu người dùng yêu cầu lập báo cáo chất lượng nâng cao, báo cáo tổng hợp theo ngày sản xuất, theo dõi phần trăm hoạt chất chính qua các lô sản xuất → GỌI generateProductionSynthesisReport với productId (và startDate, endDate nếu có). Bắt buộc phải tìm hoặc hỏi productId trước khi gọi tool.
+${sessionMemoryPrompt ? sessionMemoryPrompt : ""}
 ${isThinkingEnabled ? `14. [QUAN TRỌNG - BẮT BUỘC] Bạn phải luôn bắt đầu phản hồi của mình bằng việc lập luận chi tiết quy trình suy nghĩ và phân tích dữ liệu bên trong cặp thẻ <thinking>...</thinking> (ví dụ: giải thích tại sao bạn chọn hành động hay quyết định gọi tool nào, đối chiếu số liệu thế nào). Chỉ đưa ra câu trả lời chính thức hoặc định dạng markdown cho người dùng bên ngoài cặp thẻ <thinking>...</thinking>. Không được hiển thị thẻ <thinking> trong markdown code blocks.` : ''}`;
 
     const maxRetries = 3;

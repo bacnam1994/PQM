@@ -10,6 +10,7 @@ import { DSFormInput, CriteriaInputGroup, SpecialCharToolbar, DSDateInput } from
 import { mapAIExtractedResultsToCriteria, isCriteriaMatch } from '../../utils/aiMapping';
 import { geminiService, formatGeminiError } from '../../services/ai/geminiService';
 import { buildExtractionPrompt } from '../../services/ai/prompts';
+import { recordHighConfidenceOCRMappings } from '../../services/ai/autoLearningService';
 import { MappingConfirmModal, AIExtractedItem, ConfirmedMapping } from '../../components/features/MappingConfirmModal';
 import { useUIStore } from '../../store/useUIStore';
 import { storage } from '../../firebase';
@@ -397,6 +398,12 @@ const TestResultFormPage = () => {
   };
 
   const finalizeAiMapping = (result: any, highItems: AIExtractedItem[], confirmedLowItems: ConfirmedMapping[]) => {
+    // AUTO-LEARN: Tự động ghi nhận mapping high-confidence
+    const autoMappings = highItems
+      .filter(i => i.mappedName && i.criteriaName !== i.mappedName)
+      .map(i => ({ originalName: i.criteriaName, systemName: i.mappedName }));
+    if (autoMappings.length > 0) recordHighConfidenceOCRMappings(autoMappings);
+
     const mergedResults = [
       ...highItems.map(i => ({
         criteriaName: i.mappedName,

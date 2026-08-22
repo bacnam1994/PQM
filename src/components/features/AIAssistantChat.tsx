@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useMemo } from 'react';
+import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { UploadCloud, Loader2, Sparkles, Send, CheckCircle2, User, AlertCircle, X, Settings, Brain, Trash2 } from 'lucide-react';
 import { geminiService, validateOCRFile, formatGeminiError, AVAILABLE_GEMINI_MODELS, DEFAULT_GEMINI_MODEL } from '../../services/ai/geminiService';
 import { buildExtractionPrompt } from '../../services/ai/prompts';
@@ -10,6 +10,15 @@ import toast from 'react-hot-toast';
 import { MappingConfirmModal, AIExtractedItem, ConfirmedMapping } from './MappingConfirmModal';
 import { isCriteriaMatch } from '../../utils/aiMapping';
 import { generateQualityReport } from '../../services/reportService';
+import {
+  recordHighConfidenceOCRMappings,
+  saveSessionMemory,
+  buildSessionMemoryPrompt,
+  summarizeSessionWithAI,
+  generateRuleBasedInsights,
+  loadCachedInsights,
+  saveCachedInsights,
+} from '../../services/ai/autoLearningService';
 
 type MessageSender = 'user' | 'ai' | 'system';
 type MessageAction = 'CREATE_BATCH' | 'REDIRECT' | null;
@@ -31,8 +40,6 @@ const WELCOME_MESSAGE: ChatMessage = {
 };
 
 const CHAT_HISTORY_KEY = 'pqm_ai_chat_history';
-
-/** Lưu messages vào sessionStorage (per-session, tự xóa khi đóng tab) */
 const saveChatHistory = (msgs: ChatMessage[]) => {
   try {
     // Chỉ lưu tối đa 50 tin nhắn gần nhất để tránh tốn bộ nhớ
@@ -62,7 +69,7 @@ export const AIAssistantChat: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const { products, tccsList, testResults, addBatch, isAdmin, aiLearnedMappings, addAiLearnedMapping, productFormulas, rawMaterials } = useAppStore();
+  const { products, tccsList, testResults, addBatch, isAdmin, aiLearnedMappings, addAiLearnedMapping, productFormulas, rawMaterials, user } = useAppStore();
   const { batches: hydratedBatches } = useDataGraph();
   const navigate = useNavigate();
 
@@ -77,6 +84,48 @@ export const AIAssistantChat: React.FC = () => {
   useEffect(() => {
     saveChatHistory(messages);
   }, [messages]);
+
+  // SESSION MEMORY: Tom tat va luu khi dong chat
+  const handleCloseChat = useCallback(async () => {
+    setIsOpen(false);
+    const realMessages = messages.filter(m => m.id !== 'msg_welcome' && (m.sender === 'user' || m.sender === 'ai'));
+    if (realMessages.length >= 2 && user?.uid) {
+      try {
+        const msgForSummary = realMessages.map(m => ({ sender: m.sender as string, text: m.text }));
+        const summary = await summarizeSessionWithAI(msgForSummary, (p: string, s?: string) => geminiService.generateText(p, s));
+        if (summary) saveSessionMemory(user.uid, summary, currentModel);
+      } catch { /* silent fail */ }
+    }
+  }, [messages, user, currentModel]);
+
+  // MORNING BRIEFING: Hien thi AI Insights khi mo chat lan dau trong ngay
+  const briefingShownKey = `pqm_briefing_shown_${new Date().toDateString()}`;
+  const hasBriefingBeenShown = useRef(false);
+
+  const triggerMorningBriefing = useCallback(() => {
+    if (hasBriefingBeenShown.current) return;
+    if (sessionStorage.getItem(briefingShownKey)) return;
+    const cachedInsights = loadCachedInsights();
+    const insightsToShow = cachedInsights.length > 0
+      ? cachedInsights
+      : generateRuleBasedInsights({ products, batches: hydratedBatches, testResults, aiLearnedMappings, productFormulas, rawMaterials });
+    if (insightsToShow.length === 0) return;
+    const insightText = insightsToShow.slice(0, 3).map(i => {
+      const badge = i.severity === 'HIGH' ? '[CAO]' : i.severity === 'MEDIUM' ? '[TB]' : '[OK]';
+      return badge + ' **' + i.title + '**\n' + i.detail;
+    }).join('\n\n');
+    setMessages(prev => [
+      ...prev,
+      {
+        id: `msg_briefing_${Date.now()}`,
+        sender: 'ai' as const,
+        text: `AI Morning Briefing - ${new Date().toLocaleDateString('vi-VN')}\n\n${insightText}\n\n*Nhap "AI thay gi moi?" de xem toan bo phan tich chi tiet.*`,
+      }
+    ]);
+    sessionStorage.setItem(briefingShownKey, '1');
+    hasBriefingBeenShown.current = true;
+    if (cachedInsights.length === 0) saveCachedInsights(insightsToShow);
+  }, [products, hydratedBatches, testResults, aiLearnedMappings, productFormulas, rawMaterials, briefingShownKey]);
 
   const handleModelChange = (model: string) => {
     setCurrentModel(model);
@@ -103,8 +152,11 @@ export const AIAssistantChat: React.FC = () => {
   useEffect(() => {
     if (isOpen) {
       messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      if (products.length > 0 || testResults.length > 0) {
+        setTimeout(() => triggerMorningBriefing(), 800);
+      }
     }
-  }, [messages, isOpen]);
+  }, [isOpen, triggerMorningBriefing, products.length, testResults.length]);
 
   useEffect(() => {
     const handleTriggerAI = (e: Event) => {
@@ -321,7 +373,11 @@ export const AIAssistantChat: React.FC = () => {
       // Có item cần xác nhận → mở modal
       setIsMappingModalOpen(true);
     } else {
-      // Tất cả đã map được → điền thẳng
+      // Tất cả đã map được → điền thẳng & auto-learn high-confidence mappings
+      const autoMappings = highItems
+        .filter(i => i.mappedName && i.criteriaName !== i.mappedName)
+        .map(i => ({ originalName: i.criteriaName, systemName: i.mappedName }));
+      if (autoMappings.length > 0) recordHighConfidenceOCRMappings(autoMappings);
       finalizeMappingAndNavigate(result, context, highItems, [], false);
     }
   };
@@ -343,6 +399,12 @@ export const AIAssistantChat: React.FC = () => {
         }
       });
     }
+
+    // AUTO-LEARN: Tu dong ghi nhan high-confidence mappings
+    const autoMappings = pendingHighItems
+      .filter(i => i.mappedName && i.criteriaName !== i.mappedName)
+      .map(i => ({ originalName: i.criteriaName, systemName: i.mappedName }));
+    if (autoMappings.length > 0) recordHighConfidenceOCRMappings(autoMappings);
 
     finalizeMappingAndNavigate(result, context, pendingHighItems, confirmedMappings, true);
   };
@@ -491,6 +553,7 @@ export const AIAssistantChat: React.FC = () => {
         // FIX 8: Bổ sung productFormulas và rawMaterials để generateProductionSynthesisReport tính được % hàm lượng
         productFormulas: productFormulas || [],
         rawMaterials: rawMaterials || [],
+        aiLearnedMappings: aiLearnedMappings || [],
       };
       
       // FIX 4: Lọc history chặt hơn — chỉ lấy user/ai messages thuần text,
@@ -507,7 +570,8 @@ export const AIAssistantChat: React.FC = () => {
         }));
       
       const preferredModel = localStorage.getItem('GEMINI_MODEL') || 'gemini-2.5-flash';
-      const aiResponse = await geminiService.chatWithAppContext(userText, appContextData, history as any, preferredModel);
+      const sessionMemoryPrompt = user?.uid ? buildSessionMemoryPrompt(user.uid) : '';
+      const aiResponse = await geminiService.chatWithAppContext(userText, appContextData, history as any, preferredModel, sessionMemoryPrompt);
       
       addMessage({
         sender: 'ai',
@@ -586,7 +650,7 @@ export const AIAssistantChat: React.FC = () => {
             >
               <Settings size={18} />
             </button>
-            <button onClick={() => setIsOpen(false)} className="text-white/70 hover:text-white hover:bg-white/10 p-1.5 rounded-lg transition-colors">
+            <button onClick={handleCloseChat} className="text-white/70 hover:text-white hover:bg-white/10 p-1.5 rounded-lg transition-colors">
               <X size={20} />
             </button>
           </div>
@@ -605,11 +669,6 @@ export const AIAssistantChat: React.FC = () => {
                 onChange={(e) => handleModelChange(e.target.value)}
                 className="bg-white dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 text-[10px] font-bold text-slate-700 dark:text-zinc-300 px-2 py-1 rounded outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer shadow-sm max-w-[200px]"
               >
-                <optgroup label="🚀 Gemini 3.x (Mới nhất)">
-                  {AVAILABLE_GEMINI_MODELS.filter(m => m.group.includes('3.x')).map(m => (
-                    <option key={m.id} value={m.id}>{m.badge}</option>
-                  ))}
-                </optgroup>
                 <optgroup label="⚡ Gemini 2.5 (Tiêu chuẩn)">
                   {AVAILABLE_GEMINI_MODELS.filter(m => m.group.includes('2.5')).map(m => (
                     <option key={m.id} value={m.id}>{m.badge}</option>

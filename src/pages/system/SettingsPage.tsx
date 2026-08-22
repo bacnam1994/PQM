@@ -606,11 +606,6 @@ const SettingsPage: React.FC = () => {
                 onChange={(e) => handleSaveModel(e.target.value)}
                 className="w-full p-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl font-semibold text-slate-700 dark:text-slate-200 text-xs outline-none focus:ring-2 focus:ring-indigo-100 dark:focus:ring-indigo-900/50 cursor-pointer"
               >
-                <optgroup label="🚀 Gemini 3.x (Thế hệ mới nhất - Đề xuất)">
-                  {AVAILABLE_GEMINI_MODELS.filter(m => m.group.includes('3.x')).map(m => (
-                    <option key={m.id} value={m.id}>{m.badge} - {m.name}</option>
-                  ))}
-                </optgroup>
                 <optgroup label="⚡ Gemini 2.5 (Tiêu chuẩn)">
                   {AVAILABLE_GEMINI_MODELS.filter(m => m.group.includes('2.5')).map(m => (
                     <option key={m.id} value={m.id}>{m.badge}</option>
@@ -629,7 +624,7 @@ const SettingsPage: React.FC = () => {
                   <div className="p-2.5 rounded-xl bg-indigo-50/70 dark:bg-indigo-950/30 border border-indigo-100 dark:border-indigo-900/40 text-[11px] text-indigo-700 dark:text-indigo-300 animate-in fade-in duration-200">
                     <div className="font-bold flex items-center gap-1.5 mb-0.5">
                       <Sparkles size={13} className="text-indigo-500" />
-                      {activeModelInfo.name} {activeModelInfo.isNew && <span className="px-1.5 py-0.2 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded text-[9px] font-black uppercase tracking-wider">Mới</span>}
+                      {activeModelInfo.name}
                     </div>
                     <p className="text-[10px] text-slate-600 dark:text-slate-400 leading-relaxed">{activeModelInfo.description}</p>
                   </div>
