@@ -114,13 +114,131 @@ HƯỚNG DẪN ĐỌC BẢNG KẾT QUẢ KIỂM NGHIỆM:
 
 7. Chú thích và ghi chú:
    - Các ký hiệu (*), (**), (1), (a) cuối tên chỉ tiêu bỏ qua, chỉ lấy tên
-   - Dòng "Ghi chú:" hoặc "Note:" hoặc "Remarks:" KHÔNG trích xuất thành chỉ tiêu
+   - Dòng "Ghi chú:" hoặc "Note:" hoặc "Remarks:" KHÔNG trích xuất thành chỉ tiêu nhưng nên ghi vào field "notes" của document
    - Dòng tiêu đề bảng ("BẢNG KẾT QUẢ", "TABLE OF RESULTS") KHÔNG trích xuất
    - Hàng tóm tắt "KẾT LUẬN: ĐẠT" KHÔNG trích xuất thành chỉ tiêu riêng
 
 8. Phiếu có nhiều bảng (Lý hóa + Vi sinh + Kim loại nặng):
    Trích xuất TẤT CẢ các bảng, không bỏ sót.
    Mỗi bảng có thể có cấu trúc khác nhau, phân tích từng bảng độc lập.
+`;
+
+/**
+ * Hướng dẫn xử lý chữ viết tay và ký tự bị mờ/nhòe.
+ */
+const HANDWRITING_GUIDE = `
+XỬ LÝ CHỮ VIẾT TAY VÀ KÝ TỰ MỜ:
+
+1. Chữ viết tay trong cột "Kết quả":
+   - Đọc cẩn thận từng chữ số, đặc biệt phân biệt: 1 vs l vs 7, 0 vs O vs 6 vs 8, 5 vs S, 3 vs 8
+   - Nếu chữ số không rõ ràng nhưng vẫn đọc được nghĩa → ghi giá trị đọc được, KHÔNG để trống
+   - Nếu tuyệt đối không thể đọc → ghi "?" để báo hiệu cần xem lại thủ công
+
+2. Chữ số dạng gạch chân, gạch ngang trong phiếu Việt Nam:
+   - Số viết tay thường có dấu gạch ngang (ví dụ: 7̶ để phân biệt với 1) → đọc là 7
+   - Dấu phẩy thập phân kiểu Châu Âu (1,5) → chuyển thành 1.5
+
+3. Ký tự đặc biệt bị nhòe:
+   - "≤" bị nhòe có thể trông như "<" hoặc "⊆" → luôn hiểu là "≤" trong ngữ cảnh giới hạn
+   - "≥" tương tự → luôn hiểu là "≥"
+   - "%" bị nhòe → dùng ngữ cảnh xung quanh để xác định đơn vị
+
+4. Giá trị bị ghi đè hoặc sửa:
+   - Nếu thấy ký tự bị gạch đi và viết đè → đọc giá trị mới (bên trên hoặc cạnh)
+   - Ghi chú trong field "notes" nếu phát hiện có giá trị bị sửa: "Phát hiện giá trị bị sửa tay tại chỉ tiêu [tên]"
+`;
+
+/**
+ * Hướng dẫn xử lý phiếu có nhiều cột song song (đa cột).
+ */
+const MULTI_COLUMN_GUIDE = `
+XỬ LÝ PHIẾU ĐA CỘT VÀ BỐ CỤC PHỨC TẠP:
+
+1. Phiếu 2 cột song song (2 bộ chỉ tiêu trên cùng trang):
+   - Xác định ranh giới phân cột bằng đường kẻ dọc hoặc khoảng trắng lớn ở giữa trang
+   - Đọc CỘT TRÁI hoàn toàn trước, sau đó đọc CỘT PHẢI
+   - KHÔNG lẫn dữ liệu giữa hai cột
+
+2. Phiếu có phần Header thông tin + Phần bảng:
+   - Header (tên sản phẩm, số lô, ngày...) thường ở phần trên cùng hoặc trong khung riêng
+   - Phần bảng chỉ tiêu bên dưới hoặc trong khung riêng
+   - Trích xuất header vào các field: labName, batchNo, mfgDate, expDate, testDate
+
+3. Phiếu nhiều trang (multi-page PDF):
+   - Tiếp tục đọc TẤT CẢ các trang, gộp chỉ tiêu vào một danh sách duy nhất
+   - Trang 1 thường là header + chỉ tiêu lý hóa; Trang 2+ thường là vi sinh, kim loại nặng
+   - Ghi số trang thực tế vào field "pageCount"
+
+4. Phiếu dạng form điền tay (template có sẵn, điền vào chỗ trống):
+   - Tên chỉ tiêu đã in sẵn, kết quả được viết vào ô trống
+   - Đọc từng ô trống theo thứ tự, ghép với tên chỉ tiêu tương ứng bên cạnh
+   - Ô trống bỏ trống → bỏ qua chỉ tiêu đó (không tạo record)
+
+5. Format phòng lab phổ biến tại Việt Nam:
+   - **Quatest 3 (TP.HCM)**: Header có "Trung tâm Kỹ thuật Tiêu chuẩn Đo lường Chất lượng 3", bảng kết quả theo chuẩn TCVN, có ký hiệu phiếu dạng "KN-YYYY-XXXXXX"
+   - **CASE (Hà Nội)**: Header có "Trung tâm Phân tích và Kiểm nghiệm Thực phẩm Quốc gia" hoặc "CASE", số phiếu dạng "CASE-YYYY/XXX"
+   - **Eurofins (Sắc Ký Hà Nội)**: Header tiếng Anh, cột "Specification" = Giới hạn, "Result" = Kết quả, "Conclusion" = Đạt/KĐ
+   - **Phòng QC nội bộ**: Thường có tem/logo công ty, cột đơn giản, chữ viết tay kết quả
+   - **Vimedimex / VQC**: Phiếu kiểm nghiệm dược phẩm chuẩn GMP, có số hiệu TCCS rõ ràng
+`;
+
+/**
+ * Hướng dẫn xử lý watermark, con dấu và nội dung nhiễu.
+ */
+const WATERMARK_STAMP_GUIDE = `
+XỬ LÝ WATERMARK, CON DẤU VÀ NỘI DUNG NHIỄU:
+
+1. Watermark chéo trên tài liệu:
+   - "DRAFT" / "BẢN NHÁP" / "KHÔNG CHÍNH THỨC" → BỎ QUA watermark, đọc nội dung bên dưới
+   - "CONFIDENTIAL" / "BẢO MẬT" → BỎ QUA, vẫn trích xuất dữ liệu kiểm nghiệm
+   - "SAMPLE" / "MẪU" → BỎ QUA, vẫn đọc bình thường
+
+2. Con dấu tròn / chữ ký:
+   - Con dấu tròn "ĐÃ KIỂM TRA", "ĐÃ DUYỆT", "APPROVED" → KHÔNG trích xuất thành chỉ tiêu
+   - Chữ ký tay → KHÔNG đọc, bỏ qua
+   - Dấu "PASSED" hoặc "FAILED" đóng lên bảng kết quả → bỏ qua (không ảnh hưởng đến việc đọc giá trị từng chỉ tiêu)
+
+3. Nội dung nhiễu khác:
+   - Số trang "Trang 1/3" → bỏ qua, nhưng dùng để xác định "pageCount"
+   - Footer "In lúc: DD/MM/YYYY" hoặc "Printed on" → bỏ qua (không phải testDate)
+   - Mã vạch / QR code → bỏ qua
+   - Logo công ty, hình ảnh sản phẩm → bỏ qua
+   - Header lặp lại ở trang 2, 3... → bỏ qua (chỉ đọc 1 lần)
+
+4. Ảnh chất lượng thấp / chụp nghiêng:
+   - Cố gắng đọc dù ảnh nghiêng ≤ 15 độ
+   - Nếu phần bảng bị khuất / bị bóng → đọc phần thấy được, bỏ qua phần không rõ
+   - Nếu ảnh quá mờ (< 50% ký tự đọc được) → trả về mảng testResults rỗng và ghi notes: "Ảnh chất lượng thấp, không thể đọc đáng tin cậy"
+`;
+
+/**
+ * Tên loại phiếu và viết tắt phổ biến trong ngành kiểm nghiệm VN.
+ */
+const VN_LAB_TERMINOLOGY = `
+THUẬT NGỮ VÀ TÊN PHIẾU KIỂM NGHIỆM VIỆT NAM:
+
+Tên phiếu thường gặp (KHÔNG trích xuất làm chỉ tiêu):
+- PHIẾU KIỂM NGHIỆM / PHIẾU KẾT QUẢ KIỂM NGHIỆM (PKQKN)
+- PHIẾU KIỂM NGHIỆM THÀNH PHẨM (PKNTF)
+- PHIẾU PHÂN TÍCH / PHIẾU PHÂN TÍCH THÀNH PHẨM
+- CERTIFICATE OF ANALYSIS (CoA) / CERTIFICATE OF CONFORMANCE (CoC)
+- BIÊN BẢN KIỂM NGHIỆM / KẾT QUẢ THỬ NGHIỆM
+- TTKT = Thử nghiệm kết thúc | PKN = Phiếu kiểm nghiệm
+- HSKN = Hồ sơ kiểm nghiệm | KQKN = Kết quả kiểm nghiệm
+
+Tên đơn vị kiểm nghiệm → điền vào field "labName":
+- Quatest 1 / Quatest 3 → "Trung tâm Kỹ thuật Tiêu chuẩn Đo lường Chất lượng 3"
+- CASE → "Trung tâm Phân tích và Kiểm nghiệm Thực phẩm Quốc gia (CASE)"
+- Eurofins → "Eurofins Sắc Ký Hà Nội" hoặc "Eurofins Vietnam"
+- Sắc Ký Hà Nội → "Công ty TNHH Sắc Ký Hà Nội"
+- Vimedimex → "Vimedimex"
+- Nếu có "Phòng QC" hoặc "Phòng kiểm nghiệm nội bộ" → điền theo tên công ty trên phiếu
+
+Phân loại phiếu → điền vào field "documentType":
+- Phiếu từ cơ quan kiểm nghiệm bên ngoài (Quatest, CASE, Eurofins...) → "External_Lab"
+- Phiếu kiểm nghiệm nội bộ của nhà máy/phòng QC → "Internal"
+- CoA từ nhà sản xuất nguyên liệu/thành phẩm → "CoA"
+- Phiếu phân tích từ nhà cung cấp → "Supplier_CoA"
 `;
 
 /**
@@ -169,13 +287,16 @@ LƯU Ý: Không có danh sách TCCS. Hãy trích xuất tên chỉ tiêu nguyên
 
   return `Bạn là một chuyên gia phân tích tài liệu kiểm nghiệm dược phẩm, được giao nhiệm vụ đọc và trích xuất thông tin từ Phiếu Kiểm Nghiệm (Certificate of Analysis - CoA / Phiếu Kết Quả Kiểm Nghiệm) để điền vào Form Nhập Kết Quả.
 
-CẤU TRÚC JSON YÊU CẦU (Trả về đúng định dạng này):
+CẤU TRÚC JSON YÊU CẦU (Trả về đúng định dạng này, bao gồm đầy đủ các field mới):
 {
   "labName": "Tên đơn vị kiểm nghiệm / Phòng thí nghiệm (ví dụ: CASE, Quatest 3, Eurofins, Phòng QC nội bộ...)",
+  "documentType": "Loại phiếu: External_Lab | Internal | CoA | Supplier_CoA (xem hướng dẫn VN_LAB_TERMINOLOGY)",
+  "pageCount": 1,
   "batchNo": "Số lô sản xuất (nếu có, không có thì để rỗng)",
   "mfgDate": "Ngày sản xuất (định dạng DD/MM/YYYY, nếu không có để rỗng)",
   "expDate": "Hạn sử dụng (định dạng DD/MM/YYYY, nếu không có để rỗng)",
   "testDate": "Ngày kiểm nghiệm / Ngày xuất phiếu (định dạng DD/MM/YYYY, nếu không có để rỗng)",
+  "notes": "Ghi chú đặc biệt từ phiếu (ghi chú cuối bảng, phát hiện giá trị sửa tay, ảnh chất lượng thấp...); để rỗng nếu không có",
   "testResults": [
     {
       "criteriaName": "Tên chỉ tiêu NGUYÊN BẢN từ phiếu (giữ nguyên, không dịch, không thêm bớt)",
@@ -183,7 +304,8 @@ CẤU TRÚC JSON YÊU CẦU (Trả về đúng định dạng này):
       "confidence": "high hoặc low — mức độ tự tin khi map tên",
       "value": "Kết quả kiểm nghiệm (ví dụ: 1.5, Đạt, Trắng trong, < 10). Trả về dưới dạng chuỗi.",
       "unit": "Đơn vị tính (ví dụ: %, mg, CFU/g. Nếu không có để rỗng)",
-      "limit": "Yêu cầu / Mức tiêu chuẩn / Giới hạn cho phép từ phiếu (nếu có, ví dụ: NMT 5.0%, 95.0-105.0%)"
+      "limit": "Yêu cầu / Mức tiêu chuẩn / Giới hạn cho phép từ phiếu (nếu có, ví dụ: NMT 5.0%, 95.0-105.0%)",
+      "analysisMethod": "Phương pháp thử nghiệm nếu ghi trên phiếu (ví dụ: HPLC, UV-Vis, AAS, TCVN 9632:2013...); để rỗng nếu không có"
     }
   ]
 }
@@ -191,6 +313,14 @@ CẤU TRÚC JSON YÊU CẦU (Trả về đúng định dạng này):
 ${ABBREVIATION_GUIDE}
 
 ${TABLE_PARSING_GUIDE}
+
+${HANDWRITING_GUIDE}
+
+${MULTI_COLUMN_GUIDE}
+
+${WATERMARK_STAMP_GUIDE}
+
+${VN_LAB_TERMINOLOGY}
 
 ${tccsSection}
 
@@ -202,6 +332,9 @@ LƯU Ý QUAN TRỌNG:
 5. Trích xuất TẤT CẢ các chỉ tiêu từ mọi bảng trong phiếu (lý hóa, vi sinh, kim loại nặng).
 6. Nếu một chỉ tiêu có nhiều sub-chỉ tiêu (ví dụ: Giới hạn vi sinh gồm TVKHK, Nấm mốc...), hãy tạo từng object riêng cho mỗi sub-chỉ tiêu.
 7. Khi "value" là kết quả định tính (Đạt/Pass/Không phát hiện...), KHÔNG điền số 0 hay giá trị giả — giữ nguyên chuỗi gốc.
+8. Điền "pageCount" bằng số trang thực tế đã đọc được trong tài liệu.
+9. Điền "documentType" dựa theo hướng dẫn VN_LAB_TERMINOLOGY ở trên.
+10. Điền "analysisMethod" cho từng chỉ tiêu nếu phiếu ghi rõ phương pháp thử (cột "Phương pháp", "Method", "Test method").
 `;
 };
 

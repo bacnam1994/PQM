@@ -3,7 +3,7 @@ import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useTestResultForm } from '../../hooks/test-results/useTestResultForm';
 import { useAppStore } from '../../store/useAppStore';
 import { useDataGraph } from '../../hooks/useDataGraph';
-import { ArrowLeft, Search, CheckCircle2, Package, Hash, Calendar, Clock, AlertCircle, Printer, History, Beaker, FlaskConical, ShieldCheck, ListPlus, Plus, Trash2, Loader2, Sparkles, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, Search, CheckCircle2, Package, Hash, Calendar, Clock, AlertCircle, Printer, History, Beaker, FlaskConical, ShieldCheck, ListPlus, Plus, Trash2, Loader2, Sparkles, AlertTriangle, Files, CheckCheck, XCircle, Info } from 'lucide-react';
 import { formatDateStandard, TEST_RESULT_STATUS, BATCH_STATUS, normalizeSearch, parseDateToISO, getAppUrl } from '../../utils';
 import { fetchTestResultById } from '../../services/testResultService';
 import { DSFormInput, CriteriaInputGroup, SpecialCharToolbar, DSDateInput } from '../../components';
@@ -128,6 +128,124 @@ const GDFileSelectorModal: React.FC<GDFileSelectorModalProps> = ({ isOpen, onClo
   );
 };
 
+// ─── BATCH SCAN PROGRESS MODAL ────────────────────────────────────────────────
+interface BatchFileStatus {
+  fileName: string;
+  status: 'waiting' | 'processing' | 'done' | 'error';
+  criteriaCount?: number;
+  error?: string;
+  progressStep?: string;
+  progressPercent?: number;
+}
+
+interface BatchScanProgressModalProps {
+  isOpen: boolean;
+  files: BatchFileStatus[];
+  totalDone: number;
+  onClose?: () => void;
+}
+
+const BatchScanProgressModal: React.FC<BatchScanProgressModalProps> = ({ isOpen, files, totalDone, onClose }) => {
+  if (!isOpen) return null;
+  const total = files.length;
+  const overallPercent = total > 0 ? Math.round((totalDone / total) * 100) : 0;
+  const allFinished = files.every(f => f.status === 'done' || f.status === 'error');
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/70 backdrop-blur-sm p-4">
+      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-slate-100 dark:border-slate-700 w-full max-w-lg overflow-hidden animate-in zoom-in-95 duration-200">
+        {/* Header */}
+        <div className="p-5 border-b border-slate-100 dark:border-slate-700 bg-gradient-to-r from-violet-50 to-indigo-50 dark:from-violet-950/30 dark:to-indigo-950/30">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-gradient-to-br from-violet-600 to-indigo-600 text-white rounded-xl shadow-md">
+              <Files size={18} />
+            </div>
+            <div>
+              <h3 className="text-sm font-black text-slate-800 dark:text-slate-100 uppercase tracking-wide">AI Batch Scan – Quét nhiều file</h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400">{totalDone}/{total} file hoàn tất</p>
+            </div>
+            {allFinished && onClose && (
+              <button onClick={onClose} className="ml-auto p-2 hover:bg-slate-200/50 dark:hover:bg-slate-700 rounded-lg text-slate-400 transition-colors">
+                <X size={16} />
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Overall progress bar */}
+        <div className="px-5 pt-4">
+          <div className="flex justify-between items-center mb-1.5">
+            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Tiến độ tổng thể</span>
+            <span className="text-[10px] font-black text-violet-600 dark:text-violet-400">{overallPercent}%</span>
+          </div>
+          <div className="h-2 rounded-full bg-slate-100 dark:bg-slate-700 overflow-hidden">
+            <div
+              className="h-full rounded-full bg-gradient-to-r from-violet-500 to-indigo-500 transition-all duration-500"
+              style={{ width: `${overallPercent}%` }}
+            />
+          </div>
+        </div>
+
+        {/* File list */}
+        <div className="p-5 space-y-2.5 max-h-72 overflow-y-auto custom-scrollbar">
+          {files.map((f, idx) => (
+            <div key={idx} className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 dark:bg-slate-700/50 border border-slate-100 dark:border-slate-700">
+              {/* Status icon */}
+              <div className="flex-shrink-0">
+                {f.status === 'waiting' && <div className="w-5 h-5 rounded-full border-2 border-slate-300 dark:border-slate-600" />}
+                {f.status === 'processing' && <Loader2 size={18} className="animate-spin text-violet-500" />}
+                {f.status === 'done' && <CheckCheck size={18} className="text-emerald-500" />}
+                {f.status === 'error' && <XCircle size={18} className="text-red-500" />}
+              </div>
+
+              {/* File info */}
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-bold text-slate-700 dark:text-slate-200 truncate" title={f.fileName}>{f.fileName}</p>
+                {f.status === 'processing' && f.progressStep && (
+                  <p className="text-[10px] text-violet-500 font-medium mt-0.5">{f.progressStep}</p>
+                )}
+                {f.status === 'done' && (
+                  <p className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium mt-0.5">
+                    ✓ {f.criteriaCount ?? 0} chỉ tiêu đọc được
+                  </p>
+                )}
+                {f.status === 'error' && (
+                  <p className="text-[10px] text-red-500 font-medium mt-0.5 truncate" title={f.error}>❌ {f.error}</p>
+                )}
+              </div>
+
+              {/* Per-file progress bar khi đang xử lý */}
+              {f.status === 'processing' && typeof f.progressPercent === 'number' && (
+                <div className="w-16 h-1.5 rounded-full bg-slate-200 dark:bg-slate-600 overflow-hidden flex-shrink-0">
+                  <div
+                    className="h-full rounded-full bg-violet-400 transition-all duration-300"
+                    style={{ width: `${f.progressPercent}%` }}
+                  />
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+
+        {/* Footer */}
+        {allFinished && (
+          <div className="px-5 pb-5">
+            <div className={`flex items-center gap-2 p-3 rounded-xl text-xs font-medium ${
+              files.some(f => f.status === 'error')
+                ? 'bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800'
+                : 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800'
+            }`}>
+              <CheckCheck size={14} />
+              Đã hoàn tất: {files.filter(f => f.status === 'done').length} thành công, {files.filter(f => f.status === 'error').length} lỗi.
+              {onClose && <button onClick={onClose} className="ml-auto font-black underline">Đóng</button>}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
 const TestResultFormPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -158,6 +276,11 @@ const TestResultFormPage = () => {
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   /** Tập hợp tên chỉ tiêu đã được AI điền (dùng để hiển thị badge AI trên form) */
   const [aiFilledFields, setAiFilledFields] = React.useState<Set<string>>(new Set());
+  /** Thông tin scan AI từ OCR (documentType, pageCount, notes) */
+  const [aiScanInfo, setAiScanInfo] = React.useState<{ documentType?: string; pageCount?: number; notes?: string; fileCount?: number } | null>(null);
+  /** Batch scan progress state */
+  const [batchScanFiles, setBatchScanFiles] = React.useState<{ fileName: string; status: 'waiting' | 'processing' | 'done' | 'error'; criteriaCount?: number; error?: string; progressStep?: string; progressPercent?: number }[]>([]);
+  const [isBatchProgressOpen, setIsBatchProgressOpen] = React.useState(false);
 
   // Lấy danh sách tên chỉ tiêu từ TCCS đang hiệu lực để làm prompt
   const allActiveTccsNames = useMemo(() => {
@@ -333,52 +456,202 @@ const TestResultFormPage = () => {
     }
   };
 
-  // --- Logic xử lý File và Mapping AI ---
+  // --- Logic xử lý File và Mapping AI (Batch-capable) ---
   const handleAiFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+
     setIsAiProcessing(true);
-    try {
-      const prompt = buildExtractionPrompt(allActiveTccsNames);
-      const result = await geminiService.extractDataFromDocument(file, prompt);
-      
-      // Phân loại item để mapping
-      const rawItems: AIExtractedItem[] = (result.testResults || []).map((r: any) => ({
-        criteriaName: r.criteriaName || '',
-        mappedName: r.mappedName || '',
-        confidence: r.confidence || 'low',
-        value: r.value || '',
-        unit: r.unit || '',
-        limit: r.limit || '',
-      }));
 
-      const enrichedItems = rawItems.map(item => {
-        if (item.confidence === 'high' && item.mappedName) return item;
-        const learnedMatch = aiLearnedMappings.find(m => isCriteriaMatch(item.criteriaName, m.systemName, aiLearnedMappings));
-        if (learnedMatch) return { ...item, mappedName: learnedMatch.systemName, confidence: 'high' };
-        const fuzzyMatch = allActiveTccsNames.find(tccsName => isCriteriaMatch(item.criteriaName, tccsName, aiLearnedMappings));
-        if (fuzzyMatch) return { ...item, mappedName: fuzzyMatch, confidence: 'high' };
-        return item;
-      });
+    if (files.length === 1) {
+      // ── Single file: flow cũ + progress overlay đơn giản ──
+      const file = files[0];
+      setBatchScanFiles([{ fileName: file.name, status: 'processing' }]);
+      setIsBatchProgressOpen(true);
+      try {
+        const prompt = buildExtractionPrompt(allActiveTccsNames);
+        const result = await geminiService.extractDataFromDocument(file, prompt, (step, percent) => {
+          setBatchScanFiles([{ fileName: file.name, status: 'processing', progressStep: step, progressPercent: percent }]);
+        });
 
-      const highItems = enrichedItems.filter(i => i.confidence === 'high' && i.mappedName);
-      const lowItems = enrichedItems.filter(i => i.confidence !== 'high' || !i.mappedName);
+        setBatchScanFiles([{ fileName: file.name, status: 'done', criteriaCount: result.testResults?.length ?? 0 }]);
 
-      setPendingAiRawData(result);
-      setPendingHighItems(highItems);
-      setPendingLowItems(lowItems);
+        // Lưu thông tin scan AI
+        setAiScanInfo({ documentType: result.documentType, pageCount: result.pageCount, notes: result.notes, fileCount: 1 });
 
-      if (lowItems.length > 0) {
-        setIsMappingModalOpen(true);
-      } else {
-        finalizeAiMapping(result, highItems, []);
+        // Phân loại item để mapping
+        const rawItems: AIExtractedItem[] = (result.testResults || []).map((r: any) => ({
+          criteriaName: r.criteriaName || '',
+          mappedName: r.mappedName || '',
+          confidence: r.confidence || 'low',
+          value: r.value || '',
+          unit: r.unit || '',
+          limit: r.limit || '',
+        }));
+
+        const enrichedItems = rawItems.map(item => {
+          if (item.confidence === 'high' && item.mappedName) return item;
+          const learnedMatch = aiLearnedMappings.find(m => isCriteriaMatch(item.criteriaName, m.systemName, aiLearnedMappings));
+          if (learnedMatch) return { ...item, mappedName: learnedMatch.systemName, confidence: 'high' };
+          const fuzzyMatch = allActiveTccsNames.find(tccsName => isCriteriaMatch(item.criteriaName, tccsName, aiLearnedMappings));
+          if (fuzzyMatch) return { ...item, mappedName: fuzzyMatch, confidence: 'high' };
+          return item;
+        });
+
+        const highItems = enrichedItems.filter(i => i.confidence === 'high' && i.mappedName);
+        const lowItems = enrichedItems.filter(i => i.confidence !== 'high' || !i.mappedName);
+
+        setPendingAiRawData(result);
+        setPendingHighItems(highItems);
+        setPendingLowItems(lowItems);
+
+        if (lowItems.length > 0) {
+          setIsMappingModalOpen(true);
+        } else {
+          finalizeAiMapping(result, highItems, []);
+        }
+      } catch (error: any) {
+        setBatchScanFiles(prev => prev.map(f => ({ ...f, status: 'error', error: formatGeminiError(error) })));
+        toast.error(formatGeminiError(error), { duration: 6000 });
+      } finally {
+        setIsAiProcessing(false);
+        e.target.value = '';
       }
-    } catch (error: any) {
-      toast.error(formatGeminiError(error), { duration: 6000 });
-    } finally {
-      setIsAiProcessing(false);
-      e.target.value = '';
+
+    } else {
+      // ── Multi-file: Batch Scan ──
+      const initStatus = files.map(f => ({ fileName: f.name, status: 'waiting' as const }));
+      setBatchScanFiles(initStatus);
+      setIsBatchProgressOpen(true);
+
+      try {
+        const prompt = buildExtractionPrompt(allActiveTccsNames);
+        const { success: successResults, errors } = await geminiService.extractDataFromDocumentBatch(
+          files,
+          prompt,
+          (fileIndex, fileName, status, data, error) => {
+            setBatchScanFiles(prev => prev.map((f, idx) => {
+              if (idx !== fileIndex) return f;
+              if (status === 'processing') {
+                // Nếu data chứa _progressStep → cập nhật progress
+                if (data?._progressStep) {
+                  return { ...f, status: 'processing', progressStep: data._progressStep, progressPercent: data._progressPercent };
+                }
+                return { ...f, status: 'processing' };
+              }
+              if (status === 'done') {
+                return { ...f, status: 'done', criteriaCount: data?.testResults?.length ?? 0 };
+              }
+              if (status === 'error') {
+                return { ...f, status: 'error', error: error ?? 'Lỗi không xác định' };
+              }
+              return f;
+            }));
+          }
+        );
+
+        // Lưu thông tin scan từ file đầu tiên thành công
+        if (successResults.length > 0) {
+          const firstResult = successResults[0];
+          setAiScanInfo({
+            documentType: firstResult.documentType,
+            pageCount: successResults.reduce((sum: number, r: any) => sum + (r.pageCount ?? 1), 0),
+            notes: successResults.map((r: any) => r.notes).filter(Boolean).join(' | ') || undefined,
+            fileCount: files.length
+          });
+        }
+
+        if (errors.length > 0 && successResults.length === 0) {
+          toast.error(`Tất cả ${files.length} file đều thất bại. Vui lòng kiểm tra lại.`);
+          setIsAiProcessing(false);
+          e.target.value = '';
+          return;
+        }
+        if (errors.length > 0) {
+          toast(`${errors.length}/${files.length} file bị lỗi, ${successResults.length} file thành công.`, { icon: '⚠️' });
+        }
+
+        // Gộp testResults từ tất cả file thành công
+        // Strategy: criteriaName từ file đầu tiên thắng, file sau bị trùng → Extra Criteria
+        const seenCriteriaNames = new Set<string>();
+        const mergedTestResults: any[] = [];
+        const extraFromDuplicates: any[] = [];
+
+        for (const result of successResults) {
+          for (const tr of (result.testResults || [])) {
+            const nameKey = (tr.mappedName || tr.criteriaName || '').toLowerCase().trim();
+            if (nameKey && seenCriteriaNames.has(nameKey)) {
+              extraFromDuplicates.push(tr);
+            } else {
+              if (nameKey) seenCriteriaNames.add(nameKey);
+              mergedTestResults.push(tr);
+            }
+          }
+        }
+
+        // Tổng hợp data từ file đầu tiên + merged results
+        const mergedData = {
+          ...successResults[0],
+          testResults: mergedTestResults,
+        };
+
+        // Phân loại item
+        const rawItems: AIExtractedItem[] = mergedTestResults.map((r: any) => ({
+          criteriaName: r.criteriaName || '',
+          mappedName: r.mappedName || '',
+          confidence: r.confidence || 'low',
+          value: r.value || '',
+          unit: r.unit || '',
+          limit: r.limit || '',
+        }));
+
+        const enrichedItems = rawItems.map(item => {
+          if (item.confidence === 'high' && item.mappedName) return item;
+          const learnedMatch = aiLearnedMappings.find(m => isCriteriaMatch(item.criteriaName, m.systemName, aiLearnedMappings));
+          if (learnedMatch) return { ...item, mappedName: learnedMatch.systemName, confidence: 'high' };
+          const fuzzyMatch = allActiveTccsNames.find(tccsName => isCriteriaMatch(item.criteriaName, tccsName, aiLearnedMappings));
+          if (fuzzyMatch) return { ...item, mappedName: fuzzyMatch, confidence: 'high' };
+          return item;
+        });
+
+        const highItems = enrichedItems.filter(i => i.confidence === 'high' && i.mappedName);
+        const lowItems = enrichedItems.filter(i => i.confidence !== 'high' || !i.mappedName);
+
+        // Thêm Extra Criteria từ file trùng lặp vào mergedData để finalizeAiMapping xử lý
+        if (extraFromDuplicates.length > 0) {
+          mergedData._extraDuplicates = extraFromDuplicates;
+        }
+
+        setPendingAiRawData(mergedData);
+        setPendingHighItems(highItems);
+        setPendingLowItems(lowItems);
+
+        if (lowItems.length > 0) {
+          setIsMappingModalOpen(true);
+        } else {
+          finalizeAiMapping(mergedData, highItems, []);
+        }
+
+        // Thêm duplicate items vào Extra Criteria
+        if (extraFromDuplicates.length > 0) {
+          extraFromDuplicates.forEach((r: any) => {
+            addToArray('extraCriteria', {
+              id: 'extra_dup_' + Math.random().toString(36).substring(2, 9),
+              name: r.criteriaName,
+              value: r.value,
+              unit: r.unit || '',
+              limit: r.limit || ''
+            });
+          });
+          toast(`${extraFromDuplicates.length} chỉ tiêu trùng tên từ các file khác đã được thêm vào Chỉ tiêu bổ sung.`, { icon: 'ℹ️' });
+        }
+
+      } catch (error: any) {
+        toast.error(formatGeminiError(error), { duration: 6000 });
+      } finally {
+        setIsAiProcessing(false);
+        e.target.value = '';
+      }
     }
   };
 
@@ -681,6 +954,9 @@ const TestResultFormPage = () => {
       const prompt = buildExtractionPrompt(allActiveTccsNames);
       const result = await geminiService.extractDataFromDocument(fileObject, prompt);
       
+      // Lưu thông tin scan AI
+      setAiScanInfo({ documentType: result.documentType, pageCount: result.pageCount, notes: result.notes, fileCount: 1 });
+
       const rawItems: AIExtractedItem[] = (result.testResults || []).map((r: any) => ({
         criteriaName: r.criteriaName || '',
         mappedName: r.mappedName || '',
@@ -776,6 +1052,7 @@ const TestResultFormPage = () => {
           ref={fileInputRef} 
           className="hidden" 
           accept="image/*,application/pdf"
+          multiple
           onChange={handleAiFileSelect}
         />
         
@@ -795,7 +1072,7 @@ const TestResultFormPage = () => {
           onClick={() => fileInputRef.current?.click()}
           className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-xl font-black uppercase text-[10px] tracking-widest hover:bg-indigo-700 shadow-lg shadow-indigo-100 transition-all disabled:opacity-50"
         >
-          {isAiProcessing ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
+          {isAiProcessing ? <Loader2 size={14} className="animate-spin" /> : <Files size={14} />}
           {isAiProcessing ? 'Đang trích xuất...' : 'Nhập dữ liệu bằng AI'}
         </button>
       </div>
@@ -817,6 +1094,50 @@ const TestResultFormPage = () => {
         isLoading={isLoadingGDFiles}
         folderUrl={googleDriveFolderUrl}
       />
+
+      {/* Batch Scan Progress Modal */}
+      <BatchScanProgressModal
+        isOpen={isBatchProgressOpen}
+        files={batchScanFiles}
+        totalDone={batchScanFiles.filter(f => f.status === 'done' || f.status === 'error').length}
+        onClose={() => setIsBatchProgressOpen(false)}
+      />
+
+      {/* AI Scan Info Card – hiển thị thông tin scan từ AI sau khi đọc file */}
+      {aiScanInfo && (
+        <div className="flex items-start gap-3 p-3.5 bg-indigo-50 dark:bg-indigo-950/30 border border-indigo-200 dark:border-indigo-800 rounded-xl">
+          <Info size={16} className="text-indigo-500 flex-shrink-0 mt-0.5" />
+          <div className="flex-1 min-w-0">
+            <p className="text-[11px] font-black text-indigo-700 dark:text-indigo-300 uppercase tracking-wider">
+              Kết quả AI Scan {aiScanInfo.fileCount && aiScanInfo.fileCount > 1 ? `– Đã đọc ${aiScanInfo.fileCount} file` : ''}
+            </p>
+            <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1">
+              {aiScanInfo.documentType && (
+                <span className="text-[10px] text-indigo-600 dark:text-indigo-400">
+                  📄 Loại phiếu: <strong>{aiScanInfo.documentType}</strong>
+                </span>
+              )}
+              {aiScanInfo.pageCount != null && aiScanInfo.pageCount > 0 && (
+                <span className="text-[10px] text-indigo-600 dark:text-indigo-400">
+                  📖 Số trang: <strong>{aiScanInfo.pageCount}</strong>
+                </span>
+              )}
+            </div>
+            {aiScanInfo.notes && (
+              <p className="text-[10px] text-amber-700 dark:text-amber-400 mt-1.5 font-medium">
+                ⚠️ Ghi chú từ phiếu: {aiScanInfo.notes}
+              </p>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={() => setAiScanInfo(null)}
+            className="p-1 hover:bg-indigo-100 dark:hover:bg-indigo-900 rounded text-indigo-400 transition-colors"
+          >
+            <X size={12} />
+          </button>
+        </div>
+      )}
 
       <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
         <datalist id="lab-suggestions">

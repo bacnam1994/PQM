@@ -19,6 +19,7 @@
     "@google/generative-ai": "^0.24.1",
     "firebase": "^12.8.0",
     "lucide-react": "0.475.0",
+    "pdfjs-dist": "^6.2.108",
     "qrcode.react": "^4.2.0",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",

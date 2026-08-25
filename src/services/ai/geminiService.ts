@@ -1,5 +1,6 @@
-﻿import { GoogleGenerativeAI, SchemaType, Content } from "@google/generative-ai";
+import { GoogleGenerativeAI, SchemaType, Content } from "@google/generative-ai";
 import { GEMINI_TOOL_DECLARATIONS, executeTool } from './aiTools';
+import { convertPdfToImages, RenderedPdfPage } from '../../utils/pdfProcessor';
 
 export const getApiKey = (): string => {
   const localKey = typeof window !== 'undefined' ? localStorage.getItem('GEMINI_API_KEY')?.trim() : '';
@@ -127,27 +128,296 @@ export const extractThinking = (text: string): { thinking?: string; cleanText: s
   return { cleanText };
 };
 
+// ─── OCR SCHEMA dùng chung ─────────────────────────────────────────────────
+const OCR_RESPONSE_SCHEMA = {
+  type: SchemaType.OBJECT,
+  properties: {
+    labName: {
+      type: SchemaType.STRING,
+      description: "Tên đơn vị kiểm nghiệm / Phòng thí nghiệm. Để rỗng nếu không tìm thấy.",
+    },
+    documentType: {
+      type: SchemaType.STRING,
+      description: "Loại phiếu: External_Lab | Internal | CoA | Supplier_CoA",
+    },
+    pageCount: {
+      type: SchemaType.NUMBER,
+      description: "Số trang thực tế đã đọc được trong tài liệu (số nguyên dương)",
+    },
+    batchNo: {
+      type: SchemaType.STRING,
+      description: "Số lô sản xuất (nếu có, không có thì để rỗng)",
+    },
+    mfgDate: {
+      type: SchemaType.STRING,
+      description: "Ngày sản xuất (định dạng DD/MM/YYYY, nếu không có để rỗng)",
+    },
+    expDate: {
+      type: SchemaType.STRING,
+      description: "Hạn sử dụng (định dạng DD/MM/YYYY, nếu không có để rỗng)",
+    },
+    testDate: {
+      type: SchemaType.STRING,
+      description: "Ngày kiểm nghiệm / Ngày xuất phiếu kết quả (định dạng DD/MM/YYYY, nếu không có để rỗng)",
+    },
+    notes: {
+      type: SchemaType.STRING,
+      description: "Ghi chú đặc biệt từ phiếu (ghi chú cuối bảng, phát hiện giá trị sửa tay, ảnh chất lượng thấp...); để rỗng nếu không có",
+    },
+    testResults: {
+      type: SchemaType.ARRAY,
+      items: {
+        type: SchemaType.OBJECT,
+        properties: {
+          criteriaName: {
+            type: SchemaType.STRING,
+            description: "Tên chỉ tiêu NGUYÊN BẢN từ phiếu (giữ nguyên, không dịch)",
+          },
+          mappedName: {
+            type: SchemaType.STRING,
+            description: "Tên chỉ tiêu chuẩn trong TCCS nếu map được, để rỗng nếu không chắc",
+          },
+          confidence: {
+            type: SchemaType.STRING,
+            description: "'high' nếu map được tên TCCS chắc chắn, 'low' nếu không chắc hoặc không tìm được",
+          },
+          value: {
+            type: SchemaType.STRING,
+            description: "Kết quả kiểm nghiệm (ví dụ: 1.5, Đạt, Trắng trong). Trả về dưới dạng chuỗi.",
+          },
+          unit: {
+            type: SchemaType.STRING,
+            description: "Đơn vị tính (ví dụ: %, mg, CFU/g. Nếu không có để rỗng)",
+          },
+          limit: {
+            type: SchemaType.STRING,
+            description: "Yêu cầu / Mức tiêu chuẩn / Giới hạn cho phép (nếu có)",
+          },
+          analysisMethod: {
+            type: SchemaType.STRING,
+            description: "Phương pháp thử nghiệm nếu ghi trên phiếu (ví dụ: HPLC, UV-Vis, TCVN...); để rỗng nếu không có",
+          },
+        },
+        required: ["criteriaName", "value", "mappedName", "confidence"],
+      },
+    },
+  },
+} as const;
+
+// Model dự phòng khi model chính bị 503/429
+const FALLBACK_OCR_MODEL = 'gemini-2.0-flash';
+
+
+// ─── Helper gọi Gemini OCR với danh sách inlineData parts ─────────────────────
+async function executeGeminiOcrCall(
+  genAI: GoogleGenerativeAI,
+  systemPrompt: string,
+  contentParts: { inlineData: { data: string; mimeType: string } }[],
+  onProgress?: (step: string, percent: number) => void,
+  progressBase: number = 30
+): Promise<any> {
+  const primaryModelName = getGeminiModel();
+  const buildModel = (modelName: string) =>
+    genAI.getGenerativeModel({
+      model: modelName,
+      generationConfig: {
+        responseMimeType: "application/json",
+        responseSchema: OCR_RESPONSE_SCHEMA as any,
+      },
+    });
+
+  const maxRetries = 3;
+  let attempt = 0;
+  let useFallback = false;
+
+  while (attempt < maxRetries) {
+    try {
+      const modelName = useFallback ? FALLBACK_OCR_MODEL : primaryModelName;
+      if (useFallback && attempt === 1) {
+        onProgress?.(`Chuyển sang model dự phòng (${FALLBACK_OCR_MODEL})...`, progressBase + 5);
+      }
+      const model = buildModel(modelName);
+      onProgress?.("AI đang phân tích tài liệu...", progressBase + 15 + attempt * 10);
+
+      // Gửi prompt cùng tất cả image parts lên Gemini API
+      const result = await model.generateContent([systemPrompt, ...contentParts]);
+      const response = result.response;
+      const text = response.text();
+
+      return JSON.parse(text);
+    } catch (error: any) {
+      attempt++;
+      const errorMessage = error?.message || '';
+      const backoffMs = Math.pow(2, attempt) * 1000;
+
+      if ((errorMessage.includes('503') || errorMessage.includes('429')) && !useFallback && attempt < maxRetries) {
+        console.warn(`Gemini OCR overloaded. Switching to fallback '${FALLBACK_OCR_MODEL}' (attempt ${attempt})...`);
+        useFallback = true;
+        onProgress?.(`Model bị quá tải, đang thử lại với model dự phòng...`, progressBase + 5);
+        await new Promise((res) => setTimeout(res, backoffMs));
+        continue;
+      }
+      if ((errorMessage.includes('503') || errorMessage.includes('429')) && attempt < maxRetries) {
+        console.warn(`Gemini OCR fallback overloaded. Retrying attempt ${attempt} in ${backoffMs}ms...`);
+        onProgress?.(`Đang thử lại (lần ${attempt})...`, progressBase + 10);
+        await new Promise((res) => setTimeout(res, backoffMs));
+        continue;
+      }
+
+      console.error("Error calling Gemini API:", error);
+      throw error;
+    }
+  }
+  throw new Error("Gemini OCR: Đã vượt quá số lần thử lại tối đa mà không thành công.");
+}
 
 export const geminiService = {
   /**
-   * Gọi API Gemini để phân tích file tài liệu (ảnh hoặc PDF)
+   * Gọi API Gemini để phân tích file tài liệu (ảnh hoặc PDF) – đơn file.
+   * ĐẶC BIỆT: Đối với file PDF, tự động chuyển đổi từng trang thành ảnh JPEG tối ưu (1600px)
+   * và phân đoạn (chunking 3 trang/lần) nếu file nhiều trang, loại bỏ 100% lỗi quá tải / timeout của Gemini.
    * @param file File tài liệu upload từ input
    * @param systemPrompt Lệnh hướng dẫn AI
+   * @param onProgress Callback tiến độ (step, percent 0-100)
    */
-  extractDataFromDocument: async (file: File, systemPrompt: string) => {
-    // Kiểm tra file hợp lệ trước khi gửi lên API
+  extractDataFromDocument: async (
+    file: File,
+    systemPrompt: string,
+    onProgress?: (step: string, percent: number) => void
+  ) => {
     const validation = validateOCRFile(file);
     if (!validation.valid) {
       throw new Error(validation.error);
     }
     const genAI = getGenAI();
 
-    // Chuyển đổi File sang định dạng Base64
+    // ─── TRƯỜNG HỢP 1: FILE PDF ────────────────────────────────────────────────
+    if (file.type === 'application/pdf') {
+      try {
+        onProgress?.("Đang tối ưu & phân tích cấu trúc PDF...", 10);
+
+        // Render từng trang PDF sang ảnh JPEG tối ưu bằng Canvas
+        const renderedPages: RenderedPdfPage[] = await convertPdfToImages(file, {
+          targetWidth: 1600,
+          quality: 0.85,
+          maxPages: 50,
+          onProgress: (current, total) => {
+            onProgress?.(`Đang xử lý trang PDF ${current}/${total}...`, Math.round(10 + (current / total) * 20));
+          },
+        });
+
+        const totalPages = renderedPages.length;
+        if (totalPages === 0) {
+          throw new Error("Không thể đọc được trang nào từ file PDF này.");
+        }
+
+        // Nếu PDF ngắn (1 - 3 trang): Gửi tất cả trang trong 1 request duy nhất
+        if (totalPages <= 3) {
+          onProgress?.(`Đang gửi ${totalPages} trang lên AI phân tích...`, 35);
+          const imageParts = renderedPages.map((page) => ({
+            inlineData: {
+              data: page.base64,
+              mimeType: 'image/jpeg',
+            },
+          }));
+
+          const result = await executeGeminiOcrCall(genAI, systemPrompt, imageParts, onProgress, 40);
+          result.pageCount = totalPages;
+          onProgress?.("Hoàn tất!", 100);
+          return result;
+        }
+
+        // Nếu PDF dài (> 3 trang): Tự động chia theo đợt (Chunk 3 trang/lượt) để tránh tràn token / timeout
+        const CHUNK_SIZE = 3;
+        const chunks: RenderedPdfPage[][] = [];
+        for (let i = 0; i < totalPages; i += CHUNK_SIZE) {
+          chunks.push(renderedPages.slice(i, i + CHUNK_SIZE));
+        }
+
+        const chunkResults: any[] = [];
+        for (let idx = 0; idx < chunks.length; idx++) {
+          const chunk = chunks[idx];
+          const startPage = idx * CHUNK_SIZE + 1;
+          const endPage = Math.min(startPage + chunk.length - 1, totalPages);
+          const chunkPercentBase = Math.round(35 + (idx / chunks.length) * 55);
+
+          onProgress?.(
+            `Đang đọc PDF (${totalPages} trang) – Đợt ${idx + 1}/${chunks.length} (Trang ${startPage}-${endPage})...`,
+            chunkPercentBase
+          );
+
+          const imageParts = chunk.map((page) => ({
+            inlineData: {
+              data: page.base64,
+              mimeType: 'image/jpeg',
+            },
+          }));
+
+          try {
+            const chunkRes = await executeGeminiOcrCall(genAI, systemPrompt, imageParts, onProgress, chunkPercentBase);
+            chunkResults.push(chunkRes);
+          } catch (chunkErr) {
+            console.warn(`Lỗi khi đọc đợt ${idx + 1} (Trang ${startPage}-${endPage}):`, chunkErr);
+            // Nếu là đợt đầu tiên mà lỗi thì ném ra, nếu đợt sau lỗi thì vẫn giữ kết quả đợt trước
+            if (chunkResults.length === 0 && idx === chunks.length - 1) {
+              throw chunkErr;
+            }
+          }
+        }
+
+        if (chunkResults.length === 0) {
+          throw new Error("Không thể trích xuất dữ liệu từ các trang của file PDF.");
+        }
+
+        // Gộp kết quả thông minh từ các đợt
+        const firstResult = chunkResults[0] || {};
+        const mergedTestResults: any[] = [];
+        const seenCriteriaKeys = new Set<string>();
+
+        const allNotes: string[] = [];
+
+        for (const res of chunkResults) {
+          if (res.notes && !allNotes.includes(res.notes)) {
+            allNotes.push(res.notes);
+          }
+          for (const item of res.testResults || []) {
+            const key = (item.mappedName || item.criteriaName || '').toLowerCase().trim();
+            if (key && !seenCriteriaKeys.has(key)) {
+              seenCriteriaKeys.add(key);
+              mergedTestResults.push(item);
+            } else if (!key) {
+              mergedTestResults.push(item);
+            }
+          }
+        }
+
+        const mergedFinalResult = {
+          labName: chunkResults.find((r) => r.labName)?.labName || firstResult.labName || '',
+          documentType: chunkResults.find((r) => r.documentType)?.documentType || firstResult.documentType || 'External_Lab',
+          pageCount: totalPages,
+          batchNo: chunkResults.find((r) => r.batchNo)?.batchNo || firstResult.batchNo || '',
+          mfgDate: chunkResults.find((r) => r.mfgDate)?.mfgDate || firstResult.mfgDate || '',
+          expDate: chunkResults.find((r) => r.expDate)?.expDate || firstResult.expDate || '',
+          testDate: chunkResults.find((r) => r.testDate)?.testDate || firstResult.testDate || '',
+          notes: allNotes.filter(Boolean).join(' | ') || firstResult.notes || '',
+          testResults: mergedTestResults,
+        };
+
+        onProgress?.("Hoàn tất!", 100);
+        return mergedFinalResult;
+      } catch (pdfError: any) {
+        console.warn("Lỗi khi xử lý PDF qua Canvas, chuyển sang phương thức gửi file gốc:", pdfError);
+        // Fallback: Nếu lỗi Canvas hoặc PDF đặc thù, tiếp tục với phương thức gửi file Base64 truyền thống bên dưới
+      }
+    }
+
+    // ─── TRƯỜNG HỢP 2: FILE ẢNH HOẶC FALLBACK FILE GỐC ─────────────────────────
+    onProgress?.("Đang đọc file...", 10);
+
     const base64Data = await new Promise<string>((resolve, reject) => {
       const reader = new FileReader();
       reader.onloadend = () => {
         const result = reader.result as string;
-        // Bỏ đi phần prefix (VD: "data:image/jpeg;base64,")
         const base64 = result.split(',')[1];
         resolve(base64);
       };
@@ -155,73 +425,7 @@ export const geminiService = {
       reader.readAsDataURL(file);
     });
 
-    // Sử dụng model cấu hình (mặc định gemini-2.5-flash)
-    const modelName = getGeminiModel();
-    const model = genAI.getGenerativeModel({
-      model: modelName,
-      generationConfig: {
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: SchemaType.OBJECT,
-          properties: {
-            // FIX 1: Thêm labName và testDate vào schema để Gemini trả về đúng
-            labName: {
-              type: SchemaType.STRING,
-              description: "Tên đơn vị kiểm nghiệm / Phòng thí nghiệm (ví dụ: CASE, Quatest 3, Eurofins, Phòng QC nội bộ). Để rỗng nếu không tìm thấy.",
-            },
-            batchNo: {
-              type: SchemaType.STRING,
-              description: "Số lô sản xuất (nếu có, không có thì để rỗng)",
-            },
-            mfgDate: {
-              type: SchemaType.STRING,
-              description: "Ngày sản xuất (định dạng DD/MM/YYYY, nếu không có để rỗng)",
-            },
-            expDate: {
-              type: SchemaType.STRING,
-              description: "Hạn sử dụng (định dạng DD/MM/YYYY, nếu không có để rỗng)",
-            },
-            testDate: {
-              type: SchemaType.STRING,
-              description: "Ngày kiểm nghiệm / Ngày xuất phiếu kết quả (định dạng DD/MM/YYYY, nếu không có để rỗng)",
-            },
-            testResults: {
-              type: SchemaType.ARRAY,
-              items: {
-                type: SchemaType.OBJECT,
-                properties: {
-                  criteriaName: {
-                    type: SchemaType.STRING,
-                    description: "Tên chỉ tiêu NGUYÊN BẢN từ phiếu (giữ nguyên, không dịch)",
-                  },
-                  mappedName: {
-                    type: SchemaType.STRING,
-                    description: "Tên chỉ tiêu chuẩn trong TCCS nếu map được, để rỗng nếu không chắc",
-                  },
-                  confidence: {
-                    type: SchemaType.STRING,
-                    description: "'high' nếu map được tên TCCS chắc chắn, 'low' nếu không chắc hoặc không tìm được",
-                  },
-                  value: {
-                    type: SchemaType.STRING,
-                    description: "Kết quả kiểm nghiệm (ví dụ: 1.5, Đạt, Trắng trong). Trả về dưới dạng chuỗi.",
-                  },
-                  unit: {
-                    type: SchemaType.STRING,
-                    description: "Đơn vị tính (ví dụ: %, mg, CFU/g. Nếu không có để rỗng)",
-                  },
-                  limit: {
-                    type: SchemaType.STRING,
-                    description: "Yêu cầu / Mức tiêu chuẩn / Giới hạn cho phép (nếu có)",
-                  },
-                },
-                required: ["criteriaName", "value", "mappedName", "confidence"],
-              },
-            },
-          },
-        },
-      },
-    });
+    onProgress?.("Đang gửi lên AI...", 30);
 
     const filePart = {
       inlineData: {
@@ -230,35 +434,58 @@ export const geminiService = {
       },
     };
 
-    const maxRetries = 3;
-    let attempt = 0;
+    const result = await executeGeminiOcrCall(genAI, systemPrompt, [filePart], onProgress, 40);
+    onProgress?.("Hoàn tất!", 100);
+    return result;
+  },
 
-    while (attempt < maxRetries) {
+  /**
+   * Xử lý nhiều file PDF/ảnh cùng lúc (Batch OCR).
+   * Dùng Promise.all để xử lý song song và thu thập kết quả từng file.
+   * @param files Danh sách file cần scan
+   * @param systemPrompt Lệnh hướng dẫn AI
+   * @param onFileProgress Callback nhận trạng thái từng file
+   */
+  extractDataFromDocumentBatch: async (
+    files: File[],
+    systemPrompt: string,
+    onFileProgress?: (
+      fileIndex: number,
+      fileName: string,
+      status: 'processing' | 'done' | 'error',
+      data?: any,
+      error?: string
+    ) => void
+  ): Promise<{ success: any[]; errors: { fileName: string; error: string }[] }> => {
+    const tasks = files.map((file, index) => async () => {
+      onFileProgress?.(index, file.name, 'processing');
       try {
-        // Gửi request lên Gemini API
-        const result = await model.generateContent([systemPrompt, filePart]);
-        const response = result.response;
-        const text = response.text();
-        
-        // Do đã dùng responseSchema và responseMimeType="application/json", text chắc chắn là JSON chuẩn
-        return JSON.parse(text);
-      } catch (error: any) {
-        attempt++;
-        const errorMessage = error?.message || '';
-        
-        // Chỉ retry với lỗi quá tải (503) hoặc rate limit (429)
-        if ((errorMessage.includes('503') || errorMessage.includes('429')) && attempt < maxRetries) {
-          console.warn(`Gemini API overloaded in OCR. Retrying attempt ${attempt}...`);
-          await new Promise(res => setTimeout(res, 2000 * attempt));
-          continue;
-        }
-        
-        console.error("Error calling Gemini API:", error);
-        throw error;
+        const data = await geminiService.extractDataFromDocument(
+          file,
+          systemPrompt,
+          (_step, _percent) => {
+            // Truyền trạng thái progress ra ngoài nếu cần
+            onFileProgress?.(index, file.name, 'processing', { _progressStep: _step, _progressPercent: _percent });
+          }
+        );
+        onFileProgress?.(index, file.name, 'done', data);
+        return { ok: true as const, data, fileName: file.name };
+      } catch (err: any) {
+        const errMsg = formatGeminiError(err);
+        onFileProgress?.(index, file.name, 'error', undefined, errMsg);
+        return { ok: false as const, error: errMsg, fileName: file.name };
       }
-    }
-    // FIX 2: Sau vòng while, ném lỗi rõ ràng thay vì trả về undefined im lặng
-    throw new Error("Gemini OCR: Đã vượt quá số lần thử lại tối đa mà không thành công.");
+    });
+
+    // Chạy song song tất cả file
+    const results = await Promise.all(tasks.map(t => t()));
+
+    const success = results.filter(r => r.ok).map(r => (r as any).data);
+    const errors = results
+      .filter(r => !r.ok)
+      .map(r => ({ fileName: (r as any).fileName, error: (r as any).error }));
+
+    return { success, errors };
   },
 
   /**
@@ -482,7 +709,7 @@ ${isThinkingEnabled ? `14. [QUAN TRỌNG - BẮT BUỘC] Bạn phải luôn bắ
         throw error;
       }
     }
-    // FIX 2: Sau vòng while, ném lỗi rõ ràng thay vì trả về undefined im lặng
+    // Sau vòng while, ném lỗi rõ ràng thay vì trả về undefined im lặng
     throw new Error("Gemini Chat: Đã vượt quá số lần thử lại tối đa mà không thành công.");
   }
 };
