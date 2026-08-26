@@ -5,7 +5,7 @@ import { buildExtractionPrompt } from '../../services/ai/prompts';
 import { useAppStore } from '../../store/useAppStore';
 import { useDataGraph } from '../../hooks/useDataGraph';
 import { BATCH_STATUS, generateId } from '../../utils';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { MappingConfirmModal, AIExtractedItem, ConfirmedMapping } from './MappingConfirmModal';
 import { isCriteriaMatch } from '../../utils/aiMapping';
@@ -47,7 +47,6 @@ const saveChatHistory = (msgs: ChatMessage[]) => {
     sessionStorage.setItem(CHAT_HISTORY_KEY, JSON.stringify(toSave));
   } catch { /* Bỏ qua nếu sessionStorage đầy */ }
 };
-
 /** Khôi phục messages từ sessionStorage */
 const loadChatHistory = (): ChatMessage[] => {
   try {
@@ -72,6 +71,7 @@ export const AIAssistantChat: React.FC = () => {
   const { products, tccsList, testResults, addBatch, isAdmin, aiLearnedMappings, addAiLearnedMapping, productFormulas, rawMaterials, user } = useAppStore();
   const { batches: hydratedBatches } = useDataGraph();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const [selectedProductId, setSelectedProductId] = useState('');
   const [isCreatingBatch, setIsCreatingBatch] = useState(false);
@@ -79,6 +79,73 @@ export const AIAssistantChat: React.FC = () => {
   const [showConfig, setShowConfig] = useState(false);
   const [currentModel, setCurrentModel] = useState(() => localStorage.getItem('GEMINI_MODEL') || DEFAULT_GEMINI_MODEL);
   const [thinkingEnabled, setThinkingEnabled] = useState(() => localStorage.getItem('GEMINI_THINKING_ENABLED') !== 'false');
+
+  // Xác định thực thể đang xem theo URL hiện tại để nhúng ngữ cảnh AI
+  const currentContext = useMemo(() => {
+    const path = location.pathname;
+    if (path.startsWith('/batches/')) {
+      const batchId = path.split('/')[2];
+      const b = hydratedBatches.find(item => item.id === batchId || item.batchNo === batchId);
+      if (b) return { type: 'BATCH' as const, batch: b, label: `Lô: ${b.batchNo}` };
+    }
+    if (path.startsWith('/products/')) {
+      const prodId = path.split('/')[2];
+      const p = products.find(item => item.id === prodId || item.code === prodId);
+      if (p) return { type: 'PRODUCT' as const, product: p, label: `SP: ${p.name}` };
+    }
+    if (path.includes('/tccs')) return { type: 'TCCS' as const, label: 'Hồ sơ TCCS' };
+    if (path.includes('/quality-summary-report')) return { type: 'PQR_REPORT' as const, label: 'Báo cáo PQR' };
+    if (path.includes('/trend-analysis')) return { type: 'TREND_SPC' as const, label: 'Kiểm soát SPC' };
+    if (path.includes('/audit-logs')) return { type: 'AUDIT_LOGS' as const, label: 'Kiểm toán ALCOA+' };
+    return { type: 'GENERAL' as const, label: 'Toàn hệ thống' };
+  }, [location.pathname, hydratedBatches, products]);
+
+  const contextualChips = useMemo(() => {
+    if (currentContext.type === 'BATCH' && currentContext.batch) {
+      const b = currentContext.batch;
+      return [
+        { icon: '🔬', text: `Thẩm định Lô ${b.batchNo}`, prompt: `Thẩm định hồ sơ chất lượng lô ${b.batchNo} và đưa ra khuyến nghị duyệt xuất xưởng` },
+        { icon: '⚠️', text: 'Chỉ tiêu cận ngưỡng', prompt: `Kiểm tra xem lô ${b.batchNo} có chỉ tiêu nào sát ngưỡng giới hạn không?` },
+        { icon: '📉', text: 'Dự báo độ ổn định', prompt: `Phân tích độ ổn định và hạn dùng dự báo của lô ${b.batchNo}` },
+        { icon: '🛡️', text: 'Kiểm tra Audit Trail', prompt: `Rà soát lịch sử sửa đổi kết quả của lô ${b.batchNo}` }
+      ];
+    }
+    if (currentContext.type === 'PRODUCT' && currentContext.product) {
+      const p = currentContext.product;
+      return [
+        { icon: '📊', text: `Xu hướng Cpk ${p.code || ''}`, prompt: `Đánh giá năng lực quá trình Cpk và độ ổn định của sản phẩm ${p.name}` },
+        { icon: '📦', text: 'Tổng hợp các lô', prompt: `Cho tôi xem thống kê tất cả các lô đã sản xuất của sản phẩm ${p.name}` },
+        { icon: '🧪', text: 'Đối chiếu TCCS & Công thức', prompt: `Kiểm tra TCCS và công thức định lượng của sản phẩm ${p.name}` }
+      ];
+    }
+    if (currentContext.type === 'PQR_REPORT') {
+      return [
+        { icon: '📝', text: 'Viết kết luận PQR', prompt: 'Soạn thảo nhận xét và đánh giá tổng thể chất lượng (Executive PQR Conclusion) cho kỳ báo cáo này' },
+        { icon: '📊', text: 'Tóm tắt rủi ro Cpk', prompt: 'Tổng hợp các chỉ tiêu có Cpk dưới 1.33 và nguy cơ trong kỳ' },
+        { icon: '💡', text: 'Đề xuất CAPA', prompt: 'Đề xuất các hành động khắc phục phòng ngừa CAPA cho các sự cố chất lượng' }
+      ];
+    }
+    if (currentContext.type === 'AUDIT_LOGS') {
+      return [
+        { icon: '🛡️', text: 'Rà soát ALCOA+', prompt: 'Đánh giá mức độ tuân thủ toàn vẹn dữ liệu ALCOA+ và phát hiện các rủi ro' },
+        { icon: '⏰', text: 'Thao tác ngoài giờ', prompt: 'Kiểm tra xem có thao tác sửa đổi dữ liệu nào thực hiện ngoài giờ hành chính hoặc cuối tuần không?' },
+        { icon: '🔄', text: 'Sửa kết quả nhiều lần', prompt: 'Tìm các phiếu kiểm nghiệm bị sửa đổi nhiều lần sau khi tạo' }
+      ];
+    }
+    if (currentContext.type === 'TCCS') {
+      return [
+        { icon: '🧪', text: 'Soát lỗi TCCS', prompt: 'Kiểm tra các quy chuẩn Min/Max và đơn vị đo trong TCCS' },
+        { icon: '📖', text: 'Đối chiếu Dược điển VN', prompt: 'Gợi ý các chỉ tiêu kiểm nghiệm bắt buộc theo Dược điển Việt Nam V' },
+        { icon: '💊', text: 'Đồng bộ từ công thức', prompt: 'Hướng dẫn đồng bộ chỉ tiêu hàm lượng từ công thức sản phẩm' }
+      ];
+    }
+    return [
+      { icon: '⚠️', text: 'Cảnh báo chất lượng', prompt: 'Kiểm tra xem có bất thường chất lượng nào không?' },
+      { icon: '📊', text: 'Phân tích xu hướng', prompt: 'Phân tích xu hướng chất lượng tổng thể của tất cả sản phẩm' },
+      { icon: '📥', text: 'Xuất báo cáo tháng', prompt: 'Xuất báo cáo chất lượng tháng này ra file Excel' },
+      { icon: '📦', text: 'Tổng quan lô hàng', prompt: 'Cho tôi xem tổng quan tình trạng tất cả lô hàng hiện tại' },
+    ];
+  }, [currentContext]);
 
   // Lưu lịch sử chat vào sessionStorage mỗi khi messages thay đổi
   useEffect(() => {
@@ -803,14 +870,12 @@ export const AIAssistantChat: React.FC = () => {
           <div ref={messagesEndRef} />
         </div>
 
-        {/* Quick Action Chips */}
-        <div className="px-3 pt-2 pb-1 bg-white dark:bg-zinc-950 border-t border-slate-100 dark:border-zinc-900 flex gap-1.5 overflow-x-auto scrollbar-none">
-          {[
-            { icon: '⚠️', text: 'Cảnh báo chất lượng', prompt: 'Kiểm tra xem có bất thường chất lượng nào không?' },
-            { icon: '📊', text: 'Phân tích xu hướng', prompt: 'Phân tích xu hướng chất lượng tổng thể của tất cả sản phẩm' },
-            { icon: '📥', text: 'Xuất báo cáo tháng', prompt: 'Xuất báo cáo chất lượng tháng này ra file Excel' },
-            { icon: '📦', text: 'Tổng quan lô hàng', prompt: 'Cho tôi xem tổng quan tình trạng tất cả lô hàng hiện tại' },
-          ].map((chip) => (
+        {/* Quick Action Chips (Context-Aware) */}
+        <div className="px-3 pt-1.5 pb-1 bg-slate-50/80 dark:bg-zinc-900/60 border-t border-slate-100 dark:border-zinc-900 flex items-center gap-1.5 overflow-x-auto scrollbar-none">
+          <span className="text-[9px] font-black uppercase text-indigo-500 dark:text-indigo-400 shrink-0 bg-indigo-50 dark:bg-indigo-950/40 px-1.5 py-0.5 rounded">
+            {currentContext.label}
+          </span>
+          {contextualChips.map((chip) => (
             <button
               key={chip.text}
               type="button"

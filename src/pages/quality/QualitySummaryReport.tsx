@@ -5,7 +5,7 @@ import {
   FileText, Download, Calendar, Activity, CheckCircle2,
   XCircle, AlertCircle, RefreshCcw, ClipboardCheck,
   TrendingUp, TrendingDown, Minus, ChevronDown, ChevronUp,
-  BarChart2, ShieldAlert, Info, Search, X
+  BarChart2, ShieldAlert, Info, Search, X, Sparkles, Copy, Check, Edit3, Loader2
 } from 'lucide-react';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid,
@@ -21,6 +21,8 @@ import { Criterion, ProductFormula, TestResult, Batch } from '../../types';
 import { useCriteriaResolver } from '../../hooks/useCriteriaResolver';
 import { normalizeName } from '../../services/criteriaAliasService';
 import { isCriteriaMatch } from '../../utils/aiMapping';
+import { generatePQRRuleBasedNarrative, enrichPQRNarrativeWithAI, PQRExecutiveNarrative } from '../../services/ai/pqrNarrativeService';
+import toast from 'react-hot-toast';
 import * as XLSX from 'xlsx';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -207,6 +209,9 @@ const QualitySummaryReport: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'trend' | 'spc' | 'fail'>('trend');
   const [selectedCriteriaName, setSelectedCriteriaName] = useState<string | null>(null);
   const [spcCriteriaName, setSpcCriteriaName] = useState<string>('');
+  const [pqrNarrative, setPqrNarrative] = useState<PQRExecutiveNarrative | null>(null);
+  const [isGeneratingNarrative, setIsGeneratingNarrative] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     const loadData = async () => {
@@ -554,6 +559,47 @@ const QualitySummaryReport: React.FC = () => {
     return parts.join(' ');
   }, [criteriaStats, mainCriteria]);
 
+  // AI: Sinh nhận xét & kết luận PQR
+  const handleGeneratePQR = async (useAi: boolean = false) => {
+    const product = products.find(p => p.id === selectedProductId);
+    const summaryData = {
+      periodLabel: `${dateRange.from ? formatDate(dateRange.from) : 'Đầu kỳ'} – ${dateRange.to ? formatDate(dateRange.to) : 'Hiện tại'}`,
+      productName: product?.name || 'Sản phẩm',
+      totalBatches: stats.total,
+      passedBatches: stats.pass,
+      failedBatches: stats.fail,
+      passRate: stats.total > 0 ? (stats.pass / stats.total) * 100 : 100,
+      criteriaCpkList: mainCriteria.map(c => {
+        const s = criteriaStats[c.name];
+        return {
+          name: c.name,
+          cpk: s?.cpk,
+          mean: s?.mean,
+          stdDev: s?.stdDev,
+          isCapable: s?.cpk != null && s.cpk >= 1.33
+        };
+      }),
+      totalOOSCount: stats.fail
+    };
+
+    if (useAi) {
+      setIsGeneratingNarrative(true);
+      try {
+        const res = await enrichPQRNarrativeWithAI(summaryData);
+        setPqrNarrative(res);
+        toast.success('Đã hoàn thiện Báo cáo Nhận xét PQR bằng AI Gemini!');
+      } catch (e: any) {
+        toast.error('Lỗi khi sinh văn bản AI: ' + e.message);
+      } finally {
+        setIsGeneratingNarrative(false);
+      }
+    } else {
+      const res = generatePQRRuleBasedNarrative(summaryData);
+      setPqrNarrative(res);
+      toast.success('Đã cập nhật Báo cáo Nhận xét chất lượng PQR!');
+    }
+  };
+
   // ─── Export Excel ─────────────────────────────────────────────────────────
   const handleExportExcel = () => {
     if (reportData.length === 0) return;
@@ -828,6 +874,92 @@ const QualitySummaryReport: React.FC = () => {
                 ))}
               </div>
             </div>
+          </DSCard>
+
+          {/* ─── 1.5. AI Executive PQR Conclusion ───────────────────────────────── */}
+          <DSCard className="p-6 border border-indigo-100 dark:border-indigo-950/60 bg-gradient-to-br from-indigo-50/40 via-white to-purple-50/20 dark:from-zinc-900 dark:via-zinc-950 dark:to-indigo-950/20">
+            <div className="flex flex-wrap items-center justify-between gap-3 mb-4 pb-3 border-b border-indigo-100/60 dark:border-zinc-800">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-indigo-600 text-white shadow-sm">
+                  <Sparkles size={16} />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-slate-800 dark:text-zinc-100 uppercase tracking-tight flex items-center gap-2">
+                    Nhận xét & Kết luận Tổng quan Chất lượng (PQR Conclusion)
+                    {pqrNarrative?.isAiEnriched && (
+                      <span className="text-[9px] bg-purple-100 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300 font-bold px-2 py-0.5 rounded-full uppercase">
+                        AI Gemini
+                      </span>
+                    )}
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-zinc-400">
+                    Bản nhận định phục vụ báo cáo thẩm định chất lượng định kỳ chuẩn GMP-WHO / ICH Q10
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleGeneratePQR(false)}
+                  disabled={isGeneratingNarrative}
+                  className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-slate-700 dark:text-zinc-200 rounded-xl font-bold text-xs transition-colors"
+                >
+                  ⚡ Tạo nhanh (Rule)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleGeneratePQR(true)}
+                  disabled={isGeneratingNarrative}
+                  className="flex items-center gap-1.5 px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-black text-xs transition-all shadow-sm shadow-indigo-200 dark:shadow-none disabled:opacity-50"
+                >
+                  {isGeneratingNarrative ? <Loader2 size={13} className="animate-spin" /> : <Sparkles size={13} />}
+                  Soạn thảo bằng AI
+                </button>
+                {pqrNarrative && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(pqrNarrative.fullNarrative);
+                      setCopied(true);
+                      toast.success('Đã sao chép nội dung nhận xét vào Clipboard!');
+                      setTimeout(() => setCopied(false), 2000);
+                    }}
+                    className="p-1.5 bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 hover:bg-slate-50 rounded-xl text-slate-600 dark:text-zinc-300 transition-colors"
+                    title="Sao chép toàn bộ nhận xét"
+                  >
+                    {copied ? <Check size={16} className="text-emerald-600" /> : <Copy size={16} />}
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {!pqrNarrative ? (
+              <div className="text-center py-4 px-2 space-y-2">
+                <p className="text-xs text-slate-500 dark:text-zinc-400 font-medium">
+                  Chưa có nhận xét tổng quan cho kỳ báo cáo này. Bấm nút <strong>"Soạn thảo bằng AI"</strong> để tự động tổng hợp số liệu Cpk, OOS và viết nhận xét chuyên môn.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3 text-xs leading-relaxed text-slate-700 dark:text-zinc-200">
+                <div className="p-3 bg-white/80 dark:bg-zinc-900/80 rounded-xl border border-slate-100 dark:border-zinc-800 space-y-1">
+                  <h5 className="font-bold text-[11px] text-indigo-700 dark:text-indigo-400 uppercase">1. Tình hình sản xuất & Tỷ lệ đạt</h5>
+                  <p>{pqrNarrative.overviewSection}</p>
+                </div>
+                <div className="p-3 bg-white/80 dark:bg-zinc-900/80 rounded-xl border border-slate-100 dark:border-zinc-800 space-y-1">
+                  <h5 className="font-bold text-[11px] text-indigo-700 dark:text-indigo-400 uppercase">2. Đánh giá Năng lực Quá trình (SPC/Cpk)</h5>
+                  <p>{pqrNarrative.cpkEvaluationSection}</p>
+                </div>
+                <div className="p-3 bg-white/80 dark:bg-zinc-900/80 rounded-xl border border-slate-100 dark:border-zinc-800 space-y-1">
+                  <h5 className="font-bold text-[11px] text-indigo-700 dark:text-indigo-400 uppercase">3. Phân tích Sai lệch & Sự cố OOS</h5>
+                  <p>{pqrNarrative.deviationSection}</p>
+                </div>
+                <div className="p-3 bg-emerald-50/60 dark:bg-emerald-950/20 rounded-xl border border-emerald-200/60 dark:border-emerald-900/40 space-y-1 text-emerald-900 dark:text-emerald-200">
+                  <h5 className="font-bold text-[11px] text-emerald-700 dark:text-emerald-400 uppercase">4. Kết luận của Trưởng phòng QA & Đề xuất</h5>
+                  <p className="font-semibold">{pqrNarrative.conclusionAndPlanSection}</p>
+                </div>
+              </div>
+            )}
           </DSCard>
 
           {/* ─── 2. KPI Dashboard — Per-Criteria SPC Metrics ──────────────────── */}

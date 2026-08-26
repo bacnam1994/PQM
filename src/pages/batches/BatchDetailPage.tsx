@@ -8,6 +8,8 @@ import { fetchTestResultsByBatchId } from '../../services/testResultService';
 import { TestResult, Criterion, FormulaIngredient } from '../../types';
 import { CircularProgress, BatchCriteriaHistory } from '../../components';
 import { OOSInvestigationModal } from '../../components/features/OOSInvestigationModal';
+import { AIBatchClearanceModal } from '../../components/features/AIBatchClearanceModal';
+import { FileCheck2 } from 'lucide-react';
 
 // Helper tính tiến độ lô
 const calculateBatchProgress = (batch: any, batchResults: TestResult[]) => {
@@ -70,6 +72,7 @@ const BatchDetailPage = () => {
   const [showHistoryTable, setShowHistoryTable] = useState(false);
   const [isOOSOpen, setIsOOSOpen] = useState(false);
   const [oosModalData, setOosModalData] = useState<any>(null);
+  const [isClearanceModalOpen, setIsClearanceModalOpen] = useState(false);
 
   const batch = useMemo(() => batches.find(b => b.id === id), [batches, id]);
 
@@ -211,9 +214,18 @@ const BatchDetailPage = () => {
           </button>
           <h1 className="text-2xl font-black text-slate-800 dark:text-slate-100 uppercase tracking-tight">Chi tiết Lô hàng</h1>
         </div>
-        <button onClick={() => navigate(`/test-results/coa/${batch.id}`)} className="flex items-center gap-2 px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-black shadow-lg shadow-indigo-200 transition-all uppercase text-xs w-fit">
-          <Printer size={16} /> In CoA Tổng hợp
-        </button>
+        <div className="flex items-center gap-2">
+          <button 
+            type="button"
+            onClick={() => setIsClearanceModalOpen(true)}
+            className="flex items-center gap-2 px-4 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-xl font-black shadow-md shadow-indigo-200 dark:shadow-none transition-all uppercase text-xs w-fit"
+          >
+            <Sparkles size={16} /> Thẩm định Lô (AI)
+          </button>
+          <button onClick={() => navigate(`/test-results/coa/${batch.id}`)} className="flex items-center gap-2 px-5 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-black shadow-lg shadow-indigo-200 transition-all uppercase text-xs w-fit">
+            <Printer size={16} /> In CoA Tổng hợp
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
@@ -339,6 +351,13 @@ const BatchDetailPage = () => {
           initialData={oosModalData}
         />
       )}
+
+      <AIBatchClearanceModal
+        isOpen={isClearanceModalOpen}
+        onClose={() => setIsClearanceModalOpen(false)}
+        batch={batch}
+        batchTestResults={viewBatchResults}
+      />
     </div>
   );
 };

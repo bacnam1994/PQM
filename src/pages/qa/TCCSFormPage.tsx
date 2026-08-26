@@ -7,6 +7,8 @@ import { CriterionType, TCCS, Criterion } from '../../types';
 import { generateId, parseFlexibleValue, normalizeNumericString, autoFormatInput, parseNumberFromText, parseDateToISO } from '../../utils';
 import { SpecialCharToolbar, DSDateInput } from '../../components';
 import { logAuditAction } from '../../services/auditService';
+import { PHARMACOPOEIA_TEMPLATES, generateCriteriaFromFormula, checkTCCSFormulaConflicts, DosageFormType } from '../../services/ai/tccsAssistantService';
+import toast from 'react-hot-toast';
 
 export const COMMON_CRITERIA_UNITS = [
   'mg/viên', 'g/gói', 'mg/gói', 'mg/ml', 'mcg/ml', 'µg/ml',
@@ -209,19 +211,74 @@ const TCCSFormPage = () => {
     }
   }, [formValues.productId, id, cloneId, tccsList, setFormValues, isCloning]);
 
-  const handleFetchCriteriaFromFormula = () => {
+  // AI: Áp dụng Template Dược điển chuẩn theo dạng bào chế
+  const handleApplyPharmacopoeiaTemplate = (templateKey: DosageFormType) => {
+    const tpl = PHARMACOPOEIA_TEMPLATES[templateKey];
+    if (!tpl) return;
+
+    if (!window.confirm(`Áp dụng bộ tiêu chuẩn "${tpl.label}"? Các chỉ tiêu vi sinh và kim loại nặng mẫu sẽ được điền tự động.`)) return;
+
+    const mainList = tpl.criteria.filter(c => c.category === 'main').map(c => ({
+      name: c.name,
+      type: c.type,
+      unit: c.unit || '',
+      min: c.min,
+      max: c.max,
+      expectedText: c.expectedText,
+      notes: c.notes || ''
+    }));
+
+    const microList = tpl.criteria.filter(c => c.category === 'micro').map(c => ({
+      name: c.name,
+      type: c.type,
+      unit: c.unit || '',
+      min: c.min,
+      max: c.max,
+      expectedText: c.expectedText,
+      notes: c.notes || ''
+    }));
+
+    const metalList = tpl.criteria.filter(c => c.category === 'metal').map(c => ({
+      name: c.name,
+      type: c.type,
+      unit: c.unit || '',
+      min: c.min,
+      max: c.max,
+      expectedText: c.expectedText,
+      notes: c.notes || ''
+    }));
+
+    setFormValues(prev => ({
+      ...prev,
+      mainCriteria: mainList.length > 0 ? mainList : prev.mainCriteria,
+      microbiologicalCriteria: microList.length > 0 ? microList : prev.microbiologicalCriteria,
+      heavyMetalCriteria: metalList.length > 0 ? metalList : prev.heavyMetalCriteria
+    }));
+
+    notify({ type: 'SUCCESS', message: `Đã áp dụng mẫu tiêu chuẩn Dược điển: ${tpl.label}` });
+  };
+
+  // AI: Đồng bộ định lượng từ Công thức sản phẩm với biên độ ±5%, ±10% hoặc ±20%
+  const handleFetchCriteriaFromFormula = (tolerance: number = 10) => {
     if (!formValues.productId) return notify({ type: 'WARNING', message: 'Vui lòng chọn sản phẩm trước.' });
     const formula = productFormulas.find(f => f.productId === formValues.productId);
     if (!formula || !formula.ingredients || formula.ingredients.length === 0) {
       return notify({ type: 'INFO', message: 'Sản phẩm này chưa có công thức hoặc công thức không có hoạt chất nào.' });
     }
-    const newCriteria = formula.ingredients.map(ing => ({
-      name: ing.name, unit: ing.unit, min: undefined, max: undefined, type: CriterionType.NUMBER, notes: `Hàm lượng công bố: ${ing.declaredContent} ${ing.unit}`
-    }));
+    const newCriteria = generateCriteriaFromFormula(formula, tolerance);
+    
     const hasExisting = formValues.mainCriteria.some(c => c.name.trim() !== '');
-    if (hasExisting && !window.confirm('Thao tác này sẽ ghi đè lên các chỉ tiêu chất lượng chính hiện tại. Tiếp tục?')) return;
-    setFieldValue('mainCriteria', newCriteria);
-    notify({ type: 'SUCCESS', message: `Đã lấy ${newCriteria.length} chỉ tiêu từ công thức.` });
+    if (hasExisting) {
+      // Append or replace
+      if (window.confirm('Bạn muốn THÊM vào danh sách hiện tại (Bấm OK) hay GHI ĐÈ toàn bộ (Bấm Cancel)?')) {
+        setFieldValue('mainCriteria', [...formValues.mainCriteria.filter(c => c.name.trim() !== ''), ...newCriteria]);
+      } else {
+        setFieldValue('mainCriteria', newCriteria);
+      }
+    } else {
+      setFieldValue('mainCriteria', newCriteria);
+    }
+    notify({ type: 'SUCCESS', message: `Đã đồng bộ ${newCriteria.length} hoạt chất từ công thức (Biên độ ±${tolerance}%).` });
   };
 
   // 3. Hàm Lưu chung
@@ -392,15 +449,65 @@ const TCCSFormPage = () => {
 
             {/* 2. Chỉ tiêu chất lượng */}
             <div className="space-y-3">
-              <div className="flex justify-between items-center">
+              <div className="flex flex-wrap justify-between items-center gap-2">
                 <div className="flex items-center gap-2 text-amber-600 font-black text-[10px] uppercase tracking-widest"><Activity size={14}/> 2. Chỉ tiêu Chất lượng chính</div>
-                <div className="flex items-center gap-2">
-                  <button type="button" onClick={handleFetchCriteriaFromFormula} disabled={!formValues.productId} className="flex items-center gap-1.5 text-[10px] font-bold text-indigo-600 bg-indigo-50 px-2 py-1 rounded hover:bg-indigo-100 transition-colors disabled:opacity-50">
-                    <FlaskConical size={12} /> Lấy từ công thức
-                  </button>
-                  <button type="button" onClick={() => addToArray('mainCriteria', { name: '', unit: '', min: undefined, max: undefined, type: CriterionType.NUMBER, notes: '' })} className="p-2 bg-amber-50 text-amber-600 rounded-lg hover:bg-amber-100 transition-colors"><Plus size={16}/></button>
+                
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {/* Dropdown Mẫu Dược điển */}
+                  <select
+                    onChange={(e) => {
+                      if (e.target.value) {
+                        handleApplyPharmacopoeiaTemplate(e.target.value as DosageFormType);
+                        e.target.value = '';
+                      }
+                    }}
+                    className="text-[10px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2.5 py-1.5 rounded-lg outline-none cursor-pointer hover:bg-indigo-100 transition-colors"
+                    defaultValue=""
+                  >
+                    <option value="" disabled>📖 AI Gợi ý mẫu Dược điển...</option>
+                    <option value="TABLET">💊 Viên nén (DĐVN V)</option>
+                    <option value="CAPSULE">💊 Viên nang (DĐVN V)</option>
+                    <option value="SYRUP">🧪 Siro / Dung dịch uống</option>
+                    <option value="POWDER_GRANULE">🌾 Cốm / Bột pha</option>
+                    <option value="INJECTION">💉 Thuốc tiêm / Truyền</option>
+                    <option value="CREAM_OINTMENT">🧴 Thuốc mỡ / Kem</option>
+                  </select>
+
+                  {/* Dropdown Đồng bộ Công thức */}
+                  <select
+                    disabled={!formValues.productId}
+                    onChange={(e) => {
+                      if (e.target.value) {
+                        handleFetchCriteriaFromFormula(Number(e.target.value));
+                        e.target.value = '';
+                      }
+                    }}
+                    className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1.5 rounded-lg outline-none cursor-pointer hover:bg-emerald-100 transition-colors disabled:opacity-50"
+                    defaultValue=""
+                  >
+                    <option value="" disabled>⚡ Đồng bộ từ Công thức...</option>
+                    <option value="5">Chuẩn Dược điển (±5%)</option>
+                    <option value="10">Chuẩn TCCS thông thường (±10%)</option>
+                    <option value="20">Biên độ rộng (±20%)</option>
+                  </select>
+
+                  <button type="button" onClick={() => addToArray('mainCriteria', { name: '', unit: '', min: undefined, max: undefined, type: CriterionType.NUMBER, notes: '' })} className="p-2 bg-amber-50 text-amber-600 rounded-lg hover:bg-amber-100 transition-colors" title="Thêm chỉ tiêu thủ công"><Plus size={16}/></button>
                 </div>
               </div>
+
+              {/* Conflict Warnings */}
+              {formValues.productId && selectedFormula && checkTCCSFormulaConflicts(formValues.mainCriteria, selectedFormula).length > 0 && (
+                <div className="p-3 bg-amber-50/80 border border-amber-200 rounded-xl space-y-1">
+                  <p className="text-[11px] font-black text-amber-800 flex items-center gap-1.5">
+                    <AlertCircle size={13} /> Cảnh báo đồng bộ Công thức & TCCS:
+                  </p>
+                  <ul className="text-[10px] font-medium text-amber-700 space-y-0.5 pl-4 list-disc">
+                    {checkTCCSFormulaConflicts(formValues.mainCriteria, selectedFormula).map((warn, wIdx) => (
+                      <li key={wIdx}>{warn}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
               {formValues.mainCriteria.map((c, i) => {
                 const isMinMaxError = c.type === CriterionType.NUMBER && c.min !== undefined && c.max !== undefined && c.min !== null && c.max !== null && Number(c.min) > Number(c.max);
                 return (

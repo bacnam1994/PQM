@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { subscribeAuditLogs, AuditLogRecord } from '../../services/auditService';
 import { formatDateStandard } from '../../utils';
+import { ALCOAWatchdogWidget } from '../../components/features/ALCOAWatchdogWidget';
 
 const ACTION_CONFIG = {
   CREATE: {
@@ -197,6 +198,9 @@ const AuditLogPage: React.FC = () => {
           </select>
         </div>
       </div>
+
+      {/* ALCOA+ Data Integrity Watchdog Widget */}
+      <ALCOAWatchdogWidget logs={logs} />
 
       {/* Thẻ Thống kê nhanh */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
