@@ -125,8 +125,21 @@ export const auditDataConsistency = (data: SystemDataSnapshot): ConsistencyRepor
   const productMap = new Map(products.map(p => [p.id, p]));
   const tccsMap = new Map(tccsList.map(t => [t.id, t]));
   const batchMap = new Map(batches.map(b => [b.id, b]));
+  const batchNoMap = new Map(batches.map(b => [b.batchNo, b]));
   const materialMap = new Map(rawMaterials.map(m => [m.id, m]));
   const materialNameMap = new Map<string, RawMaterial>();
+
+  // Hàm tra cứu Lô linh hoạt (hỗ trợ cả ID, Số lô batchNo hoặc suffix)
+  const getBatchForTestResult = (batchId: string): Batch | undefined => {
+    if (!batchId) return undefined;
+    if (batchMap.has(batchId)) return batchMap.get(batchId);
+    if (batchNoMap.has(batchId)) return batchNoMap.get(batchId);
+    return batches.find(b => 
+      (b.id && batchId.endsWith(b.id)) || 
+      (batchId && b.id.endsWith(batchId)) || 
+      (b.batchNo && b.batchNo.toLowerCase() === batchId.toLowerCase())
+    );
+  };
 
   rawMaterials.forEach(m => {
     if (m.name) materialNameMap.set(normalizeName(m.name), m);
@@ -161,9 +174,11 @@ export const auditDataConsistency = (data: SystemDataSnapshot): ConsistencyRepor
 
   const testResultsByBatch = new Map<string, TestResult[]>();
   testResults.forEach(r => {
-    const list = testResultsByBatch.get(r.batchId) || [];
+    const matchedBatch = getBatchForTestResult(r.batchId);
+    const key = matchedBatch ? matchedBatch.id : r.batchId;
+    const list = testResultsByBatch.get(key) || [];
     list.push(r);
-    testResultsByBatch.set(r.batchId, list);
+    testResultsByBatch.set(key, list);
   });
 
   // =========================================================================
@@ -191,7 +206,8 @@ export const auditDataConsistency = (data: SystemDataSnapshot): ConsistencyRepor
 
   // 1.2 Phiếu kiểm nghiệm không có Lô tương ứng
   testResults.forEach(r => {
-    if (!batchMap.has(r.batchId)) {
+    const matchedBatch = getBatchForTestResult(r.batchId);
+    if (!matchedBatch) {
       issues.push({
         id: `orphan_test_${r.id}`,
         type: 'ORPHAN_TEST_RESULT',
@@ -349,7 +365,7 @@ export const auditDataConsistency = (data: SystemDataSnapshot): ConsistencyRepor
   // 3.1 Trạng thái Phiếu kiểm nghiệm không khớp với kết quả đánh giá chỉ tiêu
   testResults.forEach(r => {
     if (r.results && r.results.length > 0) {
-      const rawBatch = batchMap.get(r.batchId);
+      const rawBatch = getBatchForTestResult(r.batchId);
       const boundTccs = rawBatch?.tccsId ? tccsMap.get(rawBatch.tccsId) : undefined;
       const computedStatus = calculateOverallStatus(r.results, boundTccs || null);
       
@@ -439,7 +455,7 @@ export const auditDataConsistency = (data: SystemDataSnapshot): ConsistencyRepor
 
   // 3.5 Logic thời gian Phiếu kiểm nghiệm: testDate < mfgDate
   testResults.forEach(r => {
-    const rawBatch = batchMap.get(r.batchId);
+    const rawBatch = getBatchForTestResult(r.batchId);
     if (rawBatch && rawBatch.mfgDate && r.testDate) {
       const diff = compareDates(rawBatch.mfgDate, r.testDate);
       if (diff !== null && diff > 0) {

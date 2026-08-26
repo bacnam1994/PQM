@@ -59,6 +59,7 @@ export const useFirebaseSync = () => {
         tccsList: ref(db, 'tccs'),
         productFormulas: ref(db, 'product_formulas'),
         rawMaterials: ref(db, 'raw_materials'),
+        testResults: ref(db, 'testResults'),
         aiLearnedMappings: ref(db, 'ai_learned_mappings'),
         criteriaAliases: ref(db, 'criteria_aliases'),
       };
@@ -66,7 +67,10 @@ export const useFirebaseSync = () => {
       Object.entries(standardRefs).forEach(([key, reference]) => {
         const unsubscribe = onValue(reference, (snapshot) => {
           const data = snapshot.val();
-          const list = data ? Object.values(data) : [];
+          let list = data ? Object.values(data) : [];
+          if (key === 'testResults') {
+            list = list.sort((a: any, b: any) => new Date(b.testDate || b.createdAt || 0).getTime() - new Date(a.testDate || a.createdAt || 0).getTime());
+          }
           useAppStore.getState().setAppState({ [key]: list, lastSync: new Date().toISOString() });
 
           if (list.length > 0) {
@@ -129,22 +133,4 @@ export const useFirebaseSync = () => {
       window.removeEventListener('offline', handleOffline);
     };
   }, [user]);
-
-  // 2. Lắng nghe dữ liệu TestResults (có phân trang)
-  useEffect(() => {
-    if (!user) return; // Guard: Chỉ đồng bộ khi người dùng đã đăng nhập thành công
-
-    useAppStore.getState().setSyncStatus('SAVING');
-    const qTestResults = query(ref(db, 'testResults'), orderByChild('createdAt'), limitToLast(testResultLimit));
-    const unsubTestResults = onValue(qTestResults, (snapshot) => {
-      const list: any[] = [];
-      snapshot.forEach((child) => { list.push(child.val()); });
-      useAppStore.getState().mergeTestResults(list);
-      setTimeout(() => useAppStore.getState().setSyncStatus('IDLE'), 300);
-    }, (error) => {
-      console.error("Lỗi đồng bộ kết quả kiểm nghiệm từ Firebase:", error);
-      useAppStore.getState().setSyncStatus('ERROR');
-    });
-    return () => unsubTestResults();
-  }, [user, testResultLimit]);
 };

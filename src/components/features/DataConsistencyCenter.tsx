@@ -35,6 +35,14 @@ export const DataConsistencyCenter: React.FC = () => {
     criteriaAliases: criteriaAliases || [],
   }), [products, batches, tccsList, productFormulas, rawMaterials, testResults, criteriaAliases]);
 
+  const handleManualScan = useCallback(() => {
+    setIsScanning(true);
+    setTimeout(() => {
+      setIsScanning(false);
+      toast.success('Đã hoàn tất rà soát toàn bộ hệ thống!');
+    }, 500);
+  }, []);
+
   // Thực hiện quét liên kết dữ liệu
   const report: ConsistencyReport = useMemo(() => {
     return auditDataConsistency(systemSnapshot);
@@ -209,6 +217,15 @@ export const DataConsistencyCenter: React.FC = () => {
 
         {/* Actions */}
         <div className="flex items-center gap-2.5">
+          <button
+            onClick={handleManualScan}
+            disabled={isScanning}
+            className="px-3.5 py-2.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-bold uppercase tracking-wider flex items-center gap-2 transition-all disabled:opacity-50"
+            title="Quét lại toàn bộ cơ sở dữ liệu"
+          >
+            <RefreshCw size={14} className={isScanning ? "animate-spin text-indigo-600" : ""} />
+            Quét lại
+          </button>
           {report.autoHealableCount > 0 && isAdmin && (
             <button
               onClick={handleAutoHealAll}

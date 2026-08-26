@@ -256,4 +256,43 @@ describe('dataConsistencyService - Data Linkage & Consistency Engine', () => {
     expect(dupCode).toBeDefined();
     expect(dupBatch).toBeDefined();
   });
+
+  it('7. should resolve test results linked by batchNo or suffix and recognize RELEASED batch as PASS', () => {
+    const batchWithNo: Batch = {
+      ...sampleBatch,
+      id: 'batch_uuid_042605',
+      batchNo: '042605',
+      status: 'RELEASED',
+    };
+
+    // TestResult referencing batch by batchNo
+    const testWithBatchNo: TestResult = {
+      id: 'test_custom_1',
+      batchId: '042605',
+      labName: 'Lab Trung Tâm',
+      testDate: '2024-01-10',
+      overallStatus: 'PASS',
+      results: [
+        { criteriaName: 'Định lượng Ginkgo Biloba', value: 100, isPass: true, unit: 'mg/viên' }
+      ],
+      createdAt: '2024-01-10',
+    };
+
+    const data: SystemDataSnapshot = {
+      products: [sampleProduct],
+      rawMaterials: [sampleRawMaterial],
+      tccsList: [sampleTCCS],
+      productFormulas: [sampleFormula],
+      batches: [batchWithNo],
+      testResults: [testWithBatchNo],
+    };
+
+    const report = auditDataConsistency(data);
+    const releasedIssue = report.issues.find(i => i.type === 'RELEASED_BATCH_NO_PASSING_TEST');
+    const orphanTestIssue = report.issues.find(i => i.type === 'ORPHAN_TEST_RESULT');
+
+    expect(releasedIssue).toBeUndefined();
+    expect(orphanTestIssue).toBeUndefined();
+    expect(report.totalIssuesCount).toBe(0);
+  });
 });

@@ -78,19 +78,35 @@ export const useDataGraph = () => {
   const productMap = useMemo(() => new Map(rawProducts.map(p => [p.id, p])), [rawProducts]);
   const tccsMap = useMemo(() => new Map(rawTccsList.map(t => [t.id, t])), [rawTccsList]);
   const batchMap = useMemo(() => new Map(rawBatches.map(b => [b.id, b])), [rawBatches]);
+  const batchNoMap = useMemo(() => new Map(rawBatches.map(b => [b.batchNo, b])), [rawBatches]);
   const formulaMap = useMemo(() => new Map(rawProductFormulas.map(f => [f.productId, f])), [rawProductFormulas]);
   const materialMap = useMemo(() => new Map(rawRawMaterials.map(m => [m.id, m])), [rawRawMaterials]);
 
-  // Gom nhóm Test Results theo BatchId
+  // Tra cứu Lô linh hoạt (ID, BatchNo hoặc suffix)
+  const getBatchForTestResult = useMemo(() => (batchId: string): Batch | undefined => {
+    if (!batchId) return undefined;
+    if (batchMap.has(batchId)) return batchMap.get(batchId);
+    if (batchNoMap.has(batchId)) return batchNoMap.get(batchId);
+    return rawBatches.find(b => 
+      (b.id && batchId.endsWith(b.id)) || 
+      (batchId && b.id.endsWith(batchId)) || 
+      (b.batchNo && b.batchNo.toLowerCase() === batchId.toLowerCase())
+    );
+  }, [batchMap, batchNoMap, rawBatches]);
+
+  // Gom nhóm Test Results theo BatchId (sử dụng nguồn dữ liệu đầy đủ nhất)
   const testResultsByBatch = useMemo(() => {
     const map = new Map<string, TestResult[]>();
-    rawTestResults.forEach(r => {
-      const list = map.get(r.batchId) || [];
+    const sourceTests = (rawTestResults.length >= (rawAllTestResults?.length || 0)) ? rawTestResults : rawAllTestResults;
+    sourceTests.forEach(r => {
+      const matchedBatch = getBatchForTestResult(r.batchId);
+      const key = matchedBatch ? matchedBatch.id : r.batchId;
+      const list = map.get(key) || [];
       list.push(r);
-      map.set(r.batchId, list);
+      map.set(key, list);
     });
     return map;
-  }, [rawTestResults]);
+  }, [rawTestResults, rawAllTestResults, getBatchForTestResult]);
 
   // Gom nhóm Batches theo ProductId
   const batchesByProduct = useMemo(() => {
@@ -144,7 +160,7 @@ export const useDataGraph = () => {
   // Hydrated Test Results
   const testResults = useMemo<HydratedTestResult[]>(() => {
     return rawTestResults.map(res => {
-      const rawBatch = batchMap.get(res.batchId);
+      const rawBatch = getBatchForTestResult(res.batchId);
       const product = rawBatch ? productMap.get(rawBatch.productId) : undefined;
       const tccs = rawBatch ? tccsMap.get(rawBatch.tccsId) : undefined;
       const overallStatus = (res.results && res.results.length > 0)
@@ -159,18 +175,18 @@ export const useDataGraph = () => {
           product, 
           tccs, 
           testResults: testResultsByBatch.get(rawBatch.id) || [], 
-          isFullyTested: false 
+          isFullyTested: (testResultsByBatch.get(rawBatch.id) || []).some(t => t.overallStatus === 'PASS')
         } : undefined,
         product,
         tccs,
       };
     });
-  }, [rawTestResults, batchMap, productMap, tccsMap, testResultsByBatch]);
+  }, [rawTestResults, getBatchForTestResult, productMap, tccsMap, testResultsByBatch]);
 
   const allTestResultsHydrated = useMemo<HydratedTestResult[]>(() => {
     if (!rawAllTestResults || rawAllTestResults.length === 0) return [];
     return rawAllTestResults.map(res => {
-      const rawBatch = batchMap.get(res.batchId);
+      const rawBatch = getBatchForTestResult(res.batchId);
       const product = rawBatch ? productMap.get(rawBatch.productId) : undefined;
       const tccs = rawBatch ? tccsMap.get(rawBatch.tccsId) : undefined;
       const overallStatus = (res.results && res.results.length > 0)
@@ -185,13 +201,13 @@ export const useDataGraph = () => {
           product, 
           tccs, 
           testResults: testResultsByBatch.get(rawBatch.id) || [], 
-          isFullyTested: false 
+          isFullyTested: (testResultsByBatch.get(rawBatch.id) || []).some(t => t.overallStatus === 'PASS')
         } : undefined,
         product,
         tccs,
       };
     });
-  }, [rawAllTestResults, batchMap, productMap, tccsMap, testResultsByBatch]);
+  }, [rawAllTestResults, getBatchForTestResult, productMap, tccsMap, testResultsByBatch]);
 
   // Hydrated Formulas
   const productFormulas = useMemo<HydratedProductFormula[]>(() => {
