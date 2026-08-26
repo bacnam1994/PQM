@@ -295,4 +295,53 @@ describe('dataConsistencyService - Data Linkage & Consistency Engine', () => {
     expect(orphanTestIssue).toBeUndefined();
     expect(report.totalIssuesCount).toBe(0);
   });
+
+  it('8. should accept RELEASED batch if initial test was FAIL but re-test/subsequent test was PASS', () => {
+    const batchReTested: Batch = {
+      ...sampleBatch,
+      id: 'batch_retested_012502',
+      batchNo: '012502',
+      status: 'RELEASED',
+    };
+
+    // Test 1: FAIL (lần đầu không đạt)
+    const test1Fail: TestResult = {
+      id: 'test_fail_1',
+      batchId: 'batch_retested_012502',
+      labName: 'Lab Nội bộ',
+      testDate: '2024-01-02',
+      overallStatus: 'FAIL',
+      results: [
+        { criteriaName: 'Định lượng Ginkgo Biloba', value: 80, isPass: false, unit: 'mg/viên' }
+      ],
+      createdAt: '2024-01-02',
+    };
+
+    // Test 2: PASS (kiểm tra lại đạt)
+    const test2Pass: TestResult = {
+      id: 'test_pass_2',
+      batchId: 'batch_retested_012502',
+      labName: 'Lab Kiểm chứng',
+      testDate: '2024-01-06',
+      overallStatus: 'PASS',
+      results: [
+        { criteriaName: 'Định lượng Ginkgo Biloba', value: 102, isPass: true, unit: 'mg/viên' }
+      ],
+      createdAt: '2024-01-06',
+    };
+
+    const data: SystemDataSnapshot = {
+      products: [sampleProduct],
+      rawMaterials: [sampleRawMaterial],
+      tccsList: [sampleTCCS],
+      productFormulas: [sampleFormula],
+      batches: [batchReTested],
+      testResults: [test1Fail, test2Pass],
+    };
+
+    const report = auditDataConsistency(data);
+    const releasedIssue = report.issues.find(i => i.type === 'RELEASED_BATCH_NO_PASSING_TEST');
+    expect(releasedIssue).toBeUndefined();
+    expect(report.criticalCount).toBe(0);
+  });
 });

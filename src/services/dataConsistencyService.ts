@@ -393,27 +393,62 @@ export const auditDataConsistency = (data: SystemDataSnapshot): ConsistencyRepor
   batches.forEach(b => {
     if (b.status === 'RELEASED') {
       const batchTests = testResultsByBatch.get(b.id) || [];
-      const hasPassTest = batchTests.some(t => t.overallStatus === 'PASS');
-      const hasFailTest = batchTests.some(t => t.overallStatus === 'FAIL');
 
-      if (batchTests.length === 0 || !hasPassTest || hasFailTest) {
+      if (batchTests.length === 0) {
         issues.push({
           id: `released_no_pass_${b.id}`,
           type: 'RELEASED_BATCH_NO_PASSING_TEST',
           category: 'LOGICAL_STATUS_INCONSISTENCY',
           severity: 'CRITICAL',
-          title: `Lô đã xuất xưởng nhưng thiếu chứng nhận Đạt: ${b.batchNo}`,
-          description: batchTests.length === 0
-            ? `Lô "${b.batchNo}" ở trạng thái ĐÃ XUẤT XƯỞNG (RELEASED) nhưng chưa có bất kỳ phiếu kiểm nghiệm nào.`
-            : hasFailTest
-            ? `Lô "${b.batchNo}" ở trạng thái ĐÃ XUẤT XƯỞNG (RELEASED) nhưng có phiếu kiểm nghiệm KHÔNG ĐẠT (FAIL).`
-            : `Lô "${b.batchNo}" ở trạng thái ĐÃ XUẤT XƯỞNG (RELEASED) nhưng không có phiếu kiểm nghiệm ĐẠT hợp lệ.`,
+          title: `Lô đã xuất xưởng nhưng chưa kiểm nghiệm: ${b.batchNo}`,
+          description: `Lô "${b.batchNo}" ở trạng thái ĐÃ XUẤT XƯỞNG (RELEASED) nhưng chưa có bất kỳ phiếu kiểm nghiệm nào.`,
           entityType: 'BATCH',
           entityId: b.id,
           entityName: b.batchNo,
           suggestedAction: 'Xem xét lại quyết định duyệt lô hoặc chuyển trạng thái sang ĐANG KIỂM TRA (TESTING).',
           autoHealable: false,
         });
+      } else {
+        // Sắp xếp các phiếu kiểm nghiệm theo ngày thử nghiệm tăng dần (phiếu mới nhất ở cuối)
+        const sortedTests = [...batchTests].sort((t1, t2) => (t1.testDate || '').localeCompare(t2.testDate || ''));
+        const latestTest = sortedTests[sortedTests.length - 1];
+
+        // Hợp nhất các chỉ tiêu kiểm nghiệm (kết quả kiểm tra lại lần sau sẽ cập nhật/ghi đè chỉ tiêu lần trước)
+        const consolidatedMap = new Map<string, any>();
+        sortedTests.forEach(t => {
+          (t.results || []).forEach(r => {
+            if (r && r.criteriaName) {
+              consolidatedMap.set(r.criteriaName.trim().toLowerCase(), r);
+            }
+          });
+        });
+        const consolidatedResults = Array.from(consolidatedMap.values());
+        const boundTccs = b.tccsId ? tccsMap.get(b.tccsId) : undefined;
+        const consolidatedStatus = consolidatedResults.length > 0 
+          ? calculateOverallStatus(consolidatedResults, boundTccs || null)
+          : undefined;
+
+        const hasPassTest = batchTests.some(t => t.overallStatus === 'PASS');
+        const isLatestPass = latestTest.overallStatus === 'PASS' || consolidatedStatus === 'PASS';
+
+        // Lô chỉ bị xem là lỗi xuất xưởng nếu:
+        // 1. Không có bất kỳ phiếu kiểm nghiệm Đạt nào, HOẶC
+        // 2. Kết quả kiểm nghiệm cuối cùng vẫn là KHÔNG ĐẠT (FAIL) và kết quả hợp nhất cũng không đạt
+        if (!hasPassTest || (!isLatestPass && latestTest.overallStatus === 'FAIL')) {
+          issues.push({
+            id: `released_no_pass_${b.id}`,
+            type: 'RELEASED_BATCH_NO_PASSING_TEST',
+            category: 'LOGICAL_STATUS_INCONSISTENCY',
+            severity: 'CRITICAL',
+            title: `Lô đã xuất xưởng nhưng kết quả kiểm nghiệm không đạt: ${b.batchNo}`,
+            description: `Lô "${b.batchNo}" ở trạng thái ĐÃ XUẤT XƯỞNG (RELEASED) nhưng kết quả kiểm nghiệm cuối cùng là KHÔNG ĐẠT (FAIL) và chưa có phiếu kiểm nghiệm lại đạt.`,
+            entityType: 'BATCH',
+            entityId: b.id,
+            entityName: b.batchNo,
+            suggestedAction: 'Xem xét lại quyết định duyệt lô, thực hiện kiểm nghiệm lại hoặc chuyển trạng thái sang BỊ LOẠI (REJECTED) / ĐANG KIỂM TRA (TESTING).',
+            autoHealable: false,
+          });
+        }
       }
     } else if (b.status === 'REJECTED' && (!b.rejectReason || b.rejectReason.trim() === '')) {
       // 3.3 Lô bị từ chối nhưng thiếu lý do loại
