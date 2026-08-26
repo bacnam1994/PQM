@@ -6,7 +6,7 @@ import {
   ChevronLeft, Info, FileText, History, BarChart3, ArrowRight,
   Plus, Beaker, Calendar, Tag, Hash, Activity, CheckCircle2,
   AlertCircle, Building2, ShieldCheck, X, Eye, Box, Thermometer, BookOpen, Clock, FlaskConical,
-  ChevronDown, ChevronUp, AlertTriangle, TrendingUp, Percent, SlidersHorizontal, Table, Sparkles
+  ChevronDown, ChevronUp, AlertTriangle, TrendingUp, Percent, SlidersHorizontal, Table, Sparkles, Layers, Package
 } from 'lucide-react';
 import { 
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine 
@@ -476,6 +476,83 @@ const ProductDetail: React.FC = () => {
                    <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
                       <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">Bảo quản</p>
                       <p className="text-xs font-bold text-slate-700">{productFormula.storage || '---'}</p>
+                   </div>
+                   
+                   {/* Ecosystem Linkages Card */}
+                   <div className="col-span-1 md:col-span-2 pt-6 border-t border-slate-100 dark:border-slate-800">
+                     <h3 className="text-sm font-black text-slate-800 dark:text-slate-200 uppercase tracking-wider mb-4 flex items-center gap-2">
+                       <Layers size={16} className="text-indigo-500" />
+                       Hệ sinh thái Liên kết Dữ liệu (Data Ecosystem)
+                     </h3>
+                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+                       {/* Formula Link */}
+                       <div 
+                         onClick={() => setActiveTab('formula')}
+                         className="p-4 bg-slate-50 dark:bg-slate-900/60 rounded-xl border border-slate-200/80 dark:border-slate-800 hover:border-indigo-300 dark:hover:border-indigo-700 cursor-pointer transition-all group"
+                       >
+                         <div className="flex items-center justify-between mb-2">
+                           <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Công thức</span>
+                           <FlaskConical size={16} className="text-indigo-500 group-hover:scale-110 transition-transform" />
+                         </div>
+                         <p className="text-sm font-bold text-slate-800 dark:text-slate-200">
+                           {productFormula ? `${productFormula.ingredients.length} hoạt chất` : 'Chưa có'}
+                         </p>
+                         <span className="text-[11px] text-indigo-600 dark:text-indigo-400 font-semibold mt-1 inline-flex items-center gap-1 group-hover:underline">
+                           Xem công thức <ArrowRight size={12} />
+                         </span>
+                       </div>
+
+                       {/* TCCS Link */}
+                       <div 
+                         onClick={() => setActiveTab('tccs')}
+                         className="p-4 bg-slate-50 dark:bg-slate-900/60 rounded-xl border border-slate-200/80 dark:border-slate-800 hover:border-emerald-300 dark:hover:border-emerald-700 cursor-pointer transition-all group"
+                       >
+                         <div className="flex items-center justify-between mb-2">
+                           <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Tiêu chuẩn TCCS</span>
+                           <FileText size={16} className="text-emerald-500 group-hover:scale-110 transition-transform" />
+                         </div>
+                         <p className="text-sm font-bold text-slate-800 dark:text-slate-200 truncate" title={activeTCCS?.code || 'Chưa có'}>
+                           {activeTCCS?.code || 'Chưa có TCCS'}
+                         </p>
+                         <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold mt-1 inline-flex items-center gap-1 group-hover:underline">
+                           {productTCCSList.length} phiên bản <ArrowRight size={12} />
+                         </span>
+                       </div>
+
+                       {/* Batches Link */}
+                       <div 
+                         onClick={() => navigate(`/batches?productId=${product.id}`)}
+                         className="p-4 bg-slate-50 dark:bg-slate-900/60 rounded-xl border border-slate-200/80 dark:border-slate-800 hover:border-amber-300 dark:hover:border-amber-700 cursor-pointer transition-all group"
+                       >
+                         <div className="flex items-center justify-between mb-2">
+                           <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Lô sản xuất</span>
+                           <Package size={16} className="text-amber-500 group-hover:scale-110 transition-transform" />
+                         </div>
+                         <p className="text-sm font-bold text-slate-800 dark:text-slate-200">
+                           {batches.filter(b => b.productId === product.id).length} lô đã tạo
+                         </p>
+                         <span className="text-[11px] text-amber-600 dark:text-amber-400 font-semibold mt-1 inline-flex items-center gap-1 group-hover:underline">
+                           Quản lý lô hàng <ArrowRight size={12} />
+                         </span>
+                       </div>
+
+                       {/* Quality / Lab Results Link */}
+                       <div 
+                         onClick={() => setActiveTab('history')}
+                         className="p-4 bg-slate-50 dark:bg-slate-900/60 rounded-xl border border-slate-200/80 dark:border-slate-800 hover:border-violet-300 dark:hover:border-violet-700 cursor-pointer transition-all group"
+                       >
+                         <div className="flex items-center justify-between mb-2">
+                           <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Kiểm nghiệm Lab</span>
+                           <Activity size={16} className="text-violet-500 group-hover:scale-110 transition-transform" />
+                         </div>
+                         <p className="text-sm font-bold text-slate-800 dark:text-slate-200">
+                           {allProductResults.length} phiếu đã nhập
+                         </p>
+                         <span className="text-[11px] text-violet-600 dark:text-violet-400 font-semibold mt-1 inline-flex items-center gap-1 group-hover:underline">
+                           Lịch sử chi tiết <ArrowRight size={12} />
+                         </span>
+                       </div>
+                     </div>
                    </div>
                  </div>
               ) : (

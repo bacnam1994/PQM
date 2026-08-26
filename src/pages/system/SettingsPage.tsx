@@ -5,6 +5,7 @@ import { get, ref, update } from 'firebase/database';
 import { db } from '../../firebase';
 import { Database, Download, Upload, Trash2, RefreshCcw, ShieldAlert, FileJson, Settings2, Hash, Calendar, FlaskConical, Wand2, UserCircle2, RotateCcw, Search, Cookie, ChevronRight, BarChart3, ListFilter, Rows3, Sparkles, KeyRound, Eye, EyeOff, Bot, CheckCircle2, AlertTriangle, HardDrive, FolderOpen, ExternalLink } from 'lucide-react';
 import { ConfirmationModal } from '../../components';
+import { DataConsistencyCenter } from '../../components/features/DataConsistencyCenter';
 import { generateId } from '../../utils';
 import { ProductFormula, FormulaIngredient } from '../../types';
 import { useUIStore } from '../../store/useUIStore';
@@ -778,6 +779,11 @@ const SettingsPage: React.FC = () => {
             )}
           </div>
         </section>
+
+        {/* Data Consistency & Linkage Center */}
+        <div className="lg:col-span-2">
+          <DataConsistencyCenter />
+        </div>
 
         {/* Backup & Restore */}
         <section className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm space-y-4">

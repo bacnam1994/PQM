@@ -233,7 +233,13 @@ const BatchDetailPage = () => {
           <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700">
             <div className="mb-4 pb-4 border-b border-slate-100 dark:border-slate-700">
               <p className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1">Sản phẩm</p>
-              <h4 className="font-bold text-slate-800 dark:text-slate-100 text-base leading-tight mb-1">{batch.product?.name}</h4>
+              <h4 
+                onClick={() => batch.productId && navigate(`/products/${batch.productId}`)}
+                className="font-bold text-slate-800 dark:text-slate-100 text-base leading-tight mb-1 hover:text-indigo-600 dark:hover:text-indigo-400 cursor-pointer transition-colors"
+                title="Nhấn để xem chi tiết hồ sơ sản phẩm"
+              >
+                {batch.product?.name}
+              </h4>
               <p className="text-xs font-black text-indigo-600 dark:text-indigo-400">{batch.product?.code}</p>
             </div>
             <div className="mb-4 pb-4 border-b border-slate-100 dark:border-slate-700">
@@ -246,7 +252,13 @@ const BatchDetailPage = () => {
 
               <div className="pt-3 border-t border-slate-100 dark:border-slate-700">
                 <span className="font-bold text-slate-500 dark:text-slate-400 block mb-1">Tiêu chuẩn áp dụng:</span>
-                <span className="font-bold text-indigo-700 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 px-2 py-1 rounded inline-block">{(batch as any).tccs?.code || 'Không xác định'}</span>
+                <span 
+                  onClick={() => (batch as any).tccs?.id && navigate(`/tccs/${(batch as any).tccs?.id}`)}
+                  className="font-bold text-indigo-700 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 px-2 py-1 rounded inline-block cursor-pointer transition-colors"
+                  title="Nhấn để xem chi tiết TCCS"
+                >
+                  {(batch as any).tccs?.code || 'Không xác định'}
+                </span>
               </div>
             </div>
           </div>
