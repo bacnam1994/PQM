@@ -163,13 +163,19 @@ export const checkRange = (limit: string, value: string): boolean | null => {
 
   const isLimitND = ndWords.some(kw => limitNorm.includes(kw));
   const isValueND = ndWords.some(kw => valueNorm.includes(kw));
-  
   const isLimitPos = posWords.some(kw => limitNorm.includes(kw));
   const isValuePos = posWords.some(kw => valueNorm.includes(kw));
+  
+  // Phát hiện value có tiền tố toán tử so sánh (VD: "<10" nghĩa là thực tế < 10, dưới ngưỡng LOD)
+  // Khi user nhập "<10" (below detection limit), actualVal phải < 10 để không bị FAIL oan khi Limit là "< 10"
+  // VD: Coliforms limit "< 10 CFU/g" + value "<10" → 10 < 10 = FALSE (sai!) → cần dùng 10 - epsilon
+  const valueTrimmed = String(value).trim();
+  const isValueStrictLt = /^<(?!=|≤)/.test(valueTrimmed); // "<10" nhưng KHÔNG phải "<=" hay "≤"
+  const isValueStrictGt = /^>(?!=|≥)/.test(valueTrimmed); // ">10" nhưng KHÔNG phải ">=" hay "≥"
 
   if (isLimitND) {
-    // Nếu Yêu cầu là ND -> Kết quả thực tế phải chứa từ khóa ND hoặc là số <= 0
-    if (isValueND) return true;
+    // Nếu Yêu cầu là ND -> Kết quả thực tế phải chứa từ khóa ND, có tiền tố "<" (dưới ngưỡng LOD/LOQ), hoặc là số <= 0
+    if (isValueND || isValueStrictLt) return true;
     if (isValuePos) return false; // Fail ngay nếu kết quả là Dương tính
     const valNum = parseNumberFromText(value);
     if (!isNaN(valNum)) return valNum <= 0;
@@ -182,16 +188,9 @@ export const checkRange = (limit: string, value: string): boolean | null => {
   }
 
   if (isValueND) {
-    // Nếu Kết quả nhập là ND nhưng Yêu cầu là Số (VD: <= 10) -> Tạm quy đổi ND thành 0 để tính toán
+    // Nếu Kết quả nhập là ND nhưng Yêu cầu là Số (VD: <= 10, <= 3) -> Tạm quy đổi ND thành 0 để tính toán
     value = "0";
   }
-
-  // Phát hiện value có tiền tố toán tử so sánh (VD: "<10" nghĩa là thực tế < 10, dưới ngưỡng LOD)
-  // Khi user nhập "<10" (below detection limit), actualVal phải < 10 để không bị FAIL oan khi Limit là "< 10"
-  // VD: Coliforms limit "< 10 CFU/g" + value "<10" → 10 < 10 = FALSE (sai!) → cần dùng 10 - epsilon
-  const valueTrimmed = String(value).trim();
-  const isValueStrictLt = /^<(?!=|≤)/.test(valueTrimmed); // "<10" nhưng KHÔNG phải "<=" hay "≤"
-  const isValueStrictGt = /^>(?!=|≥)/.test(valueTrimmed); // ">10" nhưng KHÔNG phải ">=" hay "≥"
 
   let actualVal = parseNumberFromText(value);
   if (!isNaN(actualVal)) {
@@ -206,6 +205,19 @@ export const checkRange = (limit: string, value: string): boolean | null => {
   if (isNaN(actualVal)) return null;
 
   const normLimit = normalizeNumericString(limit).trim();
+
+  // Helper xử lý ngoại lệ giới hạn phát hiện phòng kiểm nghiệm (LOD / LOQ Exception):
+  // Trong kiểm nghiệm Dược & Vi sinh (Dược điển VN V, ISO 4833, BAM-FDA):
+  // Khi phương pháp đếm đĩa không mọc khuẩn lạc nào (0 CFU) ở độ pha loãng 10^-1, lab xuất phiếu là "< 10" (hoặc "< 10 CFU/g", "< 10^1", "< 1", "< LOD").
+  // Nồng độ/số lượng thực tế là 0 (Zero / Not Detected). Với các chỉ tiêu có giới hạn trên (<= 3, <= 5, <= 10, < 3, NMT 3), 0 <= limitNum nên luôn ĐẠT (PASS).
+  const isLODOrZero = (limitNum: number): boolean => {
+    if (!isValueStrictLt) return false;
+    const rawNum = parseNumberFromText(valueTrimmed);
+    if (limitNum >= 0 && (isValueND || isNaN(rawNum) || rawNum <= 10)) {
+      return true;
+    }
+    return false;
+  };
 
   // 1. Xử lý trường hợp ± (Cộng/Trừ) hoặc +/-
   const pmSymbol = normLimit.includes('±') ? '±' : normLimit.includes('+/-') ? '+/-' : null;
@@ -237,7 +249,13 @@ export const checkRange = (limit: string, value: string): boolean | null => {
     if (!isNaN(min) && !isNaN(max)) {
       // Bù trừ sai số thập phân tương đối
       const relativeEpsilon = Math.max(Math.abs(min), Math.abs(max), Math.abs(actualVal)) * 1e-10;
-      return actualVal >= (min - relativeEpsilon) && actualVal <= (max + relativeEpsilon);
+      if (actualVal >= (min - relativeEpsilon) && actualVal <= (max + relativeEpsilon)) {
+        return true;
+      }
+      if (min <= 0 && isLODOrZero(max)) {
+        return true;
+      }
+      return false;
     }
   }
   
@@ -253,7 +271,7 @@ export const checkRange = (limit: string, value: string): boolean | null => {
     const limitNum = parseNumberFromText(cleanLimit.replace(/^NMT\b/i, ''));
     if (!isNaN(limitNum)) {
       const eps = Math.max(Math.abs(limitNum), Math.abs(actualVal)) * 1e-10;
-      return actualVal <= limitNum + eps;
+      return (actualVal <= limitNum + eps) || isLODOrZero(limitNum);
     }
   }
   if (/^NLT\b/.test(upperLimit)) {
@@ -267,20 +285,23 @@ export const checkRange = (limit: string, value: string): boolean | null => {
   if (/^<=|≤/.test(cleanLimit)) {
     const limitNum = parseNumberFromText(cleanLimit.replace(/<=|≤/, ''));
     const eps = Math.max(Math.abs(limitNum), Math.abs(actualVal)) * 1e-10;
-    return actualVal <= limitNum + eps;
+    return (actualVal <= limitNum + eps) || isLODOrZero(limitNum);
   }
   if (/^>=|≥/.test(cleanLimit)) {
     const limitNum = parseNumberFromText(cleanLimit.replace(/>=|≥/, ''));
     const eps = Math.max(Math.abs(limitNum), Math.abs(actualVal)) * 1e-10;
     return actualVal >= limitNum - eps;
   }
-  if (/^</.test(cleanLimit)) return actualVal < parseNumberFromText(cleanLimit.replace(/</, ''));
+  if (/^</.test(cleanLimit)) {
+    const limitNum = parseNumberFromText(cleanLimit.replace(/</, ''));
+    return (actualVal < limitNum) || isLODOrZero(limitNum);
+  }
   if (/^>/.test(cleanLimit)) return actualVal > parseNumberFromText(cleanLimit.replace(/>/, ''));
   
   const limitNum = parseNumberFromText(cleanLimit);
   if (!isNaN(limitNum)) {
     const eps = Math.max(Math.abs(limitNum), Math.abs(actualVal)) * 1e-10;
-    return actualVal <= limitNum + eps;
+    return (actualVal <= limitNum + eps) || isLODOrZero(limitNum);
   }
 
   return null;

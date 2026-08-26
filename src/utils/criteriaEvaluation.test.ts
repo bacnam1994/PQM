@@ -75,6 +75,28 @@ describe('checkRange()', () => {
       expect(checkRange('<= 10', '<10')).toBe(true);
     });
 
+    it('<10 phải ĐẠT khi giới hạn là "≤ 3" hoặc "≤ 3 CFU/g" (chuẩn phòng lab LOD/LOQ 0 CFU)', () => {
+      expect(checkRange('≤ 3', '< 10')).toBe(true);
+      expect(checkRange('<= 3', '< 10')).toBe(true);
+      expect(checkRange('≤ 3 CFU/g', '< 10 CFU/g')).toBe(true);
+      expect(checkRange('≤ 3', '< 10^1')).toBe(true);
+      expect(checkRange('≤ 3', '< 3')).toBe(true);
+      expect(checkRange('≤ 3', '< 1')).toBe(true);
+      expect(checkRange('≤ 3', '< 0.1')).toBe(true);
+      expect(checkRange('< 3', '< 10')).toBe(true);
+      expect(checkRange('NMT 3', '< 10')).toBe(true);
+      expect(checkRange('0 - 3', '< 10')).toBe(true);
+      expect(checkRange('Không được có', '< 10')).toBe(true);
+      expect(checkRange('Âm tính', '< 10')).toBe(true);
+    });
+
+    it('Số dương vượt ngưỡng (không có dấu <) hoặc chỉ tiêu định lượng min phải FAIL đúng', () => {
+      expect(checkRange('≤ 3', '4')).toBe(false);
+      expect(checkRange('≤ 3', '10')).toBe(false);
+      expect(checkRange('90 - 110', '< 10')).toBe(false);
+      expect(checkRange('≥ 80', '< 10')).toBe(false);
+    });
+
     it('>10 phải ĐẠT khi giới hạn là "> 10" (strict greater-than)', () => {
       expect(checkRange('> 10', '>10')).toBe(true);
       expect(checkRange('>= 10', '>10')).toBe(true);

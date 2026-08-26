@@ -142,8 +142,10 @@ export const evaluateCriterion = (c: any, value: string | number): boolean => {
     return POSITIVE_KEYWORDS.some(p => lower.includes(p));
   };
 
-  const isResultAbsent = isZeroOrAbsent(strVal);
-  let resultAsNumber: number | null = parseFlexibleValue(strVal);
+  const isLtPrefix = /^<(?!=|≤)/.test(strVal);
+  const parsedFlexible = parseFlexibleValue(strVal);
+  const isResultAbsent = isZeroOrAbsent(strVal) || (isLtPrefix && (parsedFlexible === null || parsedFlexible <= 10));
+  let resultAsNumber: number | null = parsedFlexible;
   if (resultAsNumber === null && isResultAbsent) {
     resultAsNumber = 0;
   }
@@ -156,6 +158,12 @@ export const evaluateCriterion = (c: any, value: string | number): boolean => {
     }
     const min = (c.min !== undefined && c.min !== null && c.min !== '') ? parseFloat(String(c.min)) : -Infinity;
     const max = (c.max !== undefined && c.max !== null && c.max !== '') ? parseFloat(String(c.max)) : Infinity;
+    
+    // Nếu kết quả là dưới ngưỡng phát hiện (< 10) và chỉ tiêu chỉ có giới hạn trên (min <= 0 hoặc không có min)
+    if (isLtPrefix && (min === -Infinity || min <= 0) && max >= 0 && (parsedFlexible === null || parsedFlexible <= 10)) {
+      return 0 >= min && 0 <= max;
+    }
+
     return resultAsNumber >= min && resultAsNumber <= max;
   }
 
