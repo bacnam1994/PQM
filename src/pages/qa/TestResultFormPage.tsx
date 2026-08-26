@@ -12,10 +12,13 @@ import { geminiService, formatGeminiError } from '../../services/ai/geminiServic
 import { buildExtractionPrompt } from '../../services/ai/prompts';
 import { recordHighConfidenceOCRMappings } from '../../services/ai/autoLearningService';
 import { MappingConfirmModal, AIExtractedItem, ConfirmedMapping } from '../../components/features/MappingConfirmModal';
+import { VoiceInputButton } from '../../components/features/VoiceInputButton';
+import { LabComparisonModal } from '../../components/features/LabComparisonModal';
+import { ParsedVoiceCriteria } from '../../services/ai/voiceParserService';
 import { useUIStore } from '../../store/useUIStore';
 import { storage } from '../../firebase';
 import { ref as storageRef, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
-import { FileText, Link2, HardDrive, ExternalLink, X, PlusCircle, FileUp, FolderOpen } from 'lucide-react';
+import { FileText, Link2, HardDrive, ExternalLink, X, PlusCircle, FileUp, FolderOpen, Scale } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 interface GDFile {
@@ -281,6 +284,7 @@ const TestResultFormPage = () => {
   /** Batch scan progress state */
   const [batchScanFiles, setBatchScanFiles] = React.useState<{ fileName: string; status: 'waiting' | 'processing' | 'done' | 'error'; criteriaCount?: number; error?: string; progressStep?: string; progressPercent?: number }[]>([]);
   const [isBatchProgressOpen, setIsBatchProgressOpen] = React.useState(false);
+  const [isComparisonModalOpen, setIsComparisonModalOpen] = React.useState(false);
 
   // Lấy danh sách tên chỉ tiêu từ TCCS đang hiệu lực để làm prompt
   const allActiveTccsNames = useMemo(() => {
@@ -454,6 +458,27 @@ const TestResultFormPage = () => {
         setPendingAiResults(data.testResults);
       }
     }
+  };
+
+  const handleApplyVoiceCriteria = (entries: ParsedVoiceCriteria[]) => {
+    if (!entries || entries.length === 0) return;
+    const newAiFields = new Set<string>();
+
+    entries.forEach(entry => {
+      if (activeTCCS) {
+        const allCrit = [...(activeTCCS.mainQualityCriteria || []), ...(activeTCCS.safetyCriteria || [])];
+        const matched = allCrit.find(c => isCriteriaMatch(entry.criteriaName, c.name, aiLearnedMappings));
+        if (matched) {
+          setMapValue('testResultsMap', matched.name, String(entry.value));
+          newAiFields.add(matched.name);
+          return;
+        }
+      }
+      setMapValue('testResultsMap', entry.criteriaName, String(entry.value));
+      newAiFields.add(entry.criteriaName);
+    });
+
+    setAiFilledFields(prev => new Set([...prev, ...newAiFields]));
   };
 
   // --- Logic xử lý File và Mapping AI (Batch-capable) ---
@@ -1056,6 +1081,21 @@ const TestResultFormPage = () => {
           onChange={handleAiFileSelect}
         />
         
+        <VoiceInputButton
+          onApplyCriteria={handleApplyVoiceCriteria}
+          availableCriteriaNames={allActiveTccsNames}
+        />
+
+        <button
+          type="button"
+          onClick={() => setIsComparisonModalOpen(true)}
+          className="flex items-center gap-2 px-3 py-2 bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/40 dark:hover:bg-blue-900/50 text-blue-700 dark:text-blue-300 rounded-xl font-bold text-xs border border-blue-200 dark:border-blue-800 transition-all shadow-sm"
+          title="Đối chiếu kết quả giữa 2 phòng lab hoặc CoA nhà cung cấp"
+        >
+          <Scale size={14} className="text-blue-600 dark:text-blue-400" />
+          Đối chiếu Lab
+        </button>
+
         <button
           type="button"
           disabled={isAiProcessing}
@@ -1084,6 +1124,12 @@ const TestResultFormPage = () => {
         lowConfidenceItems={pendingLowItems}
         tccsNames={allActiveTccsNames}
         onConfirm={handleMappingConfirmed}
+      />
+
+      <LabComparisonModal
+        isOpen={isComparisonModalOpen}
+        onClose={() => setIsComparisonModalOpen(false)}
+        batch={hydratedBatches.find(b => b.id === formValues.batchId)}
       />
 
       <GDFileSelectorModal

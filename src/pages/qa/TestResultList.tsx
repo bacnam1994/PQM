@@ -5,13 +5,14 @@ import {
   Plus, Search, ClipboardCheck, CheckCircle2, AlertCircle, Trash2,
   Calendar, Beaker, X, FileText,
   History, ListPlus, FlaskConical, Printer, Eye, Edit2, Loader2,
-  Package, Hash, Clock, Filter, ShieldCheck, LayoutGrid, List, ArrowUpDown, FileSearch, RefreshCcw, ShieldAlert
+  Package, Hash, Clock, Filter, ShieldCheck, LayoutGrid, List, ArrowUpDown, FileSearch, RefreshCcw, ShieldAlert, Scale
 } from 'lucide-react';
 import { TestResult, TestResultEntry } from '../../types';
 import { TEST_RESULT_STATUS, BATCH_STATUS, ensureArray, formatDateStandard, normalizeSearch } from '../../utils';
 const CoAReport = lazy(() => import('../../components/features/CoAReport'));
 import { PageHeader, DSFilterBar, DSSearchInput, DSSelect, DSCard, DSViewToggle, DSTable, ActionButtons, DeleteModal, AddButton, DSEmptyState, Pagination } from '../../components';
 import { OOSInvestigationModal } from '../../components/features/OOSInvestigationModal';
+import { LabComparisonModal } from '../../components/features/LabComparisonModal';
 import { useDataGraph, HydratedTestResult, useDebounce } from '../../hooks';
 import { useTestResultList } from '../../hooks/test-results/useTestResultList';
 import { useUIStore } from '../../store/useUIStore';
@@ -224,6 +225,7 @@ const TestResultList: React.FC = () => {
 
   const [isOOSOpen, setIsOOSOpen] = useState(false);
   const [oosModalData, setOosModalData] = useState<any>(null);
+  const [isComparisonOpen, setIsComparisonOpen] = useState(false);
 
   const handleOpenOOS = useCallback((res: HydratedTestResult) => {
     const failedCriteria: { criteriaName: string; actualValue: string | number; specification: string; unit?: string }[] = [];
@@ -325,7 +327,17 @@ const TestResultList: React.FC = () => {
           subtitle="Ghi nhận dữ liệu phân tích dựa trên hồ sơ Lô hàng hiện có." 
           icon={ClipboardCheck}
           action={
-            isAdmin && <AddButton onClick={handleOpenAdd} label="NHẬP KẾT QUẢ MỚI" />
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setIsComparisonOpen(true)}
+                className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/40 dark:hover:bg-blue-900/50 text-blue-700 dark:text-blue-300 font-bold text-xs border border-blue-200 dark:border-blue-800 shadow-sm transition-all uppercase tracking-wider"
+              >
+                <Scale size={14} className="text-blue-600 dark:text-blue-400" />
+                Đối chiếu Lab (AI)
+              </button>
+              {isAdmin && <AddButton onClick={handleOpenAdd} label="NHẬP KẾT QUẢ MỚI" />}
+            </div>
           }
         />
       </div>
@@ -408,6 +420,13 @@ const TestResultList: React.FC = () => {
           isOpen={isOOSOpen}
           onClose={() => setIsOOSOpen(false)}
           initialData={oosModalData}
+        />
+      )}
+
+      {isComparisonOpen && (
+        <LabComparisonModal
+          isOpen={isComparisonOpen}
+          onClose={() => setIsComparisonOpen(false)}
         />
       )}
 

@@ -1,7 +1,10 @@
-﻿import { TestResult } from '../../types';
+import { TestResult } from '../../types';
 import { generateQualityReport as _generateReport, detectQualityAnomalies as _detectAnomalies, QualityReportOptions } from '../reportService';
 import { generateRuleBasedOOSReport } from './oosInvestigationService';
 import { generateAIInsights } from './autoLearningService';
+import { compareLabReports } from './labComparisonService';
+import { predictProductStability, generateStabilityForecastWithAI } from './stabilityPredictionService';
+import { auditDataIntegrity, generateDataIntegrityAIAssessment } from './dataIntegrityService';
 
 // ============================================================
 // GEMINI TOOL DECLARATIONS
@@ -190,6 +193,60 @@ export const GEMINI_TOOL_DECLARATIONS = [
         forceRefresh: {
           type: "BOOLEAN",
           description: "true neu muon tai phan tich, bo qua cache cu."
+        }
+      },
+      required: []
+    }
+  },
+  {
+    name: "compareLabResults",
+    description: "Đối chiếu kết quả giữa 2 phiếu kiểm nghiệm (ví dụ: Nội bộ vs Quatest 3, Eurofins, hoặc CoA Nhà cung cấp), tính %RPD sai lệch và đánh giá sai số hệ thống Lab Bias.",
+    parameters: {
+      type: "OBJECT",
+      properties: {
+        batchNo: {
+          type: "STRING",
+          description: "Số lô cần đối chiếu phiếu kiểm nghiệm."
+        },
+        lab1Name: {
+          type: "STRING",
+          description: "Tên phòng kiểm nghiệm thứ nhất (ví dụ: 'Nội bộ', 'QC', 'Quatest 3')."
+        },
+        lab2Name: {
+          type: "STRING",
+          description: "Tên phòng kiểm nghiệm thứ hai (ví dụ: 'Quatest 3', 'Eurofins', 'CASE')."
+        }
+      },
+      required: ["batchNo"]
+    }
+  },
+  {
+    name: "predictQualityStability",
+    description: "Dự báo động học suy giảm hàm lượng và độ ổn định chất lượng theo thời gian (Stability & Shelf-Life Forecasting) cho sản phẩm, tính tốc độ suy giảm k và hạn dùng dự kiến t90.",
+    parameters: {
+      type: "OBJECT",
+      properties: {
+        productId: {
+          type: "STRING",
+          description: "ID hoặc tên của sản phẩm cần dự báo độ ổn định."
+        },
+        shelfLifeMonths: {
+          type: "NUMBER",
+          description: "Hạn dùng thiết kế tính theo tháng (mặc định 24 hoặc 36 tháng)."
+        }
+      },
+      required: ["productId"]
+    }
+  },
+  {
+    name: "auditDataIntegrity",
+    description: "Rà soát toàn vẹn dữ liệu (Data Integrity Audit Trail) theo nguyên tắc ALCOA+ và US FDA 21 CFR Part 11, phát hiện các sửa đổi bất thường và tính điểm tuân thủ.",
+    parameters: {
+      type: "OBJECT",
+      properties: {
+        detailed: {
+          type: "BOOLEAN",
+          description: "true nếu muốn báo cáo phân tích chi tiết từng phát hiện."
         }
       },
       required: []
@@ -881,6 +938,122 @@ export const executeTool = async (
           return badge + ' **' + i.title + '**\n' + i.detail;
         }).join('\n\n---\n\n');
         return { count: insights.length, message: '### AI Insights\n\n' + insightLines, insights };
+      } catch (e: any) {
+        return { error: e.message };
+      }
+    }
+
+    case 'compareLabResults': {
+      try {
+        const testResults: TestResult[] = appContext.testResults || [];
+        const batches = appContext.batches || [];
+        const learned = appContext.aiLearnedMappings || [];
+
+        const targetBatch = batches.find((b: any) => b.batchNo === args.batchNo || b.id === args.batchNo);
+        if (!targetBatch) {
+          return { error: `Không tìm thấy thông tin lô hàng "${args.batchNo}" trong hệ thống.` };
+        }
+
+        const batchResults = testResults.filter((r: any) => r.batchId === targetBatch.id);
+        if (batchResults.length < 2) {
+          return {
+            error: `Lô "${targetBatch.batchNo}" hiện chỉ có ${batchResults.length} phiếu kiểm nghiệm. Cần ít nhất 2 phiếu kiểm nghiệm để thực hiện đối chiếu chéo.`
+          };
+        }
+
+        let r1 = batchResults[0];
+        let r2 = batchResults[1];
+
+        if (args.lab1Name) {
+          const found = batchResults.find(r => r.labName?.toLowerCase().includes(args.lab1Name.toLowerCase()));
+          if (found) r1 = found;
+        }
+        if (args.lab2Name) {
+          const found = batchResults.find(r => r !== r1 && r.labName?.toLowerCase().includes(args.lab2Name.toLowerCase()));
+          if (found) r2 = found;
+        }
+
+        const comparison = await compareLabReports(
+          { title: `Phiếu 1 (${r1.labName || 'Nội bộ'})`, labName: r1.labName || 'Nội bộ', testDate: r1.testDate, batchNo: targetBatch.batchNo, overallStatus: r1.overallStatus, results: r1.results || [] },
+          { title: `Phiếu 2 (${r2.labName || 'Ngoại kiểm'})`, labName: r2.labName || 'Ngoại kiểm', testDate: r2.testDate, batchNo: targetBatch.batchNo, overallStatus: r2.overallStatus, results: r2.results || [] },
+          learned
+        );
+
+        const entryLines = comparison.entries
+          .filter(e => e.deviationLevel !== 'SINGLE_SOURCE')
+          .map(e => `| ${e.criteriaName} | ${e.source1Value} ${e.source1Unit || ''} | ${e.source2Value} ${e.source2Unit || ''} | ${e.rpd !== undefined ? `${e.rpd}%` : '---'} | **${e.deviationLevel}** |`)
+          .join('\n');
+
+        const mdTable = `| Chỉ tiêu | ${comparison.report1.labName} | ${comparison.report2.labName} | Độ lệch (%RPD) | Đánh giá |\n| --- | --- | --- | --- | --- |\n${entryLines}`;
+
+        return {
+          success: true,
+          comparisonId: comparison.comparisonId,
+          metrics: comparison.metrics,
+          message: `### 🔬 ĐỐI CHIẾU KẾT QUẢ KIỂM NGHIỆM: Lô **${targetBatch.batchNo}**\n\n- **Đơn vị 1:** ${comparison.report1.labName} (${comparison.report1.testDate || 'N/A'})\n- **Đơn vị 2:** ${comparison.report2.labName} (${comparison.report2.testDate || 'N/A'})\n- **Tỷ lệ đồng thuận:** **${comparison.metrics.agreementRatePercent}%** (Độ lệch TB: **${comparison.metrics.avgRpdPercent}%**)\n\n${mdTable}\n\n**Nhận định chuyên môn:**\n${comparison.aiAnalysis.summary}\n\n**Đánh giá sai số hệ thống (Lab Bias):**\n${comparison.aiAnalysis.systematicBiasAssessment}`
+        };
+      } catch (e: any) {
+        return { error: e.message };
+      }
+    }
+
+    case 'predictQualityStability': {
+      try {
+        const products = appContext.products || [];
+        const batches = appContext.batches || [];
+        const testResults = appContext.testResults || [];
+        const tccsList = appContext.tccsList || [];
+
+        const targetProduct = products.find((p: any) => p.id === args.productId || p.name?.toLowerCase().includes(String(args.productId).toLowerCase()));
+        if (!targetProduct) {
+          return { error: `Không tìm thấy sản phẩm "${args.productId}" trong hệ thống.` };
+        }
+
+        const tccs = tccsList.find((t: any) => t.productId === targetProduct.id && t.isActive) || tccsList.find((t: any) => t.productId === targetProduct.id);
+        const report = predictProductStability(targetProduct, batches, testResults, tccs, args.shelfLifeMonths || 24);
+        const enrichedReport = await generateStabilityForecastWithAI(report);
+
+        const forecastLines = enrichedReport.forecasts.map(f => {
+          const icon = f.riskLevel === 'HIGH_EXPIRY_RISK' ? '🚨' : f.riskLevel === 'MODERATE_RISK' ? '⚠️' : '✅';
+          return `- ${icon} **${f.criteriaName}**: Ban đầu: ${f.initialValue}${f.unit} → Mới nhất: ${f.latestValue}${f.unit} (Giảm: ${(f.decayRatePerMonth * 12).toFixed(1)}${f.unit}/năm, R²=${f.rSquared}). ${f.projectedMonthToMinLimit ? `Dự kiến chạm Min (${f.minLimit}${f.unit}) sau **${f.projectedMonthToMinLimit} tháng**.` : 'Duy trì ổn định.'}`;
+        }).join('\n');
+
+        return {
+          success: true,
+          productId: targetProduct.id,
+          productName: targetProduct.name,
+          forecasts: enrichedReport.forecasts,
+          message: `### 📈 BÁO CÁO DỰ BÁO ĐỘ ỔN ĐỊNH & HẠN DÙNG: **${targetProduct.name}**\n\n**1. Tóm tắt chuyên môn:**\n${enrichedReport.executiveSummary}\n\n**2. Chi tiết động học suy giảm theo chỉ tiêu:**\n${forecastLines}\n\n*Xem biểu đồ xu hướng trực quan tại trang [Phân tích Xu hướng](/trend-analysis).*`,
+          action: 'REDIRECT',
+          path: '/trend-analysis'
+        };
+      } catch (e: any) {
+        return { error: e.message };
+      }
+    }
+
+    case 'auditDataIntegrity': {
+      try {
+        const testResults = appContext.testResults || [];
+        const batches = appContext.batches || [];
+        const auditLogs = appContext.auditLogs || [];
+
+        const report = auditDataIntegrity(auditLogs, testResults, batches);
+        const enrichedReport = await generateDataIntegrityAIAssessment(report);
+
+        const findingsLines = enrichedReport.findings.slice(0, 5).map(f => {
+          const badge = f.severity === 'HIGH' ? '[CAO]' : f.severity === 'MEDIUM' ? '[TB]' : '[THAP]';
+          return `- ${badge} **[${f.principle}]** ${f.title}: ${f.description}\n  *Hành động đề xuất:* ${f.suggestedAction}`;
+        }).join('\n\n');
+
+        return {
+          success: true,
+          overallScore: enrichedReport.overallScore,
+          grade: enrichedReport.grade,
+          message: `### 🛡️ BÁO CÁO GIÁM SÁT TOÀN VẸN DỮ LIỆU (ALCOA+ / FDA 21 CFR Part 11)\n\n- **Điểm toàn vẹn:** **${enrichedReport.overallScore}/100** (Hạng **${enrichedReport.grade.replace('_', ' ')}**)\n- **Tổng số nhật ký kiểm toán đã quét:** ${enrichedReport.totalLogsAnalyzed}\n\n**Nhận xét của Chuyên gia AI:**\n${enrichedReport.summary}\n\n${findingsLines ? `**Các điểm cần lưu ý:**\n${findingsLines}` : '✅ Không phát hiện vi phạm tính toàn vẹn dữ liệu.'}\n\n*Xem nhật ký chi tiết tại trang [Nhật ký kiểm toán](/audit-logs).*`,
+          action: 'REDIRECT',
+          path: '/audit-logs'
+        };
       } catch (e: any) {
         return { error: e.message };
       }

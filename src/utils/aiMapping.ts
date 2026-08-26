@@ -39,7 +39,7 @@ export const PHARMA_TERM_DICTIONARY: Record<string, string[]> = {
   ],
   'Độ tan rã': [
     'disintegration', 'disintegration time', 'tan ra', 'thoi gian tan ra',
-    'thời gian tan rã', 'rã viên', 'do tan ra', 'dt', 'disintegration test'
+    'thời gian tan rã', 'rã viên', 'do tan ra', 'dt', 'disintegration test', 'độ rã', 'do ra'
   ],
   'Độ hòa tan': [
     'dissolution', 'dissolution test', 'do hoa tan', 'độ hòa tan', 'hoa tan',

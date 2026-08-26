@@ -1,6 +1,6 @@
 import { GoogleGenerativeAI, SchemaType, Content } from "@google/generative-ai";
 import { GEMINI_TOOL_DECLARATIONS, executeTool } from './aiTools';
-import { convertPdfToImages, RenderedPdfPage } from '../../utils/pdfProcessor';
+import type { RenderedPdfPage } from '../../utils/pdfProcessor';
 
 export const getApiKey = (): string => {
   const localKey = typeof window !== 'undefined' ? localStorage.getItem('GEMINI_API_KEY')?.trim() : '';
@@ -297,6 +297,7 @@ export const geminiService = {
         onProgress?.("Đang tối ưu & phân tích cấu trúc PDF...", 10);
 
         // Render từng trang PDF sang ảnh JPEG tối ưu bằng Canvas
+        const { convertPdfToImages } = await import('../../utils/pdfProcessor');
         const renderedPages: RenderedPdfPage[] = await convertPdfToImages(file, {
           targetWidth: 1600,
           quality: 0.85,
