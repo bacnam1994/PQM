@@ -12,7 +12,7 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine 
 } from 'recharts';
 import { ProductStatus } from '../../types';
-import { parseNumberFromText, formatDateStandard, getActiveLocale } from '../../utils';
+import { parseNumberFromText, formatDateStandard, getActiveLocale, resolveDeclaredBasis } from '../../utils';
 import { useCriteriaResolver } from '../../hooks/useCriteriaResolver';
 import { normalizeName } from '../../services/criteriaAliasService';
 import { fetchTestResultsByProductId } from '../../services/testResultService';
@@ -169,56 +169,18 @@ const ProductDetail: React.FC = () => {
       const max = criterionObj?.max;
       const expectedText = criterionObj?.expectedText;
 
-      // 2. Tìm hàm lượng công bố từ TCCS hoặc Công thức
-      let declaredContent: number | undefined = undefined;
-      if (criterionObj?.declaredContent != null && criterionObj.declaredContent !== '') {
-        const parsed = typeof criterionObj.declaredContent === 'string'
-          ? parseNumberFromText(criterionObj.declaredContent)
-          : Number(criterionObj.declaredContent);
-        if (!isNaN(parsed) && parsed > 0) declaredContent = parsed;
-      }
-
-      if (declaredContent === undefined && productFormula) {
-        let formulaItem = productFormula.ingredients?.find(i => resolver.isMatch(i.name, criterionName)) ||
-          productFormula.excipients?.find(e => resolver.isMatch(e.name, criterionName));
-
-        if (criterionObj?.formulaIngredientId) {
-          const linkedId = criterionObj.formulaIngredientId.trim().toLowerCase();
-          const linked = productFormula.ingredients?.find(i => i.id === linkedId || i.name.trim().toLowerCase() === linkedId) ||
-            productFormula.excipients?.find(e => e.id === linkedId || e.name.trim().toLowerCase() === linkedId);
-          if (linked) formulaItem = linked;
-        }
-
-        if (formulaItem) {
-          const dc = typeof formulaItem.declaredContent === 'string' ? parseNumberFromText(formulaItem.declaredContent) : Number(formulaItem.declaredContent);
-          const ec = formulaItem.elementalContent != null
-            ? (typeof formulaItem.elementalContent === 'string' ? parseNumberFromText(formulaItem.elementalContent) : Number(formulaItem.elementalContent))
-            : undefined;
-
-          if (criterionObj?.calculationBasis === 'ELEMENTAL' && ec != null && !isNaN(ec) && ec > 0) {
-            declaredContent = ec;
-          } else if (!isNaN(dc) && dc > 0) {
-            declaredContent = dc;
-          }
-          if (!unit && formulaItem.unit) unit = formulaItem.unit;
-        }
-      }
-
-      // Mức chuẩn cơ sở để tính % (Công bố > Điểm giữa Min/Max > Max > Min)
-      let targetBasis: number | undefined = declaredContent;
-      let basisSource: 'FORMULA' | 'TCCS' | 'MIDPOINT' | 'NONE' = declaredContent ? (productFormula ? 'FORMULA' : 'TCCS') : 'NONE';
-      if (targetBasis === undefined) {
-        if (min !== undefined && max !== undefined && min > 0 && max > 0) {
-          targetBasis = (min + max) / 2;
-          basisSource = 'MIDPOINT';
-        } else if (max !== undefined && max > 0) {
-          targetBasis = max;
-          basisSource = 'TCCS';
-        } else if (min !== undefined && min > 0) {
-          targetBasis = min;
-          basisSource = 'TCCS';
-        }
-      }
+      // 2. Tìm hàm lượng công bố & cơ sở tính % chuẩn xác từ TCCS hoặc Công thức
+      const basisInfo = resolveDeclaredBasis(criterionObj || { name: criterionName }, productFormula, resolver);
+      const targetBasis = basisInfo.basis;
+      const basisSource: 'FORMULA' | 'TCCS' | 'MIDPOINT' | 'NONE' = 
+        basisInfo.basisType === 'ELEMENTAL' || basisInfo.basisType === 'DECLARED' 
+          ? (productFormula ? 'FORMULA' : 'TCCS') 
+          : basisInfo.basisType === 'MIDPOINT' 
+          ? 'MIDPOINT' 
+          : basisInfo.basisType === 'MIN' || basisInfo.basisType === 'MAX' 
+          ? 'TCCS' 
+          : 'NONE';
+      if (!unit && basisInfo.formulaItem?.unit) unit = basisInfo.formulaItem.unit;
 
       // 3. Gom dữ liệu theo lô
       const batchMap = new Map<string, any>();
@@ -345,7 +307,7 @@ const ProductDetail: React.FC = () => {
         min,
         max,
         expectedText,
-        declaredContent,
+        declaredContent: basisInfo.basis ?? targetBasis,
         targetBasis,
         basisSource,
         minPercentLimit,

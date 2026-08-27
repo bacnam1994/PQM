@@ -16,7 +16,7 @@ import {
   PageHeader, DSFilterBar, DSSelect, DSCard,
   DSEmptyState, StatusBadge
 } from '../../components';
-import { formatDateStandard, parseNumberFromText, checkRange } from '../../utils';
+import { formatDateStandard, parseNumberFromText, checkRange, resolveDeclaredBasis } from '../../utils';
 import { Criterion, ProductFormula, TestResult, Batch } from '../../types';
 import { useCriteriaResolver } from '../../hooks/useCriteriaResolver';
 import { normalizeName } from '../../services/criteriaAliasService';
@@ -322,47 +322,14 @@ const QualitySummaryReport: React.FC = () => {
           return;
         }
 
-        let basis: number | undefined = undefined;
-        if (criterion.declaredContent != null && criterion.declaredContent !== '') {
-          const parsed = typeof criterion.declaredContent === 'string'
-            ? parseNumberFromText(criterion.declaredContent)
-            : Number(criterion.declaredContent);
-          if (!isNaN(parsed) && parsed > 0) basis = parsed;
-        } else if (activeFormula) {
-          let formulaItem = activeFormula.ingredients?.find(i => resolver.isMatch(i.name, criterion.name)) ||
-            activeFormula.excipients?.find(e => resolver.isMatch(e.name, criterion.name));
-          if (criterion.formulaIngredientId) {
-            const linkedName = criterion.formulaIngredientId;
-            const linkedItem = activeFormula.ingredients?.find(i => resolver.isMatch(i.name, linkedName)) ||
-              activeFormula.excipients?.find(e => resolver.isMatch(e.name, linkedName));
-            if (linkedItem) formulaItem = linkedItem;
-          }
-          if (formulaItem) {
-            const dc = typeof formulaItem.declaredContent === 'string' ? parseNumberFromText(formulaItem.declaredContent) : Number(formulaItem.declaredContent);
-            const ec = formulaItem.elementalContent != null
-              ? (typeof formulaItem.elementalContent === 'string' ? parseNumberFromText(formulaItem.elementalContent) : Number(formulaItem.elementalContent))
-              : undefined;
-            if (criterion.calculationBasis === 'ELEMENTAL' && ec != null && !isNaN(ec) && ec > 0) basis = ec;
-            else if (!isNaN(dc) && dc > 0) basis = dc;
-          }
-        }
+        const basisInfo = resolveDeclaredBasis(criterion, activeFormula, resolver);
+        const basis = basisInfo.basis;
 
         const rawMin = parseCriterionBound(criterion.min);
         const rawMax = parseCriterionBound(criterion.max);
         const isBothZero = rawMin === 0 && rawMax === 0;
         const minVal = isBothZero ? undefined : rawMin;
         const maxVal = isBothZero ? undefined : rawMax;
-
-        // Fallback sang mức yêu cầu Min / Max của TCCS nếu không có declaredContent (VD: Men vi sinh ≥ 10^9 CFU/g)
-        if (basis === undefined) {
-          if (minVal !== undefined && maxVal !== undefined && minVal > 0 && maxVal > 0) {
-            basis = (minVal + maxVal) / 2;
-          } else if (minVal !== undefined && minVal > 0) {
-            basis = minVal;
-          } else if (maxVal !== undefined && maxVal > 0) {
-            basis = maxVal;
-          }
-        }
 
         const actualVal = parseNumberFromText(rawValueText);
         const numericValue = isNaN(actualVal) ? null : actualVal;
