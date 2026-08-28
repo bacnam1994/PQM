@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Loader2, FlaskConical, ClipboardCheck, Layers, Printer, CheckCircle2, X, AlertTriangle, ShieldAlert, Sparkles } from 'lucide-react';
+import { ArrowLeft, Loader2, FlaskConical, ClipboardCheck, Layers, Printer, CheckCircle2, X, AlertTriangle, ShieldAlert, Sparkles, GitBranch, FileWarning } from 'lucide-react';
 import { useDataGraph } from '../../hooks/useDataGraph';
 import { useAppStore } from '../../store/useAppStore';
 import { formatDateStandard, ensureArray, parseNumberFromText } from '../../utils';
@@ -9,6 +9,8 @@ import { TestResult, Criterion, FormulaIngredient } from '../../types';
 import { CircularProgress, BatchCriteriaHistory } from '../../components';
 import { OOSInvestigationModal } from '../../components/features/OOSInvestigationModal';
 import { AIBatchClearanceModal } from '../../components/features/AIBatchClearanceModal';
+import { DeviationReportModal } from '../../components/features/DeviationReportModal';
+import { BatchGenealogyModal } from '../../components/features/BatchGenealogyModal';
 import { FileCheck2 } from 'lucide-react';
 
 // Helper tính tiến độ lô
@@ -73,6 +75,9 @@ const BatchDetailPage = () => {
   const [isOOSOpen, setIsOOSOpen] = useState(false);
   const [oosModalData, setOosModalData] = useState<any>(null);
   const [isClearanceModalOpen, setIsClearanceModalOpen] = useState(false);
+  const [isDeviationOpen, setIsDeviationOpen] = useState(false);
+  const [deviationData, setDeviationData] = useState<any>(null);
+  const [isGenealogyOpen, setIsGenealogyOpen] = useState(false);
 
   const batch = useMemo(() => batches.find(b => b.id === id), [batches, id]);
 
@@ -214,7 +219,14 @@ const BatchDetailPage = () => {
           </button>
           <h1 className="text-2xl font-black text-slate-800 dark:text-slate-100 uppercase tracking-tight">Chi tiết Lô hàng</h1>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            type="button"
+            onClick={() => setIsGenealogyOpen(true)}
+            className="flex items-center gap-2 px-4 py-3 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-xl font-black shadow-sm border border-slate-200 dark:border-slate-700 transition-all uppercase text-xs w-fit"
+          >
+            <GitBranch size={16} /> Truy vết nguồn gốc
+          </button>
           <button 
             type="button"
             onClick={() => setIsClearanceModalOpen(true)}
@@ -311,12 +323,39 @@ const BatchDetailPage = () => {
                       </div>
                       <div className="flex items-center gap-2">
                         {res.overallStatus !== 'PASS' && (
-                          <button 
-                            onClick={() => handleOpenOOS(res)} 
-                            className="text-[10px] font-black text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/60 px-3 py-2 rounded-lg shadow-sm hover:bg-rose-100 dark:hover:bg-rose-900/60 transition-all flex items-center gap-1.5 uppercase tracking-wider"
-                          >
-                            <ShieldAlert size={14} className="text-rose-500" /> Điều tra OOS (AI)
-                          </button>
+                          <>
+                            <button 
+                              onClick={() => handleOpenOOS(res)} 
+                              className="text-[10px] font-black text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/60 px-3 py-2 rounded-lg shadow-sm hover:bg-rose-100 dark:hover:bg-rose-900/60 transition-all flex items-center gap-1.5 uppercase tracking-wider"
+                            >
+                              <ShieldAlert size={14} className="text-rose-500" /> Điều tra OOS (AI)
+                            </button>
+                            <button
+                              onClick={() => {
+                                const formula = productFormulas.find((f: any) => f.productId === batch.productId);
+                                const failed = ensureArray(res.results).filter((r: any) => !r.isPass).map((r: any) => ({
+                                  name: r.criteriaName,
+                                  actualValue: r.value,
+                                  unit: r.unit,
+                                  specification: (() => { const c = allCriteriaMap.get(r.criteriaName?.toLowerCase()); return c ? c.type === 'NUMBER' ? (c.min != null && c.max != null ? `${c.min}~${c.max}` : c.min != null ? `≥${c.min}` : `≤${c.max}`) : (c.expectedText || '') : ''; })(),
+                                }));
+                                setDeviationData({
+                                  productName: batch.product?.name || '',
+                                  batchNo: batch.batchNo,
+                                  mfgDate: batch.mfgDate,
+                                  expDate: batch.expDate,
+                                  labName: res.labName,
+                                  testDate: res.testDate,
+                                  failedCriteria: failed,
+                                  formulaIngredients: formula?.ingredients || [],
+                                });
+                                setIsDeviationOpen(true);
+                              }}
+                              className="text-[10px] font-black text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/40 border border-orange-200 dark:border-orange-900/60 px-3 py-2 rounded-lg shadow-sm hover:bg-orange-100 dark:hover:bg-orange-900/60 transition-all flex items-center gap-1.5 uppercase tracking-wider"
+                            >
+                              <FileWarning size={14} /> Deviation Report
+                            </button>
+                          </>
                         )}
                         <button onClick={() => navigate(`/test-results/print/${res.id}`)} className="text-[10px] font-black text-indigo-600 bg-white dark:bg-slate-700 border border-indigo-100 dark:border-slate-600 px-4 py-2.5 rounded-lg shadow-sm hover:bg-indigo-50 hover:border-indigo-200 transition-all flex items-center gap-2 uppercase tracking-widest"><Printer size={14} /> In Phiếu này</button>
                       </div>
@@ -361,6 +400,23 @@ const BatchDetailPage = () => {
           isOpen={isOOSOpen}
           onClose={() => setIsOOSOpen(false)}
           initialData={oosModalData}
+        />
+      )}
+
+      {isDeviationOpen && deviationData && (
+        <DeviationReportModal
+          isOpen={isDeviationOpen}
+          onClose={() => setIsDeviationOpen(false)}
+          initialData={deviationData}
+        />
+      )}
+
+      {isGenealogyOpen && (
+        <BatchGenealogyModal
+          isOpen={isGenealogyOpen}
+          onClose={() => setIsGenealogyOpen(false)}
+          batch={batch}
+          testResults={viewBatchResults}
         />
       )}
 

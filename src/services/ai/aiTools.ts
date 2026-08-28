@@ -5,6 +5,8 @@ import { generateAIInsights } from './autoLearningService';
 import { compareLabReports } from './labComparisonService';
 import { predictProductStability, generateStabilityForecastWithAI } from './stabilityPredictionService';
 import { auditDataIntegrity, generateDataIntegrityAIAssessment } from './dataIntegrityService';
+import { executeNLQuery } from './nlQueryService';
+import { generateRuleBasedDeviationReport } from './deviationReportService';
 
 // ============================================================
 // GEMINI TOOL DECLARATIONS
@@ -250,6 +252,34 @@ export const GEMINI_TOOL_DECLARATIONS = [
         }
       },
       required: []
+    }
+  },
+  {
+    name: "queryDataNaturalLanguage",
+    description: "Tìm kiếm và thống kê dữ liệu trong hệ thống PQM bằng ngôn ngữ tự nhiên tiếng Việt. Dùng khi người dùng hỏi: 'lô nào hết hạn trong 30 ngày', 'sản phẩm nào tỷ lệ lỗi cao nhất', 'phiếu kiểm nghiệm tháng 7', 'so sánh lô A vs B', 'thống kê tổng quan hệ thống', v.v. Tool này tự phân tích ý định, thực hiện query và trả kết quả dạng bảng/thống kê.",
+    parameters: {
+      type: "OBJECT",
+      properties: {
+        query: {
+          type: "STRING",
+          description: "Câu hỏi/yêu cầu tìm kiếm bằng tiếng Việt tự nhiên (ví dụ: 'tìm lô hết hạn trong 60 ngày', 'sản phẩm nào fail nhiều nhất', 'phiếu kiểm tháng 7/2026')"
+        }
+      },
+      required: ["query"]
+    }
+  },
+  {
+    name: "generateDeviationReport",
+    description: "Tạo Báo cáo Sai lệch (Deviation Report) chuẩn GMP-WHO/FDA đầy đủ 6 phần cho lô KHÔNG ĐẠT: mô tả sự cố, đánh giá tác động, phân tích nguyên nhân gốc rễ (Fishbone 6M + 5-Why), kế hoạch CAPA, đánh giá tái diễn và quyết định xử lý lô. Dùng khi người dùng hỏi về xử lý lô không đạt hoặc cần lập hồ sơ sai lệch.",
+    parameters: {
+      type: "OBJECT",
+      properties: {
+        batchNo: {
+          type: "STRING",
+          description: "Số lô sản xuất cần lập báo cáo sai lệch."
+        }
+      },
+      required: ["batchNo"]
     }
   }
 ];
@@ -1059,6 +1089,14 @@ export const executeTool = async (
       }
     }
 
+    case 'queryDataNaturalLanguage': {
+      return queryDataNaturalLanguage(args.query, appContext);
+    }
+
+    case 'generateDeviationReport': {
+      return generateDeviationReport(args.batchNo, appContext);
+    }
+
     default:
       return { error: `Không tìm thấy tool "${toolName}"` };
   }
@@ -1204,3 +1242,86 @@ export const generateProductionSynthesisReport = (
     mainCriteria: mainCriteria.map((c: any) => c.name)
   };
 };
+
+// ============================================================
+// TOOL: queryDataNaturalLanguage
+// Thực thi NL Query trên dữ liệu hệ thống PQM
+// ============================================================
+
+export const queryDataNaturalLanguage = (query: string, appContext: any) => {
+  return executeNLQuery(query, {
+    products: appContext.products || [],
+    batches: appContext.batches || [],
+    testResults: appContext.testResults || [],
+    tccsList: appContext.tccsList || [],
+    productFormulas: appContext.productFormulas || [],
+  });
+};
+
+// ============================================================
+// TOOL: generateDeviationReport
+// Tạo Deviation Report cho lô không đạt
+// ============================================================
+
+export const generateDeviationReport = (batchNo: string, appContext: any) => {
+  const batches = appContext.batches || [];
+  const products = appContext.products || [];
+  const testResults = appContext.testResults || [];
+  const productFormulas = appContext.productFormulas || [];
+
+  const batch = batches.find((b: any) => b.batchNo?.toLowerCase() === batchNo?.toLowerCase() || b.id === batchNo);
+  if (!batch) {
+    return { error: `Không tìm thấy lô "${batchNo}" trong hệ thống.` };
+  }
+
+  const product = products.find((p: any) => p.id === batch.productId);
+  const batchResults = testResults.filter((r: any) => r.batchId === batch.id);
+  const latestResult = batchResults.sort((a: any, b: any) => (b.testDate || '').localeCompare(a.testDate || ''))[0];
+  const formula = productFormulas.find((f: any) => f.productId === batch.productId);
+
+  if (!latestResult) {
+    return { error: `Lô "${batchNo}" chưa có kết quả kiểm nghiệm.` };
+  }
+
+  const failedCriteria = (latestResult.results || [])
+    .filter((r: any) => r.isPass === false)
+    .map((r: any) => ({
+      name: r.criteriaName,
+      actualValue: r.value,
+      unit: r.unit,
+      specification: 'Theo TCCS',
+    }));
+
+  if (failedCriteria.length === 0) {
+    return { message: `Lô "${batchNo}" không có chỉ tiêu nào không đạt trong phiếu kiểm nghiệm gần nhất.` };
+  }
+
+  const report = generateRuleBasedDeviationReport({
+    productName: product?.name || batch.productId,
+    batchNo: batch.batchNo,
+    mfgDate: batch.mfgDate,
+    expDate: batch.expDate,
+    labName: latestResult.labName,
+    testDate: latestResult.testDate,
+    failedCriteria,
+    formulaIngredients: formula?.ingredients || [],
+  });
+
+  return {
+    reportId: report.reportId,
+    decision: report.decision,
+    decisionLabel: {
+      RELEASE_WITH_NOTE: 'Xuất với điều kiện',
+      REPROCESS: 'Tái chế',
+      REJECT: 'Từ chối / Tiêu hủy',
+      PENDING_INVESTIGATION: 'Chờ điều tra',
+    }[report.decision] || report.decision,
+    executiveSummary: report.executiveSummary,
+    rootCause: report.rootCauseStatement,
+    immediateActions: report.capaItems.filter(c => c.type === 'IMMEDIATE').map(c => c.action),
+    patientSafetyRisk: report.immediateImpact.patientSafetyRisk,
+    capaCount: report.capaItems.length,
+    note: `Để xem báo cáo đầy đủ, hãy vào trang Chi tiết lô ${batchNo} → click nút "Deviation Report" bên cạnh phiếu kiểm nghiệm KHÔNG ĐẠT.`,
+  };
+};
+

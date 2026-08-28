@@ -5,7 +5,7 @@
  * Hỗ trợ toàn diện Dark Mode & Responsive Layout.
  */
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { 
   ShieldAlert, 
   TrendingUp, 
@@ -14,9 +14,15 @@ import {
   AlertTriangle,
   RefreshCw,
   Activity,
-  CheckCircle2
+  CheckCircle2,
+  Brain,
+  Zap,
+  ChevronDown,
+  ChevronRight
 } from 'lucide-react';
 import { useQualityAlerts } from '../../hooks/useQualityAlerts';
+import { useAppStore } from '../../store/useAppStore';
+import { runSmartAlertAnalysis, SmartAlert, getCachedSmartAlerts, saveSmartAlertsCache } from '../../services/ai/smartAlertService';
 import type { QualityAnomaly } from '../../services/reportService';
 
 const SEVERITY_CONFIG = {
@@ -88,6 +94,17 @@ type FilterType = 'ALL' | 'HIGH' | 'MEDIUM' | 'LOW';
 const AlertsPage: React.FC = () => {
   const { alerts, highCount, mediumCount, lowCount, totalCount, hasAlerts } = useQualityAlerts(30);
   const [filter, setFilter] = useState<FilterType>('ALL');
+  const [smartExpanded, setSmartExpanded] = useState(true);
+
+  const { products, batches, testResults, tccsList } = useAppStore();
+
+  const smartReport = useMemo(() => {
+    const cached = getCachedSmartAlerts();
+    if (cached) return cached;
+    const report = runSmartAlertAnalysis({ products, batches, testResults, tccsList });
+    saveSmartAlertsCache(report);
+    return report;
+  }, [products, batches, testResults, tccsList]);
 
   const filteredAlerts = filter === 'ALL' ? alerts : alerts.filter(a => a.severity === filter);
 
@@ -161,6 +178,41 @@ const AlertsPage: React.FC = () => {
           <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-1">thông tin cần lưu ý</p>
         </button>
       </div>
+
+      {/* === SMART AI ALERTS === */}
+      {smartReport.totalAlerts > 0 && (
+        <div className="border border-violet-200 dark:border-violet-800/50 rounded-2xl overflow-hidden shadow-sm">
+          <button
+            onClick={() => setSmartExpanded(e => !e)}
+            className="w-full flex items-center justify-between px-5 py-4 bg-gradient-to-r from-violet-50 to-indigo-50 dark:from-violet-950/40 dark:to-indigo-950/40 hover:from-violet-100 dark:hover:from-violet-900/40 transition-colors"
+          >
+            <div className="flex items-center gap-3">
+              <div className="p-1.5 rounded-lg bg-violet-100 dark:bg-violet-900/50">
+                <Brain size={16} className="text-violet-600 dark:text-violet-400" />
+              </div>
+              <div className="text-left">
+                <p className="font-black text-violet-800 dark:text-violet-200 text-sm flex items-center gap-2">
+                  AI Proactive Smart Alerts
+                  {smartReport.highCount > 0 && (
+                    <span className="text-[10px] font-black bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300 px-2 py-0.5 rounded-full">
+                      {smartReport.highCount} URGENT
+                    </span>
+                  )}
+                </p>
+                <p className="text-xs text-violet-600 dark:text-violet-400">{smartReport.summary}</p>
+              </div>
+            </div>
+            {smartExpanded ? <ChevronDown size={16} className="text-violet-400" /> : <ChevronRight size={16} className="text-violet-400" />}
+          </button>
+          {smartExpanded && (
+            <div className="divide-y divide-violet-100 dark:divide-violet-900/30 bg-white dark:bg-slate-900/50">
+              {smartReport.alerts.map((alert) => (
+                <SmartAlertCard key={alert.id} alert={alert} />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Alert list */}
       {!hasAlerts ? (
@@ -242,3 +294,58 @@ const AlertCard: React.FC<{ alert: QualityAnomaly }> = ({ alert }) => {
 };
 
 export default AlertsPage;
+
+const SmartAlertCard: React.FC<{ alert: SmartAlert }> = ({ alert }) => {
+  const [expanded, setExpanded] = useState(alert.severity === 'HIGH');
+  const sevStyle = {
+    HIGH: 'border-red-200 dark:border-red-800/50 bg-red-50/50 dark:bg-red-950/20',
+    MEDIUM: 'border-amber-200 dark:border-amber-800/50 bg-amber-50/50 dark:bg-amber-950/20',
+    LOW: 'border-blue-200 dark:border-blue-800/50 bg-blue-50/50 dark:bg-blue-950/20',
+  }[alert.severity];
+  const sevDot = { HIGH: 'bg-red-500', MEDIUM: 'bg-amber-500', LOW: 'bg-blue-400' }[alert.severity];
+
+  return (
+    <div className={`border-l-4 ${alert.severity === 'HIGH' ? 'border-l-red-500' : alert.severity === 'MEDIUM' ? 'border-l-amber-500' : 'border-l-blue-400'} ${sevStyle} p-4`}>
+      <div className="flex items-start gap-3">
+        <div className={`w-2 h-2 rounded-full shrink-0 mt-2 ${sevDot}`}></div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center justify-between gap-2 mb-1">
+            <p className="font-bold text-sm text-slate-800 dark:text-slate-100">{alert.title}</p>
+            <button onClick={() => setExpanded(e => !e)} className="text-slate-400 shrink-0">
+              {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+            </button>
+          </div>
+          <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">{alert.description}</p>
+          {expanded && (
+            <div className="mt-3 space-y-2">
+              {/* Evidence */}
+              {alert.evidence.length > 0 && (
+                <div className="bg-white/70 dark:bg-slate-800/50 rounded-lg p-3">
+                  <p className="text-[10px] font-black text-slate-400 uppercase mb-1.5">Bằng chứng</p>
+                  <ul className="space-y-0.5">
+                    {alert.evidence.map((e, i) => (
+                      <li key={i} className="text-xs text-slate-600 dark:text-slate-400 flex items-start gap-1.5">
+                        <span className="text-slate-400 shrink-0">•</span>{e}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {/* Recommendation */}
+              <div className="flex items-start gap-2 p-2.5 rounded-lg bg-violet-50 dark:bg-violet-900/20 border border-violet-100 dark:border-violet-800/40">
+                <Zap size={12} className="text-violet-500 shrink-0 mt-0.5" />
+                <p className="text-xs text-violet-700 dark:text-violet-300 font-medium">{alert.recommendation}</p>
+              </div>
+              {alert.actionSuggestion && (
+                <div className="text-xs text-rose-600 dark:text-rose-400 font-bold flex items-center gap-1.5">
+                  <AlertTriangle size={12} /> {alert.actionSuggestion}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
