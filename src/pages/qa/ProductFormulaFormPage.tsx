@@ -156,14 +156,30 @@ const ProductFormulaFormPage = () => {
     try {
       const formData = new FormData(e.currentTarget);
       const sanitizeIngredient = (item: FormulaIngredient) => {
-        const dc = parseNumberFromText(String(item.declaredContent));
-        const ec = item.elementalContent !== undefined && item.elementalContent !== null && String(item.elementalContent).trim() !== ''
-          ? parseNumberFromText(String(item.elementalContent))
-          : NaN;
+        let dc = item.declaredContent;
+        if (typeof dc === 'string') {
+          const parsed = parseNumberFromText(dc);
+          dc = isNaN(parsed) || !isFinite(parsed) ? 0 : parsed;
+        } else if (typeof dc !== 'number' || isNaN(dc) || !isFinite(dc)) {
+          dc = 0;
+        }
+
+        let ec = item.elementalContent;
+        if (ec !== undefined && ec !== null && String(ec).trim() !== '') {
+          if (typeof ec === 'string') {
+            const parsed = parseNumberFromText(ec);
+            ec = isNaN(parsed) || !isFinite(parsed) ? undefined : parsed;
+          } else if (typeof ec !== 'number' || isNaN(ec) || !isFinite(ec)) {
+            ec = undefined;
+          }
+        } else {
+          ec = undefined;
+        }
+
         return {
           ...item,
-          declaredContent: isNaN(dc) ? 0 : dc,
-          elementalContent: isNaN(ec) ? undefined : ec,
+          declaredContent: dc,
+          elementalContent: ec,
         };
       };
 

@@ -78,13 +78,22 @@ const executeOfflineOptimistic = async (
 
 const removeUndefined = (obj: any): any => {
   if (obj === undefined) return null;
+  if (typeof obj === 'number') {
+    if (isNaN(obj) || !isFinite(obj)) return 0;
+    return obj;
+  }
   if (obj === null || typeof obj !== 'object') return obj;
   if (Array.isArray(obj)) return obj.map(removeUndefined);
   
   const result: any = {};
   for (const key in obj) {
     if (Object.prototype.hasOwnProperty.call(obj, key) && obj[key] !== undefined) {
-      result[key] = removeUndefined(obj[key]);
+      const val = obj[key];
+      if (typeof val === 'number' && (isNaN(val) || !isFinite(val))) {
+        result[key] = 0;
+      } else {
+        result[key] = removeUndefined(val);
+      }
     }
   }
   return result;
@@ -135,26 +144,54 @@ const _handleDelete = async (path: string, id: string, get: any, requireAdmin: b
   }
 };
 
-// Helper chuẩn hóa công thức trước khi lưu
+// Helper chuẩn hóa công thức trước khi lưu, bảo đảm không có NaN/Infinity gây lỗi Firebase RTDB
 const processFormulaBeforeSave = (formula: ProductFormula): ProductFormula => {
   const processed = { ...formula };
-  if (processed.ingredients) {
-    processed.ingredients = processed.ingredients.map(ing => {
-      const newIng = { ...ing } as any;
-      if (typeof newIng.declaredContent === 'string') newIng.declaredContent = parseNumberFromText(newIng.declaredContent);
-      if (typeof newIng.elementalContent === 'string') newIng.elementalContent = parseNumberFromText(newIng.elementalContent);
-      else if (!newIng.elementalContent) delete newIng.elementalContent;
-      return newIng;
-    });
+  const sanitizeFormulaItem = (item: any) => {
+    if (!item) return item;
+    const newItem = { ...item };
+    
+    // 1. Xử lý declaredContent: nếu là string, parse ra số; nếu NaN / không hợp lệ thì gán 0
+    let dc = newItem.declaredContent;
+    if (typeof dc === 'string') {
+      const parsed = parseNumberFromText(dc);
+      dc = isNaN(parsed) || !isFinite(parsed) ? 0 : parsed;
+    } else if (typeof dc !== 'number' || isNaN(dc) || !isFinite(dc)) {
+      dc = 0;
+    }
+    newItem.declaredContent = dc;
+
+    // 2. Xử lý elementalContent: nếu có thì parse số hợp lệ, nếu không hợp lệ hoặc không có thì delete
+    let ec = newItem.elementalContent;
+    if (ec !== undefined && ec !== null && ec !== '') {
+      if (typeof ec === 'string') {
+        const parsed = parseNumberFromText(ec);
+        ec = isNaN(parsed) || !isFinite(parsed) ? undefined : parsed;
+      } else if (typeof ec !== 'number' || isNaN(ec) || !isFinite(ec)) {
+        ec = undefined;
+      }
+    } else {
+      ec = undefined;
+    }
+
+    if (ec !== undefined) {
+      newItem.elementalContent = ec;
+    } else {
+      delete newItem.elementalContent;
+    }
+
+    // 3. Đảm bảo id và name
+    if (!newItem.name) newItem.name = '';
+    if (!newItem.unit) newItem.unit = '';
+
+    return newItem;
+  };
+
+  if (processed.ingredients && Array.isArray(processed.ingredients)) {
+    processed.ingredients = processed.ingredients.map(sanitizeFormulaItem);
   }
-  if (processed.excipients) {
-    processed.excipients = processed.excipients.map(exc => {
-      const newExc = { ...exc } as any;
-      if (typeof newExc.declaredContent === 'string') newExc.declaredContent = parseNumberFromText(newExc.declaredContent);
-      if (typeof newExc.elementalContent === 'string') newExc.elementalContent = parseNumberFromText(newExc.elementalContent);
-      else if (!newExc.elementalContent) delete newExc.elementalContent;
-      return newExc;
-    });
+  if (processed.excipients && Array.isArray(processed.excipients)) {
+    processed.excipients = processed.excipients.map(sanitizeFormulaItem);
   }
   return processed;
 };
