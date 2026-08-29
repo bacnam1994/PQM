@@ -13,7 +13,7 @@ const ProductFormulaFormPage = () => {
   const navigate = useNavigate();
   
   // 1. Khởi tạo Hook & State
-  const { productFormulas, products, rawMaterials, addProductFormula, updateProductFormula, notify } = useAppStore();
+  const { productFormulas, products, rawMaterials, addProductFormula, updateProductFormula, addRawMaterial, notify } = useAppStore();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formulaToEdit, setFormulaToEdit] = useState<ProductFormula | null>(null);
   const [ingredients, setIngredients] = useState<FormulaIngredient[]>([]);
@@ -78,6 +78,24 @@ const ProductFormulaFormPage = () => {
     setActiveMaterialDropdown(null);
   };
 
+  const handleQuickCreateMaterialForIngredient = async (index: number, name: string) => {
+    const newId = generateId('rm');
+    const newMat: RawMaterial = {
+      id: newId,
+      name: name.trim(),
+      category: 'ACTIVE',
+      aliases: [],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    await addRawMaterial(newMat);
+    const newIngredients = [...ingredients];
+    newIngredients[index].materialId = newId;
+    setIngredients(newIngredients);
+    setActiveMaterialDropdown(null);
+    notify({ type: 'SUCCESS', message: `Đã thêm "${name}" vào Danh mục Nguyên liệu chuẩn!` });
+  };
+
   const handleExcipientChange = (index: number, field: keyof FormulaIngredient, value: any) => {
     const newExcipients = [...excipients];
     const formatted = (field === 'declaredContent' || field === 'elementalContent') ? autoFormatInput(String(value)) : value;
@@ -106,6 +124,24 @@ const ProductFormulaFormPage = () => {
     }
     setExcipients(newExcipients);
     setActiveMaterialDropdown(null);
+  };
+
+  const handleQuickCreateMaterialForExcipient = async (index: number, name: string) => {
+    const newId = generateId('rm');
+    const newMat: RawMaterial = {
+      id: newId,
+      name: name.trim(),
+      category: 'EXCIPIENT',
+      aliases: [],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    await addRawMaterial(newMat);
+    const newExcipients = [...excipients];
+    newExcipients[index].materialId = newId;
+    setExcipients(newExcipients);
+    setActiveMaterialDropdown(null);
+    notify({ type: 'SUCCESS', message: `Đã thêm "${name}" vào Danh mục Nguyên liệu chuẩn!` });
   };
 
   // 3. Hàm Save
@@ -267,8 +303,8 @@ const ProductFormulaFormPage = () => {
                         </div>
 
                         {/* Dropdown gợi ý từ Kho nguyên liệu */}
-                        {activeMaterialDropdown?.type === 'ingredient' && activeMaterialDropdown.index === index && matchingMaterials.length > 0 && (
-                          <div className="absolute z-40 w-full mt-1 bg-white rounded-xl shadow-xl border border-slate-200 max-h-48 overflow-y-auto">
+                        {activeMaterialDropdown?.type === 'ingredient' && activeMaterialDropdown.index === index && (matchingMaterials.length > 0 || ing.name.trim()) && (
+                          <div className="absolute z-40 w-full mt-1 bg-white rounded-xl shadow-xl border border-slate-200 max-h-56 overflow-y-auto">
                             <div className="p-1.5 bg-slate-50 border-b border-slate-100 text-[9px] font-black text-slate-400 uppercase tracking-wider">
                               Gợi ý từ Danh mục Nguyên liệu ({matchingMaterials.length})
                             </div>
@@ -290,6 +326,16 @@ const ProductFormulaFormPage = () => {
                                 </span>
                               </div>
                             ))}
+                            {ing.name.trim() && !matchingMaterials.some(m => m.name.toLowerCase() === ing.name.trim().toLowerCase()) && (
+                              <div
+                                onMouseDown={(e) => e.preventDefault()}
+                                onClick={() => handleQuickCreateMaterialForIngredient(index, ing.name)}
+                                className="p-2.5 bg-indigo-50/80 hover:bg-indigo-100 text-indigo-700 font-bold text-xs cursor-pointer flex items-center gap-1.5 border-t border-indigo-100 transition-colors"
+                              >
+                                <Plus size={13} />
+                                <span>+ Thêm nhanh "{ing.name}" vào Danh mục chuẩn</span>
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>
@@ -362,8 +408,8 @@ const ProductFormulaFormPage = () => {
                         </div>
 
                         {/* Dropdown gợi ý từ Kho nguyên liệu */}
-                        {activeMaterialDropdown?.type === 'excipient' && activeMaterialDropdown.index === index && matchingMaterials.length > 0 && (
-                          <div className="absolute z-40 w-full mt-1 bg-white rounded-xl shadow-xl border border-slate-200 max-h-48 overflow-y-auto">
+                        {activeMaterialDropdown?.type === 'excipient' && activeMaterialDropdown.index === index && (matchingMaterials.length > 0 || exc.name.trim()) && (
+                          <div className="absolute z-40 w-full mt-1 bg-white rounded-xl shadow-xl border border-slate-200 max-h-56 overflow-y-auto">
                             <div className="p-1.5 bg-slate-50 border-b border-slate-100 text-[9px] font-black text-slate-400 uppercase tracking-wider">
                               Gợi ý từ Danh mục Nguyên liệu ({matchingMaterials.length})
                             </div>
@@ -385,6 +431,16 @@ const ProductFormulaFormPage = () => {
                                 </span>
                               </div>
                             ))}
+                            {exc.name.trim() && !matchingMaterials.some(m => m.name.toLowerCase() === exc.name.trim().toLowerCase()) && (
+                              <div
+                                onMouseDown={(e) => e.preventDefault()}
+                                onClick={() => handleQuickCreateMaterialForExcipient(index, exc.name)}
+                                className="p-2.5 bg-indigo-50/80 hover:bg-indigo-100 text-indigo-700 font-bold text-xs cursor-pointer flex items-center gap-1.5 border-t border-indigo-100 transition-colors"
+                              >
+                                <Plus size={13} />
+                                <span>+ Thêm nhanh "{exc.name}" vào Danh mục chuẩn</span>
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>

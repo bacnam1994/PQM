@@ -86,10 +86,12 @@ export interface ProductFormula {
 
 export interface RawMaterial {
   id: string;
-  code?: string; // Mã nguyên liệu (nếu có)
+  code?: string; // Mã nguyên liệu (nếu có, ví dụ: NL-GINKGO-01)
   name: string; // Tên gốc/chuẩn
   aliases: string[]; // Các tên gọi khác
   category: 'ACTIVE' | 'EXCIPIENT' | 'OTHER'; // Phân loại: Hoạt chất, Tá dược, Khác
+  standard?: string; // Tiêu chuẩn kỹ thuật: DĐVN V, USP, Ph.Eur, BP, TCCS-NSX...
+  casNumber?: string; // Mã định danh hóa chất quốc tế CAS (nếu có)
   description?: string;
   createdAt: string;
   updatedAt: string;
