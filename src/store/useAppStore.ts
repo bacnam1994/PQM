@@ -392,21 +392,28 @@ export const useAppStore = create<AppStoreState & AppStoreActions>()(devtools((s
   updateProductFormula: (f) => _handleSave('product_formulas', processFormulaBeforeSave(f), get),
   deleteProductFormula: (id) => _handleDelete('product_formulas', id, get),
 
-  addRawMaterial: (rm) => _handleSave('raw_materials', rm, get),
-  updateRawMaterial: (rm) => _handleSave('raw_materials', rm, get),
+  addRawMaterial: async (rm) => {
+    await _handleSave('raw_materials', rm, get);
+    logAuditAction({ action: 'CREATE', collection: 'SYSTEM', documentId: rm.id, details: `Thêm mới nguyên liệu: ${rm.name}${rm.code ? ` (${rm.code})` : ''}`, performedBy: get().user?.email || 'unknown' });
+  },
+  updateRawMaterial: async (rm) => {
+    await _handleSave('raw_materials', rm, get);
+    logAuditAction({ action: 'UPDATE', collection: 'SYSTEM', documentId: rm.id, details: `Cập nhật nguyên liệu: ${rm.name}${rm.code ? ` (${rm.code})` : ''}`, performedBy: get().user?.email || 'unknown' });
+  },
   deleteRawMaterial: async (id: string) => {
     const state = get();
-    const material = state.rawMaterials.find(m => m.id === id);
-    // Kiểm tra xem nguyên liệu có đang được dùng trong công thức sản phẩm nào không
+    // ✅ Bug 2 Fix: chỉ kiểm tra materialId — không kiểm tra tên để tránh false positive sau khi merge aliases
     const isUsedInFormula = state.productFormulas.some(f => 
-      (f.ingredients || []).some(ing => ing.materialId === id || (material && ing.name?.trim().toLowerCase() === material.name?.trim().toLowerCase())) ||
-      (f.excipients || []).some(exc => exc.materialId === id || (material && exc.name?.trim().toLowerCase() === material.name?.trim().toLowerCase()))
+      (f.ingredients || []).some(ing => ing.materialId === id) ||
+      (f.excipients || []).some(exc => exc.materialId === id)
     );
     if (isUsedInFormula) {
       get().notify({ type: 'WARNING', title: 'Không thể xóa', message: 'Nguyên liệu này đang được sử dụng trong Công thức sản phẩm. Vui lòng cập nhật công thức trước.' });
       throw new Error("Material is in use");
     }
+    const material = state.rawMaterials.find(m => m.id === id);
     await _handleDelete('raw_materials', id, get);
+    logAuditAction({ action: 'DELETE', collection: 'SYSTEM', documentId: id, details: `Xóa nguyên liệu: ${material?.name || id}`, performedBy: get().user?.email || 'unknown' });
   },
 
   addBatch: async (b) => {

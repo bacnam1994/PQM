@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAppStore } from '../../store/useAppStore';
 import { useDataGraph } from '../../hooks/useDataGraph';
@@ -7,7 +7,8 @@ import {
   FlaskConical, Search, Filter, Layers, Beaker, Component, Package, 
   LayoutGrid, List, ChevronLeft, ChevronRight, Edit2, Plus, Sparkles, 
   BookUser, Link2, Unlink, ShieldCheck, Hash, Trash2, ArrowRight, 
-  CheckCircle2, AlertTriangle, RefreshCw, X as XIcon, Save, Loader2, Tag, BookOpen, Layers3
+  CheckCircle2, AlertTriangle, RefreshCw, X as XIcon, Save, Loader2, Tag, BookOpen, Layers3,
+  Info
 } from 'lucide-react';
 import { RawMaterial, ProductFormula, FormulaIngredient } from '../../types';
 import { PageHeader, DSFilterBar, DSSearchInput, DSSelect, DSViewToggle, DSCard, DSTable, ActionButtons, Modal, Pagination } from '../../components';
@@ -18,9 +19,17 @@ import {
   analyzeMaterialDuplicates, 
   createMergeExecutionPlan, 
   DuplicateGroup, 
-  HarmonizationReport 
+  HarmonizationReport,
+  calculateStringSimilarity
 } from '../../services/ai/materialHarmonizerService';
 import { logAuditAction } from '../../services/auditService';
+
+// Validate định dạng CAS Number: digits-digits-digit (ví dụ: 90045-36-6)
+const CAS_REGEX = /^\d{2,7}-\d{2}-\d{1}$/;
+const validateCasNumber = (cas: string): boolean => {
+  if (!cas || !cas.trim()) return true; // optional field
+  return CAS_REGEX.test(cas.trim());
+};
 
 // Sub-interface cho Matrix tổng hợp từ công thức
 interface AggregatedFormulaItem {
@@ -76,9 +85,14 @@ const MaterialList: React.FC = () => {
   const [formCategory, setFormCategory] = useState<'ACTIVE' | 'EXCIPIENT' | 'OTHER'>('ACTIVE');
   const [formStandard, setFormStandard] = useState('');
   const [formCasNumber, setFormCasNumber] = useState('');
+  const [formCasError, setFormCasError] = useState('');
   const [formAliases, setFormAliases] = useState<string[]>([]);
   const [formAliasInput, setFormAliasInput] = useState('');
   const [formDescription, setFormDescription] = useState('');
+
+  // Duplicate name warning state (real-time debounce)
+  const [duplicateWarnings, setDuplicateWarnings] = useState<RawMaterial[]>([]);
+  const duplicateCheckTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // AI Harmonizer Modal State
   const [isHarmonizerOpen, setIsHarmonizerOpen] = useState(false);
@@ -226,15 +240,36 @@ const MaterialList: React.FC = () => {
   // ==========================================
   // Handlers CRUD Material Modal
   // ==========================================
+  // Kiểm tra trùng tên real-time với debounce 400ms
+  const checkDuplicateNames = useCallback((name: string, currentId?: string) => {
+    if (duplicateCheckTimer.current) clearTimeout(duplicateCheckTimer.current);
+    if (!name.trim() || name.trim().length < 3) {
+      setDuplicateWarnings([]);
+      return;
+    }
+    duplicateCheckTimer.current = setTimeout(() => {
+      const warnings = rawMaterials.filter(m => {
+        if (m.id === currentId) return false; // Bỏ qua chính nó khi edit
+        const score = calculateStringSimilarity(name, m.name);
+        if (score >= 0.80) return true;
+        // Kiểm tra cả với aliases
+        return (m.aliases || []).some(a => calculateStringSimilarity(name, a) >= 0.85);
+      });
+      setDuplicateWarnings(warnings);
+    }, 400);
+  }, [rawMaterials]);
+
   const handleOpenAdd = (presetName?: string, presetCategory?: 'ACTIVE' | 'EXCIPIENT') => {
     setFormCode('');
     setFormName(presetName || '');
     setFormCategory(presetCategory || 'ACTIVE');
     setFormStandard('');
     setFormCasNumber('');
+    setFormCasError('');
     setFormAliases([]);
     setFormAliasInput('');
     setFormDescription('');
+    setDuplicateWarnings([]);
     crud.openAdd();
   };
 
@@ -244,15 +279,24 @@ const MaterialList: React.FC = () => {
     setFormCategory(mat.category || 'ACTIVE');
     setFormStandard(mat.standard || '');
     setFormCasNumber(mat.casNumber || '');
+    setFormCasError('');
     setFormAliases(mat.aliases || []);
     setFormAliasInput('');
     setFormDescription(mat.description || '');
+    setDuplicateWarnings([]);
     crud.openEdit(mat);
   };
 
   const handleSaveMaterial = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formName.trim()) return notify({ type: 'WARNING', message: 'Vui lòng nhập Tên nguyên liệu chuẩn!' });
+
+    // Validate CAS Number format
+    if (formCasNumber.trim() && !validateCasNumber(formCasNumber)) {
+      setFormCasError('Định dạng CAS không hợp lệ. Ví dụ đúng: 90045-36-6');
+      return;
+    }
+    setFormCasError('');
 
     setIsSubmitting(true);
     const materialData: RawMaterial = {
@@ -272,9 +316,24 @@ const MaterialList: React.FC = () => {
       if (crud.mode === 'EDIT') {
         await updateRawMaterial(materialData);
         notify({ type: 'SUCCESS', message: 'Đã cập nhật thông tin nguyên liệu.' });
+        // ✅ Bug 1 Fix: Audit log cho EDIT mode
+        logAuditAction({
+          action: 'UPDATE',
+          collection: 'SYSTEM',
+          documentId: materialData.id,
+          details: `Cập nhật nguyên liệu: ${materialData.name}${materialData.code ? ` (${materialData.code})` : ''}`,
+          performedBy: user?.email || 'unknown'
+        });
       } else {
         await addRawMaterial(materialData);
         notify({ type: 'SUCCESS', message: 'Đã thêm nguyên liệu mới vào Danh mục chuẩn.' });
+        logAuditAction({
+          action: 'CREATE',
+          collection: 'SYSTEM',
+          documentId: materialData.id,
+          details: `Thêm mới nguyên liệu: ${materialData.name}${materialData.code ? ` (${materialData.code})` : ''}`,
+          performedBy: user?.email || 'unknown'
+        });
 
         // Tự động kiểm tra và liên kết với các công thức có tên khớp
         const matchingFormulas = productFormulas.filter(f => 
@@ -295,6 +354,7 @@ const MaterialList: React.FC = () => {
           notify({ type: 'INFO', message: `Đã tự động liên kết với ${matchingFormulas.length} công thức phù hợp.` });
         }
       }
+      setDuplicateWarnings([]);
       crud.close();
     } catch (error: any) {
       console.error(error);
@@ -1068,6 +1128,36 @@ const MaterialList: React.FC = () => {
         title={crud.mode === 'ADD' ? "Thêm Nguyên liệu Chuẩn" : "Cập nhật Nguyên liệu"} 
         icon={BookUser}
       >
+        {/* Upgrade G: Thống kê sử dụng trong modal Edit */}
+        {crud.mode === 'EDIT' && crud.selectedItem && (() => {
+          const hydrated = hydratedMap.get(crud.selectedItem.id);
+          const usedProds = hydrated?.usedInProducts || [];
+          const usedFormulas = productFormulas.filter(f =>
+            (f.ingredients || []).some(i => i.materialId === crud.selectedItem!.id) ||
+            (f.excipients || []).some(e => e.materialId === crud.selectedItem!.id)
+          );
+          if (usedProds.length === 0 && usedFormulas.length === 0) return null;
+          return (
+            <div className="p-3 bg-indigo-50/60 dark:bg-indigo-950/30 border border-indigo-100 dark:border-indigo-900/50 rounded-xl flex flex-wrap items-center gap-3">
+              <Info size={14} className="text-indigo-500 shrink-0" />
+              <span className="text-xs font-bold text-indigo-700 dark:text-indigo-300">Đang sử dụng trong:</span>
+              {usedProds.length > 0 && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-100 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400 rounded-lg text-[11px] font-bold">
+                  <Package size={11} />
+                  {usedProds.length} sản phẩm
+                </span>
+              )}
+              {usedFormulas.length > 0 && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-100 dark:bg-blue-950/50 text-blue-700 dark:text-blue-400 rounded-lg text-[11px] font-bold">
+                  <FlaskConical size={11} />
+                  {usedFormulas.length} công thức
+                </span>
+              )}
+              <span className="text-[10px] text-indigo-400 dark:text-indigo-500 ml-auto">Thay đổi tên/alias sẽ ảnh hưởng đến toàn bộ liên kết này.</span>
+            </div>
+          );
+        })()}
+
         <form onSubmit={handleSaveMaterial} className="space-y-5">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <div className="space-y-1">
@@ -1091,11 +1181,35 @@ const MaterialList: React.FC = () => {
               <input
                 type="text"
                 value={formName}
-                onChange={e => setFormName(e.target.value)}
+                onChange={e => {
+                  setFormName(e.target.value);
+                  checkDuplicateNames(e.target.value, crud.selectedItem?.id);
+                }}
                 placeholder="VD: Ginkgo Biloba Extract (Cao khô Bạch quả)"
                 required
-                className="w-full px-3 py-2 bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl font-bold text-xs outline-none focus:ring-2 focus:ring-indigo-500 text-slate-800 dark:text-zinc-200 placeholder:text-slate-400"
+                className={`w-full px-3 py-2 bg-slate-50 dark:bg-zinc-900 border rounded-xl font-bold text-xs outline-none focus:ring-2 text-slate-800 dark:text-zinc-200 placeholder:text-slate-400 ${
+                  duplicateWarnings.length > 0
+                    ? 'border-amber-400 dark:border-amber-600 focus:ring-amber-400'
+                    : 'border-slate-200 dark:border-zinc-800 focus:ring-indigo-500'
+                }`}
               />
+              {/* Upgrade B: Cảnh báo trùng tên real-time */}
+              {duplicateWarnings.length > 0 && (
+                <div className="mt-1.5 p-2.5 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 rounded-xl">
+                  <div className="flex items-center gap-1.5 text-[10px] font-black uppercase text-amber-700 dark:text-amber-400 mb-1.5">
+                    <AlertTriangle size={11} />
+                    <span>Phát hiện {duplicateWarnings.length} nguyên liệu tương đồng trong Master Catalog!</span>
+                  </div>
+                  <div className="flex flex-wrap gap-1">
+                    {duplicateWarnings.map(w => (
+                      <span key={w.id} className="inline-flex items-center gap-1 bg-white dark:bg-zinc-800 border border-amber-200 dark:border-amber-700 px-2 py-0.5 rounded text-[10px] font-bold text-amber-800 dark:text-amber-300">
+                        {w.name}{w.code ? ` (${w.code})` : ''}
+                      </span>
+                    ))}
+                  </div>
+                  <p className="text-[10px] text-amber-600 dark:text-amber-500 mt-1">💡 Kiểm tra kỹ trước khi lưu để tránh trùng lặp. Sử dụng AI Rà soát để gộp nếu cần.</p>
+                </div>
+              )}
             </div>
           </div>
 
@@ -1130,10 +1244,27 @@ const MaterialList: React.FC = () => {
               <input
                 type="text"
                 value={formCasNumber}
-                onChange={e => setFormCasNumber(e.target.value)}
+                onChange={e => {
+                  setFormCasNumber(e.target.value);
+                  if (formCasError) setFormCasError('');
+                }}
+                onBlur={e => {
+                  if (e.target.value && !validateCasNumber(e.target.value)) {
+                    setFormCasError('Định dạng CAS không hợp lệ. Ví dụ đúng: 90045-36-6');
+                  } else {
+                    setFormCasError('');
+                  }
+                }}
                 placeholder="VD: 90045-36-6"
-                className="w-full px-3 py-2 bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl font-mono text-xs outline-none focus:ring-2 focus:ring-indigo-500 text-slate-800 dark:text-zinc-200 placeholder:text-slate-400"
+                className={`w-full px-3 py-2 bg-slate-50 dark:bg-zinc-900 border rounded-xl font-mono text-xs outline-none focus:ring-2 text-slate-800 dark:text-zinc-200 placeholder:text-slate-400 ${
+                  formCasError ? 'border-rose-400 dark:border-rose-600 focus:ring-rose-400' : 'border-slate-200 dark:border-zinc-800 focus:ring-indigo-500'
+                }`}
               />
+              {formCasError && (
+                <p className="text-[10px] text-rose-500 font-bold pl-1 flex items-center gap-1">
+                  <AlertTriangle size={10} /> {formCasError}
+                </p>
+              )}
             </div>
           </div>
 

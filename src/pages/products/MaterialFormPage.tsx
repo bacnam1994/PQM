@@ -1,11 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Loader2, Save, Plus, X as XIcon, Layers3, BookOpen, ShieldCheck, Hash } from 'lucide-react';
+import { ArrowLeft, Loader2, Save, Plus, X as XIcon, Layers3, BookOpen, ShieldCheck, Hash, AlertTriangle } from 'lucide-react';
 import { useAppStore } from '../../store/useAppStore';
 import { DSFormInput, DSSelect } from '../../components';
 import { generateId } from '../../utils';
 import { RawMaterial } from '../../types';
 import { logAuditAction } from '../../services/auditService';
+import { calculateStringSimilarity } from '../../services/ai/materialHarmonizerService';
 
 export const COMMON_PHARMA_STANDARDS = [
   'Dược điển Việt Nam V (DĐVN V)',
@@ -17,6 +18,13 @@ export const COMMON_PHARMA_STANDARDS = [
   'Food Grade / Tiêu chuẩn Thực phẩm',
   'In-house Standard (Chuẩn nội bộ)'
 ];
+
+// Validate định dạng CAS Number: digits-digits-digit (ví dụ: 90045-36-6)
+const CAS_REGEX = /^\d{2,7}-\d{2}-\d{1}$/;
+const validateCasNumber = (cas: string): boolean => {
+  if (!cas || !cas.trim()) return true;
+  return CAS_REGEX.test(cas.trim());
+};
 
 const MaterialFormPage = () => {
   const { id } = useParams();
@@ -33,24 +41,37 @@ const MaterialFormPage = () => {
   const [category, setCategory] = useState<'ACTIVE' | 'EXCIPIENT' | 'OTHER'>('ACTIVE');
   const [standard, setStandard] = useState('');
   const [casNumber, setCasNumber] = useState('');
+  const [casError, setCasError] = useState('');
   const [aliases, setAliases] = useState<string[]>([]);
   const [aliasInput, setAliasInput] = useState('');
   const [description, setDescription] = useState('');
+
+  // Duplicate name warning (real-time debounce)
+  const [duplicateWarnings, setDuplicateWarnings] = useState<RawMaterial[]>([]);
+  const duplicateCheckTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const checkDuplicateNames = useCallback((inputName: string, currentId?: string) => {
+    if (duplicateCheckTimer.current) clearTimeout(duplicateCheckTimer.current);
+    if (!inputName.trim() || inputName.trim().length < 3) {
+      setDuplicateWarnings([]);
+      return;
+    }
+    duplicateCheckTimer.current = setTimeout(() => {
+      const warnings = rawMaterials.filter(m => {
+        if (m.id === currentId) return false;
+        const score = calculateStringSimilarity(inputName, m.name);
+        if (score >= 0.80) return true;
+        return (m.aliases || []).some(a => calculateStringSimilarity(inputName, a) >= 0.85);
+      });
+      setDuplicateWarnings(warnings);
+    }, 400);
+  }, [rawMaterials]);
   
   // 2. Load dữ liệu
   useEffect(() => {
     if (id && id !== 'new') {
-      // Tìm theo ID chính xác trước
-      let material = rawMaterials.find(m => m.id === id);
-      
-      // Nếu không thấy (có thể ID truyền vào là Name từ MaterialList), tìm theo Name hoặc Aliases
-      if (!material) {
-        const decodedId = decodeURIComponent(id);
-        material = rawMaterials.find(m => 
-          m.name.toLowerCase() === decodedId.toLowerCase() || 
-          (m.aliases || []).some(a => a.toLowerCase() === decodedId.toLowerCase())
-        );
-      }
+      // ✅ Bug 3 Fix: chỉ lookup by exact ID — không fallback theo name để tránh nhầm nguyên liệu
+      const material = rawMaterials.find(m => m.id === id);
 
       if (material) {
         setMaterialToEdit(material);
@@ -59,6 +80,7 @@ const MaterialFormPage = () => {
         setCategory(material.category || 'ACTIVE');
         setStandard(material.standard || '');
         setCasNumber(material.casNumber || '');
+        setCasError('');
         setAliases(material.aliases || []);
         setDescription(material.description || '');
       } else {
@@ -109,6 +131,13 @@ const MaterialFormPage = () => {
        return;
      }
 
+     // Validate CAS Number
+     if (casNumber.trim() && !validateCasNumber(casNumber)) {
+       setCasError('Định dạng CAS không hợp lệ. Ví dụ đúng: 90045-36-6');
+       return;
+     }
+     setCasError('');
+
      setIsSubmitting(true);
      try {
        const data: RawMaterial = {
@@ -126,26 +155,12 @@ const MaterialFormPage = () => {
 
        if (materialToEdit) {
          await updateRawMaterial(data);
+         // audit log đã được ghi trong store (updateRawMaterial)
          notify({ type: 'SUCCESS', title: 'Đã cập nhật', message: 'Thông tin nguyên liệu đã được lưu.' });
-         
-         logAuditAction({
-           action: 'UPDATE',
-           collection: 'SYSTEM',
-           documentId: materialToEdit.id,
-           details: `Cập nhật nguyên liệu: ${data.name}`,
-           performedBy: user?.email || 'unknown'
-         });
        } else {
          await addRawMaterial(data);
+         // audit log đã được ghi trong store (addRawMaterial)
          notify({ type: 'SUCCESS', title: 'Thành công', message: 'Đã thêm nguyên liệu mới vào danh mục.' });
-         
-         logAuditAction({
-           action: 'CREATE',
-           collection: 'SYSTEM',
-           documentId: data.id,
-           details: `Thêm mới nguyên liệu: ${data.name}`,
-           performedBy: user?.email || 'unknown'
-         });
        }
        navigate('/materials');
      } catch (error) {
@@ -200,11 +215,35 @@ const MaterialFormPage = () => {
               <input
                 type="text"
                 value={name}
-                onChange={e => setName(e.target.value)}
+                onChange={e => {
+                  setName(e.target.value);
+                  checkDuplicateNames(e.target.value, materialToEdit?.id);
+                }}
                 placeholder="VD: Ginkgo Biloba Extract (Cao khô Bạch quả)"
                 required
-                className="w-full px-4 py-2.5 bg-slate-50 dark:bg-zinc-900 border border-slate-200/80 dark:border-zinc-800 rounded-xl font-bold text-sm outline-none focus:ring-2 focus:ring-indigo-500 text-slate-800 dark:text-zinc-200 placeholder:text-slate-400"
+                className={`w-full px-4 py-2.5 bg-slate-50 dark:bg-zinc-900 border rounded-xl font-bold text-sm outline-none focus:ring-2 text-slate-800 dark:text-zinc-200 placeholder:text-slate-400 ${
+                  duplicateWarnings.length > 0
+                    ? 'border-amber-400 dark:border-amber-600 focus:ring-amber-400'
+                    : 'border-slate-200/80 dark:border-zinc-800 focus:ring-indigo-500'
+                }`}
               />
+              {/* Upgrade B: Cảnh báo trùng tên real-time trong FormPage */}
+              {duplicateWarnings.length > 0 && (
+                <div className="mt-2 p-3 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 rounded-xl">
+                  <div className="flex items-center gap-1.5 text-[10px] font-black uppercase text-amber-700 dark:text-amber-400 mb-2">
+                    <AlertTriangle size={12} />
+                    <span>Phát hiện {duplicateWarnings.length} nguyên liệu tương đồng trong Master Catalog!</span>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {duplicateWarnings.map(w => (
+                      <span key={w.id} className="inline-flex items-center gap-1 bg-white dark:bg-zinc-800 border border-amber-200 dark:border-amber-700 px-2.5 py-1 rounded-lg text-[11px] font-bold text-amber-800 dark:text-amber-300">
+                        {w.name}{w.code ? ` (${w.code})` : ''}
+                      </span>
+                    ))}
+                  </div>
+                  <p className="text-[11px] text-amber-600 dark:text-amber-500 mt-1.5">💡 Kiểm tra kỹ trước khi lưu để tránh trùng lặp. Sử dụng AI Rà soát để gộp sau nếu cần.</p>
+                </div>
+              )}
             </div>
           </div>
 
@@ -242,10 +281,27 @@ const MaterialFormPage = () => {
               <input
                 type="text"
                 value={casNumber}
-                onChange={e => setCasNumber(e.target.value)}
+                onChange={e => {
+                  setCasNumber(e.target.value);
+                  if (casError) setCasError('');
+                }}
+                onBlur={e => {
+                  if (e.target.value && !validateCasNumber(e.target.value)) {
+                    setCasError('Định dạng CAS không hợp lệ. Ví dụ đúng: 90045-36-6');
+                  } else {
+                    setCasError('');
+                  }
+                }}
                 placeholder="VD: 90045-36-6"
-                className="w-full px-4 py-2.5 bg-slate-50 dark:bg-zinc-900 border border-slate-200/80 dark:border-zinc-800 rounded-xl font-bold text-sm outline-none focus:ring-2 focus:ring-indigo-500 text-slate-800 dark:text-zinc-200 placeholder:text-slate-400 font-mono"
+                className={`w-full px-4 py-2.5 bg-slate-50 dark:bg-zinc-900 border rounded-xl font-bold text-sm outline-none focus:ring-2 text-slate-800 dark:text-zinc-200 placeholder:text-slate-400 font-mono ${
+                  casError ? 'border-rose-400 dark:border-rose-600 focus:ring-rose-400' : 'border-slate-200/80 dark:border-zinc-800 focus:ring-indigo-500'
+                }`}
               />
+              {casError && (
+                <p className="text-[11px] text-rose-500 font-bold pl-2 flex items-center gap-1 mt-0.5">
+                  <AlertTriangle size={11} /> {casError}
+                </p>
+              )}
             </div>
           </div>
 
