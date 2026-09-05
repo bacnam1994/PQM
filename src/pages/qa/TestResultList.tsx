@@ -7,6 +7,7 @@ import {
   History, ListPlus, FlaskConical, Printer, Eye, Edit2, Loader2,
   Package, Hash, Clock, Filter, ShieldCheck, LayoutGrid, List, ArrowUpDown, FileSearch, RefreshCcw, ShieldAlert, Scale
 } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { TestResult, TestResultEntry } from '../../types';
 import { TEST_RESULT_STATUS, BATCH_STATUS, ensureArray, formatDateStandard, normalizeSearch } from '../../utils';
 const CoAReport = lazy(() => import('../../components/features/CoAReport'));
@@ -49,13 +50,40 @@ const TestResultGridItem = memo(({ res, onEdit, onDelete, onPrint, onOOS, isAdmi
       {/* Glass Box Highlighting Main Content */}
       <div className={`bg-gradient-to-br from-white/60 to-white/30 dark:from-slate-900/60 dark:to-slate-900/30 backdrop-blur-md border border-white/60 dark:border-slate-700/60 shadow-sm rounded-2xl p-4 flex flex-col gap-4 relative z-10 mt-2 flex-grow ${res.overallStatus === TEST_RESULT_STATUS.PASS ? 'shadow-[0_4px_20px_-5px_rgba(16,185,129,0.1)] dark:shadow-[0_4px_20px_-5px_rgba(16,185,129,0.05)]' : 'shadow-[0_4px_20px_-5px_rgba(239,68,68,0.1)]'}`}>
         {/* Main Info */}
-        <div className="flex items-center gap-4 cursor-pointer group/link" onClick={() => onPrint(res)}>
+        <div className="flex items-center gap-4">
           <div className={`bg-gradient-to-br p-3.5 rounded-xl shrink-0 border shadow-inner ${res.overallStatus === TEST_RESULT_STATUS.PASS ? 'from-emerald-50 to-emerald-100/50 dark:from-emerald-950/50 dark:to-emerald-900/20 text-emerald-600 dark:text-emerald-400 border-emerald-100 dark:border-emerald-900/30' : 'from-red-50 to-red-100/50 dark:from-red-950/50 dark:to-red-900/20 text-red-650 dark:text-red-400 border-red-100 dark:border-red-900/30'}`}>
             {res.overallStatus === TEST_RESULT_STATUS.PASS ? <CheckCircle2 size={24} /> : <AlertCircle size={24} />}
           </div>
-          <div className="flex flex-col">
-            <h3 className={`font-black text-slate-800 dark:text-slate-100 text-base leading-tight transition-colors line-clamp-1 group-hover/link:${res.overallStatus === TEST_RESULT_STATUS.PASS ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>{res.batch?.batchNo || `Lô ${res.batchId || 'N/A'}`}</h3>
-            <p className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mt-1">Phiếu số: {res.id.slice(-6)}</p>
+          <div className="flex flex-col flex-1 min-w-0">
+            {/* batchNo như một clickable link đến trang chi tiết lô */}
+            {res.batch?.id ? (
+              <Link
+                to={`/batches/${res.batch.id}`}
+                onClick={e => e.stopPropagation()}
+                className={`font-black text-slate-800 dark:text-slate-100 text-base leading-tight transition-colors line-clamp-1 hover:underline ${
+                  res.overallStatus === TEST_RESULT_STATUS.PASS ? 'hover:text-emerald-600 dark:hover:text-emerald-400' : 'hover:text-red-600 dark:hover:text-red-400'
+                }`}
+              >
+                {res.batch?.batchNo || `Lô ${res.batchId || 'N/A'}`}
+              </Link>
+            ) : (
+              <h3 className={`font-black text-slate-800 dark:text-slate-100 text-base leading-tight transition-colors line-clamp-1 group-hover/link:${
+                res.overallStatus === TEST_RESULT_STATUS.PASS ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'
+              }`}>{res.batch?.batchNo || `Lô ${res.batchId || 'N/A'}`}</h3>
+            )}
+            <div className="flex flex-wrap items-center gap-1 mt-1">
+              <p className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest">Phiếu số: {res.id.slice(-6)}</p>
+              {/* Badge TCCS */}
+              {res.tccs && (
+                <Link
+                  to={`/tccs/detail/${res.tccs.id}`}
+                  onClick={e => e.stopPropagation()}
+                  className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400 text-[9px] font-black border border-blue-100 dark:border-blue-900/40 hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors"
+                >
+                  <FileText size={9} /> {res.tccs.code}
+                </Link>
+              )}
+            </div>
           </div>
         </div>
 
@@ -110,8 +138,29 @@ const TestResultListItem = memo(({ res, onEdit, onDelete, onPrint, onOOS, isAdmi
   return (
     <tr className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
       <td className="px-4 py-3 font-bold text-slate-700 dark:text-slate-300 text-xs">{formatDateStandard(res.testDate)}</td>
-      <td className="px-4 py-3 font-black text-slate-800 dark:text-slate-200">{res.batch?.batchNo || `Lô ${res.batchId || 'N/A'}`}</td>
-      <td className="px-4 py-3 text-xs font-medium text-slate-600 dark:text-slate-400">{res.product?.name || 'Sản phẩm đã xóa'}</td>
+      <td className="px-4 py-3">
+        <div className="flex flex-col gap-0.5">
+          {res.batch?.id ? (
+            <Link to={`/batches/${res.batch.id}`} className="font-black text-slate-800 dark:text-slate-200 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors text-sm">
+              {res.batch?.batchNo || `Lô ${res.batchId || 'N/A'}`}
+            </Link>
+          ) : (
+            <span className="font-black text-slate-800 dark:text-slate-200 text-sm">{res.batch?.batchNo || `Lô ${res.batchId || 'N/A'}`}</span>
+          )}
+          {res.tccs && (
+            <Link to={`/tccs/detail/${res.tccs.id}`} className="text-[10px] font-bold text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1">
+              <FileText size={10} /> {res.tccs.code}
+            </Link>
+          )}
+        </div>
+      </td>
+      <td className="px-4 py-3 text-xs font-medium">
+        {res.product ? (
+          <Link to={`/products/${res.product.id}`} className="text-slate-600 dark:text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors font-bold">
+            {res.product.name}
+          </Link>
+        ) : <span className="text-slate-500 dark:text-slate-400">Sản phẩm đã xóa</span>}
+      </td>
       <td className="px-4 py-3 text-xs text-indigo-600 dark:text-indigo-400 font-bold">{res.labName}</td>
       <td className="px-4 py-3 text-center">
         <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase ${res.overallStatus === TEST_RESULT_STATUS.PASS ? 'bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400' : 'bg-red-100 dark:bg-red-950/40 text-red-700 dark:text-red-400'}`}>

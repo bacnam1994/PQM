@@ -7,6 +7,10 @@ import { predictProductStability, generateStabilityForecastWithAI } from './stab
 import { auditDataIntegrity, generateDataIntegrityAIAssessment } from './dataIntegrityService';
 import { executeNLQuery } from './nlQueryService';
 import { generateRuleBasedDeviationReport } from './deviationReportService';
+import { useAppStore } from '../../store/useAppStore';
+import { generateId, formatDateStandard, BATCH_STATUS } from '../../utils';
+import { autoHealAllWithAI } from '../dataConsistencyService';
+import { predictBatchRiskBeforeTesting } from './predictiveInspectionService';
 
 // ============================================================
 // GEMINI TOOL DECLARATIONS
@@ -281,8 +285,120 @@ export const GEMINI_TOOL_DECLARATIONS = [
       },
       required: ["batchNo"]
     }
+  },
+  {
+    name: "createBatchAction",
+    description: "Tạo mới một lô sản xuất trực tiếp vào hệ thống PQM. Dùng khi người dùng yêu cầu: 'tạo lô mới...', 'thêm lô...', 'đăng ký lô [số lô] cho sản phẩm [tên/mã SP]'. Tool sẽ tự động tìm sản phẩm, tìm TCCS hiệu lực, tạo bản ghi lô và lưu trữ an toàn.",
+    parameters: {
+      type: "OBJECT",
+      properties: {
+        productIdentifier: {
+          type: "STRING",
+          description: "Tên hoặc mã sản phẩm cần tạo lô (ví dụ: 'Siro Ho', 'SP001')."
+        },
+        batchNo: {
+          type: "STRING",
+          description: "Số lô sản xuất (ví dụ: '010926', 'SH-260901')."
+        },
+        mfgDate: {
+          type: "STRING",
+          description: "Ngày sản xuất (định dạng YYYY-MM-DD hoặc DD/MM/YYYY)."
+        },
+        expDate: {
+          type: "STRING",
+          description: "Hạn sử dụng (định dạng YYYY-MM-DD hoặc DD/MM/YYYY)."
+        },
+        theoreticalYield: {
+          type: "NUMBER",
+          description: "Cỡ lô lý thuyết (tùy chọn, ví dụ: 5000)."
+        },
+        yieldUnit: {
+          type: "STRING",
+          description: "Đơn vị tính cỡ lô (ví dụ: 'chai', 'hộp', 'viên', 'kg'). Mặc định là 'chai'."
+        }
+      },
+      required: ["productIdentifier", "batchNo", "mfgDate", "expDate"]
+    }
+  },
+  {
+    name: "exportCoAReportAction",
+    description: "Tìm và trả về đường dẫn trực tiếp để xem/in Certificate of Analysis (CoA) chuẩn GMP cho một lô sản xuất. Dùng khi người dùng yêu cầu 'xuất CoA cho lô X', 'in phiếu CoA lô X', 'xem CoA lô X'.",
+    parameters: {
+      type: "OBJECT",
+      properties: {
+        batchNo: {
+          type: "STRING",
+          description: "Số lô cần xuất hoặc xem Certificate of Analysis (CoA)."
+        }
+      },
+      required: ["batchNo"]
+    }
+  },
+  {
+    name: "navigateToAction",
+    description: "Chuyển hướng màn hình ứng dụng đến trang chức năng cụ thể theo yêu cầu của người dùng. Dùng khi người dùng bảo: 'mở trang sản phẩm...', 'dẫn tôi đến trang TCCS...', 'xem lô X', 'mở báo cáo PQR', 'mở kiểm soát SPC'.",
+    parameters: {
+      type: "OBJECT",
+      properties: {
+        destination: {
+          type: "STRING",
+          description: "Trang cần chuyển đến: 'products' (Danh mục SP), 'batches' (Danh mục Lô), 'tccs' (Danh mục TCCS), 'product-formulas' (Công thức), 'test-results' (Phiếu kiểm nghiệm), 'pqr' (Báo cáo PQR), 'spc' (Phân tích xu hướng SPC), 'alerts' (Cảnh báo chất lượng), 'data-consistency' (Trung tâm toàn vẹn dữ liệu), 'audit-logs' (Kiểm toán ALCOA+)."
+        },
+        identifier: {
+          type: "STRING",
+          description: "Mã hoặc ID của thực thể cụ thể (ví dụ ID hoặc mã số của sản phẩm, lô hàng, TCCS) để mở thẳng trang chi tiết nếu có."
+        }
+      },
+      required: ["destination"]
+    }
+  },
+  {
+    name: "triggerAutoHealingAction",
+    description: "Tự động kích hoạt bộ máy rà soát và hàn gắn toàn vẹn dữ liệu (Data Consistency Auto-Healing) 360 độ trên toàn hệ thống. Sửa chữa tự động các lỗi mồ côi, đồng bộ cờ hiệu lực TCCS, liên kết nguyên liệu vào công thức và sửa trạng thái kết quả kiểm nghiệm.",
+    parameters: {
+      type: "OBJECT",
+      properties: {},
+      required: []
+    }
+  },
+  {
+    name: "updateBatchStatusAction",
+    description: "Cập nhật trạng thái của lô sản xuất (RELEASED: Xuất xưởng, REJECTED: Từ chối, TESTING: Đang kiểm nghiệm) kèm lý do thẩm định chất lượng và ghi log kiểm toán ALCOA+.",
+    parameters: {
+      type: "OBJECT",
+      properties: {
+        batchNo: {
+          type: "STRING",
+          description: "Số lô cần cập nhật trạng thái."
+        },
+        newStatus: {
+          type: "STRING",
+          description: "Trạng thái mới: 'RELEASED' (Cho phép xuất xưởng), 'REJECTED' (Từ chối xuất xưởng), 'TESTING' (Đang kiểm nghiệm)."
+        },
+        reason: {
+          type: "STRING",
+          description: "Lý do cập nhật trạng thái hoặc ghi chú thẩm định chất lượng."
+        }
+      },
+      required: ["batchNo", "newStatus"]
+    }
+  },
+  {
+    name: "predictBatchRiskAction",
+    description: "Dự báo rủi ro chất lượng của một lô sản xuất TRƯỚC KHI có kết quả kiểm nghiệm (xác suất đạt %, rủi ro phòng lab, rủi ro mùa vụ, các chỉ tiêu nguy cơ cao). Dùng khi người dùng hỏi: 'lô X có nguy cơ gì không?', 'dự báo rủi ro lô X', 'kiểm tra nguy cơ lô X'.",
+    parameters: {
+      type: "OBJECT",
+      properties: {
+        batchNo: {
+          type: "STRING",
+          description: "Số lô cần dự báo rủi ro trước kiểm nghiệm."
+        }
+      },
+      required: ["batchNo"]
+    }
   }
 ];
+
 
 // ============================================================
 // TOOL HANDLER IMPLEMENTATIONS
@@ -1097,10 +1213,35 @@ export const executeTool = async (
       return generateDeviationReport(args.batchNo, appContext);
     }
 
+    case 'createBatchAction': {
+      return await createBatchAction(args as any, appContext);
+    }
+
+    case 'exportCoAReportAction': {
+      return exportCoAReportAction(args as any, appContext);
+    }
+
+    case 'navigateToAction': {
+      return navigateToAction(args as any, appContext);
+    }
+
+    case 'triggerAutoHealingAction': {
+      return await triggerAutoHealingAction();
+    }
+
+    case 'updateBatchStatusAction': {
+      return await updateBatchStatusAction(args as any, appContext);
+    }
+
+    case 'predictBatchRiskAction': {
+      return predictBatchRiskBeforeTesting(args.batchNo, appContext);
+    }
+
     default:
       return { error: `Không tìm thấy tool "${toolName}"` };
   }
 };
+
 
 const formatDate = (dateStr: string): string => {
   if (!dateStr) return '---';
@@ -1324,4 +1465,257 @@ export const generateDeviationReport = (batchNo: string, appContext: any) => {
     note: `Để xem báo cáo đầy đủ, hãy vào trang Chi tiết lô ${batchNo} → click nút "Deviation Report" bên cạnh phiếu kiểm nghiệm KHÔNG ĐẠT.`,
   };
 };
+
+// ============================================================
+// ACTION TOOL HANDLER IMPLEMENTATIONS
+// ============================================================
+
+export const createBatchAction = async (args: {
+  productIdentifier: string;
+  batchNo: string;
+  mfgDate: string;
+  expDate: string;
+  theoreticalYield?: number;
+  yieldUnit?: string;
+}, appContext: any) => {
+  const store = useAppStore.getState();
+  const products = store.products?.length ? store.products : (appContext.products || []);
+  const tccsList = store.tccsList?.length ? store.tccsList : (appContext.tccsList || []);
+  const batches = store.batches?.length ? store.batches : (appContext.batches || []);
+
+  const query = (args.productIdentifier || '').trim().toLowerCase();
+  const product = products.find((p: any) => 
+    p.code?.toLowerCase() === query ||
+    p.name?.toLowerCase().includes(query) ||
+    p.id === query
+  );
+
+  if (!product) {
+    return {
+      success: false,
+      error: `Không tìm thấy sản phẩm phù hợp với "${args.productIdentifier}". Vui lòng kiểm tra lại mã hoặc tên sản phẩm.`
+    };
+  }
+
+  // Kiểm tra trùng số lô trong cùng sản phẩm
+  const existingBatch = batches.find((b: any) => 
+    b.productId === product.id && b.batchNo?.trim().toUpperCase() === args.batchNo?.trim().toUpperCase()
+  );
+  if (existingBatch) {
+    return {
+      success: false,
+      error: `Số lô "${args.batchNo}" đã tồn tại cho sản phẩm "${product.name}". Bạn có thể truy cập [Xem chi tiết lô ${args.batchNo}](/batches/${existingBatch.id}).`
+    };
+  }
+
+  // Chuẩn hóa ngày
+  const formatInputDate = (d: string) => {
+    if (!d) return '';
+    if (d.includes('/')) {
+      const parts = d.split('/');
+      if (parts.length === 3) {
+        return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+      }
+    }
+    return d;
+  };
+
+  const mfg = formatInputDate(args.mfgDate);
+  const exp = formatInputDate(args.expDate);
+
+  // Tìm TCCS hiệu lực
+  const activeTccs = tccsList.find((t: any) => t.productId === product.id && t.isActive) ||
+                     tccsList.find((t: any) => t.productId === product.id);
+
+  const newBatchId = generateId('batch');
+  const newBatch = {
+    id: newBatchId,
+    productId: product.id,
+    tccsId: activeTccs?.id || '',
+    batchNo: args.batchNo.trim(),
+    mfgDate: mfg,
+    expDate: exp,
+    theoreticalYield: args.theoreticalYield || 0,
+    actualYield: 0,
+    yieldUnit: args.yieldUnit || 'chai',
+    status: BATCH_STATUS.TESTING,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+
+  try {
+    await store.addBatch(newBatch as any);
+    return {
+      success: true,
+      batchId: newBatchId,
+      batchNo: newBatch.batchNo,
+      productName: product.name,
+      productCode: product.code,
+      tccsCode: activeTccs?.code || 'Chưa gán',
+      message: `✅ Đã tạo thành công lô sản xuất mới!\n- **Số Lô**: \`${newBatch.batchNo}\`\n- **Sản phẩm**: **${product.name}** (${product.code})\n- **NSX**: ${formatDateStandard(mfg)} | **HSD**: ${formatDateStandard(exp)}\n- **TCCS áp dụng**: ${activeTccs?.code || 'Chưa có'}\n- **Trạng thái**: Đang kiểm nghiệm (TESTING)\n\n👉 [Xem chi tiết Lô ${newBatch.batchNo}](/batches/${newBatchId})`,
+      action: 'REDIRECT',
+      path: `/batches/${newBatchId}`
+    };
+  } catch (err: any) {
+    return {
+      success: false,
+      error: `Không thể tạo lô: ${err.message || err}`
+    };
+  }
+};
+
+export const exportCoAReportAction = (args: { batchNo: string }, appContext: any) => {
+  const store = useAppStore.getState();
+  const batches = store.batches?.length ? store.batches : (appContext.batches || []);
+  const testResults = store.testResults?.length ? store.testResults : (appContext.testResults || []);
+  const products = store.products?.length ? store.products : (appContext.products || []);
+
+  const query = (args.batchNo || '').trim().toLowerCase();
+  const batch = batches.find((b: any) => 
+    b.batchNo?.toLowerCase() === query || b.id === query
+  );
+
+  if (!batch) {
+    return {
+      success: false,
+      error: `Không tìm thấy lô "${args.batchNo}" trong hệ thống.`
+    };
+  }
+
+  const product = products.find((p: any) => p.id === batch.productId);
+  const batchTests = testResults.filter((r: any) => r.batchId === batch.id);
+
+  if (batchTests.length === 0) {
+    return {
+      success: false,
+      batchNo: batch.batchNo,
+      message: `Lô **${batch.batchNo}** (${product?.name || ''}) hiện chưa có phiếu kiểm nghiệm nào được nhập vào hệ thống.\n\n👉 [Nhập kết quả kiểm nghiệm cho lô này](/test-results/new)`
+    };
+  }
+
+  const sortedTests = [...batchTests].sort((a: any, b: any) => (b.testDate || '').localeCompare(a.testDate || ''));
+  const latestTest = sortedTests[0];
+
+  return {
+    success: true,
+    batchNo: batch.batchNo,
+    productName: product?.name || '',
+    testCount: batchTests.length,
+    latestTestDate: latestTest.testDate,
+    message: `📄 Tìm thấy **${batchTests.length} phiếu kiểm nghiệm** cho lô **${batch.batchNo}** (${product?.name || ''}).\n\nBạn có thể xem hoặc in Certificate of Analysis (CoA) theo 2 định dạng:\n1. 👉 [Xem CoA Tổng hợp Lô ${batch.batchNo}](/test-results/coa-batch/${batch.id})\n2. 👉 [In Phiếu kiểm nghiệm mới nhất (${latestTest.id.slice(-6)})](/test-results/print/${latestTest.id})`,
+    action: 'REDIRECT',
+    path: `/test-results/coa-batch/${batch.id}`
+  };
+};
+
+export const navigateToAction = (args: { destination: string; identifier?: string }, appContext: any) => {
+  const store = useAppStore.getState();
+  const products = store.products?.length ? store.products : (appContext.products || []);
+  const batches = store.batches?.length ? store.batches : (appContext.batches || []);
+  const tccsList = store.tccsList?.length ? store.tccsList : (appContext.tccsList || []);
+
+  const dest = (args.destination || '').toLowerCase();
+  const idQuery = (args.identifier || '').trim().toLowerCase();
+
+  switch (dest) {
+    case 'products': {
+      if (idQuery) {
+        const p = products.find((prod: any) => prod.id === idQuery || prod.code?.toLowerCase() === idQuery || prod.name?.toLowerCase().includes(idQuery));
+        if (p) return { path: `/products/${p.id}`, label: `Hồ sơ sản phẩm ${p.name}`, message: `👉 [Mở hồ sơ sản phẩm: ${p.name}](/products/${p.id})` };
+      }
+      return { path: '/products', label: 'Danh mục Sản phẩm', message: '👉 [Mở Danh mục Sản phẩm](/products)' };
+    }
+    case 'batches': {
+      if (idQuery) {
+        const b = batches.find((bat: any) => bat.id === idQuery || bat.batchNo?.toLowerCase() === idQuery);
+        if (b) return { path: `/batches/${b.id}`, label: `Chi tiết lô ${b.batchNo}`, message: `👉 [Mở Chi tiết lô: ${b.batchNo}](/batches/${b.id})` };
+      }
+      return { path: '/batches', label: 'Quản lý Lô sản xuất', message: '👉 [Mở Quản lý Lô sản xuất](/batches)' };
+    }
+    case 'tccs': {
+      if (idQuery) {
+        const t = tccsList.find((tccs: any) => tccs.id === idQuery || tccs.code?.toLowerCase() === idQuery);
+        if (t) return { path: `/tccs/detail/${t.id}`, label: `Tiêu chuẩn TCCS ${t.code}`, message: `👉 [Mở Chi tiết TCCS: ${t.code}](/tccs/detail/${t.id})` };
+      }
+      return { path: '/tccs', label: 'Tiêu chuẩn Cơ sở (TCCS)', message: '👉 [Mở Danh sách TCCS](/tccs)' };
+    }
+    case 'product-formulas':
+      return { path: '/product-formulas', label: 'Công thức Sản phẩm', message: '👉 [Mở Công thức Sản phẩm](/product-formulas)' };
+    case 'test-results':
+      return { path: '/test-results', label: 'Phiếu kiểm nghiệm', message: '👉 [Mở Danh sách Phiếu kiểm nghiệm](/test-results)' };
+    case 'pqr':
+      return { path: '/quality-summary-report', label: 'Báo cáo Tổng hợp PQR', message: '👉 [Mở Báo cáo Tổng hợp Chất lượng PQR](/quality-summary-report)' };
+    case 'spc':
+      return { path: '/trend-analysis', label: 'Phân tích Xu hướng SPC', message: '👉 [Mở Phân tích Xu hướng & Năng lực SPC](/trend-analysis)' };
+    case 'alerts':
+      return { path: '/alerts', label: 'Cảnh báo Chất lượng', message: '👉 [Mở Trung tâm Cảnh báo Chất lượng](/alerts)' };
+    case 'data-consistency':
+      return { path: '/settings?tab=consistency', label: 'Kiểm định Toàn vẹn Dữ liệu', message: '👉 [Mở Trung tâm Toàn vẹn Dữ liệu Data Consistency](/settings?tab=consistency)' };
+    case 'audit-logs':
+      return { path: '/audit-logs', label: 'Nhật ký Kiểm toán ALCOA+', message: '👉 [Mở Nhật ký Kiểm toán ALCOA+ Audit Trail](/audit-logs)' };
+    default:
+      return { path: '/', label: 'Trang chủ', message: '👉 [Về Trang chủ](/) '};
+  }
+};
+
+export const triggerAutoHealingAction = async () => {
+  try {
+    const result = await autoHealAllWithAI(() => useAppStore.getState());
+    return result;
+  } catch (e: any) {
+    return {
+      success: false,
+      error: `Lỗi khi hàn gắn dữ liệu: ${e.message || e}`
+    };
+  }
+};
+
+export const updateBatchStatusAction = async (args: {
+  batchNo: string;
+  newStatus: 'RELEASED' | 'REJECTED' | 'TESTING';
+  reason?: string;
+}, appContext: any) => {
+  const store = useAppStore.getState();
+  const batches = store.batches?.length ? store.batches : (appContext.batches || []);
+  const batch = batches.find((b: any) => b.batchNo?.toLowerCase() === args.batchNo?.toLowerCase() || b.id === args.batchNo);
+
+  if (!batch) {
+    return {
+      success: false,
+      error: `Không tìm thấy lô "${args.batchNo}" trong hệ thống.`
+    };
+  }
+
+  const validStatuses = ['RELEASED', 'REJECTED', 'TESTING'];
+  if (!validStatuses.includes(args.newStatus)) {
+    return {
+      success: false,
+      error: `Trạng thái không hợp lệ: "${args.newStatus}". Chỉ chấp nhận: RELEASED, REJECTED, TESTING.`
+    };
+  }
+
+  try {
+    await store.updateBatchStatus(batch.id, args.newStatus as any, args.reason);
+    const statusLabels: Record<string, string> = {
+      RELEASED: 'Xuất xưởng (RELEASED)',
+      REJECTED: 'Từ chối / Loại bỏ (REJECTED)',
+      TESTING: 'Đang kiểm nghiệm (TESTING)',
+    };
+    return {
+      success: true,
+      batchNo: batch.batchNo,
+      oldStatus: batch.status,
+      newStatus: args.newStatus,
+      message: `✅ Đã cập nhật trạng thái lô **${batch.batchNo}** thành **${statusLabels[args.newStatus]}**.\n- Lý do / Ghi chú: ${args.reason || 'Cập nhật qua Trợ lý AI'}\n- Nhật ký kiểm toán ALCOA+ đã được ghi nhận an toàn.\n\n👉 [Xem chi tiết lô ${batch.batchNo}](/batches/${batch.id})`,
+      action: 'REDIRECT',
+      path: `/batches/${batch.id}`
+    };
+  } catch (err: any) {
+    return {
+      success: false,
+      error: `Không thể cập nhật trạng thái lô: ${err.message || err}`
+    };
+  }
+};
+
 

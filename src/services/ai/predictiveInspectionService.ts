@@ -397,3 +397,151 @@ export const predictInspectionOutcome = (ctx: PredictiveContext): PredictiveInsp
     disclaimer: 'Đây là dự báo dựa trên dữ liệu lịch sử, không phải kết quả kiểm nghiệm chính thức. Quyết định xuất xưởng phải dựa trên kết quả kiểm nghiệm thực tế theo quy định GMP.',
   };
 };
+
+/**
+ * Động học suy giảm hoạt chất theo thời gian (First-order reaction kinetics)
+ * Ước tính hằng số suy giảm k và hạn dùng thực tế t90.
+ */
+export interface StabilityKineticsResult {
+  criteriaName: string;
+  unit: string;
+  initialValue: number;
+  latestValue: number;
+  minLimit: number;
+  decayRateConstantK: number; // tháng^-1
+  rSquared: number;
+  halfLifeMonths: number;
+  t90Months: number; // Số tháng đến khi còn 90% nồng độ ban đầu
+  monthsToMinLimit: number | null;
+  predictedExpiryValue: number;
+  isEarlyExpiryRisk: boolean;
+  status: 'STABLE' | 'MODERATE_DECAY' | 'RAPID_DECAY';
+  message: string;
+}
+
+export const calculateStabilityKinetics = (
+  criteriaName: string,
+  timeSeriesPoints: { date: string; value: number }[],
+  minLimit: number,
+  shelfLifeMonths: number = 24
+): StabilityKineticsResult | null => {
+  if (!timeSeriesPoints || timeSeriesPoints.length < 2) return null;
+
+  // Sắp xếp theo ngày
+  const sorted = [...timeSeriesPoints].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  const t0 = new Date(sorted[0].date).getTime();
+
+  // Đổi sang tháng tương đối từ điểm t0
+  const points = sorted.map(p => {
+    const tMonths = (new Date(p.date).getTime() - t0) / (1000 * 60 * 60 * 24 * 30.4375);
+    return {
+      t: tMonths,
+      val: p.value,
+      lnVal: p.value > 0 ? Math.log(p.value) : 0
+    };
+  }).filter(p => p.val > 0);
+
+  if (points.length < 2) return null;
+
+  // Hồi quy tuyến tính: ln(C_t) = ln(C_0) - k*t
+  const n = points.length;
+  const sumT = points.reduce((acc, p) => acc + p.t, 0);
+  const sumLnC = points.reduce((acc, p) => acc + p.lnVal, 0);
+  const sumTLnC = points.reduce((acc, p) => acc + p.t * p.lnVal, 0);
+  const sumT2 = points.reduce((acc, p) => acc + p.t * p.t, 0);
+
+  const denom = n * sumT2 - sumT * sumT;
+  if (Math.abs(denom) < 1e-9) return null;
+
+  const slope = (n * sumTLnC - sumT * sumLnC) / denom; // slope = -k
+  const intercept = (sumLnC - slope * sumT) / n; // ln(C_0)
+
+  // Tính R^2
+  const meanLnC = sumLnC / n;
+  const ssTot = points.reduce((acc, p) => acc + Math.pow(p.lnVal - meanLnC, 2), 0);
+  const ssRes = points.reduce((acc, p) => {
+    const pred = intercept + slope * p.t;
+    return acc + Math.pow(p.lnVal - pred, 2);
+  }, 0);
+  const rSquared = ssTot > 0 ? Math.max(0, Math.min(1, 1 - ssRes / ssTot)) : 0;
+
+  const k = -slope; // k > 0 nghĩa là đang suy giảm
+  const C0 = Math.exp(intercept);
+  const initialValue = sorted[0].value;
+  const latestValue = sorted[sorted.length - 1].value;
+
+  // t90 = ln(100/90) / k = 0.10536 / k
+  const t90Months = k > 1e-6 ? Math.round(0.10536 / k) : 999;
+  const halfLifeMonths = k > 1e-6 ? Math.round(Math.log(2) / k) : 999;
+
+  // Nồng độ dự báo tại hạn dùng (shelfLifeMonths)
+  const predictedExpiryValue = parseFloat((C0 * Math.exp(-k * shelfLifeMonths)).toFixed(2));
+
+  // Thời gian chạm min limit
+  let monthsToMinLimit: number | null = null;
+  if (k > 1e-6 && minLimit > 0 && C0 > minLimit) {
+    monthsToMinLimit = Math.round(Math.log(C0 / minLimit) / k);
+  }
+
+  const isEarlyExpiryRisk = (monthsToMinLimit !== null && monthsToMinLimit < shelfLifeMonths) || predictedExpiryValue < minLimit;
+  const status: StabilityKineticsResult['status'] = isEarlyExpiryRisk ? 'RAPID_DECAY' : k > 0.01 ? 'MODERATE_DECAY' : 'STABLE';
+
+  let message = '';
+  if (isEarlyExpiryRisk) {
+    message = `🚨 Cảnh báo nguy cơ hết hạn sớm! Hoạt chất "${criteriaName}" suy giảm với tốc độ ${(k * 100).toFixed(2)}%/tháng. Dự báo sẽ chạm ngưỡng tối thiểu (${minLimit}) sau ${monthsToMinLimit} tháng (trước hạn dùng ${shelfLifeMonths} tháng).`;
+  } else if (status === 'MODERATE_DECAY') {
+    message = `⚠️ Hoạt chất "${criteriaName}" có xu hướng giảm nhẹ (${(k * 100).toFixed(2)}%/tháng). Tại thời điểm hết hạn dự báo còn ${predictedExpiryValue} (vẫn trên ngưỡng ${minLimit}).`;
+  } else {
+    message = `✅ Hoạt chất "${criteriaName}" duy trì độ ổn định rất cao qua các mốc thời gian (R²=${rSquared.toFixed(2)}).`;
+  }
+
+  return {
+    criteriaName,
+    unit: '',
+    initialValue,
+    latestValue,
+    minLimit,
+    decayRateConstantK: parseFloat(k.toFixed(5)),
+    rSquared: parseFloat(rSquared.toFixed(3)),
+    halfLifeMonths,
+    t90Months,
+    monthsToMinLimit,
+    predictedExpiryValue,
+    isEarlyExpiryRisk,
+    status,
+    message
+  };
+};
+
+/**
+ * Đánh giá nhanh rủi ro lô trước khi kiểm nghiệm
+ */
+export const predictBatchRiskBeforeTesting = (
+  batchNo: string,
+  appContext: {
+    batches: any[];
+    products: any[];
+    testResults: any[];
+    tccsList: any[];
+  }
+) => {
+  const batch = appContext.batches.find(b => b.batchNo === batchNo || b.id === batchNo);
+  if (!batch) return { error: `Không tìm thấy lô ${batchNo}` };
+
+  const product = appContext.products.find(p => p.id === batch.productId);
+  const tccs = appContext.tccsList.find(t => t.id === batch.tccsId) ||
+               appContext.tccsList.find(t => t.productId === batch.productId && t.isActive);
+
+  const productTestResults = (appContext.testResults || []).filter(r => {
+    const b = appContext.batches.find(bat => bat.id === r.batchId);
+    return b && b.productId === batch.productId;
+  });
+
+  return predictInspectionOutcome({
+    batch,
+    product,
+    tccs,
+    productTestResults,
+    allBatches: appContext.batches || []
+  });
+};

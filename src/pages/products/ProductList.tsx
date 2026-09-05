@@ -1,12 +1,12 @@
 
 import React, { useState, useMemo, useCallback, memo, useEffect } from 'react';
 import { useAppStore } from '../../store/useAppStore';
-import { Plus, Search, Trash2, Edit2, Upload, Eye, FileSpreadsheet, Package, X, Building2, AlertCircle, Info, CheckCircle2, LayoutGrid, List, ArrowUpDown, FileUp, Loader2, PackageSearch } from 'lucide-react';
+import { Plus, Search, Trash2, Edit2, Upload, Eye, FileSpreadsheet, Package, X, Building2, AlertCircle, Info, CheckCircle2, LayoutGrid, List, ArrowUpDown, FileUp, Loader2, PackageSearch, Layers, ClipboardCheck, TrendingUp, FileText } from 'lucide-react';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import { Product, ProductStatus } from '../../types';
 import { logAuditAction } from '../../services/auditService';
 import { StatusBadge, PageHeader, Modal, Pagination, DSFilterBar, DSSearchInput, DSSelect, DSViewToggle, DSCard, DSTable, ActionButtons, DeleteModal, AddButton, DSEmptyState } from '../../components';
-import { useDebounce, useCrud } from '../../hooks';
+import { useDebounce, useCrud, useDataGraph } from '../../hooks';
 import { useUIStore } from '../../store/useUIStore';
 import { PRODUCT_STATUS, generateId, formatDateStandard } from '../../utils';
 import { useShallow } from 'zustand/react/shallow';
@@ -14,7 +14,7 @@ import { useShallow } from 'zustand/react/shallow';
 const SELF_ANNOUNCED_COMPANY = "CÔNG TY CỔ PHẦN CÔNG NGHỆ SINH PHẨM NAM VIỆT";
 
 // --- SUB-COMPONENT: Grid Item (Memoized) ---
-const ProductGridItem = memo(({ product, onEdit, onDelete, isAdmin }: { product: Product, onEdit: (p: Product) => void, onDelete: (p: Product) => void, isAdmin: boolean }) => {
+const ProductGridItem = memo(({ product, hProduct, onEdit, onDelete, isAdmin }: { product: Product, hProduct: any, onEdit: (p: Product) => void, onDelete: (p: Product) => void, isAdmin: boolean }) => {
   const isSelf = product.registrant.trim().toUpperCase() === SELF_ANNOUNCED_COMPANY;
   return (
     <DSCard className="p-5 flex flex-col gap-5 hover:-translate-y-2 hover:shadow-[0_20px_40px_-15px_rgba(16,185,129,0.15)] dark:hover:shadow-[0_20px_40px_-15px_rgba(16,185,129,0.08)] transition-all duration-500 group relative overflow-hidden bg-gradient-to-br from-emerald-50/80 via-white to-teal-50/80 dark:from-emerald-950/20 dark:via-slate-800 dark:to-teal-950/20 dark:border-slate-700/50">
@@ -58,6 +58,46 @@ const ProductGridItem = memo(({ product, onEdit, onDelete, isAdmin }: { product:
               <span className="text-slate-700 dark:text-slate-300 text-right">{formatDateStandard(product.registrationDate)}</span>
             </div>
         </div>
+
+        {/* --- MINI STATS: Lô, Kếết quả, Tỷ lệ đạt --- */}
+        {hProduct && (
+          <div className="flex flex-wrap gap-1.5 pt-2 border-t border-slate-100/60 dark:border-slate-700/40">
+            <Link
+              to={`/batches?productId=${product.id}`}
+              onClick={e => e.stopPropagation()}
+              className="flex items-center gap-1 px-2 py-1 rounded-lg bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400 text-[10px] font-black border border-blue-100 dark:border-blue-900/40 hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors"
+            >
+              <Layers size={10} /> {hProduct.batchesCount > 0 ? `${hProduct.batchesCount} lô` : 'Chưa có lô'}
+            </Link>
+            {hProduct.testResultsCount > 0 && (
+              <Link
+                to={`/test-results?productId=${product.id}`}
+                onClick={e => e.stopPropagation()}
+                className="flex items-center gap-1 px-2 py-1 rounded-lg bg-cyan-50 dark:bg-cyan-950/30 text-cyan-600 dark:text-cyan-400 text-[10px] font-black border border-cyan-100 dark:border-cyan-900/40 hover:bg-cyan-100 dark:hover:bg-cyan-900/50 transition-colors"
+              >
+                <ClipboardCheck size={10} /> {hProduct.testResultsCount} KN
+              </Link>
+            )}
+            {hProduct.testResultsCount > 0 && (
+              <span className={`flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-black border ${
+                hProduct.passRate >= 80 ? 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 border-emerald-100 dark:border-emerald-900/40'
+                : hProduct.passRate >= 50 ? 'bg-amber-50 dark:bg-amber-950/30 text-amber-600 dark:text-amber-400 border-amber-100 dark:border-amber-900/40'
+                : 'bg-red-50 dark:bg-red-950/30 text-red-600 dark:text-red-400 border-red-100 dark:border-red-900/40'
+              }`}>
+                <TrendingUp size={10} /> {hProduct.passRate}%
+              </span>
+            )}
+            {hProduct.activeTCCS && (
+              <Link
+                to={`/tccs/detail/${hProduct.activeTCCS.id}`}
+                onClick={e => e.stopPropagation()}
+                className="flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-50 dark:bg-slate-900/50 text-slate-500 dark:text-slate-400 text-[10px] font-black border border-slate-100 dark:border-slate-700/60 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+              >
+                <FileText size={10} /> TCCS
+              </Link>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Footer: Actions */}
@@ -77,6 +117,7 @@ const ProductGridItem = memo(({ product, onEdit, onDelete, isAdmin }: { product:
     </DSCard>
   );
 });
+
 
 // --- SUB-COMPONENT: List Item (Memoized) ---
 const ProductListItem = memo(({ product, onEdit, onDelete, isAdmin }: { product: Product, onEdit: (p: Product) => void, onDelete: (p: Product) => void, isAdmin: boolean }) => {
@@ -126,7 +167,7 @@ const ProductListItem = memo(({ product, onEdit, onDelete, isAdmin }: { product:
   );
 });
 
-const ProductDataList = ({ viewMode, data, onEdit, onDelete, isAdmin }: any) => {
+const ProductDataList = ({ viewMode, data, hydratedProductMap, onEdit, onDelete, isAdmin }: any) => {
   if (data.length === 0) {
      return <DSEmptyState icon={PackageSearch} title="Không tìm thấy Sản phẩm" message="Chưa có sản phẩm nào khớp với từ khóa hoặc bộ lọc." />;
   }
@@ -135,7 +176,7 @@ const ProductDataList = ({ viewMode, data, onEdit, onDelete, isAdmin }: any) => 
     return (
       <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
         {data.map((product: Product) => (
-          <ProductGridItem key={product.id} product={product} onEdit={onEdit} onDelete={onDelete} isAdmin={isAdmin} />
+          <ProductGridItem key={product.id} product={product} hProduct={hydratedProductMap?.get(product.id)} onEdit={onEdit} onDelete={onDelete} isAdmin={isAdmin} />
         ))}
       </div>
     );
@@ -160,6 +201,7 @@ const ProductDataList = ({ viewMode, data, onEdit, onDelete, isAdmin }: any) => 
   );
 };
 
+
 const ProductList: React.FC = () => {
   // Zustand Selectors
   // Tối ưu 1: Gom nhóm Zustand Selectors bằng useShallow
@@ -171,6 +213,9 @@ const ProductList: React.FC = () => {
     user: state.user,
     isAdmin: state.isAdmin
   })));
+  // Dùng useDataGraph để lấy HydratedProduct (có batchesCount, testResultsCount, passRate, activeTCCS)
+  const { products: hydratedProducts } = useDataGraph();
+  const hydratedProductMap = useMemo(() => new Map(hydratedProducts.map(p => [p.id, p])), [hydratedProducts]);
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   
@@ -450,6 +495,7 @@ const ProductList: React.FC = () => {
       <ProductDataList 
         viewMode={viewMode}
         data={currentProducts}
+        hydratedProductMap={hydratedProductMap}
         onEdit={handleEditClick}
         onDelete={handleDeleteClick}
         isAdmin={isAdmin}

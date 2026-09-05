@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Loader2, FlaskConical, ClipboardCheck, Layers, Printer, CheckCircle2, X, AlertTriangle, ShieldAlert, Sparkles, GitBranch, FileWarning } from 'lucide-react';
+import { useParams, useNavigate, Link } from 'react-router-dom';
+import { ArrowLeft, Loader2, FlaskConical, ClipboardCheck, Layers, Printer, CheckCircle2, X, AlertTriangle, ShieldAlert, Sparkles, GitBranch, FileWarning, FileText } from 'lucide-react';
 import { useDataGraph } from '../../hooks/useDataGraph';
 import { useAppStore } from '../../store/useAppStore';
 import { formatDateStandard, ensureArray, parseNumberFromText } from '../../utils';
@@ -264,14 +264,32 @@ const BatchDetailPage = () => {
 
               <div className="pt-3 border-t border-slate-100 dark:border-slate-700">
                 <span className="font-bold text-slate-500 dark:text-slate-400 block mb-1">Tiêu chuẩn áp dụng:</span>
-                <span 
-                  onClick={() => (batch as any).tccs?.id && navigate(`/tccs/${(batch as any).tccs?.id}`)}
-                  className="font-bold text-indigo-700 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 px-2 py-1 rounded inline-block cursor-pointer transition-colors"
-                  title="Nhấn để xem chi tiết TCCS"
-                >
-                  {(batch as any).tccs?.code || 'Không xác định'}
-                </span>
+                {(batch as any).tccs?.id ? (
+                  <Link
+                    to={`/tccs/detail/${(batch as any).tccs?.id}`}
+                    className="font-bold text-indigo-700 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 px-2 py-1 rounded inline-flex items-center gap-1 transition-colors"
+                    title="Nhấn để xem chi tiết TCCS"
+                  >
+                    <FileText size={12} /> {(batch as any).tccs?.code || 'Không xác định'}
+                  </Link>
+                ) : (
+                  <span className="font-bold text-slate-500 dark:text-slate-400">Không xác định</span>
+                )}
               </div>
+
+              {/* Link đến Công thức sản phẩm (nếu có) */}
+              {(batch as any).formula && (
+                <div className="pt-2 border-t border-slate-100 dark:border-slate-700">
+                  <span className="font-bold text-slate-500 dark:text-slate-400 block mb-1">Công thức sản phẩm:</span>
+                  <Link
+                    to={`/product-formulas`}
+                    className="font-bold text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/20 hover:bg-purple-100 dark:hover:bg-purple-900/40 px-2 py-1 rounded inline-flex items-center gap-1 transition-colors text-[11px]"
+                    title="Xem công thức sản phẩm"
+                  >
+                    <FlaskConical size={11} /> Xem công thức
+                  </Link>
+                </div>
+              )}
             </div>
           </div>
 

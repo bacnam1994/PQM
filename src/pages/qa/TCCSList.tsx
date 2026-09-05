@@ -5,12 +5,13 @@ import {
   Plus, Search, FileText, ChevronDown, Trash2,
   Calendar, Package, Layers, Beaker, ShieldCheck,
   X, Info, Eye, LayoutGrid, List, CornerDownRight, ArrowRightLeft, Loader2, FlaskConical,
-  CheckCircle2, Clock, Copy, Filter, Activity, Thermometer, Edit2, History, GitCompare, ArrowRight, ArrowUpDown
+  CheckCircle2, Clock, Copy, Filter, Activity, Thermometer, Edit2, History, GitCompare, ArrowRight, ArrowUpDown, ClipboardCheck, TrendingUp
 } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { TCCS, Product, Criterion, TestResultEntry, CriterionType } from '../../types';
 import { logAuditAction } from '../../services/auditService';
 import { StatusBadge, PageHeader, Modal, Pagination, DSFilterBar, DSSearchInput, DSSelect, DSViewToggle, DSCard, DSTable, ActionButtons, DeleteModal, AddButton } from '../../components';
-import { useCrud } from '../../hooks';
+import { useCrud, useDataGraph } from '../../hooks';
 import { useUIStore } from '../../store/useUIStore';
 import { ensureArray, generateId, formatDateStandard } from '../../utils';
 import { useNavigate } from 'react-router-dom';
@@ -49,6 +50,43 @@ const TCCSGridItem = React.memo(({ tccs, product, isExpanded, onExpand, onView, 
               </div>
             </div>
           </div>
+
+          {/* --- BADGES LIÊN KẾT DỮ LIỆU --- */}
+          <div className="flex flex-wrap gap-1.5 pt-2 border-t border-slate-100/60 dark:border-slate-700/40">
+            {/* Badge: Số lô áp dụng */}
+            <Link
+              to={`/batches?productId=${tccs.productId}`}
+              onClick={e => e.stopPropagation()}
+              className="flex items-center gap-1 px-2 py-1 rounded-lg bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400 text-[10px] font-black border border-blue-100 dark:border-blue-900/40 hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors"
+            >
+              <Layers size={10} />
+              {tccs.batchesCount > 0 ? `${tccs.batchesCount} lô` : 'Chưa có lô'}
+            </Link>
+            {/* Badge: Số phiếu KN */}
+            {tccs.testResultsCount > 0 && (
+              <Link
+                to={`/test-results?productId=${tccs.productId}`}
+                onClick={e => e.stopPropagation()}
+                className="flex items-center gap-1 px-2 py-1 rounded-lg bg-cyan-50 dark:bg-cyan-950/30 text-cyan-600 dark:text-cyan-400 text-[10px] font-black border border-cyan-100 dark:border-cyan-900/40 hover:bg-cyan-100 dark:hover:bg-cyan-900/50 transition-colors"
+              >
+                <ClipboardCheck size={10} />
+                {tccs.testResultsCount} phiếu KN
+              </Link>
+            )}
+            {/* Badge: Tỷ lệ đạt */}
+            {tccs.testResultsCount > 0 && (
+              <span className={`flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-black border ${
+                tccs.passRate >= 80
+                  ? 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 border-emerald-100 dark:border-emerald-900/40'
+                  : tccs.passRate >= 50
+                  ? 'bg-amber-50 dark:bg-amber-950/30 text-amber-600 dark:text-amber-400 border-amber-100 dark:border-amber-900/40'
+                  : 'bg-red-50 dark:bg-red-950/30 text-red-600 dark:text-red-400 border-red-100 dark:border-red-900/40'
+              }`}>
+                <TrendingUp size={10} />
+                Đạt: {tccs.passRate}%
+              </span>
+            )}
+          </div>
         </div>
 
         {/* Footer: Actions */}
@@ -72,6 +110,7 @@ const TCCSGridItem = React.memo(({ tccs, product, isExpanded, onExpand, onView, 
     </DSCard>
   );
 });
+
 
 const TCCSExpandedStructure = ({ tccs }: { tccs: any }) => {
   const HEAVY_METAL_KEYWORDS = ['asen', 'chì', 'thủy ngân', 'cadmi'];
@@ -140,6 +179,35 @@ const TCCSListItem = React.memo(({ tccs, product, onView, onClone, onEdit, onDel
     <td className="px-4 py-3 font-black text-slate-800 dark:text-slate-200">{tccs.code}</td>
     <td className="px-4 py-3 font-bold text-slate-600 dark:text-slate-300">{product?.name}</td>
     <td className="px-4 py-3 text-sm text-zinc-600 dark:text-zinc-400">{formatDateStandard(tccs.issueDate)}</td>
+    <td className="px-4 py-3">
+      <div className="flex flex-wrap gap-1">
+        <Link
+          to={`/batches?productId=${tccs.productId}`}
+          onClick={e => e.stopPropagation()}
+          className="flex items-center gap-1 px-2 py-0.5 rounded bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400 text-[10px] font-black hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors border border-blue-100 dark:border-blue-900/40"
+        >
+          <Layers size={9} /> {tccs.batchesCount} lô
+        </Link>
+        {tccs.testResultsCount > 0 && (
+          <Link
+            to={`/test-results?productId=${tccs.productId}`}
+            onClick={e => e.stopPropagation()}
+            className="flex items-center gap-1 px-2 py-0.5 rounded bg-cyan-50 dark:bg-cyan-950/30 text-cyan-600 dark:text-cyan-400 text-[10px] font-black hover:bg-cyan-100 dark:hover:bg-cyan-900/50 transition-colors border border-cyan-100 dark:border-cyan-900/40"
+          >
+            <ClipboardCheck size={9} /> {tccs.testResultsCount} KN
+          </Link>
+        )}
+        {tccs.testResultsCount > 0 && (
+          <span className={`flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-black border ${
+            tccs.passRate >= 80 ? 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 border-emerald-100 dark:border-emerald-900/40'
+            : tccs.passRate >= 50 ? 'bg-amber-50 dark:bg-amber-950/30 text-amber-600 dark:text-amber-400 border-amber-100 dark:border-amber-900/40'
+            : 'bg-red-50 dark:bg-red-950/30 text-red-600 dark:text-red-400 border-red-100 dark:border-red-900/40'
+          }`}>
+            <TrendingUp size={9} /> {tccs.passRate}%
+          </span>
+        )}
+      </div>
+    </td>
     <td className="px-4 py-3 text-center">
       {tccs.isActive ? <span className="bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 px-2 py-1 rounded text-[10px] font-black uppercase">Hiệu lực</span> : <span className="bg-slate-100 dark:bg-slate-900 text-slate-500 dark:text-slate-400 px-2 py-1 rounded text-[10px] font-black uppercase">Hết hiệu lực</span>}
     </td>
@@ -155,6 +223,7 @@ const TCCSListItem = React.memo(({ tccs, product, onView, onClone, onEdit, onDel
     </td>
   </tr>
 ));
+
 
 const TCCSDataList = ({ viewMode, data, products, expandedIds, onExpand, onView, onClone, onEdit, onDelete, handleViewHistory, isAdmin }: any) => {
   if (viewMode === 'grid') {
@@ -182,7 +251,7 @@ const TCCSDataList = ({ viewMode, data, products, expandedIds, onExpand, onView,
     <DSTable>
       <thead className="bg-slate-50 dark:bg-zinc-900 border-b border-slate-100 dark:border-zinc-800/80">
         <tr className="text-slate-500 dark:text-zinc-400 text-[10px] font-black uppercase tracking-widest">
-          <th className="px-4 py-3">Mã TCCS</th><th className="px-4 py-3">Sản phẩm</th><th className="px-4 py-3">Ngày ban hành</th><th className="px-4 py-3 text-center">Trạng thái</th><th className="px-4 py-3 text-right">Thao tác</th>
+          <th className="px-4 py-3">Mã TCCS</th><th className="px-4 py-3">Sản phẩm</th><th className="px-4 py-3">Ngày ban hành</th><th className="px-4 py-3">Thống kê</th><th className="px-4 py-3 text-center">Trạng thái</th><th className="px-4 py-3 text-right">Thao tác</th>
         </tr>
       </thead>
       <tbody className="divide-y divide-slate-50 dark:divide-zinc-850">
@@ -193,6 +262,7 @@ const TCCSDataList = ({ viewMode, data, products, expandedIds, onExpand, onView,
     </DSTable>
   );
 };
+
 
 const TCCSList: React.FC = () => {
   const products = useAppStore(s => s.products);
@@ -205,6 +275,8 @@ const TCCSList: React.FC = () => {
   const isAdmin = useAppStore(s => s.isAdmin);
   const notify = useAppStore(s => s.notify);
   const user = useAppStore(s => s.user);
+  // Dùng useDataGraph để lấy HydratedTCCS (có batchesCount, testResultsCount, passRate)
+  const { tccsList: hydratedTccsList } = useDataGraph();
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterProductId, setFilterProductId] = useState('');
@@ -315,8 +387,10 @@ const TCCSList: React.FC = () => {
 
   const filteredTCCS = useMemo(() => {
     const productMap = new Map(products.map(p => [p.id, p]));
+    // Dùng hydratedTccsList để có batchesCount, testResultsCount, passRate
+    const sourceList = hydratedTccsList.length > 0 ? hydratedTccsList : tccsList;
 
-    return tccsList.filter(t => {
+    return sourceList.filter(t => {
       const p = productMap.get(t.productId);
       const matchesSearch = t.code.toLowerCase().includes(searchTerm.toLowerCase()) || (p?.name || '').toLowerCase().includes(searchTerm.toLowerCase());
       const matchesProduct = !filterProductId || t.productId === filterProductId;
@@ -335,7 +409,8 @@ const TCCSList: React.FC = () => {
       const dateB = new Date(b.issueDate).getTime();
       return sortConfig.direction === 'asc' ? dateA - dateB : dateB - dateA;
     });
-  }, [tccsList, products, searchTerm, filterProductId, filterStatus, sortConfig, filterMonth, filterYear]);
+  }, [tccsList, hydratedTccsList, products, searchTerm, filterProductId, filterStatus, sortConfig, filterMonth, filterYear]);
+
 
   useEffect(() => {
     setCurrentPage(1);

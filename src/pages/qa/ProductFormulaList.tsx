@@ -1,10 +1,10 @@
 import React, { useState, useMemo, useCallback, memo } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { FlaskConical, Plus, Search, Beaker, Eye, Loader2, LayoutGrid, List, Package, Component, FileSearch } from 'lucide-react';
+import { useNavigate, Link } from 'react-router-dom';
+import { FlaskConical, Plus, Search, Beaker, Eye, Loader2, LayoutGrid, List, Package, Component, FileSearch, FileText, Layers, TrendingUp, ArrowRight } from 'lucide-react';
 import { useAppStore } from '../../store/useAppStore';
 import { ProductFormula, FormulaIngredient } from '../../types';
 import { PageHeader, Modal, Pagination, DSFilterBar, DSSearchInput, DSTable, DSViewToggle, DSCard, AddButton, ActionButtons, DeleteModal, DSEmptyState } from '../../components';
-import { useCrud, useDebounce } from '../../hooks';
+import { useCrud, useDebounce, useDataGraph } from '../../hooks';
 import { useUIStore } from '../../store/useUIStore';
 import { parseNumberFromText, normalizeSearch, formatDateStandard, getActiveLocale } from '../../utils';
 
@@ -53,6 +53,18 @@ const ProductFormulaList: React.FC = () => {
   const notify = useAppStore(state => state.notify);
   const isAdmin = useAppStore(state => state.isAdmin);
   const navigate = useNavigate();
+  const { tccsList: hydratedTccs, batches: hydratedBatches, products: hydratedProducts } = useDataGraph();
+
+  // Map HydratedProduct (có activeTCCS, batchesCount, passRate) để hiển thị badge
+  const hydratedProductMap = useMemo(() => new Map(hydratedProducts.map(p => [p.id, p])), [hydratedProducts]);
+  // Map HydratedTCCS theo productId (lấy TCCS active)
+  const activeTccsMap = useMemo(() => {
+    const m = new Map<string, typeof hydratedTccs[0]>();
+    hydratedTccs.forEach(t => {
+      if (t.isActive || !m.has(t.productId)) m.set(t.productId, t);
+    });
+    return m;
+  }, [hydratedTccs]);
 
   const crud = useCrud<ProductFormula>();
   
@@ -154,15 +166,15 @@ const ProductFormulaList: React.FC = () => {
 
                 {/* Glass Box Highlighting Main Content */}
                 <div className="bg-gradient-to-br from-white/60 to-white/30 dark:from-slate-900/60 dark:to-slate-900/30 backdrop-blur-md border border-white/60 dark:border-slate-700/60 shadow-[0_4px_20px_-5px_rgba(244,63,94,0.1)] dark:shadow-[0_4px_20px_-5px_rgba(244,63,94,0.05)] rounded-2xl p-4 flex flex-col gap-4 relative z-10 mt-2 flex-grow">
-                  {/* Main Info: Name and Icon */}
+                  {/* Main Info: Name and Icon - clickable link to product */}
                   <div className="flex items-center gap-4">
                     <div className="bg-rose-50/80 dark:bg-rose-950/50 p-3.5 rounded-xl text-rose-600 dark:text-rose-400 shrink-0 border border-rose-100/50 dark:border-rose-900/30 shadow-inner">
                       <FlaskConical size={24} />
                     </div>
-                    <div className="flex flex-col">
-                      <h3 className="font-black text-slate-800 dark:text-slate-200 text-base leading-tight group-hover:text-rose-600 dark:group-hover:text-rose-400 transition-colors line-clamp-2">{product?.name || 'Sản phẩm đã xóa'}</h3>
+                    <Link to={`/products/${formula.productId}`} className="flex flex-col group/link">
+                      <h3 className="font-black text-slate-800 dark:text-slate-200 text-base leading-tight group-hover/link:text-rose-600 dark:group-hover/link:text-rose-400 transition-colors line-clamp-2">{product?.name || 'Sản phẩm đã xóa'}</h3>
                       <p className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mt-1">{product?.code || '---'}</p>
-                    </div>
+                    </Link>
                   </div>
 
                   {/* Meta Info: Ingredients & Excipients */}
@@ -176,6 +188,47 @@ const ProductFormulaList: React.FC = () => {
                       <span className="font-black text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 px-2 py-0.5 rounded shadow-sm border border-slate-100 dark:border-slate-700">{formula.excipients?.length || 0}</span>
                     </div>
                   </div>
+
+                  {/* --- BADGES LIÊN KẾT: TCCS, SỐ LÔ, TỶ LỆ ĐẠT --- */}
+                  {(() => {
+                    const hProd = hydratedProductMap.get(formula.productId);
+                    const activeTccs = activeTccsMap.get(formula.productId);
+                    if (!hProd && !activeTccs) return null;
+                    return (
+                      <div className="flex flex-wrap gap-1.5 pt-2 border-t border-slate-100/60 dark:border-slate-700/40">
+                        {/* Badge: TCCS active */}
+                        {activeTccs && (
+                          <Link
+                            to={`/tccs/detail/${activeTccs.id}`}
+                            onClick={e => e.stopPropagation()}
+                            className="flex items-center gap-1 px-2 py-1 rounded-lg bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400 text-[10px] font-black border border-blue-100 dark:border-blue-900/40 hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors"
+                          >
+                            <FileText size={10} /> {activeTccs.code}
+                          </Link>
+                        )}
+                        {/* Badge: Số lô */}
+                        {hProd && hProd.batchesCount > 0 && (
+                          <Link
+                            to={`/batches?productId=${formula.productId}`}
+                            onClick={e => e.stopPropagation()}
+                            className="flex items-center gap-1 px-2 py-1 rounded-lg bg-indigo-50 dark:bg-indigo-950/30 text-indigo-600 dark:text-indigo-400 text-[10px] font-black border border-indigo-100 dark:border-indigo-900/40 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-colors"
+                          >
+                            <Layers size={10} /> {hProd.batchesCount} lô
+                          </Link>
+                        )}
+                        {/* Badge: Tỷ lệ đạt */}
+                        {hProd && hProd.testResultsCount > 0 && (
+                          <span className={`flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-black border ${
+                            hProd.passRate >= 80 ? 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 border-emerald-100 dark:border-emerald-900/40'
+                            : hProd.passRate >= 50 ? 'bg-amber-50 dark:bg-amber-950/30 text-amber-600 dark:text-amber-400 border-amber-100 dark:border-amber-900/40'
+                            : 'bg-red-50 dark:bg-red-950/30 text-red-600 dark:text-red-400 border-red-100 dark:border-red-900/40'
+                          }`}>
+                            <TrendingUp size={10} /> {hProd.passRate}%
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })()}
                 </div>
 
                 {/* Footer: Actions */}

@@ -18,7 +18,8 @@ export type SmartAlertType =
   | 'LAB_PERFORMANCE_DEGRADATION'
   | 'CROSS_PRODUCT_ANOMALY'
   | 'CAPA_EFFECTIVENESS_CHECK'
-  | 'TREND_ACCELERATION';
+  | 'TREND_ACCELERATION'
+  | 'BORDERLINE_ACCUMULATION';
 
 export interface SmartAlert {
   id: string;
@@ -385,6 +386,73 @@ const detectCAPAEffectiveness = (ctx: AlertContext): SmartAlert[] => {
 };
 
 // ─────────────────────────────────────────────
+// DETECTOR 6: Borderline Accumulation
+// Tích tụ rủi ro tiệm cận biên (>= 2 lô liên tiếp sát ngưỡng)
+// ─────────────────────────────────────────────
+
+const detectBorderlineAccumulation = (ctx: AlertContext): SmartAlert[] => {
+  const alerts: SmartAlert[] = [];
+  const { products, batches, testResults, tccsList } = ctx;
+
+  products.forEach(p => {
+    const pBatches = batches.filter(b => b.productId === p.id);
+    const pTccs = tccsList.find(t => t.productId === p.id && t.isActive) || tccsList.find(t => t.productId === p.id);
+    if (!pTccs) return;
+
+    const allCriteria = [...(pTccs.mainQualityCriteria || []), ...(pTccs.safetyCriteria || [])];
+    const numericCriteria = allCriteria.filter(c => c && (c.min !== undefined || c.max !== undefined));
+
+    numericCriteria.forEach(crit => {
+      const points: { batchNo: string; val: number; date: string }[] = [];
+      pBatches.forEach(b => {
+        const bTests = testResults.filter(tr => tr.batchId === b.id);
+        bTests.forEach(tr => {
+          const entry = (tr.results || []).find((r: any) => r.criteriaName?.toLowerCase() === crit.name?.toLowerCase());
+          if (entry && typeof entry.value === 'string') {
+            const num = parseFloat(entry.value.replace(',', '.'));
+            if (!isNaN(num)) {
+              points.push({ batchNo: b.batchNo, val: num, date: tr.testDate || b.mfgDate || '' });
+            }
+          }
+        });
+      });
+
+      if (points.length < 2) return;
+      const sorted = points.sort((a, b) => a.date.localeCompare(b.date));
+      const recent = sorted.slice(-3);
+
+      let borderlineCount = 0;
+      recent.forEach(pt => {
+        const isNearMax = crit.max !== undefined && pt.val >= crit.max * 0.88 && pt.val <= crit.max;
+        const isNearMin = crit.min !== undefined && pt.val <= crit.min * 1.12 && pt.val >= crit.min;
+        if (isNearMax || isNearMin) borderlineCount++;
+      });
+
+      if (borderlineCount >= 2) {
+        alerts.push({
+          id: generateId(),
+          type: 'BORDERLINE_ACCUMULATION',
+          severity: borderlineCount >= 3 ? 'HIGH' : 'MEDIUM',
+          title: `Tích tụ rủi ro tiệm cận ngưỡng: ${p.name} - ${crit.name}`,
+          description: `Chỉ tiêu "${crit.name}" của sản phẩm "${p.name}" có ${borderlineCount}/${recent.length} lô gần nhất nằm sát biên giới hạn cho phép (tiềm ẩn nguy cơ OOS).`,
+          recommendation: `Rà soát lại thông số quy trình sản xuất và nguyên liệu đầu vào trước khi tiến hành sản xuất lô kế tiếp của sản phẩm "${p.name}".`,
+          detectedAt: new Date().toISOString(),
+          affectedEntities: [
+            { type: 'PRODUCT', id: p.id, name: p.name },
+            { type: 'CRITERIA', name: crit.name }
+          ],
+          evidence: recent.map(r => `Lô ${r.batchNo} (${r.date}): ${r.val} ${crit.unit || ''}`),
+          actionRequired: borderlineCount >= 3,
+          actionSuggestion: `Họp kiểm thảo quy trình sản xuất sản phẩm ${p.name}`
+        });
+      }
+    });
+  });
+
+  return alerts;
+};
+
+// ─────────────────────────────────────────────
 // MAIN: Chạy toàn bộ detectors
 // ─────────────────────────────────────────────
 
@@ -396,6 +464,7 @@ export const runSmartAlertAnalysis = (ctx: AlertContext): SmartAlertReport => {
   try { allAlerts.push(...detectLabPerformanceDegradation(ctx)); } catch (e) { console.warn('[SmartAlert] Lab performance detector error:', e); }
   try { allAlerts.push(...detectCrossProductAnomalies(ctx)); } catch (e) { console.warn('[SmartAlert] Cross-product detector error:', e); }
   try { allAlerts.push(...detectCAPAEffectiveness(ctx)); } catch (e) { console.warn('[SmartAlert] CAPA effectiveness detector error:', e); }
+  try { allAlerts.push(...detectBorderlineAccumulation(ctx)); } catch (e) { console.warn('[SmartAlert] Borderline accumulation detector error:', e); }
 
   const highCount = allAlerts.filter(a => a.severity === 'HIGH').length;
   const mediumCount = allAlerts.filter(a => a.severity === 'MEDIUM').length;

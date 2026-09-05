@@ -301,7 +301,8 @@ CẤU TRÚC JSON YÊU CẦU (Trả về đúng định dạng này, bao gồm đ
     {
       "criteriaName": "Tên chỉ tiêu NGUYÊN BẢN từ phiếu (giữ nguyên, không dịch, không thêm bớt)",
       "mappedName": "Tên chỉ tiêu chuẩn trong TCCS nếu map được, để rỗng nếu không chắc",
-      "confidence": "high hoặc low — mức độ tự tin khi map tên",
+      "confidence": "high | medium | low — mức độ tự tin khi map tên",
+      "confidenceScore": 95, // Điểm số từ 0 đến 100 phản ánh độ nét chữ, độ rõ ràng số học và mức độ chắc chắn khi map
       "value": "Kết quả kiểm nghiệm (ví dụ: 1.5, Đạt, Trắng trong, < 10). Trả về dưới dạng chuỗi.",
       "unit": "Đơn vị tính (ví dụ: %, mg, CFU/g. Nếu không có để rỗng)",
       "limit": "Yêu cầu / Mức tiêu chuẩn / Giới hạn cho phép từ phiếu (nếu có, ví dụ: NMT 5.0%, 95.0-105.0%)",
@@ -321,6 +322,21 @@ ${MULTI_COLUMN_GUIDE}
 ${WATERMARK_STAMP_GUIDE}
 
 ${VN_LAB_TERMINOLOGY}
+
+HƯỚNG DẪN BẢNG PHỨC TẠP ĐA TRANG & SUB-ITEMS (MULTI_PAGE_TABLE_GUIDE):
+1. Bảng kéo dài qua nhiều trang (trang 1, 2, 3...):
+   - Tiếp tục đọc xuyên suốt các trang, duy trì cùng thứ tự cột từ header trang đầu tiên.
+   - Không bỏ sót bất kỳ chỉ tiêu nào ở các trang sau (thường là vi sinh vật hoặc kim loại nặng ở trang 2/3).
+2. Chỉ tiêu có phân nhóm con (Sub-criteria):
+   - Ví dụ: "Giới hạn kim loại nặng" gồm: Chì (Pb), Cadmi (Cd), Asen (As), Thủy ngân (Hg) -> Trích xuất thành 4 chỉ tiêu độc lập riêng biệt với tên tương ứng ("Chì (Pb)", "Cadmi (Cd)...").
+   - Ví dụ: "Chỉ tiêu vi sinh" gồm: Tổng số VKHK, Tổng số nấm men/mốc, E.coli, Salmonella -> Trích xuất thành 4 chỉ tiêu độc lập.
+3. Bảng có cột phương pháp thử nghiệm hoặc điều kiện kiểm tra:
+   - Tách riêng phương pháp thử vào field "analysisMethod" (ví dụ: "TCVN 9632:2013", "HPLC-UV", "DĐVN V").
+   - Đơn vị đo lường phải đưa vào field "unit", không dính vào field "value".
+4. Điểm tin cậy (confidenceScore: 0-100):
+   - 95-100: Số rõ ràng, tên khớp chuẩn TCCS, đơn vị tường minh.
+   - 80-94: Số rõ nhưng tên cần suy luận nhẹ từ viết tắt hoặc dạng muối/nguyên tố.
+   - Dưới 80: Chữ mờ, vết mực, số bị nhòe hoặc không tìm thấy trong TCCS.
 
 ${tccsSection}
 

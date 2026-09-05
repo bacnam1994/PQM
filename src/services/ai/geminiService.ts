@@ -600,8 +600,14 @@ QUY TẮC:
 11. Nếu người dùng yêu cầu xuất báo cáo, tải file Excel, báo cáo tháng/quý → GỌI generateQualityReport với period phù hợp ('month', 'quarter', 'all').
 12. Nếu người dùng hỏi về cảnh báo chất lượng, rủi ro, lô sắp hết hạn, xu hướng trôi → GỌI detectQualityAnomalies.
 13. Nếu người dùng yêu cầu lập báo cáo chất lượng nâng cao, báo cáo tổng hợp theo ngày sản xuất, theo dõi phần trăm hoạt chất chính qua các lô sản xuất → GỌI generateProductionSynthesisReport với productId (và startDate, endDate nếu có). Bắt buộc phải tìm hoặc hỏi productId trước khi gọi tool.
+14. [ACTION] Nếu người dùng yêu cầu tạo lô mới ("tạo lô...", "thêm lô...", "đăng ký lô [số lô] cho [tên SP]") → GỌI createBatchAction với thông tin chi tiết.
+15. [ACTION] Nếu người dùng yêu cầu xuất hoặc xem Certificate of Analysis ("xuất CoA...", "in phiếu CoA lô X...", "xem CoA lô X") → GỌI exportCoAReportAction với batchNo.
+16. [ACTION] Nếu người dùng yêu cầu điều hướng / mở trang ("mở trang sản phẩm...", "dẫn tôi tới lô X", "mở TCCS", "xem PQR", "xem SPC", "kiểm toán ALCOA") → GỌI navigateToAction với destination phù hợp.
+17. [ACTION] Nếu người dùng yêu cầu tự động sửa / hàn gắn dữ liệu ("chạy auto-heal", "tự động hàn gắn dữ liệu", "quét và sửa lỗi dữ liệu") → GỌI triggerAutoHealingAction.
+18. [ACTION] Nếu người dùng yêu cầu cập nhật trạng thái lô ("duyệt xuất xưởng lô X", "từ chối lô X", "chuyển lô X về kiểm nghiệm") → GỌI updateBatchStatusAction với batchNo, newStatus ('RELEASED' | 'REJECTED' | 'TESTING') và reason.
+19. [PREDICTIVE] Nếu người dùng hỏi về rủi ro trước khi kiểm nghiệm lô ("lô X có nguy cơ gì không?", "dự báo rủi ro lô X") → GỌI predictBatchRiskAction với batchNo.
 ${sessionMemoryPrompt ? sessionMemoryPrompt : ""}
-${isThinkingEnabled ? `14. [QUAN TRỌNG - BẮT BUỘC] Bạn phải luôn bắt đầu phản hồi của mình bằng việc lập luận chi tiết quy trình suy nghĩ và phân tích dữ liệu bên trong cặp thẻ <thinking>...</thinking> (ví dụ: giải thích tại sao bạn chọn hành động hay quyết định gọi tool nào, đối chiếu số liệu thế nào). Chỉ đưa ra câu trả lời chính thức hoặc định dạng markdown cho người dùng bên ngoài cặp thẻ <thinking>...</thinking>. Không được hiển thị thẻ <thinking> trong markdown code blocks.` : ''}`;
+${isThinkingEnabled ? `20. [QUAN TRỌNG - BẮT BUỘC] Bạn phải luôn bắt đầu phản hồi của mình bằng việc lập luận chi tiết quy trình suy nghĩ và phân tích dữ liệu bên trong cặp thẻ <thinking>...</thinking> (ví dụ: giải thích tại sao bạn chọn hành động hay quyết định gọi tool nào, đối chiếu số liệu thế nào). Chỉ đưa ra câu trả lời chính thức hoặc định dạng markdown cho người dùng bên ngoài cặp thẻ <thinking>...</thinking>. Không được hiển thị thẻ <thinking> trong markdown code blocks.` : ''}`;
 
     const maxRetries = 3;
     let attempt = 0;

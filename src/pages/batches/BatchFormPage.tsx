@@ -5,14 +5,13 @@ import { useAppStore } from '../../store/useAppStore';
 import { DSFormInput, DSDateInput } from '../../components';
 import { BATCH_STATUS, generateId, parseDateToISO, normalizeSearch } from '../../utils';
 import { Batch } from '../../types';
-import { logAuditAction } from '../../services/auditService';
 
 const BatchFormPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   
   // 1. Khởi tạo Hook & Bóc tách State
-  const { batches, products, tccsList, addBatch, updateBatch, notify, user } = useAppStore();
+  const { batches, products, tccsList, addBatch, updateBatch, notify } = useAppStore();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [batchToEdit, setBatchToEdit] = useState<Batch | null>(null);
   
@@ -41,19 +40,7 @@ const BatchFormPage = () => {
     }
   }, [id, batches, products, navigate, notify]);
 
-  // 3. Hàm tiện ích cho Sub-component (Tự tính sản lượng thực tế)
-  const handleAutoCalculateYield = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = parseFloat(e.target.value);
-    const form = e.target.form;
-    if (form && !isNaN(val)) {
-      const actualInput = form.elements.namedItem('actualYield') as HTMLInputElement;
-      if (actualInput && !actualInput.value) {
-        actualInput.value = Math.round(val * 0.98).toString();
-      }
-    }
-  };
-
-  // 4. Hàm xử lý lưu chung (Gom Add và Edit)
+  // 3. Hàm xử lý lưu chung (Gom Add và Edit)
   const handleSave = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!selectedProductId) {
@@ -82,43 +69,34 @@ const BatchFormPage = () => {
       return notify({ type: 'WARNING', title: 'Trùng lặp', message: `Số lô "${batchNo}" đã tồn tại cho sản phẩm này.` });
     }
 
+    const theoreticalYield = parseFloat(formData.get('theoreticalYield') as string) || 0;
+    const actualYield = parseFloat(formData.get('actualYield') as string) || 0;
+    const yieldUnit = (formData.get('yieldUnit') as string) || '';
+    const packaging = (formData.get('packaging') as string) || '';
+
     const batchData = {
         productId: pid, 
         tccsId: assignedTccs.id,
         batchNo: batchNo,
         mfgDate: mfgDate, 
         expDate: expDate,
-        theoreticalYield: 0,
-        actualYield: 0,
-        yieldUnit: '',
-        packaging: '',
+        theoreticalYield,
+        actualYield,
+        yieldUnit,
+        packaging,
     };
 
     setIsSubmitting(true);
     try {
       if (id && batchToEdit) {
+        // logAuditAction được gọi trong store.updateBatch — không cần gọi lại ở đây
         await updateBatch({ ...batchToEdit, ...batchData, updatedAt: new Date().toISOString() });
         notify({ type: 'SUCCESS', title: 'Đã cập nhật', message: `Cập nhật thành công lô ${batchData.batchNo}` });
-
-        logAuditAction({
-          action: 'UPDATE',
-          collection: 'BATCHES',
-          documentId: batchToEdit.id,
-          details: `Cập nhật thông tin lô hàng: ${batchData.batchNo}`,
-          performedBy: user?.email || 'unknown'
-        });
       } else {
         const newId = generateId('batch');
+        // logAuditAction được gọi trong store.addBatch — không cần gọi lại ở đây
         await addBatch({ id: newId, ...batchData, status: BATCH_STATUS.PENDING, createdAt: new Date().toISOString() });
         notify({ type: 'SUCCESS', title: 'Thành công', message: `Đã tạo lô ${batchData.batchNo}` });
-
-        logAuditAction({
-          action: 'CREATE',
-          collection: 'BATCHES',
-          documentId: newId,
-          details: `Đăng ký lô hàng mới: ${batchData.batchNo}`,
-          performedBy: user?.email || 'unknown'
-        });
       }
       navigate('/batches');
     } catch (error) {
@@ -202,13 +180,52 @@ const BatchFormPage = () => {
               </div>
             )}
 
-            {/* Các Field nhập liệu dùng defaultValue */}
+            {/* Thông tin cơ bản */}
             <DSFormInput label="Số Lô *" name="batchNo" defaultValue={batchToEdit?.batchNo} required className="uppercase" />
             
             <div className="grid grid-cols-2 gap-4">
               <DSDateInput label="Ngày SX *" value={mfgDate} onChange={setMfgDate} required />
               <DSDateInput label="Hạn dùng *" value={expDate} onChange={setExpDate} required />
             </div>
+
+            {/* Sản lượng */}
+            <div className="border-t border-slate-100 pt-5">
+              <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">Thông tin Sản lượng</p>
+              <div className="grid grid-cols-3 gap-4">
+                <DSFormInput
+                  label="Sản lượng lý thuyết"
+                  name="theoreticalYield"
+                  type="number"
+                  min="0"
+                  step="any"
+                  defaultValue={batchToEdit?.theoreticalYield || ''}
+                  placeholder="VD: 10000"
+                />
+                <DSFormInput
+                  label="Sản lượng thực tế"
+                  name="actualYield"
+                  type="number"
+                  min="0"
+                  step="any"
+                  defaultValue={batchToEdit?.actualYield || ''}
+                  placeholder="VD: 9800"
+                />
+                <DSFormInput
+                  label="Đơn vị"
+                  name="yieldUnit"
+                  defaultValue={batchToEdit?.yieldUnit || ''}
+                  placeholder="VD: viên, gói, chai..."
+                />
+              </div>
+            </div>
+
+            {/* Quy cách đóng gói */}
+            <DSFormInput
+              label="Quy cách đóng gói"
+              name="packaging"
+              defaultValue={batchToEdit?.packaging || ''}
+              placeholder="VD: Hộp 10 vỉ × 10 viên"
+            />
 
             <div className="flex justify-end gap-3 pt-6 border-t mt-6">
               <button type="button" onClick={() => navigate('/batches')} className="px-6 py-3 text-slate-400 font-black uppercase text-xs tracking-widest hover:bg-slate-50 rounded-xl transition-colors">Hủy & Quay lại</button>

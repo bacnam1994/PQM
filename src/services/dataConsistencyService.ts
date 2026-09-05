@@ -486,6 +486,29 @@ export const auditDataConsistency = (data: SystemDataSnapshot): ConsistencyRepor
         });
       }
     }
+
+    // 3.6 Logic ngày sản xuất trước ngày ban hành TCCS
+    if (b.mfgDate && b.tccsId) {
+      const appliedTccs = tccsMap.get(b.tccsId);
+      if (appliedTccs && appliedTccs.issueDate) {
+        const diff = compareDates(appliedTccs.issueDate, b.mfgDate);
+        if (diff !== null && diff > 0) {
+          issues.push({
+            id: `batch_before_tccs_issue_${b.id}`,
+            type: 'INVALID_DATE_SEQUENCE',
+            category: 'LOGICAL_STATUS_INCONSISTENCY',
+            severity: 'WARNING',
+            title: `Lô sản xuất trước ngày ban hành TCCS: ${b.batchNo}`,
+            description: `Lô "${b.batchNo}" sản xuất ngày ${b.mfgDate} trước ngày ban hành ${appliedTccs.issueDate} của TCCS "${appliedTccs.code}".`,
+            entityType: 'BATCH',
+            entityId: b.id,
+            entityName: b.batchNo,
+            suggestedAction: 'Kiểm tra lại phiên bản TCCS áp dụng cho lô hàng này.',
+            autoHealable: false,
+          });
+        }
+      }
+    }
   });
 
   // 3.5 Logic thời gian Phiếu kiểm nghiệm: testDate < mfgDate
@@ -806,5 +829,103 @@ export const generateAutoHealPlan = (report: ConsistencyReport, data: SystemData
     tccsActiveUpdates,
     orphanAliasIdsToDelete,
     totalActionsCount: Object.keys(formulaUpdates).length + Object.keys(testResultStatusUpdates).length + Object.keys(tccsActiveUpdates).length + orphanAliasIdsToDelete.length,
+  };
+};
+
+/**
+ * Thực thi kế hoạch Auto-Heal lên hệ thống
+ */
+export const executeAutoHealPlan = async (
+  plan: ReturnType<typeof generateAutoHealPlan>,
+  actions: {
+    updateProductFormula: (f: ProductFormula) => Promise<any> | any;
+    updateTestResult: (tr: TestResult) => Promise<any> | any;
+    updateTCCS: (tccs: TCCS) => Promise<any> | any;
+    deleteCriteriaAlias: (id: string) => Promise<any> | any;
+    testResults: TestResult[];
+    tccsList: TCCS[];
+  }
+): Promise<number> => {
+  let successCount = 0;
+
+  // 1. Cập nhật Formulas
+  for (const formulaId of Object.keys(plan.formulaUpdates)) {
+    await actions.updateProductFormula(plan.formulaUpdates[formulaId]);
+    successCount++;
+  }
+
+  // 2. Cập nhật Test Result Statuses
+  for (const trId of Object.keys(plan.testResultStatusUpdates)) {
+    const tr = actions.testResults.find(t => t.id === trId);
+    if (tr) {
+      await actions.updateTestResult({ ...tr, overallStatus: plan.testResultStatusUpdates[trId] });
+      successCount++;
+    }
+  }
+
+  // 3. Cập nhật TCCS Active Flags
+  for (const pId of Object.keys(plan.tccsActiveUpdates)) {
+    const updates = plan.tccsActiveUpdates[pId];
+    for (const u of updates) {
+      const tccsItem = actions.tccsList.find(t => t.id === u.tccsId);
+      if (tccsItem && tccsItem.isActive !== u.isActive) {
+        await actions.updateTCCS({ ...tccsItem, isActive: u.isActive });
+      }
+    }
+    successCount++;
+  }
+
+  // 4. Dọn dẹp Orphan Aliases
+  for (const aId of plan.orphanAliasIdsToDelete) {
+    await actions.deleteCriteriaAlias(aId);
+    successCount++;
+  }
+
+  return successCount;
+};
+
+/**
+ * Hàm gọi Auto-Heal toàn diện dành cho AI Chatbot và automation
+ */
+export const autoHealAllWithAI = async (
+  storeGetState: () => any
+) => {
+  const state = storeGetState();
+  const snapshot: SystemDataSnapshot = {
+    products: state.products || [],
+    batches: state.batches || [],
+    tccsList: state.tccsList || [],
+    productFormulas: state.productFormulas || [],
+    rawMaterials: state.rawMaterials || [],
+    testResults: state.testResults || [],
+    criteriaAliases: state.criteriaAliases || [],
+  };
+
+  const report = auditDataConsistency(snapshot);
+  const plan = generateAutoHealPlan(report, snapshot);
+
+  if (plan.totalActionsCount === 0) {
+    return {
+      success: true,
+      message: `✅ Hệ thống đã được kiểm tra: Đạt ${report.overallScore}/100 điểm (${report.grade}). Không phát hiện liên kết nào cần tự động sửa chữa.`,
+      healedCount: 0,
+      score: report.overallScore
+    };
+  }
+
+  const healedCount = await executeAutoHealPlan(plan, {
+    updateProductFormula: state.updateProductFormula,
+    updateTestResult: state.updateTestResult,
+    updateTCCS: state.updateTCCS,
+    deleteCriteriaAlias: state.deleteCriteriaAlias,
+    testResults: state.testResults || [],
+    tccsList: state.tccsList || [],
+  });
+
+  return {
+    success: true,
+    message: `🛠️ Đã tự động hàn gắn và chuẩn hóa thành công **${healedCount} liên kết dữ liệu** trên hệ thống!\n- Điểm chất lượng dữ liệu: **${report.overallScore}/100**\n- Các tác vụ hoàn tất: Liên kết nguyên liệu vào công thức, đồng bộ trạng thái phiếu kiểm nghiệm, sửa cờ hiệu lực TCCS và dọn dẹp ánh xạ mồ côi.`,
+    healedCount,
+    score: report.overallScore
   };
 };

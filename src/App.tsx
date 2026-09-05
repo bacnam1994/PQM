@@ -4,8 +4,7 @@ import { Toaster } from 'react-hot-toast';
 import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { AppProvider } from './providers/AppProvider';
 import { Outlet } from 'react-router-dom';
-import { Layout, ErrorBoundary, Skeleton } from './components';
-import CookieConsentBanner from './components/ui/CookieConsentBanner';
+import { Layout, ErrorBoundary, Skeleton, CookieConsentBanner } from './components';
 import { useAppStore } from './store/useAppStore';
 import { useShallow } from 'zustand/react/shallow';
 import { useUIStore, loadUserPreferences, resetToSharedKey } from './store/useUIStore';
@@ -55,7 +54,6 @@ const TCCSFormPage = lazyWithRetry(() => import('./pages/qa/TCCSFormPage'));
 const TccsDetailPage = lazyWithRetry(() => import('./pages/qa/TccsDetailPage'));
 const ProductFormulaFormPage = lazyWithRetry(() => import('./pages/qa/ProductFormulaFormPage'));
 const MaterialFormPage = lazyWithRetry(() => import('./pages/products/MaterialFormPage'));
-const RawMaterialCatalog = lazyWithRetry(() => import('./pages/products/RawMaterialCatalog'));
 const CriteriaFormPage = lazyWithRetry(() => import('./pages/qa/CriteriaFormPage'));
 const NotFoundPage = lazyWithRetry(() => import('./pages/system/NotFoundPage'));
 const AlertsPage = lazyWithRetry(() => import('./pages/quality/AlertsPage'));
@@ -184,16 +182,19 @@ const AppRoutes: React.FC = () => {
           <Route path="/materials" element={<MaterialList />} />
           <Route path="/materials/new" element={<AdminRoute><MaterialFormPage /></AdminRoute>} />
           <Route path="/materials/edit/:id" element={<AdminRoute><MaterialFormPage /></AdminRoute>} />
-          <Route path="/materials/catalog" element={<RawMaterialCatalog />} />
+          {/* /materials/catalog redirect về /materials — RawMaterialCatalog đã gộp vào MaterialList */}
+          <Route path="/materials/catalog" element={<Navigate to="/materials" replace />} />
           <Route path="/criteria" element={<CriteriaList />} />
           <Route path="/criteria/new" element={<AdminRoute><CriteriaFormPage /></AdminRoute>} />
           <Route path="/criteria/edit/:id" element={<AdminRoute><CriteriaFormPage /></AdminRoute>} />
           <Route path="/batches" element={<BatchList />} />
-          <Route path="/batches/new" element={<AdminRoute><BatchFormPage /></AdminRoute>} />
+          {/* USER được tạo lô mới, chỉ ADMIN mới sửa/xóa */}
+          <Route path="/batches/new" element={<BatchFormPage />} />
           <Route path="/batches/edit/:id" element={<AdminRoute><BatchFormPage /></AdminRoute>} />
           <Route path="/batches/:id" element={<BatchDetailPage />} />
           <Route path="/test-results" element={<TestResultList />} />
-          <Route path="/test-results/new" element={<AdminRoute><TestResultFormPage /></AdminRoute>} />
+          {/* USER được tạo phiếu KN mới, chỉ ADMIN mới sửa */}
+          <Route path="/test-results/new" element={<TestResultFormPage />} />
           <Route path="/test-results/edit/:id" element={<AdminRoute><TestResultFormPage /></AdminRoute>} />
           <Route path="/reports/quality-summary" element={<QualitySummaryReport />} />
           <Route path="/reports/trend-analysis" element={<TrendAnalysisPage />} />

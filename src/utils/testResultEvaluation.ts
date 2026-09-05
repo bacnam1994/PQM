@@ -1,4 +1,4 @@
-import { evaluateCriterionSmart, parseNumberFromText } from './index';
+import { evaluateCriterionSmart, parseNumberFromText } from './criteriaEvaluation';
 
 /**
  * Hàm tiện ích để kiểm tra Quy tắc thay thế TCCS

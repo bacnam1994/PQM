@@ -1,4 +1,4 @@
-﻿/**
+/**
  * autoLearningService.ts
  * ======================
  * He thong Tu hoc AI Chu dong (Active / Autonomous Learning)
@@ -35,16 +35,17 @@ const INSIGHT_CACHE_TTL_MS = 12 * 60 * 60 * 1000;
  * ke ca khi user KHONG sua — he thong van tu hoc tu thanh cong.
  */
 export const recordHighConfidenceOCRMappings = (
-  mappings: Array<{ originalName: string; systemName: string }>
+  mappings: Array<{ originalName: string; systemName: string; confidenceScore?: number }>
 ): void => {
   if (!mappings || mappings.length === 0) return;
 
   const store = useAppStore.getState();
   const existingMappings: AILearnedMapping[] = store.aiLearnedMappings || [];
 
-  mappings.forEach(({ originalName, systemName }) => {
+  mappings.forEach(({ originalName, systemName, confidenceScore }) => {
     if (!originalName || !systemName) return;
     if (originalName.trim().toLowerCase() === systemName.trim().toLowerCase()) return;
+    if (confidenceScore !== undefined && confidenceScore < 85) return;
 
     const existing = existingMappings.find(
       m => m.originalName.trim().toLowerCase() === originalName.trim().toLowerCase()
@@ -53,7 +54,7 @@ export const recordHighConfidenceOCRMappings = (
 
     if (!existing) {
       store.addAiLearnedMapping(originalName, systemName);
-      console.log(`[AutoLearn] Ghi nhan mapping moi (auto): "${originalName}" -> "${systemName}"`);
+      console.log(`[AutoLearn] Ghi nhận mapping tự động mới (Score: ${confidenceScore ?? 'high'}): "${originalName}" -> "${systemName}"`);
     }
   });
 };

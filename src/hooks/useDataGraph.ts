@@ -21,6 +21,10 @@ export interface HydratedTCCS extends TCCS {
   formula?: ProductFormula;
   batchesCount: number;
   aliases: CriteriaAlias[];
+  /** Tổng số phiếu kiểm nghiệm của tất cả lô dùng TCCS này */
+  testResultsCount: number;
+  /** Tỷ lệ đạt (%) của các phiếu KN liên quan (0-100) */
+  passRate: number;
 }
 
 export interface HydratedRawMaterial extends RawMaterial {
@@ -32,9 +36,14 @@ export interface HydratedRawMaterial extends RawMaterial {
 export interface HydratedBatch extends Batch {
   product?: Product;
   tccs?: TCCS;
+  formula?: ProductFormula;
   testResults?: TestResult[];
   latestTestResult?: TestResult;
   isFullyTested?: boolean;
+  /** Số phiếu kiểm nghiệm của lô này */
+  testResultsCount?: number;
+  /** Tỷ lệ đạt (%) của các phiếu KN trong lô (0-100) */
+  passRate?: number;
 }
 
 export interface HydratedTestResult extends TestResult {
@@ -146,16 +155,20 @@ export const useDataGraph = () => {
     return rawBatches.map(batch => {
       const bTests = testResultsByBatch.get(batch.id) || [];
       const sortedTests = [...bTests].sort((a, b) => b.testDate.localeCompare(a.testDate));
+      const passTests = bTests.filter(t => t.overallStatus === 'PASS');
       return {
         ...batch,
         product: productMap.get(batch.productId),
         tccs: tccsMap.get(batch.tccsId),
+        formula: formulaMap.get(batch.productId),
         testResults: sortedTests,
         latestTestResult: sortedTests[0],
         isFullyTested: bTests.length > 0 && bTests.some(t => t.overallStatus === 'PASS'),
+        testResultsCount: bTests.length,
+        passRate: bTests.length > 0 ? Math.round((passTests.length / bTests.length) * 100) : 100,
       };
     });
-  }, [rawBatches, productMap, tccsMap, testResultsByBatch]);
+  }, [rawBatches, productMap, tccsMap, formulaMap, testResultsByBatch]);
 
   // Hydrated Test Results
   const testResults = useMemo<HydratedTestResult[]>(() => {
@@ -170,18 +183,25 @@ export const useDataGraph = () => {
       return {
         ...res,
         overallStatus,
-        batch: rawBatch ? { 
-          ...rawBatch, 
-          product, 
-          tccs, 
-          testResults: testResultsByBatch.get(rawBatch.id) || [], 
-          isFullyTested: (testResultsByBatch.get(rawBatch.id) || []).some(t => t.overallStatus === 'PASS')
-        } : undefined,
+        batch: rawBatch ? (() => {
+          const bTests = testResultsByBatch.get(rawBatch.id) || [];
+          const passCount = bTests.filter(t => t.overallStatus === 'PASS').length;
+          return {
+            ...rawBatch,
+            product,
+            tccs,
+            formula: formulaMap.get(rawBatch.productId),
+            testResults: bTests,
+            isFullyTested: bTests.some(t => t.overallStatus === 'PASS'),
+            testResultsCount: bTests.length,
+            passRate: bTests.length > 0 ? Math.round((passCount / bTests.length) * 100) : 100,
+          };
+        })() : undefined,
         product,
         tccs,
       };
     });
-  }, [rawTestResults, getBatchForTestResult, productMap, tccsMap, testResultsByBatch]);
+  }, [rawTestResults, getBatchForTestResult, productMap, tccsMap, formulaMap, testResultsByBatch]);
 
   const allTestResultsHydrated = useMemo<HydratedTestResult[]>(() => {
     if (!rawAllTestResults || rawAllTestResults.length === 0) return [];
@@ -196,18 +216,26 @@ export const useDataGraph = () => {
       return {
         ...res,
         overallStatus,
-        batch: rawBatch ? { 
-          ...rawBatch, 
-          product, 
-          tccs, 
-          testResults: testResultsByBatch.get(rawBatch.id) || [], 
-          isFullyTested: (testResultsByBatch.get(rawBatch.id) || []).some(t => t.overallStatus === 'PASS')
-        } : undefined,
+        batch: rawBatch ? (() => {
+          const bTests = testResultsByBatch.get(rawBatch.id) || [];
+          const passCount = bTests.filter(t => t.overallStatus === 'PASS').length;
+          return {
+            ...rawBatch,
+            product,
+            tccs,
+            formula: formulaMap.get(rawBatch.productId),
+            testResults: bTests,
+            isFullyTested: bTests.some(t => t.overallStatus === 'PASS'),
+            testResultsCount: bTests.length,
+            passRate: bTests.length > 0 ? Math.round((passCount / bTests.length) * 100) : 100,
+          };
+        })() : undefined,
         product,
         tccs,
       };
     });
-  }, [rawAllTestResults, getBatchForTestResult, productMap, tccsMap, testResultsByBatch]);
+  }, [rawAllTestResults, getBatchForTestResult, productMap, tccsMap, formulaMap, testResultsByBatch]);
+
 
   // Hydrated Formulas
   const productFormulas = useMemo<HydratedProductFormula[]>(() => {
@@ -273,16 +301,28 @@ export const useDataGraph = () => {
   // Hydrated TCCS
   const tccsList = useMemo<HydratedTCCS[]>(() => {
     return rawTccsList.map(t => {
-      const batchesUsingThis = rawBatches.filter(b => b.tccsId === t.id).length;
+      const batchesUsingThis = rawBatches.filter(b => b.tccsId === t.id);
+      const batchesCount = batchesUsingThis.length;
+      // Tính tổng phiếu KN và tỷ lệ đạt qua tất cả lô dùng TCCS này
+      const allTccsTests: TestResult[] = [];
+      batchesUsingThis.forEach(b => {
+        const bTests = testResultsByBatch.get(b.id) || [];
+        allTccsTests.push(...bTests);
+      });
+      const passCount = allTccsTests.filter(r => r.overallStatus === 'PASS').length;
+      const testResultsCount = allTccsTests.length;
+      const passRate = testResultsCount > 0 ? Math.round((passCount / testResultsCount) * 100) : 100;
       return {
         ...t,
         product: productMap.get(t.productId),
         formula: formulaMap.get(t.productId),
-        batchesCount: batchesUsingThis,
+        batchesCount,
         aliases: aliasesByTccs.get(t.id) || [],
+        testResultsCount,
+        passRate,
       };
     });
-  }, [rawTccsList, productMap, formulaMap, rawBatches, aliasesByTccs]);
+  }, [rawTccsList, productMap, formulaMap, rawBatches, aliasesByTccs, testResultsByBatch]);
 
   // Hydrated Products
   const products = useMemo<HydratedProduct[]>(() => {
