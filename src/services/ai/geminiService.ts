@@ -1,6 +1,7 @@
 import { GoogleGenerativeAI, SchemaType, Content } from "@google/generative-ai";
 import { GEMINI_TOOL_DECLARATIONS, executeTool } from './aiTools';
 import type { RenderedPdfPage } from '../../utils/pdfProcessor';
+import type { TesseractFallbackResult } from './tesseractFallback';
 
 export const getApiKey = (): string => {
   const localKey = typeof window !== 'undefined' ? localStorage.getItem('GEMINI_API_KEY')?.trim() : '';
@@ -276,6 +277,7 @@ export const geminiService = {
    * Gọi API Gemini để phân tích file tài liệu (ảnh hoặc PDF) – đơn file.
    * ĐẶC BIỆT: Đối với file PDF, tự động chuyển đổi từng trang thành ảnh JPEG tối ưu (1600px)
    * và phân đoạn (chunking 3 trang/lần) nếu file nhiều trang, loại bỏ 100% lỗi quá tải / timeout của Gemini.
+   * Nếu Gemini API hoàn toàn không khả dụng (mất mạng), tự động chuyển sang Tesseract.js offline OCR.
    * @param file File tài liệu upload từ input
    * @param systemPrompt Lệnh hướng dẫn AI
    * @param onProgress Callback tiến độ (step, percent 0-100)
@@ -291,153 +293,201 @@ export const geminiService = {
     }
     const genAI = getGenAI();
 
-    // ─── TRƯỜNG HỢP 1: FILE PDF ────────────────────────────────────────────────
-    if (file.type === 'application/pdf') {
-      try {
-        onProgress?.("Đang tối ưu & phân tích cấu trúc PDF...", 10);
+    // ─── Outer try: bắt mọi lỗi mạng để kích hoạt Tesseract.js fallback ────────
+    try {
 
-        // Render từng trang PDF sang ảnh JPEG tối ưu bằng Canvas
-        const { convertPdfToImages } = await import('../../utils/pdfProcessor');
-        const renderedPages: RenderedPdfPage[] = await convertPdfToImages(file, {
-          targetWidth: 1600,
-          quality: 0.85,
-          maxPages: 50,
-          onProgress: (current, total) => {
-            onProgress?.(`Đang xử lý trang PDF ${current}/${total}...`, Math.round(10 + (current / total) * 20));
-          },
-        });
+      // ─── TRƯỜNG HỢP 1: FILE PDF ──────────────────────────────────────────────
+      if (file.type === 'application/pdf') {
+        try {
+          onProgress?.("Đang tối ưu & phân tích cấu trúc PDF...", 10);
 
-        const totalPages = renderedPages.length;
-        if (totalPages === 0) {
-          throw new Error("Không thể đọc được trang nào từ file PDF này.");
-        }
-
-        // Nếu PDF ngắn (1 - 3 trang): Gửi tất cả trang trong 1 request duy nhất
-        if (totalPages <= 3) {
-          onProgress?.(`Đang gửi ${totalPages} trang lên AI phân tích...`, 35);
-          const imageParts = renderedPages.map((page) => ({
-            inlineData: {
-              data: page.base64,
-              mimeType: 'image/jpeg',
+          // Render từng trang PDF sang ảnh JPEG tối ưu bằng Canvas
+          const { convertPdfToImages } = await import('../../utils/pdfProcessor');
+          const renderedPages: RenderedPdfPage[] = await convertPdfToImages(file, {
+            targetWidth: 1600,
+            quality: 0.85,
+            maxPages: 50,
+            onProgress: (current, total) => {
+              onProgress?.(`Đang xử lý trang PDF ${current}/${total}...`, Math.round(10 + (current / total) * 20));
             },
-          }));
+          });
 
-          const result = await executeGeminiOcrCall(genAI, systemPrompt, imageParts, onProgress, 40);
-          result.pageCount = totalPages;
+          const totalPages = renderedPages.length;
+          if (totalPages === 0) {
+            throw new Error("Không thể đọc được trang nào từ file PDF này.");
+          }
+
+          // Nếu PDF ngắn (1 - 3 trang): Gửi tất cả trang trong 1 request duy nhất
+          if (totalPages <= 3) {
+            onProgress?.(`Đang gửi ${totalPages} trang lên AI phân tích...`, 35);
+            const imageParts = renderedPages.map((page) => ({
+              inlineData: {
+                data: page.base64,
+                mimeType: 'image/jpeg',
+              },
+            }));
+
+            const result = await executeGeminiOcrCall(genAI, systemPrompt, imageParts, onProgress, 40);
+            result.pageCount = totalPages;
+            onProgress?.("Hoàn tất!", 100);
+            return result;
+          }
+
+          // Nếu PDF dài (> 3 trang): Tự động chia theo đợt (Chunk 3 trang/lượt) để tránh tràn token / timeout
+          const CHUNK_SIZE = 3;
+          const chunks: RenderedPdfPage[][] = [];
+          for (let i = 0; i < totalPages; i += CHUNK_SIZE) {
+            chunks.push(renderedPages.slice(i, i + CHUNK_SIZE));
+          }
+
+          const chunkResults: any[] = [];
+          for (let idx = 0; idx < chunks.length; idx++) {
+            const chunk = chunks[idx];
+            const startPage = idx * CHUNK_SIZE + 1;
+            const endPage = Math.min(startPage + chunk.length - 1, totalPages);
+            const chunkPercentBase = Math.round(35 + (idx / chunks.length) * 55);
+
+            onProgress?.(
+              `Đang đọc PDF (${totalPages} trang) – Đợt ${idx + 1}/${chunks.length} (Trang ${startPage}-${endPage})...`,
+              chunkPercentBase
+            );
+
+            const imageParts = chunk.map((page) => ({
+              inlineData: {
+                data: page.base64,
+                mimeType: 'image/jpeg',
+              },
+            }));
+
+            try {
+              const chunkRes = await executeGeminiOcrCall(genAI, systemPrompt, imageParts, onProgress, chunkPercentBase);
+              chunkResults.push(chunkRes);
+            } catch (chunkErr) {
+              console.warn(`Lỗi khi đọc đợt ${idx + 1} (Trang ${startPage}-${endPage}):`, chunkErr);
+              // Nếu là đợt đầu tiên mà lỗi thì ném ra, nếu đợt sau lỗi thì vẫn giữ kết quả đợt trước
+              if (chunkResults.length === 0 && idx === chunks.length - 1) {
+                throw chunkErr;
+              }
+            }
+          }
+
+          if (chunkResults.length === 0) {
+            throw new Error("Không thể trích xuất dữ liệu từ các trang của file PDF.");
+          }
+
+          // Gộp kết quả thông minh từ các đợt
+          const firstResult = chunkResults[0] || {};
+          const mergedTestResults: any[] = [];
+          const seenCriteriaKeys = new Set<string>();
+
+          const allNotes: string[] = [];
+
+          for (const res of chunkResults) {
+            if (res.notes && !allNotes.includes(res.notes)) {
+              allNotes.push(res.notes);
+            }
+            for (const item of res.testResults || []) {
+              const key = (item.mappedName || item.criteriaName || '').toLowerCase().trim();
+              if (key && !seenCriteriaKeys.has(key)) {
+                seenCriteriaKeys.add(key);
+                mergedTestResults.push(item);
+              } else if (!key) {
+                mergedTestResults.push(item);
+              }
+            }
+          }
+
+          const mergedFinalResult = {
+            labName: chunkResults.find((r) => r.labName)?.labName || firstResult.labName || '',
+            documentType: chunkResults.find((r) => r.documentType)?.documentType || firstResult.documentType || 'External_Lab',
+            pageCount: totalPages,
+            batchNo: chunkResults.find((r) => r.batchNo)?.batchNo || firstResult.batchNo || '',
+            mfgDate: chunkResults.find((r) => r.mfgDate)?.mfgDate || firstResult.mfgDate || '',
+            expDate: chunkResults.find((r) => r.expDate)?.expDate || firstResult.expDate || '',
+            testDate: chunkResults.find((r) => r.testDate)?.testDate || firstResult.testDate || '',
+            notes: allNotes.filter(Boolean).join(' | ') || firstResult.notes || '',
+            testResults: mergedTestResults,
+          };
+
           onProgress?.("Hoàn tất!", 100);
-          return result;
+          return mergedFinalResult;
+        } catch (pdfError: any) {
+          console.warn("Lỗi khi xử lý PDF qua Canvas, chuyển sang phương thức gửi file gốc:", pdfError);
+          // Fallback: Nếu lỗi Canvas hoặc PDF đặc thù, tiếp tục với phương thức gửi file Base64 truyền thống bên dưới
         }
-
-        // Nếu PDF dài (> 3 trang): Tự động chia theo đợt (Chunk 3 trang/lượt) để tránh tràn token / timeout
-        const CHUNK_SIZE = 3;
-        const chunks: RenderedPdfPage[][] = [];
-        for (let i = 0; i < totalPages; i += CHUNK_SIZE) {
-          chunks.push(renderedPages.slice(i, i + CHUNK_SIZE));
-        }
-
-        const chunkResults: any[] = [];
-        for (let idx = 0; idx < chunks.length; idx++) {
-          const chunk = chunks[idx];
-          const startPage = idx * CHUNK_SIZE + 1;
-          const endPage = Math.min(startPage + chunk.length - 1, totalPages);
-          const chunkPercentBase = Math.round(35 + (idx / chunks.length) * 55);
-
-          onProgress?.(
-            `Đang đọc PDF (${totalPages} trang) – Đợt ${idx + 1}/${chunks.length} (Trang ${startPage}-${endPage})...`,
-            chunkPercentBase
-          );
-
-          const imageParts = chunk.map((page) => ({
-            inlineData: {
-              data: page.base64,
-              mimeType: 'image/jpeg',
-            },
-          }));
-
-          try {
-            const chunkRes = await executeGeminiOcrCall(genAI, systemPrompt, imageParts, onProgress, chunkPercentBase);
-            chunkResults.push(chunkRes);
-          } catch (chunkErr) {
-            console.warn(`Lỗi khi đọc đợt ${idx + 1} (Trang ${startPage}-${endPage}):`, chunkErr);
-            // Nếu là đợt đầu tiên mà lỗi thì ném ra, nếu đợt sau lỗi thì vẫn giữ kết quả đợt trước
-            if (chunkResults.length === 0 && idx === chunks.length - 1) {
-              throw chunkErr;
-            }
-          }
-        }
-
-        if (chunkResults.length === 0) {
-          throw new Error("Không thể trích xuất dữ liệu từ các trang của file PDF.");
-        }
-
-        // Gộp kết quả thông minh từ các đợt
-        const firstResult = chunkResults[0] || {};
-        const mergedTestResults: any[] = [];
-        const seenCriteriaKeys = new Set<string>();
-
-        const allNotes: string[] = [];
-
-        for (const res of chunkResults) {
-          if (res.notes && !allNotes.includes(res.notes)) {
-            allNotes.push(res.notes);
-          }
-          for (const item of res.testResults || []) {
-            const key = (item.mappedName || item.criteriaName || '').toLowerCase().trim();
-            if (key && !seenCriteriaKeys.has(key)) {
-              seenCriteriaKeys.add(key);
-              mergedTestResults.push(item);
-            } else if (!key) {
-              mergedTestResults.push(item);
-            }
-          }
-        }
-
-        const mergedFinalResult = {
-          labName: chunkResults.find((r) => r.labName)?.labName || firstResult.labName || '',
-          documentType: chunkResults.find((r) => r.documentType)?.documentType || firstResult.documentType || 'External_Lab',
-          pageCount: totalPages,
-          batchNo: chunkResults.find((r) => r.batchNo)?.batchNo || firstResult.batchNo || '',
-          mfgDate: chunkResults.find((r) => r.mfgDate)?.mfgDate || firstResult.mfgDate || '',
-          expDate: chunkResults.find((r) => r.expDate)?.expDate || firstResult.expDate || '',
-          testDate: chunkResults.find((r) => r.testDate)?.testDate || firstResult.testDate || '',
-          notes: allNotes.filter(Boolean).join(' | ') || firstResult.notes || '',
-          testResults: mergedTestResults,
-        };
-
-        onProgress?.("Hoàn tất!", 100);
-        return mergedFinalResult;
-      } catch (pdfError: any) {
-        console.warn("Lỗi khi xử lý PDF qua Canvas, chuyển sang phương thức gửi file gốc:", pdfError);
-        // Fallback: Nếu lỗi Canvas hoặc PDF đặc thù, tiếp tục với phương thức gửi file Base64 truyền thống bên dưới
       }
-    }
 
-    // ─── TRƯỜNG HỢP 2: FILE ẢNH HOẶC FALLBACK FILE GỐC ─────────────────────────
-    onProgress?.("Đang đọc file...", 10);
+      // ─── TRƯỜNG HỢP 2: FILE ẢNH HOẶC FALLBACK FILE GỐC ─────────────────────────
+      onProgress?.("Đang đọc file...", 10);
 
-    const base64Data = await new Promise<string>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const result = reader.result as string;
-        const base64 = result.split(',')[1];
-        resolve(base64);
+      const base64Data = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          const result = reader.result as string;
+          const base64 = result.split(',')[1];
+          resolve(base64);
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+
+      onProgress?.("Đang gửi lên AI...", 30);
+
+      const filePart = {
+        inlineData: {
+          data: base64Data,
+          mimeType: file.type,
+        },
       };
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
-    });
 
-    onProgress?.("Đang gửi lên AI...", 30);
+      const result = await executeGeminiOcrCall(genAI, systemPrompt, [filePart], onProgress, 40);
+      onProgress?.("Hoàn tất!", 100);
+      return result;
 
-    const filePart = {
-      inlineData: {
-        data: base64Data,
-        mimeType: file.type,
-      },
-    };
+    } catch (geminiError: any) {
+      // ─── FALLBACK CUỐI CÙNG: Tesseract.js Offline OCR ──────────────────────────
+      // Chỉ kích hoạt khi Gemini API hoàn toàn không khả dụng (mất mạng, API sập)
+      // Các lỗi logic (API key sai, file không hợp lệ...) vẫn được throw ra bình thường
+      const msg = geminiError?.message || '';
+      const isNetworkError =
+        msg.includes('Failed to fetch') ||
+        msg.includes('NetworkError') ||
+        msg.includes('net::ERR') ||
+        msg.includes('ECONNREFUSED') ||
+        msg.includes('503') ||
+        msg.includes('502');
 
-    const result = await executeGeminiOcrCall(genAI, systemPrompt, [filePart], onProgress, 40);
-    onProgress?.("Hoàn tất!", 100);
-    return result;
+      if (isNetworkError) {
+        console.warn('[geminiService] Gemini API không khả dụng. Chuyển sang Tesseract.js offline fallback...');
+        try {
+          const { extractRawTextWithTesseract } = await import('./tesseractFallback');
+          const fallbackResult = await extractRawTextWithTesseract(file, onProgress);
+          return fallbackResult as any;
+        } catch (tessError: any) {
+          console.error('[geminiService] Cả Gemini lẫn Tesseract đều thất bại:', tessError);
+          // Trả về object thông báo để UI hiển thị thay vì throw lỗi trắng
+          const emptyFallback: TesseractFallbackResult = {
+            _isOfflineFallback: true,
+            rawText: '',
+            fileName: file.name,
+            lang: 'n/a',
+            confidence: 0,
+            offlineMessage:
+              '⚠️ **Không thể đọc tài liệu** — Cả Gemini AI và OCR offline đều không khả dụng. ' +
+              'Vui lòng kiểm tra kết nối mạng và thử lại, hoặc nhập kết quả thủ công.',
+            testResults: [],
+            labName: '',
+            batchNo: '',
+            testDate: '',
+            notes: `[Offline - OCR thất bại] ${tessError?.message || ''}`,
+          };
+          return emptyFallback as any;
+        }
+      }
+
+      // Lỗi không phải lưới: throw ra để hàm gọi xử lý (API key sai, v.v.)
+      throw geminiError;
+    }
   },
 
   /**
@@ -504,6 +554,64 @@ export const geminiService = {
     });
     const result = await model.generateContent(prompt);
     return result.response.text();
+  },
+
+  /**
+   * Gọi API Gemini với Structured Output (JSON Schema bắt buộc).
+   * Loại bỏ 100% rủi ro JSON.parse thủ công — Gemini được enforce trả về đúng schema định sẵn.
+   * Dùng cho tất cả AI service cần trả về cấu trúc JSON có kiểu rõ ràng.
+   *
+   * @param prompt Nội dung yêu cầu
+   * @param schema JSON Schema object (dạng Gemini SchemaType)
+   * @param systemPrompt Lệnh định hướng hệ thống (tuỳ chọn)
+   * @param modelName Tên model cụ thể (tuỳ chọn, mặc định theo cài đặt)
+   * @param temperature Mức độ sáng tạo (mặc định 0.2 cho JSON nghiêm ngặt)
+   * @returns Promise<T> — Object đã parse sẵn, đúng kiểu T
+   */
+  generateStructuredJson: async <T = any>(
+    prompt: string,
+    schema: object,
+    systemPrompt?: string,
+    modelName?: string,
+    temperature: number = 0.2
+  ): Promise<T> => {
+    const genAI = getGenAI();
+    const activeModel = modelName || getGeminiModel();
+
+    const model = genAI.getGenerativeModel({
+      model: activeModel,
+      generationConfig: {
+        responseMimeType: 'application/json',
+        responseSchema: schema as any,
+        temperature,
+      },
+      ...(systemPrompt ? { systemInstruction: systemPrompt } : {}),
+    });
+
+    const maxRetries = 3;
+    let attempt = 0;
+
+    while (attempt < maxRetries) {
+      try {
+        const result = await model.generateContent(prompt);
+        const text = result.response.text();
+        // JSON.parse ở đây là safety net — Structured Output đảm bảo text luôn là JSON hợp lệ
+        return JSON.parse(text) as T;
+      } catch (error: any) {
+        attempt++;
+        const errorMessage = error?.message || '';
+        const backoffMs = Math.pow(2, attempt) * 1000;
+
+        if ((errorMessage.includes('503') || errorMessage.includes('429')) && attempt < maxRetries) {
+          console.warn(`Gemini generateStructuredJson overloaded. Retrying attempt ${attempt} in ${backoffMs}ms...`);
+          await new Promise((res) => setTimeout(res, backoffMs));
+          continue;
+        }
+        console.error('Error in generateStructuredJson:', error);
+        throw error;
+      }
+    }
+    throw new Error('generateStructuredJson: Đã vượt quá số lần thử lại tối đa mà không thành công.');
   },
 
   /**

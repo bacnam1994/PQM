@@ -1,8 +1,8 @@
 import { Batch, TestResult, TCCS, ProductFormula, Product, Criterion } from '../../types';
 import { ensureArray, parseNumberFromText, formatDateStandard } from '../../utils';
 import { isCriteriaMatch } from '../../utils/aiMapping';
-import { getApiKey, getGeminiModel } from './geminiService';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { getApiKey, geminiService } from './geminiService';
+import { SchemaType } from '@google/generative-ai';
 
 export type ClearanceVerdict = 'READY_FOR_RELEASE' | 'CONDITIONAL_RELEASE' | 'HOLD_FOR_INVESTIGATION';
 
@@ -217,8 +217,31 @@ export const evaluateBatchQualityClearance = (
   };
 };
 
+// ─── JSON Schema cho phản hồi AI Thẩm định Lô ─────────────────────────────
+const CLEARANCE_AI_SCHEMA = {
+  type: SchemaType.OBJECT,
+  properties: {
+    executiveSummary: {
+      type: SchemaType.STRING,
+      description: 'Đoạn văn ngắn 3-4 câu nhận xét tổng quan chất lượng lô và khuyến nghị xuất xưởng chính thức theo tiêu chuẩn GMP-WHO',
+    },
+    riskFactors: {
+      type: SchemaType.ARRAY,
+      items: { type: SchemaType.STRING, description: 'Một yếu tố rủi ro chất lượng tiềm ẩn' },
+      description: 'Danh sách 2-3 rủi ro chất lượng tiềm ẩn của lô này',
+    },
+    recommendations: {
+      type: SchemaType.ARRAY,
+      items: { type: SchemaType.STRING, description: 'Một hành động khuyến nghị cụ thể' },
+      description: 'Danh sách 2-3 hành động khuyến nghị cho Trưởng phòng QA trước khi ký duyệt',
+    },
+  },
+  required: ['executiveSummary', 'riskFactors', 'recommendations'],
+} as const;
+
 /**
- * Làm giàu thẩm định Lô bằng AI Gemini
+ * Làm giàu thẩm định Lô bằng AI Gemini – dùng Structured Outputs (JSON Schema)
+ * để đảm bảo phản hồi luôn đúng cấu trúc, loại bỏ rủi ro JSON.parse thủ công.
  */
 export const enrichBatchClearanceWithAI = async (
   dossier: BatchClearanceDossier
@@ -227,10 +250,6 @@ export const enrichBatchClearanceWithAI = async (
   if (!apiKey) return dossier;
 
   try {
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const modelName = getGeminiModel();
-    const model = genAI.getGenerativeModel({ model: modelName });
-
     const prompt = `Bạn là Chuyên gia Đảm bảo Chất lượng Dược phẩm (Senior QA Manager) theo tiêu chuẩn GMP-WHO.
 Hãy thẩm định và đưa ra nhận xét chuyên môn cho hồ sơ lô sản xuất sau:
 
@@ -242,20 +261,13 @@ Hãy thẩm định và đưa ra nhận xét chuyên môn cho hồ sơ lô sản
 - Điểm đánh giá sẵn sàng: ${dossier.readinessScore}/100
 - Đề xuất sơ bộ: ${dossier.verdict}
 
-Yêu cầu phản hồi dạng JSON với cấu trúc:
-{
-  "executiveSummary": "Đoạn văn ngắn 3-4 câu nhận xét tổng quan chất lượng lô và khuyến nghị xuất xưởng chính thức",
-  "riskFactors": ["danh sách 2-3 rủi ro chất lượng tiềm ẩn nếu có"],
-  "recommendations": ["danh sách 2-3 hành động khuyến nghị cho Trưởng phòng QA trước khi ký duyệt"]
-}`;
+Hãy viết nhận xét chuyên môn, đưa ra các rủi ro tiềm ẩn và các khuyến nghị hành động cho Trưởng phòng QA.`;
 
-    const res = await model.generateContent({
-      contents: [{ role: 'user', parts: [{ text: prompt }] }],
-      generationConfig: { responseMimeType: 'application/json', temperature: 0.2 }
-    });
-
-    const text = res.response.text();
-    const parsed = JSON.parse(text);
+    const parsed = await geminiService.generateStructuredJson<{
+      executiveSummary: string;
+      riskFactors: string[];
+      recommendations: string[];
+    }>(prompt, CLEARANCE_AI_SCHEMA, undefined, undefined, 0.2);
 
     return {
       ...dossier,

@@ -1,5 +1,5 @@
-import { getApiKey, getGeminiModel } from './geminiService';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { getApiKey, geminiService } from './geminiService';
+import { SchemaType } from '@google/generative-ai';
 
 export interface PQRQualityMetricsSummary {
   periodLabel: string;
@@ -79,8 +79,37 @@ export const generatePQRRuleBasedNarrative = (
   };
 };
 
+// ─── JSON Schema cho phản hồi AI PQR Narrative ─────────────────────────────
+const PQR_NARRATIVE_SCHEMA = {
+  type: SchemaType.OBJECT,
+  properties: {
+    overviewSection: {
+      type: SchemaType.STRING,
+      description: 'Đoạn 1: Tổng quan tình hình sản xuất và tỷ lệ đạt trong kỳ báo cáo, hành văn chuẩn GMP',
+    },
+    cpkEvaluationSection: {
+      type: SchemaType.STRING,
+      description: 'Đoạn 2: Đánh giá năng lực quá trình SPC/Cpk Analysis các chỉ tiêu định lượng',
+    },
+    deviationSection: {
+      type: SchemaType.STRING,
+      description: 'Đoạn 3: Tổng kết các sai lệch chất lượng OOS/OOT và hiệu quả CAPA triển khai',
+    },
+    conclusionAndPlanSection: {
+      type: SchemaType.STRING,
+      description: 'Đoạn 4: Kết luận của Trưởng phòng QA và kiến nghị hành động tiếp theo',
+    },
+    fullNarrative: {
+      type: SchemaType.STRING,
+      description: 'Toàn văn ghép 4 đoạn lại thành báo cáo hoàn chỉnh',
+    },
+  },
+  required: ['overviewSection', 'cpkEvaluationSection', 'deviationSection', 'conclusionAndPlanSection', 'fullNarrative'],
+} as const;
+
 /**
- * Nâng cao nội dung Báo cáo PQR bằng AI Gemini
+ * Nâng cao nội dung Báo cáo PQR bằng AI Gemini – dùng Structured Outputs (JSON Schema)
+ * để đảm bảo phản hồi luôn đúng cấu trúc 5 phần, loại bỏ rủi ro JSON.parse thủ công.
  */
 export const enrichPQRNarrativeWithAI = async (
   summary: PQRQualityMetricsSummary
@@ -90,10 +119,6 @@ export const enrichPQRNarrativeWithAI = async (
   if (!apiKey) return base;
 
   try {
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const modelName = getGeminiModel();
-    const model = genAI.getGenerativeModel({ model: modelName });
-
     const prompt = `Bạn là Trưởng phòng Đảm bảo Chất lượng Dược phẩm (QA Director) viết Báo cáo Đánh giá Chất lượng Sản phẩm Hàng năm (Annual Product Quality Review - PQR / APR) theo hướng dẫn GMP-WHO và ICH Q10.
 
 Số liệu thống kê chất lượng trong kỳ:
@@ -107,23 +132,15 @@ Hãy viết một bản Báo cáo Đánh giá Tổng thể Chất lượng (Exec
 1. Tổng quan tình hình sản xuất & tỷ lệ đạt
 2. Đánh giá năng lực quá trình (SPC/Cpk Analysis)
 3. Tổng kết các sai lệch chất lượng và hiệu quả CAPA
-4. Kết luận của Trưởng phòng QA & Kiến nghị hành động tiếp theo
+4. Kết luận của Trưởng phòng QA & Kiến nghị hành động tiếp theo`;
 
-Trả về kết quả dưới định dạng JSON:
-{
-  "overviewSection": "Đoạn 1...",
-  "cpkEvaluationSection": "Đoạn 2...",
-  "deviationSection": "Đoạn 3...",
-  "conclusionAndPlanSection": "Đoạn 4...",
-  "fullNarrative": "Toàn văn ghép lại..."
-}`;
-
-    const res = await model.generateContent({
-      contents: [{ role: 'user', parts: [{ text: prompt }] }],
-      generationConfig: { responseMimeType: 'application/json', temperature: 0.3 }
-    });
-
-    const parsed = JSON.parse(res.response.text());
+    const parsed = await geminiService.generateStructuredJson<{
+      overviewSection: string;
+      cpkEvaluationSection: string;
+      deviationSection: string;
+      conclusionAndPlanSection: string;
+      fullNarrative: string;
+    }>(prompt, PQR_NARRATIVE_SCHEMA, undefined, undefined, 0.3);
 
     return {
       overviewSection: parsed.overviewSection || base.overviewSection,
