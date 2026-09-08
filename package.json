@@ -13,7 +13,8 @@
     "test:e2e-ui": "playwright test --ui",
     "deploy": "npm run build && npx firebase deploy --only hosting",
     "build:gh": "cross-env GITHUB_PAGES=true npm run build",
-    "deploy:gh-pages": "npm run build && gh-pages -d dist"
+    "deploy:gh-pages": "npm run build && gh-pages -d dist",
+    "export:source": "node scripts/exportAllSource.cjs"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",

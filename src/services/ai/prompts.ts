@@ -211,6 +211,8 @@ XỬ LÝ WATERMARK, CON DẤU VÀ NỘI DUNG NHIỄU:
    - Nếu ảnh quá mờ (< 50% ký tự đọc được) → trả về mảng testResults rỗng và ghi notes: "Ảnh chất lượng thấp, không thể đọc đáng tin cậy"
 `;
 
+import { buildExternalLabPromptSection, RecognizedLab } from './externalLabTemplates';
+
 /**
  * Tên loại phiếu và viết tắt phổ biến trong ngành kiểm nghiệm VN.
  */
@@ -219,23 +221,23 @@ THUẬT NGỮ VÀ TÊN PHIẾU KIỂM NGHIỆM VIỆT NAM:
 
 Tên phiếu thường gặp (KHÔNG trích xuất làm chỉ tiêu):
 - PHIẾU KIỂM NGHIỆM / PHIẾU KẾT QUẢ KIỂM NGHIỆM (PKQKN)
+- PHIẾU KẾT QUẢ THỬ NGHIỆM / TEST REPORT
 - PHIẾU KIỂM NGHIỆM THÀNH PHẨM (PKNTF)
-- PHIẾU PHÂN TÍCH / PHIẾU PHÂN TÍCH THÀNH PHẨM
-- CERTIFICATE OF ANALYSIS (CoA) / CERTIFICATE OF CONFORMANCE (CoC)
+- PHIẾU PHÂN TÍCH / CERTIFICATE OF ANALYSIS (CoA)
 - BIÊN BẢN KIỂM NGHIỆM / KẾT QUẢ THỬ NGHIỆM
 - TTKT = Thử nghiệm kết thúc | PKN = Phiếu kiểm nghiệm
 - HSKN = Hồ sơ kiểm nghiệm | KQKN = Kết quả kiểm nghiệm
 
 Tên đơn vị kiểm nghiệm → điền vào field "labName":
-- Quatest 1 / Quatest 3 → "Trung tâm Kỹ thuật Tiêu chuẩn Đo lường Chất lượng 3"
-- CASE → "Trung tâm Phân tích và Kiểm nghiệm Thực phẩm Quốc gia (CASE)"
-- Eurofins → "Eurofins Sắc Ký Hà Nội" hoặc "Eurofins Vietnam"
-- Sắc Ký Hà Nội → "Công ty TNHH Sắc Ký Hà Nội"
-- Vimedimex → "Vimedimex"
+- Quatest 3 → "Trung tâm Kỹ thuật Tiêu chuẩn Đo lường Chất lượng 3 (QUATEST 3)"
+- CASE → "Trung tâm Dịch vụ Phân tích Thí nghiệm TP.HCM (CASE)"
+- NIFC → "Viện Kiểm nghiệm An toàn Vệ sinh Thực phẩm Quốc gia (NIFC)"
+- Eurofins → "Eurofins Sắc Ký Hải Đăng / Eurofins Vietnam"
+- Sắc Ký Hải Đăng / Sắc Ký Hà Nội → "Công ty TNHH Eurofins Sắc Ký Hải Đăng"
 - Nếu có "Phòng QC" hoặc "Phòng kiểm nghiệm nội bộ" → điền theo tên công ty trên phiếu
 
 Phân loại phiếu → điền vào field "documentType":
-- Phiếu từ cơ quan kiểm nghiệm bên ngoài (Quatest, CASE, Eurofins...) → "External_Lab"
+- Phiếu từ cơ quan kiểm nghiệm bên ngoài (Quatest, CASE, NIFC, Eurofins...) → "External_Lab"
 - Phiếu kiểm nghiệm nội bộ của nhà máy/phòng QC → "Internal"
 - CoA từ nhà sản xuất nguyên liệu/thành phẩm → "CoA"
 - Phiếu phân tích từ nhà cung cấp → "Supplier_CoA"
@@ -245,9 +247,11 @@ Phân loại phiếu → điền vào field "documentType":
  * Tạo prompt động cho việc trích xuất dữ liệu từ Phiếu Kiểm Nghiệm.
  * Nếu có danh sách tên chỉ tiêu chuẩn từ TCCS, AI sẽ cố gắng map thẳng về tên chuẩn.
  * @param tccsNames Danh sách tên chỉ tiêu chuẩn từ TCCS hiệu lực (tùy chọn)
+ * @param detectedLab Đơn vị phòng lab nhận diện được nếu có (QUATEST3, CASE, NIFC, EUROFINS...)
  */
-export const buildExtractionPrompt = (tccsNames: string[] = []): string => {
+export const buildExtractionPrompt = (tccsNames: string[] = [], detectedLab?: RecognizedLab): string => {
   const hasTccsContext = tccsNames.length > 0;
+  const externalLabSection = buildExternalLabPromptSection(detectedLab);
 
   const tccsSection = hasTccsContext
     ? `
@@ -292,6 +296,8 @@ CẤU TRÚC JSON YÊU CẦU (Trả về đúng định dạng này, bao gồm đ
   "labName": "Tên đơn vị kiểm nghiệm / Phòng thí nghiệm (ví dụ: CASE, Quatest 3, Eurofins, Phòng QC nội bộ...)",
   "documentType": "Loại phiếu: External_Lab | Internal | CoA | Supplier_CoA (xem hướng dẫn VN_LAB_TERMINOLOGY)",
   "pageCount": 1,
+  "productCode": "Mã số / Mã hàng hóa / Mã sản phẩm / SKU / Mã SP đọc được từ phiếu (ví dụ: VBT-001, SP-GBE-500, GBE500...). Thường xuất hiện ở header phiếu gần tên sản phẩm. Để rỗng nếu không có.",
+  "productName": "Tên sản phẩm / Tên hàng hóa đầy đủ đọc được từ phiếu (ví dụ: Viên nang Ginkgo Biloba 500mg). Để rỗng nếu không có.",
   "batchNo": "Số lô sản xuất (nếu có, không có thì để rỗng)",
   "mfgDate": "Ngày sản xuất (định dạng DD/MM/YYYY, nếu không có để rỗng)",
   "expDate": "Hạn sử dụng (định dạng DD/MM/YYYY, nếu không có để rỗng)",
@@ -323,6 +329,8 @@ ${WATERMARK_STAMP_GUIDE}
 
 ${VN_LAB_TERMINOLOGY}
 
+${externalLabSection}
+
 HƯỚNG DẪN BẢNG PHỨC TẠP ĐA TRANG & SUB-ITEMS (MULTI_PAGE_TABLE_GUIDE):
 1. Bảng kéo dài qua nhiều trang (trang 1, 2, 3...):
    - Tiếp tục đọc xuyên suốt các trang, duy trì cùng thứ tự cột từ header trang đầu tiên.
@@ -351,6 +359,8 @@ LƯU Ý QUAN TRỌNG:
 8. Điền "pageCount" bằng số trang thực tế đã đọc được trong tài liệu.
 9. Điền "documentType" dựa theo hướng dẫn VN_LAB_TERMINOLOGY ở trên.
 10. Điền "analysisMethod" cho từng chỉ tiêu nếu phiếu ghi rõ phương pháp thử (cột "Phương pháp", "Method", "Test method").
+11. Điền "productCode" là mã số sản phẩm (thường ký hiệu: Mã SP, Mã HH, Product Code, SKU, Item Code, Ref. No...) thường xuất hiện ở header phiếu gần tên sản phẩm hoặc trong bảng thông tin mẫu. Đây là ưu tiên số 1 để nhận diện sản phẩm.
+12. Điền "productName" là tên đầy đủ của sản phẩm được kiểm nghiệm (thường đứng đầu phiếu, sau label "Tên sản phẩm:", "Product:", "Commodity:", "Sample name:").
 `;
 };
 

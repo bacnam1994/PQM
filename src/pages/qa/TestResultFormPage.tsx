@@ -14,6 +14,7 @@ import { recordHighConfidenceOCRMappings } from '../../services/ai/autoLearningS
 import { MappingConfirmModal, AIExtractedItem, ConfirmedMapping } from '../../components/features/MappingConfirmModal';
 import { VoiceInputButton } from '../../components/features/VoiceInputButton';
 import { LabComparisonModal } from '../../components/features/LabComparisonModal';
+import AutoCreateBatchModal, { AutoCreateBatchData, AutoCreateBatchResult } from '../../components/features/AutoCreateBatchModal';
 import { ParsedVoiceCriteria } from '../../services/ai/voiceParserService';
 import { useUIStore } from '../../store/useUIStore';
 import { storage } from '../../firebase';
@@ -257,6 +258,9 @@ const TestResultFormPage = () => {
   const allTestResults = useAppStore(state => state.allTestResults) || [];
   const testResults = useAppStore(state => state.testResults);
   const aiLearnedMappings = useAppStore(state => state.aiLearnedMappings) || [];
+  const products = useAppStore(state => state.products);
+  const tccsList = useAppStore(state => state.tccsList);
+  const addBatch = useAppStore(state => state.addBatch);
   const { batches: hydratedBatches } = useDataGraph();
 
   // Trích xuất State/Hàm từ Hook chung
@@ -285,6 +289,25 @@ const TestResultFormPage = () => {
   const [batchScanFiles, setBatchScanFiles] = React.useState<{ fileName: string; status: 'waiting' | 'processing' | 'done' | 'error'; criteriaCount?: number; error?: string; progressStep?: string; progressPercent?: number }[]>([]);
   const [isBatchProgressOpen, setIsBatchProgressOpen] = React.useState(false);
   const [isComparisonModalOpen, setIsComparisonModalOpen] = React.useState(false);
+
+  // --- Auto-Create Batch State ---
+  const [isAutoCreateModalOpen, setIsAutoCreateModalOpen] = React.useState(false);
+  const [pendingAutoCreateData, setPendingAutoCreateData] = React.useState<AutoCreateBatchData | null>(null);
+
+  // Expose test hook in DEV for deterministic E2E testing
+  useEffect(() => {
+    if (import.meta.env.DEV) {
+      (window as any).__TEST_TRIGGER_AUTO_CREATE_BATCH__ = (mockData: AutoCreateBatchData) => {
+        setPendingAutoCreateData(mockData);
+        setIsAutoCreateModalOpen(true);
+      };
+    }
+    return () => {
+      if (import.meta.env.DEV) {
+        delete (window as any).__TEST_TRIGGER_AUTO_CREATE_BATCH__;
+      }
+    };
+  }, []);
 
   // Lấy danh sách tên chỉ tiêu từ TCCS đang hiệu lực để làm prompt
   const allActiveTccsNames = useMemo(() => {
@@ -408,10 +431,24 @@ const TestResultFormPage = () => {
     // Auto-fill Batch
     if (data.batchNo) {
       setBatchSearch(data.batchNo);
-      const matchedBatch = hydratedBatches.find(b => b.batchNo.toLowerCase().includes(data.batchNo.toLowerCase()));
+      const matchedBatch = hydratedBatches.find(
+        b => b.batchNo.toLowerCase().trim() === data.batchNo.toLowerCase().trim()
+          || b.batchNo.toLowerCase().includes(data.batchNo.toLowerCase())
+      );
       if (matchedBatch) {
+        // Lô đã tồn tại → select bình thường
         handleBatchSelect(matchedBatch.id);
         setBatchSearch(`${matchedBatch.batchNo} - ${matchedBatch.product?.name}`);
+      } else {
+        // Lô CHƯA tồn tại → mở dialog xác nhận tạo lô mới
+        setPendingAutoCreateData({
+          batchNo: data.batchNo,
+          productCode: data.productCode || '',
+          productName: data.productName || '',
+          mfgDate: data.mfgDate || '',
+          expDate: data.expDate || '',
+        });
+        setIsAutoCreateModalOpen(true);
       }
     }
 
@@ -458,6 +495,32 @@ const TestResultFormPage = () => {
         setPendingAiResults(data.testResults);
       }
     }
+  };
+
+  // --- Handler tạo Batch mới tự động từ AI ---
+  const handleAutoCreateBatchConfirm = async (result: AutoCreateBatchResult) => {
+    const { generateId, BATCH_STATUS } = await import('../../utils');
+    const now = new Date().toISOString();
+    const newBatch = {
+      id: generateId(),
+      productId: result.productId,
+      tccsId: result.tccsId,
+      batchNo: result.batchNo,
+      mfgDate: result.mfgDate,
+      expDate: result.expDate,
+      theoreticalYield: 0,
+      actualYield: 0,
+      yieldUnit: '',
+      status: BATCH_STATUS.TESTING as 'TESTING',
+      createdAt: now,
+      updatedAt: now,
+    };
+    await addBatch(newBatch);
+    handleBatchSelect(newBatch.id);
+    setBatchSearch(`${newBatch.batchNo} - ${products.find(p => p.id === newBatch.productId)?.name || ''}`);
+    setIsAutoCreateModalOpen(false);
+    setPendingAutoCreateData(null);
+    toast.success(`Đã tạo lô "${result.batchNo}" và gắn vào phiếu kiểm nghiệm!`, { duration: 4000 });
   };
 
   const handleApplyVoiceCriteria = (entries: ParsedVoiceCriteria[]) => {
@@ -1058,6 +1121,7 @@ const TestResultFormPage = () => {
   }
 
   return (
+    <>
     <div className="p-6 max-w-7xl mx-auto animate-in fade-in duration-500 space-y-6">
       <div className="flex items-center gap-4">
         <button 
@@ -1514,7 +1578,7 @@ const TestResultFormPage = () => {
            </div>
 
            <div className="pt-8 flex justify-end gap-3 border-t bg-white mt-8">
-             <button type="button" onClick={() => navigate('/test-results')} className="px-6 py-3 text-slate-400 font-black uppercase text-xs tracking-widest hover:bg-slate-50 rounded-xl transition-colors">Hủy & Quay lại</button>
+             <button type="button" onClick={() => navigate('/test-results')} className="px-6 py-3 text-slate-400 font-black uppercase text-xs tracking-widest hover:bg-slate-50 rounded-xl transition-colors">Hủy &amp; Quay lại</button>
              <button type="submit" disabled={!activeTCCS || isSubmitting} className={`px-8 py-3 text-white font-black rounded-xl shadow-2xl transition-all uppercase text-xs tracking-widest ${crud.mode === 'EDIT' ? 'bg-blue-600 shadow-blue-100 hover:bg-blue-700' : 'bg-indigo-600 shadow-indigo-100 hover:bg-indigo-700'} disabled:opacity-20 flex items-center gap-2`}>
                 {isSubmitting && <Loader2 size={14} className="animate-spin" />}
                 {crud.mode === 'EDIT' ? 'Cập nhật Phiếu' : 'Lưu Kết quả Mới'}
@@ -1523,7 +1587,24 @@ const TestResultFormPage = () => {
         </form>
       </div>
     </div>
+
+    {/* ── Auto-Create Batch Modal ── */}
+    {pendingAutoCreateData && (
+      <AutoCreateBatchModal
+        isOpen={isAutoCreateModalOpen}
+        onClose={() => {
+          setIsAutoCreateModalOpen(false);
+          setPendingAutoCreateData(null);
+        }}
+        onConfirm={handleAutoCreateBatchConfirm}
+        aiData={pendingAutoCreateData}
+        products={products}
+        tccsList={tccsList}
+      />
+    )}
+    </>
   );
 };
 
 export default TestResultFormPage;
+

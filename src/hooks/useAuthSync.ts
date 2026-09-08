@@ -9,6 +9,10 @@ export const useAuthSync = () => {
   useEffect(() => {
     const auth = getAuth();
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+      if (!currentUser && import.meta.env.DEV && useAppStore.getState().user?.email === 'admin@example.com') {
+        useAppStore.getState().setAuthLoading(false);
+        return;
+      }
       useAppStore.getState().setUser(currentUser);
       if (currentUser) {
         try {

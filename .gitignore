@@ -31,3 +31,7 @@ dist-ssr
 /blob-report/
 /playwright/.cache/
 /playwright/.auth/
+
+# Internal code exports
+FULL_SOURCE_CODE.*
+ALL_SOURCE_CODE.*

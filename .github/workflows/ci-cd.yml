@@ -1,0 +1,127 @@
+name: PQM Continuous Integration & Deployment (CI/CD)
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ─────────────────────────────────────────────────────────────
+  # JOB 1: Chạy toàn bộ Unit Tests với Vitest
+  # ─────────────────────────────────────────────────────────────
+  unit-tests:
+    name: Unit Tests (Vitest)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Run Vitest Suite (116+ tests)
+        run: npm run test -- --run
+
+  # ─────────────────────────────────────────────────────────────
+  # JOB 2: Chạy bộ kiểm thử End-to-End với Playwright (Chromium)
+  # ─────────────────────────────────────────────────────────────
+  e2e-tests:
+    name: End-to-End Tests (Playwright)
+    needs: unit-tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Install Playwright Chromium Browser
+        run: npx playwright install --with-deps chromium
+
+      - name: Run Playwright Tests (Chromium)
+        run: npx playwright test --project=chromium
+
+      - name: Upload Playwright Report Artifact
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 14
+
+  # ─────────────────────────────────────────────────────────────
+  # JOB 3: Build & Tự động Deploy lên Firebase Hosting
+  # ─────────────────────────────────────────────────────────────
+  build-and-deploy:
+    name: Build & Deploy to Firebase Hosting
+    needs: [unit-tests, e2e-tests]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # Chỉ deploy khi code được push/merge vào nhánh chính
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Build Production Bundle (Vite)
+        run: npm run build
+
+      - name: Deploy to Firebase Hosting (via Service Account)
+        if: ${{ env.FIREBASE_SA != '' }}
+        env:
+          FIREBASE_SA: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_V_BIOTECH }}
+        uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: ${{ secrets.GITHUB_TOKEN }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_V_BIOTECH }}
+          channelId: live
+          projectId: v-biotech
+
+      - name: Deploy to Firebase Hosting (via FIREBASE_TOKEN fallback)
+        if: ${{ env.FIREBASE_SA == '' && env.FIREBASE_TOKEN != '' }}
+        env:
+          FIREBASE_SA: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_V_BIOTECH }}
+          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
+        run: npx firebase-tools deploy --only hosting --token "${{ secrets.FIREBASE_TOKEN }}" --project v-biotech
+
+      - name: Informational Notice (If no Firebase secrets configured yet)
+        if: ${{ env.FIREBASE_SA == '' && env.FIREBASE_TOKEN == '' }}
+        env:
+          FIREBASE_SA: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_V_BIOTECH }}
+          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
+        run: |
+          echo "ℹ️ Lưu ý: Build hoàn tất thành công 100%!"
+          echo "Để kích hoạt tự động deploy lên Firebase Hosting (v-biotech.web.app):"
+          echo "Vui lòng cấu hình Secret 'FIREBASE_SERVICE_ACCOUNT_V_BIOTECH' hoặc 'FIREBASE_TOKEN' trong Settings -> Secrets của GitHub Repository."

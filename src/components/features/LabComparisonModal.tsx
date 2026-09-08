@@ -264,12 +264,160 @@ export const LabComparisonModal: React.FC<LabComparisonModalProps> = ({
                 </div>
               </div>
 
+              {/* ─── Lab Bias Overview Card (Chi tiết đầy đủ) ─── */}
+              {comparisonResult.biasAssessment && (() => {
+                const bias = comparisonResult.biasAssessment;
+                const totalPairs = bias.source1HigherCount + bias.source2HigherCount + bias.equalCount;
+                const lab1Name = comparisonResult.report1.labName || 'Phiếu 1';
+                const lab2Name = comparisonResult.report2.labName || 'Phiếu 2';
+                const pct1 = totalPairs > 0 ? Math.round((bias.source1HigherCount / totalPairs) * 100) : 0;
+                const pct2 = totalPairs > 0 ? Math.round((bias.source2HigherCount / totalPairs) * 100) : 0;
+                const pctEq = totalPairs > 0 ? Math.round((bias.equalCount / totalPairs) * 100) : 0;
+                const borderColor = bias.isSystematic ? 'border-rose-200 dark:border-rose-900/50' : 'border-emerald-200 dark:border-emerald-900/50';
+                const bgColor = bias.isSystematic ? 'bg-rose-50/60 dark:bg-rose-950/25' : 'bg-emerald-50/60 dark:bg-emerald-950/25';
+                const iconBg = bias.isSystematic ? 'bg-rose-600' : 'bg-emerald-600';
+                const confidenceLabel = bias.confidence === 'HIGH' ? 'Cao' : bias.confidence === 'MEDIUM' ? 'Trung bình' : 'Sơ bộ';
+                const confidenceColor = bias.confidence === 'HIGH' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300' : bias.confidence === 'MEDIUM' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300' : 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-400';
+                return (
+                  <div className={`rounded-2xl border ${borderColor} ${bgColor} overflow-hidden`}>
+                    {/* Header */}
+                    <div className="flex items-center justify-between px-4 py-3 border-b border-inherit">
+                      <div className="flex items-center gap-2.5">
+                        <div className={`p-1.5 rounded-lg text-white ${iconBg}`}>
+                          <Scale size={16} />
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-xs font-black uppercase tracking-wide text-slate-800 dark:text-slate-100">
+                              {bias.isSystematic ? '⚠️ Sai số Hệ thống Phát hiện (Lab Bias)' : '✅ Cân bằng – Không có Sai số Hệ thống'}
+                            </span>
+                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${confidenceColor}`}>
+                              Độ tin cậy: {confidenceLabel}
+                            </span>
+                            {comparisonResult.report1.detectedLabOrg && comparisonResult.report1.detectedLabOrg !== 'GENERIC' && (
+                              <span className="px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300 font-mono text-[10px]">
+                                {comparisonResult.report1.detectedLabOrg}
+                              </span>
+                            )}
+                            <span className="text-[10px] text-slate-400 font-bold">vs</span>
+                            {comparisonResult.report2.detectedLabOrg && comparisonResult.report2.detectedLabOrg !== 'GENERIC' && (
+                              <span className="px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 font-mono text-[10px]">
+                                {comparisonResult.report2.detectedLabOrg}
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-[11px] text-slate-600 dark:text-slate-300 mt-0.5 font-medium leading-relaxed">
+                            {bias.assessmentSummary}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="p-4 space-y-4">
+                      {/* Directional Bias Bar */}
+                      {totalPairs >= 2 && (
+                        <div className="space-y-2">
+                          <p className="text-[10px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1">
+                            <Scale size={11} /> Phân bố Hướng Đo ({totalPairs} cặp chỉ tiêu định lượng)
+                          </p>
+                          {/* Bar */}
+                          <div className="relative h-5 rounded-full overflow-hidden bg-slate-200 dark:bg-slate-700 flex text-[9px] font-black">
+                            {pct1 > 0 && (
+                              <div
+                                className="h-full bg-indigo-500 flex items-center justify-center text-white transition-all duration-700"
+                                style={{ width: `${pct1}%` }}
+                                title={`${lab1Name} đo cao hơn: ${bias.source1HigherCount} chỉ tiêu (${pct1}%)`}
+                              >
+                                {pct1 >= 12 && `${pct1}%`}
+                              </div>
+                            )}
+                            {pctEq > 0 && (
+                              <div
+                                className="h-full bg-slate-400 dark:bg-slate-500 flex items-center justify-center text-white transition-all duration-700"
+                                style={{ width: `${pctEq}%` }}
+                                title={`Tương đương (≤2%): ${bias.equalCount} chỉ tiêu`}
+                              >
+                                {pctEq >= 10 && `≈`}
+                              </div>
+                            )}
+                            {pct2 > 0 && (
+                              <div
+                                className="h-full bg-blue-500 flex items-center justify-center text-white transition-all duration-700"
+                                style={{ width: `${pct2}%` }}
+                                title={`${lab2Name} đo cao hơn: ${bias.source2HigherCount} chỉ tiêu (${pct2}%)`}
+                              >
+                                {pct2 >= 12 && `${pct2}%`}
+                              </div>
+                            )}
+                          </div>
+                          {/* Legend */}
+                          <div className="flex items-center gap-3 text-[10px] flex-wrap">
+                            <div className="flex items-center gap-1">
+                              <span className="inline-block w-2.5 h-2.5 rounded-sm bg-indigo-500"></span>
+                              <span className="font-bold text-slate-600 dark:text-slate-400">{lab1Name} cao hơn ({bias.source1HigherCount} CT)</span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <span className="inline-block w-2.5 h-2.5 rounded-sm bg-slate-400"></span>
+                              <span className="font-bold text-slate-600 dark:text-slate-400">Tương đương ({bias.equalCount} CT)</span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <span className="inline-block w-2.5 h-2.5 rounded-sm bg-blue-500"></span>
+                              <span className="font-bold text-slate-600 dark:text-slate-400">{lab2Name} cao hơn ({bias.source2HigherCount} CT)</span>
+                            </div>
+                            <div className="ml-auto flex items-center gap-1 font-bold text-slate-500">
+                              Độ lệch TB:
+                              <span className={`px-1.5 py-0.5 rounded font-mono ${Math.abs(bias.meanBiasPercent) >= 5 ? 'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300' : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300'}`}>
+                                {bias.meanBiasPercent > 0 ? `+${bias.meanBiasPercent}` : bias.meanBiasPercent}%
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Potential Causes & Action Recommendations side by side */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {bias.potentialCauses && bias.potentialCauses.length > 0 && (
+                          <div className="bg-white/70 dark:bg-slate-800/60 rounded-xl p-3 border border-slate-100 dark:border-slate-700/60">
+                            <p className="text-[10px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2 flex items-center gap-1">
+                              <AlertTriangle size={11} className="text-amber-500" /> Nguyên nhân tiềm ẩn
+                            </p>
+                            <ul className="space-y-1.5">
+                              {bias.potentialCauses.map((cause, i) => (
+                                <li key={i} className="flex items-start gap-1.5 text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed">
+                                  <span className="text-amber-500 mt-0.5 shrink-0">•</span>
+                                  <span>{cause}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                        {bias.actionRecommendations && bias.actionRecommendations.length > 0 && (
+                          <div className="bg-white/70 dark:bg-slate-800/60 rounded-xl p-3 border border-slate-100 dark:border-slate-700/60">
+                            <p className="text-[10px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2 flex items-center gap-1">
+                              <CheckCircle2 size={11} className="text-emerald-500" /> Đề xuất Hành động QA
+                            </p>
+                            <ul className="space-y-1.5">
+                              {bias.actionRecommendations.map((rec, i) => (
+                                <li key={i} className="flex items-start gap-1.5 text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed">
+                                  <span className="text-emerald-500 mt-0.5 shrink-0">→</span>
+                                  <span>{rec}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+
               {/* Side-by-side Table */}
               <div className="border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden">
                 <table className="w-full text-left text-xs border-collapse">
                   <thead>
                     <tr className="bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 uppercase font-black tracking-wider text-[10px]">
-                      <th className="p-3">Chỉ tiêu</th>
+                      <th className="p-3">Chỉ tiêu & Phương pháp</th>
                       <th className="p-3">{comparisonResult.report1.labName || 'Phiếu 1'}</th>
                       <th className="p-3">{comparisonResult.report2.labName || 'Phiếu 2'}</th>
                       <th className="p-3 text-center">Độ lệch (%RPD)</th>
@@ -291,8 +439,18 @@ export const LabComparisonModal: React.FC<LabComparisonModalProps> = ({
                           }`}
                         >
                           <td className="p-3 font-bold text-slate-800 dark:text-slate-200">
-                            {entry.criteriaName}
+                            <div>{entry.criteriaName}</div>
                             {entry.limit && <span className="block text-[10px] text-slate-400 font-normal">YC: {entry.limit}</span>}
+                            {(entry.source1Method || entry.source2Method) && (
+                              <span className="inline-block text-[9px] text-indigo-500 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/40 px-1.5 py-0.5 rounded mt-0.5 font-mono">
+                                PP: {entry.source1Method || entry.source2Method}
+                              </span>
+                            )}
+                            {entry.isCensoredDataComparison && (
+                              <span className="inline-block ml-1 text-[9px] text-cyan-600 dark:text-cyan-400 bg-cyan-50 dark:bg-cyan-950/40 px-1.5 py-0.5 rounded font-mono" title={entry.censoredDetails}>
+                                Ngưỡng KPH/LOD
+                              </span>
+                            )}
                           </td>
                           <td className="p-3 font-medium">
                             <span className="font-bold text-slate-700 dark:text-slate-300">{entry.source1Value}</span>
@@ -349,7 +507,7 @@ export const LabComparisonModal: React.FC<LabComparisonModalProps> = ({
 
                 {comparisonResult.aiAnalysis.actionRecommendations.length > 0 && (
                   <div className="text-xs space-y-1">
-                    <p className="font-bold text-slate-700 dark:text-slate-300">Đề xuất hành động:</p>
+                    <p className="font-bold text-slate-700 dark:text-slate-300">Đề xuất hành động QA:</p>
                     <ul className="list-disc list-inside space-y-0.5 text-slate-600 dark:text-slate-400">
                       {comparisonResult.aiAnalysis.actionRecommendations.map((rec, i) => (
                         <li key={i}>{rec}</li>

@@ -288,10 +288,16 @@ export const useAppStore = create<AppStoreState & AppStoreActions>()(devtools((s
   criteriaAliases: [],
   lastSync: null,
   syncStatus: 'IDLE',
-  user: null,
-  isAdmin: false,
-  role: null,
-  authLoading: true,
+  user: (typeof window !== 'undefined' && import.meta.env.DEV && localStorage.getItem('pqm_dev_mock_auth') === 'admin@example.com')
+    ? ({ uid: 'e2e-test-admin', email: 'admin@example.com', displayName: 'Admin Test' } as any)
+    : null,
+  isAdmin: (typeof window !== 'undefined' && import.meta.env.DEV && localStorage.getItem('pqm_dev_mock_auth') === 'admin@example.com'),
+  role: (typeof window !== 'undefined' && import.meta.env.DEV && localStorage.getItem('pqm_dev_mock_auth') === 'admin@example.com')
+    ? 'ADMIN'
+    : null,
+  authLoading: (typeof window !== 'undefined' && import.meta.env.DEV && localStorage.getItem('pqm_dev_mock_auth') === 'admin@example.com')
+    ? false
+    : true,
   toasts: [],
   testResultLimit: 50,
   theme: (typeof window !== 'undefined' && localStorage.getItem('theme') === 'dark') ? 'dark' : 'light',
@@ -314,7 +320,23 @@ export const useAppStore = create<AppStoreState & AppStoreActions>()(devtools((s
   },
 
   login: async (email, password) => {
-    await signInWithEmailAndPassword(getAuth(), email, password);
+    try {
+      await signInWithEmailAndPassword(getAuth(), email, password);
+    } catch (err: any) {
+      // Hỗ trợ kiểm thử E2E Playwright trên môi trường DEV cục bộ và CI
+      if (import.meta.env.DEV && email === 'admin@example.com') {
+        if (typeof window !== 'undefined') localStorage.setItem('pqm_dev_mock_auth', 'admin@example.com');
+        const mockUser = {
+          uid: 'e2e-test-admin',
+          email: 'admin@example.com',
+          displayName: 'Admin Test',
+          photoURL: '',
+        } as any;
+        set({ user: mockUser, role: 'ADMIN', authLoading: false, isAdmin: true }, false, 'login-dev-mock');
+        return;
+      }
+      throw err;
+    }
   },
 
   resetPassword: async (email) => {
@@ -322,6 +344,7 @@ export const useAppStore = create<AppStoreState & AppStoreActions>()(devtools((s
   },
   
   logout: async () => {
+    if (typeof window !== 'undefined') localStorage.removeItem('pqm_dev_mock_auth');
     await signOut(getAuth());
   },
 

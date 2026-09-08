@@ -195,6 +195,7 @@ const AppRoutes: React.FC = () => {
           <Route path="/test-results" element={<TestResultList />} />
           {/* USER được tạo phiếu KN mới, chỉ ADMIN mới sửa */}
           <Route path="/test-results/new" element={<TestResultFormPage />} />
+          <Route path="/test-results/form" element={<Navigate to="/test-results/new" replace />} />
           <Route path="/test-results/edit/:id" element={<AdminRoute><TestResultFormPage /></AdminRoute>} />
           <Route path="/reports/quality-summary" element={<QualitySummaryReport />} />
           <Route path="/reports/trend-analysis" element={<TrendAnalysisPage />} />
