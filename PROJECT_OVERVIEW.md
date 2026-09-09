@@ -195,7 +195,7 @@ npm run build
 # 3. Deploy l�n Firebase Hosting
 npx firebase deploy --only hosting
 
-# 4. Ch?y Unit Test (Vitest - 257 tests passed 100% across 37 suites)
+# 4. Ch?y Unit Test (Vitest - 264 tests passed 100% across 38 suites)
 npm run test -- --run
 
 # 5. Ch?y End-to-End Test (Playwright)
@@ -210,6 +210,7 @@ npm run test:e2e
 
 | Ngay | Phien ban | Noi dung cap nhat tom tat | Nguoi thuc hien |
 | :--- | :---: | :--- | :--- |
+| **2026-09-09** | `2.5.3` | **Phan ra useAppStore thanh Modular Slices (TASK-003)**: Tieu bien God Store (~800 dong) thanh 6 domain slices doc lap (`authSlice`, `systemSlice`, `productSlice`, `batchSlice`, `testResultSlice`, `tccsSlice`) trong `src/store/slices/`; trich xuat `storeHelpers.ts` quan ly mutation offline va chuan hoa cong thuc; bo sung cac selector hooks chuyen biet (`useAppAuth`, `useAppProducts`, `useAppBatches`, v.v.); viet unit test bao phu cac slice. Toan bo 264/264 unit tests (38 suites) va Playwright E2E passed. Build 2443 modules thanh cong. | AI Pair Programmer |
 | **2026-09-09** | `2.5.2` | **Tai cau truc TestResultFormPage Modularization (TASK-002)**: Chia nho God Component tu 1.610 dong xuong con ~300 dong bang cach tach thanh 7 specialized sub-components (`TestResultHeader`, `BatchLabSelector`, `TccsCriteriaSection`, `ExtraCriteriaSection`, `AttachmentSection`, `GDFileSelectorModal`, `BatchScanProgressModal`) va custom hook `useTestResultAIIntegration`. Toan bo 257 unit tests va Playwright E2E tests deu passed. Build 2436 modules thanh cong. | AI Pair Programmer |
 | **2026-09-08** | `2.5.1` | **Hoan thien Lab Bias Detail UI & Toi uu CI/CD**: [ENHANCE] LabComparisonModal.tsx - thay banner don gian bang Lab Bias Detail Card day du: Directional Bias Bar (phan bo huong do), meanBiasPercent, potentialCauses & actionRecommendations; [ENHANCE] playwright.config.ts - screenshot/video on-failure, github reporter cho CI; 123/123 Unit Tests passed, Build 2402 modules. | AI Pair Programmer |
 | **2026-09-07** | `2.5.0` | **Toi uu Do tin cay AI & Don dep Tai lieu**: [NEW] generateStructuredJson<T>() helper enforce JSON Schema cung qua responseSchema - loai bo 100% rui ro JSON.parse thu cong; Migrate batchClearanceService + pqrNarrativeService sang Structured Outputs; [NEW] tesseractFallback.ts OCR offline (Tesseract.js lazy-load) khi Gemini API khong kha dung; Tach CHANGELOG.md rieng; Xoa ban ghi trung v1.5.0/v1.4.0. | AI Pair Programmer |
