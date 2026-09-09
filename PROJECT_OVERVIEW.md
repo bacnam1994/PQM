@@ -195,7 +195,7 @@ npm run build
 # 3. Deploy l�n Firebase Hosting
 npx firebase deploy --only hosting
 
-# 4. Ch?y Unit Test (Vitest - 315 tests passed 100% across 45 suites)
+# 4. Ch?y Unit Test (Vitest - 326 tests passed 100% across 48 suites)
 npm run test -- --run
 
 # 5. Ch?y End-to-End Test (Playwright)
