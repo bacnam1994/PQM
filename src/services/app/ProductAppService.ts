@@ -85,6 +85,14 @@ export class ProductAppService {
       throw new Error('Từ chối quyền: Bạn không có quyền nạp danh sách sản phẩm.');
     }
     await this.repo.bulkSave(products);
+
+    logAuditAction({
+      action: 'CREATE',
+      collection: 'PRODUCTS',
+      documentId: `bulk_${products.length}`,
+      details: `Nạp hàng loạt ${products.length} sản phẩm`,
+      performedBy: currentUser?.email || 'unknown'
+    });
   }
 }
 

@@ -56,20 +56,24 @@ export const REGULATED_ACTIONS: Record<string, { permission: PermissionAction; i
 export function resolveToolPermission(toolName: string, payload: any): PermissionAction {
   switch (toolName) {
     case 'updateBatchStatus':
+    case 'updateBatchStatusAction':
       if (payload?.status === 'RELEASED') return 'batch:release';
       if (payload?.status === 'REJECTED') return 'batch:reject';
       return 'batch:update';
 
     case 'createBatch':
+    case 'createBatchAction':
       return 'batch:create';
 
     case 'createTestResult':
+    case 'createTestResultAction':
       return 'test_result:create';
 
     case 'harmonizeMaterials':
       return 'material:update';
 
     case 'autoHealInconsistencies':
+    case 'triggerAutoHealingAction':
       return 'settings:update';
 
     case 'queryDataNaturalLanguage':
@@ -82,10 +86,14 @@ export function resolveToolPermission(toolName: string, payload: any): Permissio
  * Kiểm tra xem công cụ và payload có phải hành động Regulated bắt buộc phê duyệt không
  */
 export function isRegulatedToolAction(toolName: string, payload: any): boolean {
-  if (toolName === 'updateBatchStatus') {
+  if (toolName === 'updateBatchStatus' || toolName === 'updateBatchStatusAction') {
     return payload?.status === 'RELEASED' || payload?.status === 'REJECTED';
   }
-  if (toolName === 'autoHealInconsistencies' || toolName === 'harmonizeMaterials') {
+  if (
+    toolName === 'autoHealInconsistencies' || 
+    toolName === 'triggerAutoHealingAction' || 
+    toolName === 'harmonizeMaterials'
+  ) {
     return true;
   }
   return false;

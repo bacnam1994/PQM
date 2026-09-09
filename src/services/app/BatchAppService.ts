@@ -216,7 +216,10 @@ export class BatchAppService {
   /**
    * Cập nhật tiến độ kiểm nghiệm lô (%)
    */
-  async updateProgress(batchId: string, progressPercent: number, _currentUser?: any): Promise<void> {
+  async updateProgress(batchId: string, progressPercent: number, currentUser?: any): Promise<void> {
+    if (currentUser && !can(currentUser, 'batch:update')) {
+      throw new Error('Từ chối quyền: Bạn không có quyền cập nhật tiến độ lô.');
+    }
     await this.repo.updateProgress(batchId, progressPercent);
   }
 

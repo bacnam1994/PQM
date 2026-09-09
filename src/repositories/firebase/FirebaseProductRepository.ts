@@ -53,7 +53,17 @@ export class FirebaseProductRepository
     products.forEach(p => {
       updates[`${this.collectionPath}/${p.id}`] = removeUndefined(p);
     });
-    await update(ref(db), updates);
+    try {
+      await update(ref(db), updates);
+    } catch (e: any) {
+      if (typeof navigator !== 'undefined' && (!navigator.onLine || e?.code === 'unavailable')) {
+        for (const [path, data] of Object.entries(updates)) {
+          await enqueueOfflineMutation({ path, operation: 'SET', data });
+        }
+        return;
+      }
+      throw e;
+    }
   }
 }
 

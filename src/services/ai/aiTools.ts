@@ -1214,6 +1214,7 @@ export const executeTool = async (
       return generateDeviationReport(args.batchNo, appContext);
     }
 
+    case 'createBatch':
     case 'createBatchAction': {
       return await createBatchAction(args as any, appContext);
     }
@@ -1226,10 +1227,13 @@ export const executeTool = async (
       return navigateToAction(args as any, appContext);
     }
 
-    case 'triggerAutoHealingAction': {
+    case 'triggerAutoHealing':
+    case 'triggerAutoHealingAction':
+    case 'autoHealInconsistencies': {
       return await triggerAutoHealingAction();
     }
 
+    case 'updateBatchStatus':
     case 'updateBatchStatusAction': {
       return await updateBatchStatusAction(args as any, appContext);
     }
@@ -1486,6 +1490,16 @@ export const createBatchAction = async (args: {
     return {
       success: false,
       error: guard.reason || 'Tài khoản hiện tại không có quyền tạo lô sản xuất mới qua AI.'
+    };
+  }
+
+  if (guard.requiresUserApproval) {
+    return {
+      success: false,
+      isRegulated: true,
+      requiresApproval: true,
+      proposal: guard.proposal,
+      message: `⚠️ **Yêu cầu phê duyệt hành động tạo lô sản xuất:**\n- Hành động: Tạo lô mới **${args.batchNo}** cho sản phẩm **${args.productIdentifier}**\n- Lý do: Yêu cầu từ AI Copilot\n- Theo chuẩn kiểm soát chất lượng, AI không được tự ý ghi dữ liệu lô mới vào cơ sở dữ liệu khi chưa có sự xác nhận của người dùng.\n\n👉 Vui lòng xác nhận đề xuất tạo lô này trên giao diện.`
     };
   }
 
