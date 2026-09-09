@@ -12,30 +12,43 @@ import { useShallow } from 'zustand/react/shallow';
 import { useQualityAlerts } from '../../hooks/useQualityAlerts';
 import { QAQCActionQueue } from '../../components/features/QAQCActionQueue';
 
-// Gauge Chart Component with Conic Gradient & Needle Rotation
+// Gauge Chart Component — SVG Inline Needle Gauge (no external CSS dependency)
 const GaugeChart: React.FC<{ passRate: number }> = ({ passRate }) => {
-  // 0% corresponds to -90deg, 100% corresponds to 90deg
+  // -90° = 0%, +90° = 100%
   const needleRotation = -90 + (passRate / 100) * 180;
-  
+
   return (
-    <div className="gauge-wrap">
-      <div className="gauge-ring"></div>
-      <div className="gauge-mask"></div>
-      <div className="gauge-ticks">
-        <div className="gauge-tick" style={{ transform: 'rotate(-90deg) translate(0,-95px)' }}></div>
-        <div className="gauge-tick" style={{ transform: 'rotate(-45deg) translate(0,-95px)' }}></div>
-        <div className="gauge-tick" style={{ transform: 'rotate(0deg) translate(0,-95px)' }}></div>
-        <div className="gauge-tick" style={{ transform: 'rotate(45deg) translate(0,-95px)' }}></div>
-        <div className="gauge-tick" style={{ transform: 'rotate(90deg) translate(0,-95px)' }}></div>
+    <div className="flex flex-col items-center justify-center gap-2">
+      {/* SVG Gauge Arc */}
+      <div className="relative w-48 h-24 overflow-hidden">
+        <svg className="w-48 h-48 transform -rotate-180" viewBox="0 0 100 100">
+          {/* Vùng đỏ: 0-50% */}
+          <circle cx="50" cy="50" r="40" fill="none" stroke="#d6494a" strokeWidth="8"
+            strokeDasharray="62.8 126" strokeDashoffset="-62.8" />
+          {/* Vùng vàng: 50-75% */}
+          <circle cx="50" cy="50" r="40" fill="none" stroke="#e0972a" strokeWidth="8"
+            strokeDasharray="31.4 126" strokeDashoffset="-94.2" />
+          {/* Vùng xanh: 75-100% */}
+          <circle cx="50" cy="50" r="40" fill="none" stroke="#10b981" strokeWidth="8"
+            strokeDasharray="31.4 126" strokeDashoffset="-125.6" />
+        </svg>
+        {/* Kim đo xoay động theo passRate */}
+        <div
+          className="absolute bottom-0 left-1/2 w-1 h-16 bg-white origin-bottom rounded-full shadow-lg transition-transform duration-1000 ease-out"
+          style={{ transform: `translateX(-50%) rotate(${needleRotation}deg)` }}
+        />
+        {/* Trụ kim trung tâm */}
+        <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-4 h-4 rounded-full bg-white shadow border-4 border-slate-700 dark:border-slate-900" />
       </div>
-      <div className="gauge-needle animate-needle" style={{ transform: `translateX(-50%) rotate(${needleRotation}deg)` }}></div>
-      <div className="gauge-label">
-        <div className="gauge-value text-zinc-900 dark:text-zinc-50">{passRate}%</div>
-        <div className="gauge-caption text-zinc-500 dark:text-emerald-400/80">TỶ LỆ ĐẠT CHỈ TIÊU</div>
+      {/* Nhãn giá trị */}
+      <div className="text-center -mt-1">
+        <span className="text-2xl font-black tracking-tight tabular-nums text-slate-800 dark:text-slate-100">{passRate}%</span>
+        <span className="text-[10px] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider block">Tỷ lệ đạt chỉ tiêu</span>
       </div>
     </div>
   );
 };
+
 
 const Dashboard: React.FC = () => {
   const navigate = useNavigate();

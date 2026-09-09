@@ -16,7 +16,12 @@ export type QMSStatusType =
   | 'DRAFT'
   | 'APPROVED'
   | 'UNDER_INVESTIGATION'
-  | 'TESTING';
+  | 'TESTING'
+  | 'LOGGED'
+  | 'CAPA_PLANNED';
+
+/** @alias backward-compat alias for GMPStatus used in new workbench components */
+export type GMPStatus = QMSStatusType;
 
 export interface StatusBadgeProps {
   status: string;
@@ -140,6 +145,21 @@ const statusConfig: Record<string, { bg: string; text: string; border: string; d
     border: 'border-slate-200 dark:border-slate-700',
     dot: 'bg-slate-400',
     defaultLabel: 'NGỪNG SX'
+  },
+  // GMP trạng thái bổ sung (PQM Workbench v2.7+)
+  LOGGED: {
+    bg: 'bg-blue-50 dark:bg-blue-950/40',
+    text: 'text-blue-700 dark:text-blue-300',
+    border: 'border-blue-200 dark:border-blue-800/60',
+    dot: 'bg-blue-500',
+    defaultLabel: 'ĐÃ GHI NHẬN'
+  },
+  CAPA_PLANNED: {
+    bg: 'bg-purple-50 dark:bg-purple-950/40',
+    text: 'text-purple-700 dark:text-purple-300',
+    border: 'border-purple-200 dark:border-purple-800/60',
+    dot: 'bg-purple-500',
+    defaultLabel: 'ĐÃ LẬP CAPA'
   }
 };
 

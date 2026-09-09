@@ -2,6 +2,8 @@ import React from 'react';
 
 export interface SurfaceProps extends Omit<React.HTMLAttributes<HTMLDivElement>, 'title'> {
   variant?: 'default' | 'flat' | 'subtle' | 'inset' | 'elevated';
+  /** @alias intensity maps 'flat'|'raised'|'glass' -> variant for backward compat with workbench components */
+  intensity?: 'flat' | 'raised' | 'glass';
   padding?: 'none' | 'sm' | 'md' | 'lg';
   rounded?: 'lg' | 'xl' | '2xl' | 'none';
   bordered?: boolean;
@@ -15,7 +17,8 @@ export interface SurfaceProps extends Omit<React.HTMLAttributes<HTMLDivElement>,
  */
 export const Surface: React.FC<SurfaceProps> = ({
   children,
-  variant = 'default',
+  variant,
+  intensity,
   padding = 'md',
   rounded = 'xl',
   bordered = true,
@@ -24,6 +27,13 @@ export const Surface: React.FC<SurfaceProps> = ({
   subtitle,
   ...props
 }) => {
+  // Map intensity -> variant for backward compat (intensity takes lower priority than explicit variant)
+  const intensityToVariant: Record<string, 'flat' | 'default' | 'subtle'> = {
+    flat: 'flat',
+    raised: 'default',
+    glass: 'subtle'
+  };
+  const resolvedVariant = variant || (intensity ? intensityToVariant[intensity] : 'default') || 'default';
   const variantStyles = {
     default: 'bg-white dark:bg-slate-900 shadow-xs',
     flat: 'bg-white dark:bg-slate-900 shadow-2xs',
@@ -52,7 +62,7 @@ export const Surface: React.FC<SurfaceProps> = ({
 
   return (
     <div
-      className={`transition-colors duration-150 ${variantStyles[variant]} ${paddingStyles[padding]} ${roundedStyles[rounded]} ${borderStyle} ${className}`}
+      className={`transition-colors duration-150 ${variantStyles[resolvedVariant as keyof typeof variantStyles] || variantStyles.default} ${paddingStyles[padding]} ${roundedStyles[rounded]} ${borderStyle} ${className}`}
       {...props}
     >
       {(title || subtitle) && (
