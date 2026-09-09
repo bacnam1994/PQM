@@ -50,6 +50,18 @@ const ACTION_CONFIG = {
     color: 'bg-slate-50 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700',
     badge: 'bg-slate-500',
     icon: LogIn
+  },
+  SYNC_MERGE: {
+    label: 'Hợp nhất đồng bộ',
+    color: 'bg-teal-50 text-teal-700 border-teal-200 dark:bg-teal-950/40 dark:text-teal-300 dark:border-teal-800',
+    badge: 'bg-teal-500',
+    icon: RefreshCw
+  },
+  SYNC_CONFLICT: {
+    label: 'Xung đột đồng bộ',
+    color: 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800',
+    badge: 'bg-amber-500',
+    icon: Shield
   }
 };
 
@@ -57,9 +69,13 @@ const COLLECTION_LABELS: Record<string, string> = {
   PRODUCTS: 'Sản phẩm',
   BATCHES: 'Lô sản xuất',
   TCCS: 'Hồ sơ TCCS',
+  FORMULAS: 'Công thức định lượng',
   TEST_RESULTS: 'Phiếu kiểm nghiệm',
   MATERIALS: 'Nguyên liệu',
   CRITERIA_ALIASES: 'Liên kết chỉ tiêu',
+  DEVIATIONS: 'Sai lệch & CAPA',
+  ELECTRONIC_SIGNATURES: 'Chữ ký điện tử',
+  AI_GATEWAY: 'Trí tuệ nhân tạo',
   SYSTEM: 'Hệ thống'
 };
 
@@ -195,6 +211,7 @@ const AuditLogPage: React.FC = () => {
             <option value={100}>Tải 100 bản ghi</option>
             <option value={200}>Tải 200 bản ghi</option>
             <option value={500}>Tải 500 bản ghi</option>
+            <option value={1000}>Tải 1,000 bản ghi</option>
           </select>
         </div>
       </div>

@@ -1,28 +1,54 @@
 rules_version = '2';
 
-// [BẢO MẬT - LƯU Ý QUAN TRỌNG]
-// Dự án này dùng Firebase Realtime Database, KHÔNG phải Firestore.
-// Storage Rules KHÔNG thể đọc trực tiếp từ Realtime Database.
-//
-// Giải pháp hiện tại: Dùng Firebase Custom Claims để xác định quyền Admin.
-// Để thiết lập: Tạo Cloud Function gán claim { admin: true } khi user được nâng cấp.
-//
-// Tạm thời: Chỉ user đã đăng nhập mới được upload, kiểm tra admin qua Custom Claim.
+// [BẢO MẬT PQM 3.0 - STORAGE ACCESS CONTROL]
+// Phân quyền lưu trữ tệp theo vai trò & kiểm soát loại tệp, dung lượng.
+
+function isAuthenticated() {
+  return request.auth != null;
+}
+
 function isAdmin() {
-  // Kiểm tra Firebase Custom Claim 'admin: true' (set bởi Firebase Admin SDK)
-  // Nếu chưa có Custom Claim, chỉ cho phép user đã đăng nhập upload
-  return request.auth != null && (
+  return isAuthenticated() && (
     request.auth.token.admin == true ||
     request.auth.token.role == 'ADMIN'
   );
 }
 
+function isQA() {
+  return isAdmin() || (isAuthenticated() && request.auth.token.role == 'QA');
+}
+
+function isQC() {
+  return isQA() || (isAuthenticated() && (request.auth.token.role == 'QC' || request.auth.token.role == 'LAB'));
+}
+
 service firebase.storage {
   match /b/{bucket}/o {
+    // 1. Hồ sơ chứng nhận CoA điện tử: Chỉ QA hoặc Admin được ghi; Đọc: user đã xác thực
+    match /coas/{allPaths=**} {
+      allow read: if isAuthenticated();
+      allow write: if isQA();
+    }
+
+    // 2. Dữ liệu phổ/hình ảnh đính kèm phiếu kiểm nghiệm: LAB/QC/QA/Admin được ghi
+    match /test_attachments/{allPaths=**} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() &&
+        request.resource.size < 20 * 1024 * 1024 && // Tối đa 20MB
+        (request.resource.contentType.matches('image/.*') || request.resource.contentType == 'application/pdf');
+    }
+
+    // 3. Ảnh mẫu sản phẩm & tài liệu chuẩn: QA hoặc Admin
+    match /product_images/{allPaths=**} {
+      allow read: if isAuthenticated();
+      allow write: if isQA() &&
+        request.resource.size < 5 * 1024 * 1024 && // Tối đa 5MB
+        request.resource.contentType.matches('image/.*');
+    }
+
+    // 4. Đường dẫn mặc định khác
     match /{allPaths=**} {
-      // Đọc: user đã đăng nhập (không public)
-      allow read: if request.auth != null;
-      // Ghi/Upload: chỉ Admin (qua Custom Claims)
+      allow read: if isAuthenticated();
       allow write: if isAdmin();
     }
   }

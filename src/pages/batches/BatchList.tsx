@@ -11,6 +11,8 @@ import { BATCH_STATUS, formatDateStandard, toInputDate, parseDateToISO, generate
 import { useNavigate } from 'react-router-dom';
 const CoAReport = React.lazy(() => import('../../components/features/CoAReport'));
 import { fetchTestResultsByBatchId } from '../../services/testResultService';
+import { ESignatureModal } from '../../components/features/ESignatureModal';
+import { ElectronicSignature } from '../../types/signature';
 
 // --- HELPER: Tính toán tiến độ kiểm nghiệm ---
 const calculateBatchProgress = (batch: any, batchResults: TestResult[]) => {
@@ -411,6 +413,7 @@ const BatchList: React.FC = () => {
   const [isStatusConfirmOpen, setIsStatusConfirmOpen] = useState(false);
   const [pendingStatusUpdate, setPendingStatusUpdate] = useState<{status: string, batchId: string} | null>(null);
   const [rejectReason, setRejectReason] = useState('');
+  const [eSignatureTarget, setESignatureTarget] = useState<{ batchId: string; batch?: Batch } | null>(null);
   
   const crud = useCrud<Batch>();
   // Dùng trực tiếp hàm fetch từ service để không phụ thuộc vào logic hook
@@ -671,10 +674,44 @@ const BatchList: React.FC = () => {
   }, [crud.selectedItem, deleteBatch, user]);
 
   const handleUpdateBatchStatusClick = useCallback((newStatus: string, batchId: string) => {
-      setRejectReason('');
-      setPendingStatusUpdate({ status: newStatus, batchId });
-      setIsStatusConfirmOpen(true);
-  }, []);
+    if (newStatus === 'RELEASED') {
+      const targetBatch = hydratedBatches.find(b => b.id === batchId);
+      const batchTests = sourceResults.filter(r => r.batchId === batchId);
+      const hasFailed = batchTests.some(
+        r => r.overallStatus === 'FAIL' || r.results?.some(entry => !entry.isPass)
+      );
+      if (hasFailed) {
+        notify({
+          type: 'ERROR',
+          title: 'Quy chuẩn GMP & Release Guard',
+          message: 'Không thể duyệt xuất xưởng lô có kết quả kiểm nghiệm KHÔNG ĐẠT (OOS).'
+        });
+        return;
+      }
+      setESignatureTarget({ batchId, batch: targetBatch });
+      return;
+    }
+    setRejectReason('');
+    setPendingStatusUpdate({ status: newStatus, batchId });
+    setIsStatusConfirmOpen(true);
+  }, [hydratedBatches, sourceResults, notify]);
+
+  const handleESignatureSuccess = async (signature: ElectronicSignature) => {
+    if (!eSignatureTarget) return;
+    try {
+      await updateBatchStatus(eSignatureTarget.batchId, 'RELEASED', undefined, signature);
+      notify({
+        type: 'SUCCESS',
+        title: 'Xuất xưởng Lô thành công',
+        message: `Đã phê duyệt xuất xưởng Lô ${eSignatureTarget.batch?.batchNo || eSignatureTarget.batchId} với chữ ký điện tử hợp lệ (21 CFR Part 11).`
+      });
+    } catch (error: any) {
+      console.error("Lỗi xuất xưởng Lô có chữ ký điện tử:", error);
+      notify({ type: 'ERROR', title: 'Lỗi xuất xưởng', message: error.message || 'Không thể cập nhật trạng thái Lô' });
+    } finally {
+      setESignatureTarget(null);
+    }
+  };
 
   const confirmBatchStatusUpdate = async () => {
     if (!pendingStatusUpdate) return;
@@ -922,6 +959,19 @@ const BatchList: React.FC = () => {
         confirmText="Đồng ý"
         icon={ShieldCheck}
       />
+
+      {/* Modal Ký duyệt Điện tử (FDA 21 CFR Part 11) cho Xuất xưởng Lô */}
+      {eSignatureTarget && (
+        <ESignatureModal
+          isOpen={!!eSignatureTarget}
+          onClose={() => setESignatureTarget(null)}
+          documentType="BATCH_RELEASE"
+          documentId={eSignatureTarget.batchId}
+          documentTitle={`Lô sản xuất: ${eSignatureTarget.batch?.batchNo || eSignatureTarget.batchId}${(eSignatureTarget.batch as any)?.product?.name ? ` - ${(eSignatureTarget.batch as any).product.name}` : ''}`}
+          documentVersion={eSignatureTarget.batch?.version}
+          onSuccess={handleESignatureSuccess}
+        />
+      )}
     </div>
   );
 };

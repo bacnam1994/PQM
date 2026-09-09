@@ -43,7 +43,9 @@ export interface TCCS {
   mainQualityCriteria: Criterion[]; 
   safetyCriteria: Criterion[];
   alternateRules?: { main: string; alt: string; type?: 'FAIL_RETRY' | 'CONDITIONAL_CHECK'; conditionValue?: string }[];
+  version?: number;
   createdAt: string;
+  updatedAt?: string;
 }
 
 export interface Product {
@@ -57,6 +59,7 @@ export interface Product {
   status: ProductStatus;
   description: string;
   imageUrl?: string;
+  version?: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -80,6 +83,7 @@ export interface ProductFormula {
   storage?: string;
   shelfLife?: string;
   standardRefs?: string;
+  version?: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -93,6 +97,7 @@ export interface RawMaterial {
   standard?: string; // Tiêu chuẩn kỹ thuật: DĐVN V, USP, Ph.Eur, BP, TCCS-NSX...
   casNumber?: string; // Mã định danh hóa chất quốc tế CAS (nếu có)
   description?: string;
+  version?: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -111,6 +116,9 @@ export interface Batch {
   status: 'PENDING' | 'TESTING' | 'RELEASED' | 'REJECTED';
   rejectReason?: string;
   progressPercent?: number;
+  version?: number;
+  tccsSnapshot?: TCCS;
+  formulaSnapshot?: ProductFormula;
   createdAt: string;
   updatedAt?: string;
 }
@@ -145,6 +153,7 @@ export interface TestResult {
   overallStatus: 'PASS' | 'FAIL';
   notes?: string;
   attachments?: Attachment[];
+  version?: number;
   createdAt: string;
   updatedAt?: string;
 }
@@ -229,3 +238,8 @@ export interface AppState {
   qualityAlerts: QualityAnomaly[];
   criteriaAliases: CriteriaAlias[];
 }
+
+export * from './types/signature';
+
+export * from './types/permissions';
+export * from './types/deviation';

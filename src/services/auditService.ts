@@ -1,9 +1,9 @@
 import { db } from '../firebase';
-import { ref, push, serverTimestamp, query, orderByChild, limitToLast, onValue, get } from 'firebase/database';
+import { ref, push, serverTimestamp, query, orderByChild, limitToLast, onValue, get, endBefore } from 'firebase/database';
 
 export interface AuditLogEntry {
-  action: 'CREATE' | 'UPDATE' | 'DELETE' | 'IMPORT' | 'RESTORE' | 'LOGIN';
-  collection: 'PRODUCTS' | 'BATCHES' | 'TCCS' | 'TEST_RESULTS' | 'SYSTEM' | 'CRITERIA_ALIASES' | 'MATERIALS';
+  action: 'CREATE' | 'UPDATE' | 'DELETE' | 'IMPORT' | 'RESTORE' | 'LOGIN' | 'SYNC_CONFLICT' | 'SYNC_MERGE';
+  collection: 'PRODUCTS' | 'BATCHES' | 'TCCS' | 'FORMULAS' | 'TEST_RESULTS' | 'SYSTEM' | 'CRITERIA_ALIASES' | 'MATERIALS' | 'DEVIATIONS' | 'AI_GATEWAY' | 'ELECTRONIC_SIGNATURES';
   documentId?: string;
   details: string;
   performedBy: string; // Email người thực hiện
@@ -52,6 +52,61 @@ export const fetchAuditLogs = async (limitCount: number = 100): Promise<AuditLog
   } catch (error) {
     console.error("Failed to fetch audit logs:", error);
     return [];
+  }
+};
+
+/**
+ * Lấy danh sách nhật ký phân trang theo đợt (Server-side Pagination)
+ */
+export const fetchAuditLogsPaged = async (
+  pageSize: number = 50,
+  lastTimestamp?: number
+): Promise<{ records: AuditLogRecord[]; hasMore: boolean; nextTimestamp?: number }> => {
+  try {
+    const logsRef = ref(db, 'audit_logs');
+    const fetchLimit = pageSize + 1;
+    let logsQuery;
+
+    if (lastTimestamp) {
+      logsQuery = query(
+        logsRef,
+        orderByChild('timestamp'),
+        endBefore(lastTimestamp),
+        limitToLast(fetchLimit)
+      );
+    } else {
+      logsQuery = query(
+        logsRef,
+        orderByChild('timestamp'),
+        limitToLast(fetchLimit)
+      );
+    }
+
+    const snapshot = await get(logsQuery);
+    if (!snapshot.exists()) {
+      return { records: [], hasMore: false };
+    }
+
+    const data = snapshot.val();
+    let records: AuditLogRecord[] = Object.keys(data).map(key => ({
+      id: key,
+      ...data[key],
+      timestamp: typeof data[key].timestamp === 'number' ? data[key].timestamp : Date.now()
+    }));
+
+    records.sort((a, b) => b.timestamp - a.timestamp);
+
+    const hasMore = records.length > pageSize;
+    if (hasMore) {
+      records = records.slice(0, pageSize);
+    }
+
+    const nextTimestamp = records.length > 0 ? records[records.length - 1].timestamp : undefined;
+
+    return { records, hasMore, nextTimestamp };
+  } catch (error) {
+    console.error("Failed to fetch paged audit logs:", error);
+    return { records: [], hasMore: false };
   }
 };
 

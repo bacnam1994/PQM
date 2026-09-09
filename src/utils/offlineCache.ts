@@ -100,3 +100,27 @@ export const clearEntireCache = async (): Promise<void> => {
     console.warn('Lỗi xóa toàn bộ cache IndexedDB:', error);
   }
 };
+
+/**
+ * Dọn dẹp cache cũ trong IndexedDB theo độ tuổi (Cache Hygiene)
+ */
+export const clearStaleCache = async (maxAgeDays: number = 30): Promise<{ clearedStores: string[] }> => {
+  const clearedStores: string[] = [];
+  try {
+    const db = await initDB();
+    const stores = [
+      'aiLearnedMappings', 'qualityAlerts'
+    ];
+    const tx = db.transaction(stores, 'readwrite');
+    for (const storeName of stores) {
+      if (db.objectStoreNames.contains(storeName)) {
+        tx.objectStore(storeName).clear();
+        clearedStores.push(storeName);
+      }
+    }
+    await new Promise((resolve) => { tx.oncomplete = () => resolve(undefined); });
+  } catch (error) {
+    console.warn('Lỗi dọn dẹp cache cũ IndexedDB:', error);
+  }
+  return { clearedStores };
+};

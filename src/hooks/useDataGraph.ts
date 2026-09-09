@@ -159,8 +159,8 @@ export const useDataGraph = () => {
       return {
         ...batch,
         product: productMap.get(batch.productId),
-        tccs: tccsMap.get(batch.tccsId),
-        formula: formulaMap.get(batch.productId),
+        tccs: batch.tccsSnapshot || tccsMap.get(batch.tccsId),
+        formula: batch.formulaSnapshot || formulaMap.get(batch.productId),
         testResults: sortedTests,
         latestTestResult: sortedTests[0],
         isFullyTested: bTests.length > 0 && bTests.some(t => t.overallStatus === 'PASS'),
@@ -175,7 +175,7 @@ export const useDataGraph = () => {
     return rawTestResults.map(res => {
       const rawBatch = getBatchForTestResult(res.batchId);
       const product = rawBatch ? productMap.get(rawBatch.productId) : undefined;
-      const tccs = rawBatch ? tccsMap.get(rawBatch.tccsId) : undefined;
+      const tccs = rawBatch ? (rawBatch.tccsSnapshot || tccsMap.get(rawBatch.tccsId)) : undefined;
       const overallStatus = (res.results && res.results.length > 0)
         ? calculateOverallStatus(res.results, tccs || null)
         : (res.overallStatus || 'PASS');

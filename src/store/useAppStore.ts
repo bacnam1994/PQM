@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
-import { AppState, SyncStatus, Product, Batch, TCCS, TestResult, ProductFormula, RawMaterial, AILearnedMapping, CriteriaAlias } from '../types';
+import { AppState, SyncStatus, Product, Batch, TCCS, TestResult, ProductFormula, RawMaterial, AILearnedMapping, CriteriaAlias, Role, ElectronicSignature } from '../types';
 import { ref, set as firebaseSet, remove as firebaseRemove, update as firebaseUpdate, get as firebaseGet } from 'firebase/database';
 import { db } from '../firebase';
 import { User, getAuth, signInWithEmailAndPassword, signOut, createUserWithEmailAndPassword, updatePassword, reauthenticateWithCredential, EmailAuthProvider, sendPasswordResetEmail } from 'firebase/auth';
@@ -9,6 +9,12 @@ import { logAuditAction } from '../services/auditService';
 import { detectCriteriaChanges, normalizeName, mergeAliases, createAliasRecord } from '../services/criteriaAliasService';
 import { deleteProductService, deleteBatchService, deleteTestResultService } from '../services/databaseService';
 import { detectQualityAnomalies } from '../services/reportService';
+import { productAppService } from '../services/app/ProductAppService';
+import { materialAppService } from '../services/app/MaterialAppService';
+import { tccsAppService } from '../services/app/TCCSAppService';
+import { formulaAppService } from '../services/app/FormulaAppService';
+import { batchAppService } from '../services/app/BatchAppService';
+import { testResultAppService } from '../services/app/TestResultAppService';
 
 import { enqueueOfflineMutation, replayOfflineMutations, getPendingMutationsCount } from '../utils/offlineMutationQueue';
 
@@ -200,7 +206,7 @@ interface AppStoreState extends AppState {
   syncStatus: SyncStatus;
   user: User | null;
   isAdmin: boolean;
-  role: 'ADMIN' | 'USER' | 'GUEST' | null;
+  role: Role | null;
   authLoading: boolean;
   toasts: ToastMessage[];
   testResultLimit: number;
@@ -215,7 +221,7 @@ interface AppStoreActions {
   setSyncStatus: (status: SyncStatus) => void;
   setUser: (user: User | null) => void;
   setIsAdmin: (isAdmin: boolean) => void;
-  setRole: (role: 'ADMIN' | 'USER' | 'GUEST' | null) => void;
+  setRole: (role: Role | null) => void;
   setAuthLoading: (loading: boolean) => void;
   login: (email: string, pass: string) => Promise<void>;
   logout: () => Promise<void>;
@@ -245,7 +251,7 @@ interface AppStoreActions {
   addBatch: (b: Batch) => Promise<void>;
   updateBatch: (b: Batch) => Promise<void>;
   deleteBatch: (id: string) => Promise<void>;
-  updateBatchStatus: (id: string, status: string, rejectReason?: string) => Promise<void>;
+  updateBatchStatus: (id: string, status: string, rejectReason?: string, signature?: ElectronicSignature) => Promise<void>;
   updateBatchProgress: (id: string, progressPercent: number) => Promise<void>;
 
   addTCCS: (t: TCCS) => Promise<void>;
@@ -381,97 +387,153 @@ export const useAppStore = create<AppStoreState & AppStoreActions>()(devtools((s
   },
   removeToast: (id) => set((state) => ({ toasts: state.toasts.filter(t => t.id !== id) }), false, 'removeToast'),
 
-  // --- CRUD ACTIONS ---
+  // --- CRUD ACTIONS (MIGRATED TO APPLICATION SERVICES VIA STRANGLER PATTERN) ---
   addProduct: async (p) => {
-    await _handleSave('products', p, get);
-    logAuditAction({ action: 'CREATE', collection: 'PRODUCTS', documentId: p.id, details: `Tạo sản phẩm: ${p.name} (${p.code})`, performedBy: get().user?.email || 'unknown' });
+    try {
+      await productAppService.createProduct(p, get().user);
+    } catch (error: any) {
+      get().notify({ type: 'ERROR', title: 'Lỗi lưu sản phẩm', message: error.message });
+      throw error;
+    }
   },
   updateProduct: async (p) => {
-    await _handleSave('products', p, get);
-    logAuditAction({ action: 'UPDATE', collection: 'PRODUCTS', documentId: p.id, details: `Cập nhật sản phẩm: ${p.name} (${p.code})`, performedBy: get().user?.email || 'unknown' });
+    try {
+      const state = get();
+      const oldProduct = state.products.find(item => item.id === p.id);
+      await productAppService.updateProduct(p, state.user, oldProduct);
+    } catch (error: any) {
+      get().notify({ type: 'ERROR', title: 'Lỗi cập nhật sản phẩm', message: error.message });
+      throw error;
+    }
   },
   deleteProduct: async (id) => {
-    if (!get().isAdmin) {
-      get().notify({ type: 'ERROR', title: 'Từ chối truy cập', message: 'Chỉ Quản trị viên mới có quyền xóa dữ liệu này.' });
-      throw new Error("Permission denied");
+    try {
+      const product = get().products.find(p => p.id === id);
+      await productAppService.deleteProduct(id, get().user, product?.name);
+      await get().syncQualityAlerts();
+    } catch (error: any) {
+      get().notify({ type: 'ERROR', title: 'Lỗi xóa sản phẩm', message: error.message });
+      throw error;
     }
-    const product = get().products.find(p => p.id === id);
-    await executeOfflineOptimistic(deleteProductService(id), get);
-    await get().syncQualityAlerts();
-    logAuditAction({ action: 'DELETE', collection: 'PRODUCTS', documentId: id, details: `Xóa sản phẩm: ${product?.name || id}`, performedBy: get().user?.email || 'unknown' });
   },
   bulkAddProducts: async (products) => {
     try {
-      const updates: Record<string, any> = {};
-      products.forEach(p => { updates[`products/${p.id}`] = removeUndefined(p); });
-      await executeOfflineOptimistic(firebaseUpdate(ref(db), updates), get);
+      await productAppService.bulkCreateProducts(products, get().user);
     } catch (error: any) {
-      get().notify({ type: 'ERROR', title: 'Lỗi', message: error.message });
+      get().notify({ type: 'ERROR', title: 'Lỗi nạp sản phẩm', message: error.message });
       throw error;
     }
   },
 
-  addProductFormula: (f) => _handleSave('product_formulas', processFormulaBeforeSave(f), get),
-  updateProductFormula: (f) => _handleSave('product_formulas', processFormulaBeforeSave(f), get),
-  deleteProductFormula: (id) => _handleDelete('product_formulas', id, get),
+  addProductFormula: async (f) => {
+    try {
+      await formulaAppService.createFormula(f, get().user);
+    } catch (error: any) {
+      get().notify({ type: 'ERROR', title: 'Lỗi lưu công thức', message: error.message });
+      throw error;
+    }
+  },
+  updateProductFormula: async (f) => {
+    try {
+      await formulaAppService.updateFormula(f, get().user);
+    } catch (error: any) {
+      get().notify({ type: 'ERROR', title: 'Lỗi cập nhật công thức', message: error.message });
+      throw error;
+    }
+  },
+  deleteProductFormula: async (id) => {
+    try {
+      await formulaAppService.deleteFormula(id, get().user);
+    } catch (error: any) {
+      get().notify({ type: 'ERROR', title: 'Lỗi xóa công thức', message: error.message });
+      throw error;
+    }
+  },
 
   addRawMaterial: async (rm) => {
-    await _handleSave('raw_materials', rm, get);
-    logAuditAction({ action: 'CREATE', collection: 'SYSTEM', documentId: rm.id, details: `Thêm mới nguyên liệu: ${rm.name}${rm.code ? ` (${rm.code})` : ''}`, performedBy: get().user?.email || 'unknown' });
+    try {
+      await materialAppService.createMaterial(rm, get().user);
+    } catch (error: any) {
+      get().notify({ type: 'ERROR', title: 'Lỗi lưu nguyên liệu', message: error.message });
+      throw error;
+    }
   },
   updateRawMaterial: async (rm) => {
-    await _handleSave('raw_materials', rm, get);
-    logAuditAction({ action: 'UPDATE', collection: 'SYSTEM', documentId: rm.id, details: `Cập nhật nguyên liệu: ${rm.name}${rm.code ? ` (${rm.code})` : ''}`, performedBy: get().user?.email || 'unknown' });
+    try {
+      await materialAppService.updateMaterial(rm, get().user);
+    } catch (error: any) {
+      get().notify({ type: 'ERROR', title: 'Lỗi cập nhật nguyên liệu', message: error.message });
+      throw error;
+    }
   },
   deleteRawMaterial: async (id: string) => {
-    const state = get();
-    // ✅ Bug 2 Fix: chỉ kiểm tra materialId — không kiểm tra tên để tránh false positive sau khi merge aliases
-    const isUsedInFormula = state.productFormulas.some(f => 
-      (f.ingredients || []).some(ing => ing.materialId === id) ||
-      (f.excipients || []).some(exc => exc.materialId === id)
-    );
-    if (isUsedInFormula) {
-      get().notify({ type: 'WARNING', title: 'Không thể xóa', message: 'Nguyên liệu này đang được sử dụng trong Công thức sản phẩm. Vui lòng cập nhật công thức trước.' });
-      throw new Error("Material is in use");
+    try {
+      const state = get();
+      const material = state.rawMaterials.find(m => m.id === id);
+      await materialAppService.deleteMaterial(id, state.productFormulas, state.user, material?.name);
+    } catch (error: any) {
+      get().notify({ type: 'WARNING', title: 'Không thể xóa', message: error.message });
+      throw error;
     }
-    const material = state.rawMaterials.find(m => m.id === id);
-    await _handleDelete('raw_materials', id, get);
-    logAuditAction({ action: 'DELETE', collection: 'SYSTEM', documentId: id, details: `Xóa nguyên liệu: ${material?.name || id}`, performedBy: get().user?.email || 'unknown' });
   },
 
   addBatch: async (b) => {
-    await _handleSave('batches', b, get);
-    await get().syncQualityAlerts();
-    logAuditAction({ action: 'CREATE', collection: 'BATCHES', documentId: b.id, details: `Tạo lô hàng: ${b.batchNo}`, performedBy: get().user?.email || 'unknown' });
+    try {
+      const state = get();
+      await batchAppService.createBatch(b, state.user, state.batches, {
+        activeTCCS: state.tccsList.find(t => t.id === b.tccsId),
+        tccsList: state.tccsList,
+        productFormula: state.productFormulas.find(f => f.productId === b.productId),
+        productFormulas: state.productFormulas,
+      });
+      await get().syncQualityAlerts();
+    } catch (error: any) {
+      get().notify({ type: 'ERROR', title: 'Lỗi lưu lô sản xuất', message: error.message });
+      throw error;
+    }
   },
   updateBatch: async (b) => {
-    await _handleSave('batches', b, get);
-    await get().syncQualityAlerts();
-    logAuditAction({ action: 'UPDATE', collection: 'BATCHES', documentId: b.id, details: `Cập nhật lô: ${b.batchNo} -> trạng thái: ${b.status}`, performedBy: get().user?.email || 'unknown' });
+    try {
+      const state = get();
+      const oldBatch = state.batches.find(item => item.id === b.id);
+      await batchAppService.updateBatch(b, state.user, oldBatch);
+      await get().syncQualityAlerts();
+    } catch (error: any) {
+      get().notify({ type: 'ERROR', title: 'Lỗi cập nhật lô sản xuất', message: error.message });
+      throw error;
+    }
   },
   deleteBatch: async (id) => {
-    if (!get().isAdmin) {
-      get().notify({ type: 'ERROR', title: 'Từ chối truy cập', message: 'Chỉ Quản trị viên mới có quyền xóa dữ liệu này.' });
-      throw new Error("Permission denied");
-    }
-    const batch = get().batches.find(b => b.id === id);
-    await executeOfflineOptimistic(deleteBatchService(id), get);
-    await get().syncQualityAlerts();
-    logAuditAction({ action: 'DELETE', collection: 'BATCHES', documentId: id, details: `Xóa lô: ${batch?.batchNo || id}`, performedBy: get().user?.email || 'unknown' });
-  },
-  updateBatchStatus: async (id, status, rejectReason) => {
     try {
-      const updates: any = { status, updatedAt: new Date().toISOString() };
-      updates.rejectReason = status === 'REJECTED' ? (rejectReason || null) : null;
-      await executeOfflineOptimistic(firebaseUpdate(ref(db, `batches/${id}`), updates), get);
+      const state = get();
+      const batch = state.batches.find(b => b.id === id);
+      await batchAppService.deleteBatch(id, state.user, batch?.batchNo);
       await get().syncQualityAlerts();
-    } catch (e: any) {
-      get().notify({ type: 'ERROR', title: 'Lỗi', message: 'Không thể cập nhật trạng thái lô' });
+    } catch (error: any) {
+      get().notify({ type: 'ERROR', title: 'Lỗi xóa lô sản xuất', message: error.message });
+      throw error;
+    }
+  },
+  updateBatchStatus: async (id, status, rejectReason, signature) => {
+    try {
+      const state = get();
+      const currentBatch = state.batches.find(b => b.id === id);
+      const batchTestResults = state.testResults.filter(r => r.batchId === id);
+      await batchAppService.updateStatus(id, status as Batch['status'], state.user, {
+        reason: rejectReason,
+        currentBatch,
+        batchTestResults,
+        signature,
+      });
+      await get().syncQualityAlerts();
+    } catch (error: any) {
+      get().notify({ type: 'ERROR', title: 'Lỗi trạng thái lô', message: error.message || 'Không thể cập nhật trạng thái lô' });
+      throw error;
     }
   },
   updateBatchProgress: async (id, progressPercent) => {
     try {
-      await executeOfflineOptimistic(firebaseUpdate(ref(db, `batches/${id}`), { progressPercent }), get);
+      await batchAppService.updateProgress(id, progressPercent, get().user);
     } catch (e: any) {
       console.error("Lỗi cập nhật tiến độ lô", e);
     }
@@ -480,132 +542,80 @@ export const useAppStore = create<AppStoreState & AppStoreActions>()(devtools((s
   addTCCS: async (t) => {
     try {
       const state = get();
-      const otherTCCS = state.tccsList.filter(item => item.productId === t.productId && item.id !== t.id);
-      const allTCCS = [...otherTCCS, t].sort((a, b) => b.issueDate.localeCompare(a.issueDate));
-      if (allTCCS.length === 0) {
-        // Guard: không có TCCS nào (rất hiếm) — lưu thẳng không cần lóc thứ tự
-        await executeOfflineOptimistic(firebaseSet(ref(db, `tccs/${t.id}`), removeUndefined({ ...t, isActive: true })), get);
-        return;
-      }
-      const latestId = allTCCS[0].id;
-      const updates: Record<string, any> = {};
-      
-      allTCCS.forEach(item => {
-        const shouldBeActive = item.id === latestId;
-        if (item.id === t.id) {
-          updates[`tccs/${item.id}`] = removeUndefined({ ...t, isActive: shouldBeActive });
-        } else if (item.isActive !== shouldBeActive) {
-          updates[`tccs/${item.id}/isActive`] = shouldBeActive;
-        }
-      });
-      
-      await executeOfflineOptimistic(firebaseUpdate(ref(db), updates), get);
+      await tccsAppService.createTCCS(t, state.tccsList, state.user);
     } catch (error: any) {
-      get().notify({ type: 'ERROR', title: 'Lỗi', message: error.message });
+      get().notify({ type: 'ERROR', title: 'Lỗi lưu TCCS', message: error.message });
       throw error;
     }
   },
   updateTCCS: async (t) => {
-    // 1. Phát hiện thay đổi tên chỉ tiêu so với TCCS cũ → tự động tạo alias
     try {
       const state = get();
       const oldTCCS = state.tccsList.find(item => item.id === t.id);
-      if (oldTCCS) {
-        const oldNames = [
-          ...(oldTCCS.mainQualityCriteria || []),
-          ...(oldTCCS.safetyCriteria || []),
-        ].filter(c => c?.name).map(c => c.name);
-
-        const newNames = [
-          ...(t.mainQualityCriteria || []),
-          ...(t.safetyCriteria || []),
-        ].filter(c => c?.name).map(c => c.name);
-
-        const changes = detectCriteriaChanges(oldNames, newNames);
-
-        if (changes.length > 0) {
-          const aliasUpdates: Record<string, any> = {};
-          const existingAliases = state.criteriaAliases;
-          let autoConfirmCount = 0;
-
-          for (const change of changes) {
-            // Tìm alias record đã có cho tên mới này
-            const existing = existingAliases.find(
-              a => a.tccsId === t.id && normalizeName(a.canonicalName) === normalizeName(change.newName)
-            );
-
-            if (existing) {
-              // Merge alias cũ vào record đã có
-              const merged = mergeAliases(existing, [change.oldName]);
-              if (change.autoConfirm) merged.confirmedByAdmin = true;
-              aliasUpdates[`criteria_aliases/${existing.id}`] = removeUndefined(merged);
-            } else {
-              // Tạo alias record mới
-              const newId = `ca_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
-              const newAlias: CriteriaAlias = {
-                id: newId,
-                ...createAliasRecord(t.id, change.newName, [change.oldName], true, change.autoConfirm),
-              };
-              aliasUpdates[`criteria_aliases/${newId}`] = removeUndefined(newAlias);
-            }
-            if (change.autoConfirm) autoConfirmCount++;
-          }
-
-          if (Object.keys(aliasUpdates).length > 0) {
-            await executeOfflineOptimistic(firebaseUpdate(ref(db), aliasUpdates), get);
-            const pendingCount = changes.length - autoConfirmCount;
-            get().notify({
-              type: 'INFO',
-              title: '🔗 Alias tự động tạo',
-              message: `Phát hiện ${changes.length} chỉ tiêu đổi tên. Đã tạo ${autoConfirmCount} alias tự động${
-                pendingCount > 0 ? `, ${pendingCount} cần Admin xác nhận.` : '.'
-              }`,
-            });
-          }
-        }
+      const { aliasUpdates } = await tccsAppService.updateTCCS(t, oldTCCS, state.criteriaAliases, state.user);
+      if (Object.keys(aliasUpdates).length > 0) {
+        await executeOfflineOptimistic(firebaseUpdate(ref(db), aliasUpdates), get);
       }
-    } catch (aliasError) {
-      console.warn('Lỗi khi phát hiện alias TCCS (không ảnh hưởng đến việc lưu TCCS):', aliasError);
+      return get().addTCCS(t);
+    } catch (error: any) {
+      get().notify({ type: 'ERROR', title: 'Lỗi cập nhật TCCS', message: error.message });
+      throw error;
     }
-
-    // 2. Lưu TCCS bình thường
-    return get().addTCCS(t);
   },
   deleteTCCS: async (id) => {
-    const isUsed = get().batches.some(b => b.tccsId === id);
-    if (isUsed) {
-      get().notify({ type: 'WARNING', title: 'Không thể xóa', message: 'TCCS này đang được sử dụng bởi các Lô hàng. Vui lòng xóa Lô trước.' });
-      throw new Error("TCCS is in use");
-    }
-    // Dọn dẹp các Criteria Alias gắn liền với TCCS này để tránh orphan records
-    const state = get();
-    const relatedAliases = state.criteriaAliases.filter(a => a.tccsId === id);
-    if (relatedAliases.length > 0) {
-      const aliasUpdates: Record<string, any> = {};
-      relatedAliases.forEach(a => { aliasUpdates[`criteria_aliases/${a.id}`] = null; });
-      try {
-        await executeOfflineOptimistic(firebaseUpdate(ref(db), aliasUpdates), get);
-      } catch (e) {
-        console.warn("Lỗi dọn dẹp alias khi xóa TCCS:", e);
+    try {
+      const state = get();
+      const tccs = state.tccsList.find(t => t.id === id);
+      await tccsAppService.deleteTCCS(id, state.batches, state.user, tccs?.code);
+      // Dọn dẹp các Criteria Alias gắn liền với TCCS này để tránh orphan records
+      const relatedAliases = state.criteriaAliases.filter(a => a.tccsId === id);
+      if (relatedAliases.length > 0) {
+        const aliasUpdates: Record<string, any> = {};
+        relatedAliases.forEach(a => { aliasUpdates[`criteria_aliases/${a.id}`] = null; });
+        try {
+          await executeOfflineOptimistic(firebaseUpdate(ref(db), aliasUpdates), get);
+        } catch (e) {
+          console.warn("Lỗi dọn dẹp alias khi xóa TCCS:", e);
+        }
       }
+    } catch (error: any) {
+      get().notify({ type: 'WARNING', title: 'Không thể xóa', message: error.message });
+      throw error;
     }
-    await _handleDelete('tccs', id, get, true);
   },
 
   addTestResult: async (r) => {
-    await _handleSave('testResults', r, get);
-    await get().syncQualityAlerts();
-    logAuditAction({ action: 'CREATE', collection: 'TEST_RESULTS', documentId: r.id, details: `Thêm phiếu KN: Lô ${r.batchId}, Lab: ${r.labName}, Kết quả: ${r.overallStatus}`, performedBy: get().user?.email || 'unknown' });
+    try {
+      const state = get();
+      const batch = state.batches.find(b => b.id === r.batchId);
+      await testResultAppService.createTestResult(r, state.user, { batch });
+      await get().syncQualityAlerts();
+    } catch (error: any) {
+      get().notify({ type: 'ERROR', title: 'Lỗi lưu phiếu kiểm nghiệm', message: error.message });
+      throw error;
+    }
   },
   updateTestResult: async (r) => {
-    await _handleSave('testResults', r, get);
-    await get().syncQualityAlerts();
-    logAuditAction({ action: 'UPDATE', collection: 'TEST_RESULTS', documentId: r.id, details: `Cập nhật phiếu KN: ${r.id}, Kết quả: ${r.overallStatus}`, performedBy: get().user?.email || 'unknown' });
+    try {
+      const state = get();
+      const oldResult = state.testResults.find(item => item.id === r.id);
+      await testResultAppService.updateTestResult(r, state.user, oldResult);
+      await get().syncQualityAlerts();
+    } catch (error: any) {
+      get().notify({ type: 'ERROR', title: 'Lỗi cập nhật phiếu kiểm nghiệm', message: error.message });
+      throw error;
+    }
   },
   deleteTestResult: async (id) => {
-    await executeOfflineOptimistic(deleteTestResultService(id), get);
-    await get().syncQualityAlerts();
-    logAuditAction({ action: 'DELETE', collection: 'TEST_RESULTS', documentId: id, details: `Xóa phiếu KN: ${id}`, performedBy: get().user?.email || 'unknown' });
+    try {
+      const state = get();
+      const oldResult = state.testResults.find(item => item.id === id);
+      await testResultAppService.deleteTestResult(id, state.user, oldResult);
+      await get().syncQualityAlerts();
+    } catch (error: any) {
+      get().notify({ type: 'ERROR', title: 'Lỗi xóa phiếu kiểm nghiệm', message: error.message });
+      throw error;
+    }
   },
 
   loadMoreTestResults: () => set((state) => ({ testResultLimit: state.testResultLimit + 50 }), false, 'loadMoreTestResults'),

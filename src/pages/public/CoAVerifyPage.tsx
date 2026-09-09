@@ -15,6 +15,7 @@ import {
   Award, RefreshCw
 } from 'lucide-react';
 import { TestResult, Batch, Product, TCCS } from '../../types';
+import { ElectronicSignature } from '../../types/signature';
 import { formatDateStandard, calculateOverallStatus, TEST_RESULT_STATUS } from '../../utils';
 
 export const CoAVerifyPage: React.FC = () => {
@@ -24,6 +25,7 @@ export const CoAVerifyPage: React.FC = () => {
   const [batch, setBatch] = useState<Batch | null>(null);
   const [product, setProduct] = useState<Product | null>(null);
   const [tccs, setTccs] = useState<TCCS | null>(null);
+  const [signature, setSignature] = useState<ElectronicSignature | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -95,6 +97,25 @@ export const CoAVerifyPage: React.FC = () => {
           if (tccsSnap.exists()) {
             setTccs({ id: tccsSnap.key!, ...tccsSnap.val() });
           }
+        }
+
+        // 6. Tải Chữ ký điện tử (FDA 21 CFR Part 11) nếu có
+        try {
+          const sigSnap = await get(ref(db, 'electronic_signatures'));
+          if (sigSnap.exists()) {
+            const allSigs = Object.values(sigSnap.val()) as ElectronicSignature[];
+            const found = allSigs.find(s =>
+              s && (
+                (currentBatch && s.documentId === currentBatch.id) ||
+                (trData && s.documentId === trData.id)
+              )
+            );
+            if (found) {
+              setSignature(found);
+            }
+          }
+        } catch (sigErr) {
+          console.warn('Lỗi đọc chữ ký điện tử:', sigErr);
         }
       } catch (err: any) {
         console.error('Error verifying CoA:', err);
@@ -207,6 +228,53 @@ export const CoAVerifyPage: React.FC = () => {
             </div>
           </div>
         </div>
+
+        {/* Thẻ Chữ Ký Điện Tử (FDA 21 CFR Part 11) */}
+        {signature && (
+          <div className="bg-gradient-to-br from-indigo-950 via-slate-900 to-blue-950 text-white rounded-3xl p-6 shadow-xl border border-indigo-500/30 relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-48 h-48 bg-indigo-500/10 rounded-full blur-2xl -mr-12 -mt-12 pointer-events-none" />
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2.5 bg-emerald-500/20 text-emerald-400 rounded-xl border border-emerald-500/30">
+                  <ShieldCheck size={22} />
+                </div>
+                <div>
+                  <h3 className="font-black text-sm uppercase tracking-wide">Chữ Ký Điện Tử Hợp Lệ (21 CFR Part 11)</h3>
+                  <p className="text-[11px] text-indigo-200">Chứng nhận tính toàn vẹn bất biến (ALCOA+ Compliant)</p>
+                </div>
+              </div>
+              <span className="px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-400/20 text-emerald-300 border border-emerald-400/40">
+                Đã Ký Duyệt
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+              <div className="bg-white/5 p-3 rounded-xl border border-white/10">
+                <span className="text-slate-400 block text-[10px] uppercase font-bold">Người ký & Chức danh</span>
+                <span className="font-bold text-white text-sm">{signature.signerName}</span>
+                <span className="text-indigo-300 block text-[11px] font-mono mt-0.5">{signature.signerEmail} ({signature.role})</span>
+              </div>
+
+              <div className="bg-white/5 p-3 rounded-xl border border-white/10">
+                <span className="text-slate-400 block text-[10px] uppercase font-bold">Thời gian ký chính xác</span>
+                <span className="font-semibold text-white">{new Date(signature.signedAt).toLocaleString('vi-VN')}</span>
+                <span className="text-slate-400 block text-[10px] mt-0.5 font-mono">{signature.signedAt}</span>
+              </div>
+            </div>
+
+            <div className="mt-3 bg-white/5 p-3 rounded-xl border border-white/10 space-y-1">
+              <span className="text-slate-400 block text-[10px] uppercase font-bold">Ý nghĩa pháp lý chữ ký</span>
+              <p className="text-xs text-amber-200 font-medium italic">"{signature.meaning}"</p>
+            </div>
+
+            {signature.checksum && (
+              <div className="mt-3 flex items-center justify-between text-[10px] text-slate-400 pt-2 border-t border-white/10 font-mono">
+                <span>SHA-256 Digest:</span>
+                <span className="text-indigo-300 truncate max-w-xs">{signature.checksum}</span>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Bảng Chỉ tiêu Kết quả Tóm tắt */}
         <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-200/80 space-y-4">

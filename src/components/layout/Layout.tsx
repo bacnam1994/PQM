@@ -55,7 +55,8 @@ const navItems: NavGroup[] = [
     children: [
       { name: 'Quản lý Lô', path: '/batches', icon: Layers },
       { name: 'Kiểm soát Lab', path: '/test-results', icon: ClipboardCheck },
-      { name: 'Cảnh báo chất lượng', path: '/alerts', icon: ShieldAlert, isAlerts: true },
+      { name: 'Quản lý Sai lệch (CAPA)', path: '/deviations', icon: ShieldAlert },
+      { name: 'Cảnh báo chất lượng', path: '/alerts', icon: Bell, isAlerts: true },
       { name: 'Báo cáo tổng hợp', path: '/reports/quality-summary', icon: FileText },
       { name: 'Phân tích xu hướng', path: '/reports/trend-analysis', icon: TrendingUp },
     ]
@@ -140,6 +141,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     if (pathname.startsWith('/product-formulas')) return { title: 'Công thức Sản phẩm', subtitle: 'Định mức nguyên liệu và công thức chế phẩm' };
     if (pathname.startsWith('/batches')) return { title: 'Quản lý Lô', subtitle: 'Theo dõi trạng thái, hồ sơ và kiểm nghiệm lô sản xuất' };
     if (pathname.startsWith('/test-results')) return { title: 'Kiểm soát Lab', subtitle: 'Nhập kết quả kiểm nghiệm và phát hành CoA' };
+    if (pathname.startsWith('/deviations')) return { title: 'Quản lý Sai lệch & CAPA', subtitle: 'Theo dõi sự cố OOS, điều tra nguyên nhân gốc rễ và kiểm soát hành động khắc phục (GMP-WHO / 21 CFR Part 211)' };
     if (pathname.startsWith('/reports')) return { title: 'Báo cáo tổng hợp', subtitle: 'Thống kê chất lượng và báo cáo định kỳ' };
     if (pathname.startsWith('/users')) return { title: 'Người dùng', subtitle: 'Quản lý tài khoản và phân quyền thành viên' };
     if (pathname.startsWith('/settings')) return { title: 'Cấu hình', subtitle: 'Thông tin hệ thống và tùy chọn kết nối API AI' };

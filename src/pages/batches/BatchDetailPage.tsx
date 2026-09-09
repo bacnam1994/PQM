@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { ArrowLeft, Loader2, FlaskConical, ClipboardCheck, Layers, Printer, CheckCircle2, X, AlertTriangle, ShieldAlert, Sparkles, GitBranch, FileWarning, FileText } from 'lucide-react';
+import { ArrowLeft, Loader2, FlaskConical, ClipboardCheck, Layers, Printer, CheckCircle2, X, AlertTriangle, ShieldAlert, Sparkles, GitBranch, FileWarning, FileText, ShieldCheck } from 'lucide-react';
 import { useDataGraph } from '../../hooks/useDataGraph';
 import { useAppStore } from '../../store/useAppStore';
 import { formatDateStandard, ensureArray, parseNumberFromText } from '../../utils';
@@ -11,6 +11,10 @@ import { OOSInvestigationModal } from '../../components/features/OOSInvestigatio
 import { AIBatchClearanceModal } from '../../components/features/AIBatchClearanceModal';
 import { DeviationReportModal } from '../../components/features/DeviationReportModal';
 import { BatchGenealogyModal } from '../../components/features/BatchGenealogyModal';
+import { ESignatureModal } from '../../components/features/ESignatureModal';
+import { ElectronicSignature } from '../../types/signature';
+import { QualityDeviation } from '../../types/deviation';
+import { firebaseDeviationRepository } from '../../repositories/firebase/FirebaseDeviationRepository';
 import { FileCheck2 } from 'lucide-react';
 
 // Helper tính tiến độ lô
@@ -68,6 +72,10 @@ const BatchDetailPage = () => {
   const { batches } = useDataGraph();
   const tccsList = useAppStore(state => state.tccsList);
   const productFormulas = useAppStore(state => (state as any).productFormulas || []);
+  const updateBatchStatus = useAppStore(state => state.updateBatchStatus);
+  const notify = useAppStore(state => state.notify);
+  const role = useAppStore(state => state.role);
+  const isAdmin = useAppStore(state => state.isAdmin);
 
   const [viewBatchResults, setViewBatchResults] = useState<TestResult[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
@@ -78,8 +86,53 @@ const BatchDetailPage = () => {
   const [isDeviationOpen, setIsDeviationOpen] = useState(false);
   const [deviationData, setDeviationData] = useState<any>(null);
   const [isGenealogyOpen, setIsGenealogyOpen] = useState(false);
+  const [isSignReleaseOpen, setIsSignReleaseOpen] = useState(false);
+  const [batchDeviations, setBatchDeviations] = useState<QualityDeviation[]>([]);
 
   const batch = useMemo(() => batches.find(b => b.id === id), [batches, id]);
+  const canSignRelease = isAdmin || role === 'QA';
+
+  const handleOpenSignRelease = () => {
+    if (!batch) return;
+    const hasFailed = viewBatchResults.some(
+      r => r.overallStatus === 'FAIL' || r.results?.some(entry => !entry.isPass)
+    );
+    if (hasFailed) {
+      notify({
+        type: 'ERROR',
+        title: 'Quy chuẩn GMP & Release Guard',
+        message: 'Không thể duyệt xuất xưởng lô có kết quả kiểm nghiệm KHÔNG ĐẠT (OOS).'
+      });
+      return;
+    }
+
+    const hasOpenDeviations = batchDeviations.some(d => d.status !== 'CLOSED');
+    if (hasOpenDeviations) {
+      notify({
+        type: 'ERROR',
+        title: 'Quy chuẩn GMP & Deviation Guard',
+        message: 'Lô sản xuất đang có hồ sơ Sai lệch/CAPA chưa đóng (Open Deviation). Yêu cầu hoàn tất điều tra và đóng hồ sơ trước khi ký duyệt xuất xưởng.'
+      });
+      return;
+    }
+
+    setIsSignReleaseOpen(true);
+  };
+
+  const handleSignReleaseSuccess = async (signature: ElectronicSignature) => {
+    if (!batch) return;
+    try {
+      await updateBatchStatus(batch.id, 'RELEASED', undefined, signature);
+      notify({
+        type: 'SUCCESS',
+        title: 'Xuất xưởng Lô thành công',
+        message: `Đã phê duyệt xuất xưởng Lô ${batch.batchNo} với chữ ký điện tử hợp lệ (FDA 21 CFR Part 11).`
+      });
+    } catch (error: any) {
+      console.error("Lỗi xuất xưởng Lô:", error);
+      notify({ type: 'ERROR', title: 'Lỗi xuất xưởng', message: error.message || 'Không thể xuất xưởng Lô' });
+    }
+  };
 
   const handleOpenOOS = (res?: TestResult) => {
     if (!batch) return;
@@ -203,6 +256,10 @@ const BatchDetailPage = () => {
         .then(res => setViewBatchResults(res))
         .catch(err => console.error(err))
         .finally(() => setIsLoadingHistory(false));
+
+      firebaseDeviationRepository.findByBatchId(id)
+        .then(devs => setBatchDeviations(devs || []))
+        .catch(err => console.error('Lỗi nạp sai lệch của lô:', err));
     }
   }, [id]);
 
@@ -220,6 +277,20 @@ const BatchDetailPage = () => {
           <h1 className="text-2xl font-black text-slate-800 dark:text-slate-100 uppercase tracking-tight">Chi tiết Lô hàng</h1>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
+          {batch.status === 'RELEASED' ? (
+            <div className="flex items-center gap-1.5 px-4 py-3 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 rounded-xl font-black text-xs uppercase shadow-sm">
+              <ShieldCheck size={16} className="text-emerald-600 dark:text-emerald-400" />
+              <span>Đã Phê Duyệt Xuất Xưởng (21 CFR Part 11)</span>
+            </div>
+          ) : canSignRelease ? (
+            <button
+              type="button"
+              onClick={handleOpenSignRelease}
+              className="flex items-center gap-2 px-4 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-black shadow-md shadow-emerald-200 dark:shadow-none transition-all uppercase text-xs w-fit"
+            >
+              <ShieldCheck size={16} /> Phê Duyệt Xuất Xưởng (QA)
+            </button>
+          ) : null}
           <button
             type="button"
             onClick={() => setIsGenealogyOpen(true)}
@@ -312,6 +383,61 @@ const BatchDetailPage = () => {
               <div className="bg-emerald-50 dark:bg-emerald-900/20 p-4 rounded-xl border border-emerald-100 dark:border-emerald-800/40 flex items-center gap-2">
                 <CheckCircle2 size={16} className="text-emerald-500" />
                 <span className="text-xs font-bold text-emerald-700 dark:text-emerald-400">Đã kiểm đủ tất cả chỉ tiêu.</span>
+              </div>
+            )}
+          </div>
+
+          {/* Card: Hồ sơ Sai lệch & CAPA liên kết */}
+          <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <ShieldAlert size={16} className={batchDeviations.some(d => d.status !== 'CLOSED') ? 'text-rose-500' : 'text-slate-400'} />
+                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-200">
+                  Hồ sơ Sai lệch (CAPA)
+                </h4>
+              </div>
+              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                batchDeviations.length === 0 
+                  ? 'bg-slate-100 dark:bg-slate-700 text-slate-500' 
+                  : batchDeviations.some(d => d.status !== 'CLOSED')
+                    ? 'bg-rose-100 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300'
+                    : 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300'
+              }`}>
+                {batchDeviations.length} hồ sơ
+              </span>
+            </div>
+
+            {batchDeviations.length === 0 ? (
+              <p className="text-xs text-slate-400 italic">Không có hồ sơ sai lệch nào cho lô này.</p>
+            ) : (
+              <div className="space-y-2.5">
+                {batchDeviations.map(dev => (
+                  <div key={dev.id} className="p-3 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200/60 dark:border-slate-700/60 text-xs space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <span className="font-mono font-bold text-slate-800 dark:text-slate-200">{dev.deviationNo}</span>
+                      <span className={`text-[10px] font-semibold px-2 py-0.5 rounded ${
+                        dev.status === 'CLOSED'
+                          ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300'
+                          : 'bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-300'
+                      }`}>
+                        {dev.status === 'CLOSED' ? 'Đã đóng' : 'Đang xử lý'}
+                      </span>
+                    </div>
+                    <p className="text-slate-600 dark:text-slate-300 font-medium truncate">{dev.title}</p>
+                    {dev.failedCriteria && dev.failedCriteria.length > 0 && (
+                      <p className="text-[11px] text-rose-600 dark:text-rose-400 font-medium">
+                        {dev.failedCriteria.length} chỉ tiêu OOS ({dev.failedCriteria.map(c => c.name).join(', ')})
+                      </p>
+                    )}
+                  </div>
+                ))}
+
+                <Link
+                  to="/deviations"
+                  className="block text-center py-2 px-3 rounded-xl bg-slate-100 dark:bg-slate-700 hover:bg-rose-50 dark:hover:bg-rose-950/40 text-slate-700 dark:text-slate-200 hover:text-rose-600 dark:hover:text-rose-400 text-xs font-semibold transition-colors"
+                >
+                  Mở trang Quản lý Sai lệch & CAPA →
+                </Link>
               </div>
             )}
           </div>
@@ -444,6 +570,19 @@ const BatchDetailPage = () => {
         batch={batch}
         batchTestResults={viewBatchResults}
       />
+
+      {/* Modal Ký duyệt Điện tử (FDA 21 CFR Part 11) */}
+      {isSignReleaseOpen && batch && (
+        <ESignatureModal
+          isOpen={isSignReleaseOpen}
+          onClose={() => setIsSignReleaseOpen(false)}
+          documentType="BATCH_RELEASE"
+          documentId={batch.id}
+          documentTitle={`Lô sản xuất: ${batch.batchNo} - ${batch.product?.name || ''}`}
+          documentVersion={batch.version}
+          onSuccess={handleSignReleaseSuccess}
+        />
+      )}
     </div>
   );
 };

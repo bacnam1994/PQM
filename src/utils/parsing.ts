@@ -1,6 +1,27 @@
-
 import { CriterionType } from '../types';
 import { useUIStore } from '../store/useUIStore';
+
+export const removeUndefined = (obj: any): any => {
+  if (obj === undefined) return null;
+  if (typeof obj === 'number') {
+    if (isNaN(obj) || !isFinite(obj)) return 0;
+    return obj;
+  }
+  if (obj === null || typeof obj !== 'object') return obj;
+  if (Array.isArray(obj)) return obj.map(removeUndefined);
+  const result: any = {};
+  for (const key of Object.keys(obj)) {
+    const val = obj[key];
+    if (val !== undefined) {
+      if (typeof val === 'number') {
+        result[key] = (isNaN(val) || !isFinite(val)) ? 0 : val;
+      } else {
+        result[key] = removeUndefined(val);
+      }
+    }
+  }
+  return result;
+};
 
 const getDecimalSeparator = () => {
   if (typeof window === 'undefined') return 'dot';

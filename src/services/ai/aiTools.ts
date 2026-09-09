@@ -11,6 +11,7 @@ import { useAppStore } from '../../store/useAppStore';
 import { generateId, formatDateStandard, BATCH_STATUS } from '../../utils';
 import { autoHealAllWithAI } from '../dataConsistencyService';
 import { predictBatchRiskBeforeTesting } from './predictiveInspectionService';
+import { validateAIAction } from './aiActionGuard';
 
 // ============================================================
 // GEMINI TOOL DECLARATIONS
@@ -1479,6 +1480,15 @@ export const createBatchAction = async (args: {
   yieldUnit?: string;
 }, appContext: any) => {
   const store = useAppStore.getState();
+  const currentUser = appContext?.user || store.user;
+  const guard = validateAIAction('createBatch', { batchNo: args.batchNo, productIdentifier: args.productIdentifier }, currentUser);
+  if (!guard.allowed) {
+    return {
+      success: false,
+      error: guard.reason || 'Tài khoản hiện tại không có quyền tạo lô sản xuất mới qua AI.'
+    };
+  }
+
   const products = store.products?.length ? store.products : (appContext.products || []);
   const tccsList = store.tccsList?.length ? store.tccsList : (appContext.tccsList || []);
   const batches = store.batches?.length ? store.batches : (appContext.batches || []);
@@ -1659,6 +1669,24 @@ export const navigateToAction = (args: { destination: string; identifier?: strin
 };
 
 export const triggerAutoHealingAction = async () => {
+  const store = useAppStore.getState();
+  const guard = validateAIAction('autoHealInconsistencies', {}, store.user);
+  if (!guard.allowed) {
+    return {
+      success: false,
+      error: guard.reason || 'Tài khoản hiện tại không có quyền kích hoạt tự động hàn gắn dữ liệu.'
+    };
+  }
+  if (guard.requiresUserApproval) {
+    return {
+      success: false,
+      isRegulated: true,
+      requiresApproval: true,
+      proposal: guard.proposal,
+      message: `⚠️ **Hành động tái cấu trúc dữ liệu (Auto-Heal) cần phê duyệt:**\n- Theo chuẩn PQM 3.0, tính năng tự động sửa chữa dữ liệu yêu cầu Trưởng phòng hoặc Quản trị viên duyệt đề xuất trước khi chạy.\n- Vui lòng vào trang [Kiểm toán tính nhất quán dữ liệu](/settings) để xem trước tác động và xác nhận thực thi.`
+    };
+  }
+
   try {
     const result = await autoHealAllWithAI(() => useAppStore.getState());
     return result;
@@ -1683,6 +1711,32 @@ export const updateBatchStatusAction = async (args: {
     return {
       success: false,
       error: `Không tìm thấy lô "${args.batchNo}" trong hệ thống.`
+    };
+  }
+
+  const currentUser = appContext?.user || store.user;
+  const guard = validateAIAction(
+    'updateBatchStatus', 
+    { batchId: batch.id, status: args.newStatus, reason: args.reason }, 
+    currentUser, 
+    args.reason, 
+    batch
+  );
+
+  if (!guard.allowed) {
+    return {
+      success: false,
+      error: guard.reason || 'Tài khoản hiện tại không có thẩm quyền đổi trạng thái lô này.'
+    };
+  }
+
+  if (guard.requiresUserApproval) {
+    return {
+      success: false,
+      isRegulated: true,
+      requiresApproval: true,
+      proposal: guard.proposal,
+      message: `⚠️ **Yêu cầu phê duyệt hành động xuất/hủy lô (Regulated QMS Action):**\n- Hành động: Đổi trạng thái lô **${batch.batchNo}** sang **${args.newStatus}**\n- Lý do: ${args.reason || 'Yêu cầu từ AI'}\n- Theo quy định GMP, AI không được phép tự động quyết định xuất xưởng hoặc loại bỏ lô. Vui lòng xác nhận phê duyệt trực tiếp tại [Chi tiết lô ${batch.batchNo}](/batches/${batch.id}).`
     };
   }
 

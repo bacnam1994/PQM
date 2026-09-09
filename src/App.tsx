@@ -64,6 +64,7 @@ const WelcomePage = lazyWithRetry(() => import('./pages/auth/WelcomePage'));
 const CriteriaAliasManager = lazyWithRetry(() => import('./pages/system/CriteriaAliasManager'));
 const AuditLogPage = lazyWithRetry(() => import('./pages/system/AuditLogPage'));
 const CoAVerifyPage = lazyWithRetry(() => import('./pages/public/CoAVerifyPage'));
+const DeviationListPage = lazyWithRetry(() => import('./pages/qa/DeviationListPage'));
 
 const LoadingFallback = () => (
   <div className="flex items-center justify-center h-screen w-full bg-transparent transition-colors duration-300">
@@ -197,6 +198,7 @@ const AppRoutes: React.FC = () => {
           <Route path="/test-results/new" element={<TestResultFormPage />} />
           <Route path="/test-results/form" element={<Navigate to="/test-results/new" replace />} />
           <Route path="/test-results/edit/:id" element={<AdminRoute><TestResultFormPage /></AdminRoute>} />
+          <Route path="/deviations" element={<DeviationListPage />} />
           <Route path="/reports/quality-summary" element={<QualitySummaryReport />} />
           <Route path="/reports/trend-analysis" element={<TrendAnalysisPage />} />
           <Route path="/alerts" element={<AlertsPage />} />

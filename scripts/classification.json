@@ -1,0 +1,704 @@
+{
+  "totalFiles": 158,
+  "totalLines": 48139,
+  "breakdown": {
+    "app": {
+      "count": 2,
+      "lines": 402,
+      "files": [
+        {
+          "file": "src/App.tsx",
+          "lines": 291
+        },
+        {
+          "file": "src/providers/AppProvider.tsx",
+          "lines": 111
+        }
+      ]
+    },
+    "presentation": {
+      "count": 59,
+      "lines": 26052,
+      "files": [
+        {
+          "file": "src/components/features/AIAssistantChat.tsx",
+          "lines": 988
+        },
+        {
+          "file": "src/components/features/AIBatchClearanceModal.tsx",
+          "lines": 349
+        },
+        {
+          "file": "src/components/features/ALCOAWatchdogWidget.tsx",
+          "lines": 171
+        },
+        {
+          "file": "src/components/features/AutoCreateBatchModal.tsx",
+          "lines": 357
+        },
+        {
+          "file": "src/components/features/BatchCriteriaHistory.tsx",
+          "lines": 363
+        },
+        {
+          "file": "src/components/features/BatchGenealogyModal.tsx",
+          "lines": 266
+        },
+        {
+          "file": "src/components/features/CoAReport.tsx",
+          "lines": 698
+        },
+        {
+          "file": "src/components/features/CriteriaInputGroup.tsx",
+          "lines": 234
+        },
+        {
+          "file": "src/components/features/DataConsistencyCenter.tsx",
+          "lines": 418
+        },
+        {
+          "file": "src/components/features/DeviationReportModal.tsx",
+          "lines": 418
+        },
+        {
+          "file": "src/components/features/LabComparisonModal.tsx",
+          "lines": 526
+        },
+        {
+          "file": "src/components/features/MappingConfirmModal.tsx",
+          "lines": 231
+        },
+        {
+          "file": "src/components/features/OOSInvestigationModal.tsx",
+          "lines": 525
+        },
+        {
+          "file": "src/components/features/VoiceInputButton.tsx",
+          "lines": 279
+        },
+        {
+          "file": "src/components/index.ts",
+          "lines": 19
+        },
+        {
+          "file": "src/components/layout/GlobalCommandPalette.tsx",
+          "lines": 297
+        },
+        {
+          "file": "src/components/layout/Layout.tsx",
+          "lines": 403
+        },
+        {
+          "file": "src/components/layout/ReloadPrompt.tsx",
+          "lines": 54
+        },
+        {
+          "file": "src/components/ui/CommonUI.tsx",
+          "lines": 180
+        },
+        {
+          "file": "src/components/ui/CookieConsentBanner.tsx",
+          "lines": 151
+        },
+        {
+          "file": "src/components/ui/CrudControls.tsx",
+          "lines": 92
+        },
+        {
+          "file": "src/components/ui/DesignSystem.tsx",
+          "lines": 216
+        },
+        {
+          "file": "src/components/ui/ErrorBoundary.tsx",
+          "lines": 61
+        },
+        {
+          "file": "src/components/ui/SpecialCharToolbar.tsx",
+          "lines": 90
+        },
+        {
+          "file": "src/pages/auth/ForgotPasswordPage.tsx",
+          "lines": 95
+        },
+        {
+          "file": "src/pages/auth/LoginPage.tsx",
+          "lines": 112
+        },
+        {
+          "file": "src/pages/auth/SignupPage.tsx",
+          "lines": 126
+        },
+        {
+          "file": "src/pages/auth/UnauthorizedPage.tsx",
+          "lines": 78
+        },
+        {
+          "file": "src/pages/auth/WelcomePage.tsx",
+          "lines": 104
+        },
+        {
+          "file": "src/pages/batches/BatchDetailPage.tsx",
+          "lines": 450
+        },
+        {
+          "file": "src/pages/batches/BatchFormPage.tsx",
+          "lines": 244
+        },
+        {
+          "file": "src/pages/batches/BatchList.tsx",
+          "lines": 930
+        },
+        {
+          "file": "src/pages/products/MaterialFormPage.tsx",
+          "lines": 382
+        },
+        {
+          "file": "src/pages/products/MaterialList.tsx",
+          "lines": 1510
+        },
+        {
+          "file": "src/pages/products/ProductDetail.tsx",
+          "lines": 1140
+        },
+        {
+          "file": "src/pages/products/ProductFormPage.tsx",
+          "lines": 350
+        },
+        {
+          "file": "src/pages/products/ProductList.tsx",
+          "lines": 593
+        },
+        {
+          "file": "src/pages/public/CoAVerifyPage.tsx",
+          "lines": 278
+        },
+        {
+          "file": "src/pages/qa/CoAReportPage.tsx",
+          "lines": 360
+        },
+        {
+          "file": "src/pages/qa/CriteriaFormPage.tsx",
+          "lines": 490
+        },
+        {
+          "file": "src/pages/qa/CriteriaList.tsx",
+          "lines": 562
+        },
+        {
+          "file": "src/pages/qa/ProductFormulaFormPage.tsx",
+          "lines": 509
+        },
+        {
+          "file": "src/pages/qa/ProductFormulaList.tsx",
+          "lines": 415
+        },
+        {
+          "file": "src/pages/qa/TccsDetailPage.tsx",
+          "lines": 257
+        },
+        {
+          "file": "src/pages/qa/TCCSFormPage.tsx",
+          "lines": 677
+        },
+        {
+          "file": "src/pages/qa/TCCSList.tsx",
+          "lines": 616
+        },
+        {
+          "file": "src/pages/qa/TestResultFormPage.tsx",
+          "lines": 1610
+        },
+        {
+          "file": "src/pages/qa/TestResultList.tsx",
+          "lines": 487
+        },
+        {
+          "file": "src/pages/quality/AlertsPage.tsx",
+          "lines": 352
+        },
+        {
+          "file": "src/pages/quality/QualitySummaryReport.tsx",
+          "lines": 1376
+        },
+        {
+          "file": "src/pages/quality/TrendAnalysisPage.tsx",
+          "lines": 1329
+        },
+        {
+          "file": "src/pages/system/AccountPage.tsx",
+          "lines": 215
+        },
+        {
+          "file": "src/pages/system/AuditLogPage.tsx",
+          "lines": 450
+        },
+        {
+          "file": "src/pages/system/CriteriaAliasManager.tsx",
+          "lines": 507
+        },
+        {
+          "file": "src/pages/system/Dashboard.tsx",
+          "lines": 532
+        },
+        {
+          "file": "src/pages/system/NotFoundPage.tsx",
+          "lines": 54
+        },
+        {
+          "file": "src/pages/system/SearchPage.tsx",
+          "lines": 257
+        },
+        {
+          "file": "src/pages/system/SettingsPage.tsx",
+          "lines": 900
+        },
+        {
+          "file": "src/pages/system/UserManagement.tsx",
+          "lines": 319
+        }
+      ]
+    },
+    "infrastructure": {
+      "count": 6,
+      "lines": 542,
+      "files": [
+        {
+          "file": "src/firebase.ts",
+          "lines": 24
+        },
+        {
+          "file": "src/services/databaseService.ts",
+          "lines": 176
+        },
+        {
+          "file": "src/services/storageService.ts",
+          "lines": 56
+        },
+        {
+          "file": "src/utils/offlineMutationQueue.ts",
+          "lines": 171
+        },
+        {
+          "file": "database.rules.json",
+          "lines": 85
+        },
+        {
+          "file": "storage.rules",
+          "lines": 30
+        }
+      ]
+    },
+    "presentation/hooks": {
+      "count": 19,
+      "lines": 2415,
+      "files": [
+        {
+          "file": "src/hooks/index.ts",
+          "lines": 16
+        },
+        {
+          "file": "src/hooks/test-results/useTestResultForm.ts",
+          "lines": 400
+        },
+        {
+          "file": "src/hooks/test-results/useTestResultList.ts",
+          "lines": 73
+        },
+        {
+          "file": "src/hooks/test-results/useTestResultSave.ts",
+          "lines": 329
+        },
+        {
+          "file": "src/hooks/useAuthSync.ts",
+          "lines": 80
+        },
+        {
+          "file": "src/hooks/useBatchStatusTransition.ts",
+          "lines": 38
+        },
+        {
+          "file": "src/hooks/useCookieConsent.ts",
+          "lines": 88
+        },
+        {
+          "file": "src/hooks/useCriteriaResolver.ts",
+          "lines": 224
+        },
+        {
+          "file": "src/hooks/useCrud.ts",
+          "lines": 56
+        },
+        {
+          "file": "src/hooks/useDataGraph.ts",
+          "lines": 377
+        },
+        {
+          "file": "src/hooks/useDebounce.ts",
+          "lines": 26
+        },
+        {
+          "file": "src/hooks/useFirebaseSync.ts",
+          "lines": 137
+        },
+        {
+          "file": "src/hooks/useForm.ts",
+          "lines": 93
+        },
+        {
+          "file": "src/hooks/useFormDraft.ts",
+          "lines": 90
+        },
+        {
+          "file": "src/hooks/useKeyboardShortcuts.ts",
+          "lines": 63
+        },
+        {
+          "file": "src/hooks/useLocalStorage.ts",
+          "lines": 41
+        },
+        {
+          "file": "src/hooks/useQualityAlerts.ts",
+          "lines": 34
+        },
+        {
+          "file": "src/hooks/useTccsSelection.ts",
+          "lines": 65
+        },
+        {
+          "file": "src/hooks/useTestResultPrint.ts",
+          "lines": 185
+        }
+      ]
+    },
+    "tests": {
+      "count": 23,
+      "lines": 2258,
+      "files": [
+        {
+          "file": "src/hooks/useFormDraft.test.ts",
+          "lines": 60
+        },
+        {
+          "file": "src/services/ai/autoLearningService.test.ts",
+          "lines": 207
+        },
+        {
+          "file": "src/services/ai/batchClearanceService.test.ts",
+          "lines": 126
+        },
+        {
+          "file": "src/services/ai/dataIntegrityService.test.ts",
+          "lines": 44
+        },
+        {
+          "file": "src/services/ai/labComparisonService.test.ts",
+          "lines": 169
+        },
+        {
+          "file": "src/services/ai/materialHarmonizerService.test.ts",
+          "lines": 80
+        },
+        {
+          "file": "src/services/ai/pqrNarrativeService.test.ts",
+          "lines": 48
+        },
+        {
+          "file": "src/services/ai/predictiveInspectionService.test.ts",
+          "lines": 68
+        },
+        {
+          "file": "src/services/ai/stabilityPredictionService.test.ts",
+          "lines": 100
+        },
+        {
+          "file": "src/services/ai/tccsAssistantService.test.ts",
+          "lines": 64
+        },
+        {
+          "file": "src/services/ai/voiceParserService.test.ts",
+          "lines": 46
+        },
+        {
+          "file": "src/services/auditService.test.ts",
+          "lines": 59
+        },
+        {
+          "file": "src/services/criteriaAliasService.test.ts",
+          "lines": 147
+        },
+        {
+          "file": "src/services/dataConsistencyService.test.ts",
+          "lines": 348
+        },
+        {
+          "file": "src/services/reportService.test.ts",
+          "lines": 91
+        },
+        {
+          "file": "src/services/testResultService.test.ts",
+          "lines": 67
+        },
+        {
+          "file": "src/store/useUIStore.test.ts",
+          "lines": 61
+        },
+        {
+          "file": "src/utils/aiMapping.test.ts",
+          "lines": 90
+        },
+        {
+          "file": "src/utils/basisCalculation.test.ts",
+          "lines": 126
+        },
+        {
+          "file": "src/utils/criteriaEvaluation.test.ts",
+          "lines": 170
+        },
+        {
+          "file": "src/utils/ootDetection.test.ts",
+          "lines": 53
+        },
+        {
+          "file": "src/utils/urlUtils.test.ts",
+          "lines": 15
+        },
+        {
+          "file": "tests/example.spec.ts",
+          "lines": 19
+        }
+      ]
+    },
+    "other": {
+      "count": 5,
+      "lines": 1803,
+      "files": [
+        {
+          "file": "src/index.css",
+          "lines": 1688
+        },
+        {
+          "file": "src/index.tsx",
+          "lines": 16
+        },
+        {
+          "file": "src/vite-env.d.ts",
+          "lines": 18
+        },
+        {
+          "file": "package.json",
+          "lines": 56
+        },
+        {
+          "file": "vite.config.ts",
+          "lines": 25
+        }
+      ]
+    },
+    "AI": {
+      "count": 21,
+      "lines": 9336,
+      "files": [
+        {
+          "file": "src/services/ai/aiTools.ts",
+          "lines": 1722
+        },
+        {
+          "file": "src/services/ai/autoLearningService.ts",
+          "lines": 397
+        },
+        {
+          "file": "src/services/ai/batchClearanceService.ts",
+          "lines": 283
+        },
+        {
+          "file": "src/services/ai/batchGenealogyService.ts",
+          "lines": 327
+        },
+        {
+          "file": "src/services/ai/dataIntegrityService.ts",
+          "lines": 236
+        },
+        {
+          "file": "src/services/ai/deviationReportService.ts",
+          "lines": 387
+        },
+        {
+          "file": "src/services/ai/externalLabTemplates.ts",
+          "lines": 308
+        },
+        {
+          "file": "src/services/ai/geminiService.ts",
+          "lines": 831
+        },
+        {
+          "file": "src/services/ai/labComparisonService.ts",
+          "lines": 586
+        },
+        {
+          "file": "src/services/ai/materialHarmonizerService.ts",
+          "lines": 381
+        },
+        {
+          "file": "src/services/ai/nlQueryService.ts",
+          "lines": 530
+        },
+        {
+          "file": "src/services/ai/oosInvestigationService.ts",
+          "lines": 318
+        },
+        {
+          "file": "src/services/ai/pqrNarrativeService.ts",
+          "lines": 159
+        },
+        {
+          "file": "src/services/ai/predictiveInspectionService.ts",
+          "lines": 548
+        },
+        {
+          "file": "src/services/ai/prompts.ts",
+          "lines": 369
+        },
+        {
+          "file": "src/services/ai/smartAlertService.ts",
+          "lines": 526
+        },
+        {
+          "file": "src/services/ai/stabilityPredictionService.ts",
+          "lines": 276
+        },
+        {
+          "file": "src/services/ai/tccsAssistantService.ts",
+          "lines": 176
+        },
+        {
+          "file": "src/services/ai/tesseractFallback.ts",
+          "lines": 137
+        },
+        {
+          "file": "src/services/ai/voiceParserService.ts",
+          "lines": 225
+        },
+        {
+          "file": "src/utils/aiMapping.ts",
+          "lines": 614
+        }
+      ]
+    },
+    "application": {
+      "count": 6,
+      "lines": 2163,
+      "files": [
+        {
+          "file": "src/services/auditService.ts",
+          "lines": 82
+        },
+        {
+          "file": "src/services/authService.ts",
+          "lines": 40
+        },
+        {
+          "file": "src/services/criteriaAliasService.ts",
+          "lines": 377
+        },
+        {
+          "file": "src/services/dataConsistencyService.ts",
+          "lines": 932
+        },
+        {
+          "file": "src/services/reportService.ts",
+          "lines": 356
+        },
+        {
+          "file": "src/services/testResultService.ts",
+          "lines": 376
+        }
+      ]
+    },
+    "state": {
+      "count": 2,
+      "lines": 1130,
+      "files": [
+        {
+          "file": "src/store/useAppStore.ts",
+          "lines": 782
+        },
+        {
+          "file": "src/store/useUIStore.ts",
+          "lines": 348
+        }
+      ]
+    },
+    "domain": {
+      "count": 4,
+      "lines": 1223,
+      "files": [
+        {
+          "file": "src/types.ts",
+          "lines": 232
+        },
+        {
+          "file": "src/utils/basisCalculation.ts",
+          "lines": 310
+        },
+        {
+          "file": "src/utils/criteriaEvaluation.ts",
+          "lines": 496
+        },
+        {
+          "file": "src/utils/ootDetection.ts",
+          "lines": 185
+        }
+      ]
+    },
+    "shared": {
+      "count": 11,
+      "lines": 815,
+      "files": [
+        {
+          "file": "src/utils/constants.ts",
+          "lines": 30
+        },
+        {
+          "file": "src/utils/dateUtils.ts",
+          "lines": 109
+        },
+        {
+          "file": "src/utils/evaluation.ts",
+          "lines": 70
+        },
+        {
+          "file": "src/utils/idGenerator.ts",
+          "lines": 30
+        },
+        {
+          "file": "src/utils/index.ts",
+          "lines": 15
+        },
+        {
+          "file": "src/utils/offlineCache.ts",
+          "lines": 102
+        },
+        {
+          "file": "src/utils/parsing.ts",
+          "lines": 244
+        },
+        {
+          "file": "src/utils/pdfProcessor.ts",
+          "lines": 106
+        },
+        {
+          "file": "src/utils/searchUtils.ts",
+          "lines": 13
+        },
+        {
+          "file": "src/utils/testResultEvaluation.ts",
+          "lines": 82
+        },
+        {
+          "file": "src/utils/urlUtils.ts",
+          "lines": 14
+        }
+      ]
+    }
+  }
+}

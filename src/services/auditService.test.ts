@@ -55,4 +55,12 @@ describe('auditService', () => {
     expect(logs[1].id).toBe('log_1');
     expect(logs[1].action).toBe('CREATE');
   });
+
+  it('fetchAuditLogsPaged trả về phân trang chính xác', async () => {
+    const { fetchAuditLogsPaged } = await import('./auditService');
+    const result = await fetchAuditLogsPaged(10);
+    expect(result.records).toHaveLength(2);
+    expect(result.records[0].id).toBe('log_2');
+    expect(result.hasMore).toBe(false);
+  });
 });

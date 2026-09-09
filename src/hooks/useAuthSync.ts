@@ -4,6 +4,7 @@ import { ref, get } from 'firebase/database';
 import { db } from '../firebase';
 import { useAppStore } from '../store/useAppStore';
 import { clearEntireCache } from '../utils';
+import { Role } from '../types';
 
 export const useAuthSync = () => {
   useEffect(() => {
@@ -31,12 +32,13 @@ export const useAuthSync = () => {
             const userRole = userData?.role;
             
             const isUserAdmin = isListedInAdmins || userRole === 'ADMIN';
-            let role: 'ADMIN' | 'USER' | 'GUEST' = 'GUEST';
+            const validRoles: Role[] = ['ADMIN', 'QA', 'QC', 'LAB', 'PRODUCTION', 'VIEWER', 'USER'];
+            let role: Role = 'GUEST';
             
             if (isUserAdmin) {
               role = 'ADMIN';
-            } else if (userRole === 'USER') {
-              role = 'USER';
+            } else if (userRole && validRoles.includes(userRole)) {
+              role = userRole;
             } else {
               role = 'GUEST';
             }
@@ -56,7 +58,9 @@ export const useAuthSync = () => {
               get(ref(db, `users/${currentUser.uid}`))
             ]);
             const isUserAdmin = adminSnap.exists() || userSnap.val()?.role === 'ADMIN';
-            const role: 'ADMIN' | 'USER' | 'GUEST' = isUserAdmin ? 'ADMIN' : (userSnap.val()?.role || 'GUEST');
+            const rawRole = userSnap.val()?.role;
+            const validRoles: Role[] = ['ADMIN', 'QA', 'QC', 'LAB', 'PRODUCTION', 'VIEWER', 'USER'];
+            const role: Role = isUserAdmin ? 'ADMIN' : (rawRole && validRoles.includes(rawRole) ? rawRole : 'GUEST');
             useAppStore.getState().setIsAdmin(isUserAdmin);
             useAppStore.getState().setRole(role);
           } catch (retryErr) {
