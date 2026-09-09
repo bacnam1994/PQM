@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { FormulaAppService } from './FormulaAppService';
 import { IFormulaRepository } from '../../repositories/FormulaRepository';
+import { createBaseMockRepository } from '../../repositories/mockRepositoryHelper';
 import { ProductFormula } from '../../types';
 
 describe('FormulaAppService - PQM 3.0 Application Service', () => {
@@ -25,12 +26,10 @@ describe('FormulaAppService - PQM 3.0 Application Service', () => {
 
   beforeEach(() => {
     mockRepo = {
+      ...createBaseMockRepository<ProductFormula>(),
       findById: vi.fn().mockResolvedValue(sampleFormula),
       findAll: vi.fn().mockResolvedValue([sampleFormula]),
-      findByProductId: vi.fn().mockResolvedValue(sampleFormula),
-      save: vi.fn().mockResolvedValue(undefined),
-      update: vi.fn().mockResolvedValue(undefined),
-      delete: vi.fn().mockResolvedValue(undefined)
+      findByProductId: vi.fn().mockResolvedValue(sampleFormula)
     };
     service = new FormulaAppService(mockRepo);
   });

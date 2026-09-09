@@ -1,57 +1,24 @@
 /**
- * PQM 3.0 - Firebase Quality Deviation Repository Implementation
+ * PQM 3.0 & V4 Platform - Firebase Quality Deviation Repository Implementation
  * Triển khai lưu trữ Hồ sơ Sai lệch (Quality Deviation) trên Firebase Realtime Database
+ * Kế thừa BaseFirebaseRepository: phân trang cursor/offset, lọc server-side & đếm số lượng.
  */
 
-import { ref, get, set, update as fbUpdate, remove } from 'firebase/database';
+import { ref, update as fbUpdate, remove } from 'firebase/database';
 import { db } from '../../firebase';
 import { QualityDeviation, DeviationStatus } from '../../types/deviation';
 import { IDeviationRepository } from '../IDeviationRepository';
-import { removeUndefined } from '../../utils';
+import { BaseFirebaseRepository } from './BaseFirebaseRepository';
 import { enqueueOfflineMutation } from '../../utils/offlineMutationQueue';
 
-export class FirebaseDeviationRepository implements IDeviationRepository {
-  private readonly collectionPath = 'quality_deviations';
-
-  async findById(id: string): Promise<QualityDeviation | null> {
-    const snapshot = await get(ref(db, `${this.collectionPath}/${id}`));
-    if (!snapshot.exists()) return null;
-    return snapshot.val() as QualityDeviation;
-  }
-
-  async findAll(): Promise<QualityDeviation[]> {
-    const snapshot = await get(ref(db, this.collectionPath));
-    if (!snapshot.exists()) return [];
-    const val = snapshot.val();
-    return Object.values(val) as QualityDeviation[];
-  }
+export class FirebaseDeviationRepository
+  extends BaseFirebaseRepository<QualityDeviation>
+  implements IDeviationRepository
+{
+  protected readonly collectionPath = 'quality_deviations';
 
   async findByBatchId(batchId: string): Promise<QualityDeviation[]> {
-    const all = await this.findAll();
-    return all.filter(d => d.batchId === batchId);
-  }
-
-  async save(deviation: QualityDeviation): Promise<void> {
-    if (!deviation || !deviation.id) {
-      throw new Error('Dữ liệu sai lệch không hợp lệ: Thiếu ID');
-    }
-    const cleanItem = removeUndefined(deviation);
-    const targetPath = `${this.collectionPath}/${deviation.id}`;
-
-    try {
-      await set(ref(db, targetPath), cleanItem);
-    } catch (e: any) {
-      if (typeof navigator !== 'undefined' && (!navigator.onLine || e?.code === 'unavailable')) {
-        await enqueueOfflineMutation({ 
-          path: targetPath, 
-          operation: 'SET', 
-          data: cleanItem, 
-          expectedVersion: (deviation as any)?.version ?? 1 
-        });
-        return;
-      }
-      throw e;
-    }
+    return this.findByRelation('batchId', batchId);
   }
 
   async updateStatus(id: string, status: DeviationStatus, notes?: string): Promise<void> {

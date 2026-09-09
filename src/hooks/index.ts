@@ -14,3 +14,4 @@ export * from './test-results/useTestResultForm';
 export * from './test-results/useTestResultList';
 export * from './useTestResultPrint';
 export * from './useCookieConsent';
+export * from './usePaginatedQuery';

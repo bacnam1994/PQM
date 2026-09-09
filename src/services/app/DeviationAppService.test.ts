@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { DeviationAppService } from './DeviationAppService';
 import { IDeviationRepository } from '../../repositories/IDeviationRepository';
+import { createBaseMockRepository } from '../../repositories/mockRepositoryHelper';
 import { QualityDeviation } from '../../types/deviation';
 import { TestResult, Batch } from '../../types';
 import * as auditService from '../auditService';
@@ -20,6 +21,7 @@ describe('DeviationAppService - Quality Deviation & CAPA Workflow', () => {
     inMemoryDeviations = new Map();
 
     mockRepo = {
+      ...createBaseMockRepository<QualityDeviation>(),
       findById: vi.fn(async (id: string) => inMemoryDeviations.get(id) || null),
       findAll: vi.fn(async () => Array.from(inMemoryDeviations.values())),
       findByBatchId: vi.fn(async (batchId: string) =>

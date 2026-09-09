@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { TestResultAppService } from './TestResultAppService';
 import { ITestResultRepository } from '../../repositories/TestResultRepository';
+import { createBaseMockRepository } from '../../repositories/mockRepositoryHelper';
 import { TestResult } from '../../types';
 
 vi.mock('../auditService', () => ({
@@ -32,14 +33,12 @@ describe('TestResultAppService', () => {
 
   beforeEach(() => {
     mockRepo = {
+      ...createBaseMockRepository<TestResult>(),
       findById: vi.fn().mockResolvedValue(null),
       findAll: vi.fn().mockResolvedValue([]),
       findByBatchId: vi.fn().mockResolvedValue([]),
       findByOverallStatus: vi.fn().mockResolvedValue([]),
-      findRecent: vi.fn().mockResolvedValue([]),
-      save: vi.fn().mockResolvedValue(undefined),
-      update: vi.fn().mockResolvedValue(undefined),
-      delete: vi.fn().mockResolvedValue(undefined),
+      findRecent: vi.fn().mockResolvedValue([])
     };
     mockDeviationService = {
       autoLogFromOOS: vi.fn().mockResolvedValue(null),

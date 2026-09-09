@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { TCCSAppService } from './TCCSAppService';
 import { ITCCSRepository } from '../../repositories/TCCSRepository';
+import { createBaseMockRepository } from '../../repositories/mockRepositoryHelper';
 import { TCCS, Batch, CriterionType } from '../../types';
 
 describe('TCCSAppService - PQM 3.0 Application Service', () => {
@@ -40,14 +41,12 @@ describe('TCCSAppService - PQM 3.0 Application Service', () => {
 
   beforeEach(() => {
     mockRepo = {
+      ...createBaseMockRepository<TCCS>(),
       findById: vi.fn().mockResolvedValue(sampleTCCS),
       findAll: vi.fn().mockResolvedValue([sampleTCCS]),
       findByProductId: vi.fn().mockResolvedValue([sampleTCCS]),
       findActiveByProductId: vi.fn().mockResolvedValue(sampleTCCS),
       findByCode: vi.fn().mockResolvedValue(sampleTCCS),
-      save: vi.fn().mockResolvedValue(undefined),
-      update: vi.fn().mockResolvedValue(undefined),
-      delete: vi.fn().mockResolvedValue(undefined)
     };
     service = new TCCSAppService(mockRepo);
   });

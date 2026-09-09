@@ -1,72 +1,43 @@
 /**
- * PQM 3.0 - Firebase Test Result Repository Implementation
+ * PQM 3.0 & V4 Platform - Firebase Test Result Repository Implementation
  * Triển khai lưu trữ kết quả kiểm nghiệm trên Firebase Realtime Database có hỗ trợ Offline Queue
- * Lưu ý: Tự động loại bỏ trường ảo 'batch' trước khi ghi để bảo toàn tính toàn vẹn dữ liệu.
+ * Kế thừa BaseFirebaseRepository: phân trang cursor/offset, lọc server-side & đếm số lượng.
  */
 
-import { ref, get, set } from 'firebase/database';
-import { db } from '../../firebase';
 import { TestResult } from '../../types';
 import { ITestResultRepository } from '../TestResultRepository';
+import { deleteTestResultService } from '../../services/databaseService';
+import { BaseFirebaseRepository } from './BaseFirebaseRepository';
 import { removeUndefined } from '../../utils';
 import { enqueueOfflineMutation } from '../../utils/offlineMutationQueue';
-import { deleteTestResultService } from '../../services/databaseService';
 
-export class FirebaseTestResultRepository implements ITestResultRepository {
-  private readonly collectionPath = 'testResults';
+export class FirebaseTestResultRepository
+  extends BaseFirebaseRepository<TestResult>
+  implements ITestResultRepository
+{
+  protected readonly collectionPath = 'testResults';
 
-  async findById(id: string): Promise<TestResult | null> {
-    const snapshot = await get(ref(db, `${this.collectionPath}/${id}`));
-    if (!snapshot.exists()) return null;
-    return snapshot.val() as TestResult;
-  }
-
-  async findAll(): Promise<TestResult[]> {
-    const snapshot = await get(ref(db, this.collectionPath));
-    if (!snapshot.exists()) return [];
-    const val = snapshot.val();
-    return Object.values(val) as TestResult[];
+  protected override sanitizeItem(testResult: TestResult): any {
+    // Bóc tách thuộc tính ảo 'batch' để không lưu trùng thừa vào DB
+    const { batch: _virtualBatch, ...dataToSave } = testResult;
+    return removeUndefined(dataToSave);
   }
 
   async findByBatchId(batchId: string): Promise<TestResult[]> {
-    const all = await this.findAll();
-    return all.filter(r => r.batchId === batchId);
+    return this.findByRelation('batchId', batchId);
   }
 
   async findByOverallStatus(status: 'PASS' | 'FAIL'): Promise<TestResult[]> {
-    const all = await this.findAll();
-    return all.filter(r => r.overallStatus === status);
+    return this.findByRelation('overallStatus', status);
   }
 
   async findRecent(limitCount: number): Promise<TestResult[]> {
-    const all = await this.findAll();
-    return all
-      .sort((a, b) => (b.testDate || '').localeCompare(a.testDate || ''))
-      .slice(0, limitCount);
-  }
-
-  async save(testResult: TestResult): Promise<void> {
-    if (!testResult || !testResult.id) {
-      throw new Error('Dữ liệu phiếu kiểm nghiệm không hợp lệ: Thiếu ID');
-    }
-    // Bóc tách thuộc tính ảo 'batch' để không lưu trùng thừa vào DB
-    const { batch: _virtualBatch, ...dataToSave } = testResult;
-    const cleanItem = removeUndefined(dataToSave);
-    const targetPath = `${this.collectionPath}/${testResult.id}`;
-
-    try {
-      await set(ref(db, targetPath), cleanItem);
-    } catch (e: any) {
-      if (typeof navigator !== 'undefined' && (!navigator.onLine || e?.code === 'unavailable')) {
-        await enqueueOfflineMutation({ path: targetPath, operation: 'SET', data: cleanItem });
-        return;
-      }
-      throw e;
-    }
-  }
-
-  async update(testResult: TestResult): Promise<void> {
-    await this.save(testResult);
+    const result = await this.findPaginated({
+      pageSize: limitCount,
+      orderBy: 'testDate',
+      orderDirection: 'desc'
+    });
+    return result.items;
   }
 
   async delete(id: string): Promise<void> {

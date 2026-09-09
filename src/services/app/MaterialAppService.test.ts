@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { MaterialAppService } from './MaterialAppService';
 import { IMaterialRepository } from '../../repositories/MaterialRepository';
+import { createBaseMockRepository } from '../../repositories/mockRepositoryHelper';
 import { RawMaterial, ProductFormula } from '../../types';
 
 describe('MaterialAppService - PQM 3.0 Application Service', () => {
@@ -33,14 +34,12 @@ describe('MaterialAppService - PQM 3.0 Application Service', () => {
 
   beforeEach(() => {
     mockRepo = {
+      ...createBaseMockRepository<RawMaterial>(),
       findById: vi.fn().mockResolvedValue(sampleMaterial),
       findAll: vi.fn().mockResolvedValue([sampleMaterial]),
       findByCode: vi.fn().mockResolvedValue(sampleMaterial),
       findByCasNumber: vi.fn().mockResolvedValue(null),
-      searchByNameOrAlias: vi.fn().mockResolvedValue([sampleMaterial]),
-      save: vi.fn().mockResolvedValue(undefined),
-      update: vi.fn().mockResolvedValue(undefined),
-      delete: vi.fn().mockResolvedValue(undefined)
+      searchByNameOrAlias: vi.fn().mockResolvedValue([sampleMaterial])
     };
     service = new MaterialAppService(mockRepo);
   });

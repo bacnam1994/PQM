@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ProductAppService } from './ProductAppService';
 import { IProductRepository } from '../../repositories/ProductRepository';
+import { createBaseMockRepository } from '../../repositories/mockRepositoryHelper';
 import { Product } from '../../types';
 
 describe('ProductAppService - PQM 3.0 Application Service', () => {
@@ -26,13 +27,11 @@ describe('ProductAppService - PQM 3.0 Application Service', () => {
 
   beforeEach(() => {
     mockRepo = {
+      ...createBaseMockRepository<Product>(),
       findById: vi.fn().mockResolvedValue(sampleProduct),
       findAll: vi.fn().mockResolvedValue([sampleProduct]),
       findByCode: vi.fn().mockResolvedValue(sampleProduct),
       searchByName: vi.fn().mockResolvedValue([sampleProduct]),
-      save: vi.fn().mockResolvedValue(undefined),
-      update: vi.fn().mockResolvedValue(undefined),
-      delete: vi.fn().mockResolvedValue(undefined),
       bulkSave: vi.fn().mockResolvedValue(undefined)
     };
     service = new ProductAppService(mockRepo);

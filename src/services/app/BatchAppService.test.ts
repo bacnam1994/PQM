@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { BatchAppService } from './BatchAppService';
 import { IBatchRepository } from '../../repositories/BatchRepository';
+import { createBaseMockRepository } from '../../repositories/mockRepositoryHelper';
 import { Batch, TestResult } from '../../types';
 
 vi.mock('../auditService', () => ({
@@ -38,16 +39,14 @@ describe('BatchAppService', () => {
 
   beforeEach(() => {
     mockRepo = {
+      ...createBaseMockRepository<Batch>(),
       findById: vi.fn().mockResolvedValue(null),
       findAll: vi.fn().mockResolvedValue([]),
       findByBatchNo: vi.fn().mockResolvedValue(null),
       findByProductId: vi.fn().mockResolvedValue([]),
       findByStatus: vi.fn().mockResolvedValue([]),
-      save: vi.fn().mockResolvedValue(undefined),
-      update: vi.fn().mockResolvedValue(undefined),
       updateStatus: vi.fn().mockResolvedValue(undefined),
       updateProgress: vi.fn().mockResolvedValue(undefined),
-      delete: vi.fn().mockResolvedValue(undefined),
     };
     service = new BatchAppService(mockRepo);
   });
