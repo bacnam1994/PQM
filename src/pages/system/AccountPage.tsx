@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useAppStore } from '../../store/useAppStore';
 import { Shield, Key, Save, Loader2, User, Mail, Lock, Camera } from 'lucide-react';
-import { PageHeader } from '../../components/ui/CommonUI';
+import { PageHeader } from '../../components/ui';
 import { DSFormInput } from '../../components/ui/DesignSystem';
 import toast from 'react-hot-toast';
 import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';

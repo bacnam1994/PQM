@@ -3,7 +3,7 @@ import { X, CheckCircle2, AlertCircle, Loader2, Tag, ShieldCheck, Clock, HelpCir
 import { BATCH_STATUS, PRODUCT_STATUS, TEST_RESULT_STATUS } from '../../utils/constants';
 
 // --- BỘ NHẬN DIỆN TRẠNG THÁI DÙNG CHUNG ---
-export const StatusBadge: React.FC<{ type: string; status: string }> = memo(({ type, status }) => {
+export const LegacyStatusBadge: React.FC<{ type: string; status: string }> = memo(({ type, status }) => {
   const configs: Record<string, any> = {
     PRODUCT: {
       [PRODUCT_STATUS.ACTIVE]: { bg: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400 border border-emerald-100/80 dark:border-emerald-900/30', icon: Tag, label: 'Đang công bố' },
@@ -72,8 +72,8 @@ export const Modal: React.FC<{ isOpen: boolean; onClose: () => void; title: stri
   );
 };
 
-// --- TIÊU ĐỀ TRANG DÙNG CHUNG ---
-export const PageHeader: React.FC<{ title: string; subtitle: string; icon: any; action?: React.ReactNode }> = ({ title, subtitle, icon, action }) => {
+// --- TIÊU ĐỀ TRANG DÙNG CHUNG (LEGACY) ---
+export const LegacyPageHeader: React.FC<{ title: string; subtitle: string; icon: any; action?: React.ReactNode }> = ({ title, subtitle, icon, action }) => {
   const renderIcon = () => {
     if (!icon) return null;
     if (React.isValidElement(icon)) return icon;

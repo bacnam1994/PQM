@@ -1,6 +1,7 @@
 import React from 'react';
 import { Activity, Download, BarChart2, Info } from 'lucide-react';
 import { PageHeader, DSCard } from '../../../components';
+import { Surface } from '../../../components/ui';
 import { useTrendAnalyticsState } from './hooks/useTrendAnalyticsState';
 import { TrendFilterPanel } from './components/TrendFilterPanel';
 import { StatsSummaryCards } from './components/StatsSummaryCards';
@@ -79,21 +80,21 @@ export const TrendAnalysisPage: React.FC = () => {
       )}
 
       {!state.loading && !state.selectedProductId && (
-        <DSCard className="p-12 text-center">
-          <BarChart2 size={48} className="text-slate-300 dark:text-zinc-700 mx-auto mb-3" />
-          <p className="text-slate-600 dark:text-zinc-300 font-bold text-base">Chọn một sản phẩm để bắt đầu phân tích xu hướng SPC</p>
-          <p className="text-slate-400 dark:text-zinc-500 text-xs mt-1 max-w-md mx-auto">
+        <Surface variant="flat" padding="lg" className="text-center py-12">
+          <BarChart2 size={44} className="text-slate-300 dark:text-zinc-700 mx-auto mb-3" />
+          <p className="text-slate-700 dark:text-zinc-300 font-bold text-base">Chọn một sản phẩm để bắt đầu phân tích xu hướng SPC</p>
+          <p className="text-slate-400 dark:text-zinc-500 text-xs mt-1.5 max-w-md mx-auto leading-relaxed">
             Hệ thống sẽ tự động tổng hợp kết quả kiểm nghiệm, tính toán năng lực quy trình Cpk, giới hạn kiểm soát 3σ (UCL, LCL) và dự báo độ ổn định theo thời gian bảo quản.
           </p>
-        </DSCard>
+        </Surface>
       )}
 
       {!state.loading && state.selectedProductId && state.selectedCriteriaName && state.chartData.length === 0 && (
-        <DSCard className="p-12 text-center">
-          <Info size={40} className="text-slate-300 dark:text-zinc-700 mx-auto mb-3" />
-          <p className="text-slate-600 dark:text-zinc-300 font-bold">Chưa có dữ liệu định lượng cho chỉ tiêu: &quot;{state.selectedCriteriaName}&quot;</p>
+        <Surface variant="flat" padding="lg" className="text-center py-12">
+          <Info size={38} className="text-slate-300 dark:text-zinc-700 mx-auto mb-3" />
+          <p className="text-slate-700 dark:text-zinc-300 font-bold">Chưa có dữ liệu định lượng cho chỉ tiêu: &quot;{state.selectedCriteriaName}&quot;</p>
           <p className="text-slate-400 dark:text-zinc-500 text-xs mt-1">Vui lòng chọn chỉ tiêu khác hoặc kiểm tra lại phiếu kiểm nghiệm của sản phẩm này.</p>
-        </DSCard>
+        </Surface>
       )}
 
       {/* Khi có đủ từ 2 điểm dữ liệu trở lên */}
@@ -131,11 +132,11 @@ export const TrendAnalysisPage: React.FC = () => {
       )}
 
       {!state.loading && state.chartData.length === 1 && (
-        <DSCard className="p-6 text-center">
-          <Info size={36} className="text-amber-400 mx-auto mb-2" />
-          <p className="text-slate-600 dark:text-zinc-300 font-medium">Cần ít nhất 2 điểm dữ liệu để tính toán SPC</p>
+        <Surface variant="flat" padding="md" className="text-center py-8">
+          <Info size={32} className="text-amber-500 mx-auto mb-2" />
+          <p className="text-slate-700 dark:text-zinc-300 font-semibold text-sm">Cần ít nhất 2 điểm dữ liệu để tính toán SPC</p>
           <p className="text-slate-400 dark:text-zinc-500 text-xs mt-1">Hiện có 1 lô: <strong>{state.chartData[0].batchNo}</strong> = {state.chartData[0].value}</p>
-        </DSCard>
+        </Surface>
       )}
     </div>
   );

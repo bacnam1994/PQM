@@ -22,6 +22,7 @@ import { MappingConfirmModal } from '../../components/features/MappingConfirmMod
 import { LabComparisonModal } from '../../components/features/LabComparisonModal';
 import AutoCreateBatchModal from '../../components/features/AutoCreateBatchModal';
 import { SpecialCharToolbar } from '../../components';
+import { Surface, WorkflowSteps, ActionBar, WorkflowStep } from '../../components/ui';
 
 const TestResultFormPage: React.FC = () => {
   const { id } = useParams();
@@ -221,9 +222,25 @@ const TestResultFormPage: React.FC = () => {
     );
   }
 
+  // Tối ưu Workflow steps cho Workbench
+  const currentWorkflowStep = useMemo(() => {
+    if (!formValues.batchId) return 0;
+    const hasResults = Object.keys(formValues.testResultsMap || {}).length > 0;
+    if (!hasResults) return 1;
+    if (!formValues.notes && (!formValues.attachments || formValues.attachments.length === 0)) return 2;
+    return 3;
+  }, [formValues.batchId, formValues.testResultsMap, formValues.notes, formValues.attachments]);
+
+  const workflowSteps: WorkflowStep[] = [
+    { id: 'step-batch', label: '1. Lô & Phòng Lab', description: 'Chọn lô sản xuất và phòng thử nghiệm' },
+    { id: 'step-criteria', label: '2. Chỉ tiêu kiểm nghiệm', description: 'Đánh giá chỉ tiêu theo TCCS' },
+    { id: 'step-attachments', label: '3. Minh chứng & Ghi chú', description: 'Tải tài liệu và kết luận' },
+    { id: 'step-submit', label: '4. Ký duyệt & Hoàn tất', description: 'Xác nhận kết quả vào hệ thống' },
+  ];
+
   return (
     <>
-      <div className="p-6 max-w-7xl mx-auto animate-in fade-in duration-500 space-y-6">
+      <div className="p-6 max-w-7xl mx-auto animate-in fade-in duration-300 space-y-6 pb-28">
         <TestResultHeader
           isEditMode={crud.mode === 'EDIT'}
           onBack={() => navigate('/test-results')}
@@ -238,28 +255,37 @@ const TestResultFormPage: React.FC = () => {
           onClearAiScanInfo={() => ai.setAiScanInfo(null)}
         />
 
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
-          <form onSubmit={handleSaveResult}>
-            <div className="space-y-6 pr-2">
-              <SpecialCharToolbar className="-mx-2 px-2" />
+        {/* Workflow Progression Stepper */}
+        <Surface variant="subtle" padding="sm" className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-xs">
+          <WorkflowSteps steps={workflowSteps} activeStep={currentWorkflowStep} />
+        </Surface>
 
-              <BatchLabSelector
-                batchSearch={batchSearch}
-                setBatchSearch={setBatchSearch}
-                showBatchDropdown={showBatchDropdown}
-                setShowBatchDropdown={setShowBatchDropdown}
-                isEditMode={crud.mode === 'EDIT'}
-                batchId={formValues.batchId}
-                availableBatchesForDropdown={availableBatchesForDropdown}
-                handleBatchSelect={handleBatchSelect}
-                setFieldValue={setFieldValue}
-                labName={formValues.labName}
-                testDate={formValues.testDate}
-                hydratedBatches={hydratedBatches}
-                existingResultsForBatch={existingResultsForBatch}
-                switchToEditMode={switchToEditMode}
-              />
+        <form id="test-result-form" onSubmit={handleSaveResult} className="space-y-6">
+          <SpecialCharToolbar className="-mx-2 px-2" />
 
+          {/* Section 1: Batch & Lab Information */}
+          <Surface variant="flat" padding="lg" title="1. Thông tin Lô & Phòng Kiểm nghiệm" subtitle="Lựa chọn lô thành phẩm và phòng thí nghiệm thực hiện phép thử">
+            <BatchLabSelector
+              batchSearch={batchSearch}
+              setBatchSearch={setBatchSearch}
+              showBatchDropdown={showBatchDropdown}
+              setShowBatchDropdown={setShowBatchDropdown}
+              isEditMode={crud.mode === 'EDIT'}
+              batchId={formValues.batchId}
+              availableBatchesForDropdown={availableBatchesForDropdown}
+              handleBatchSelect={handleBatchSelect}
+              setFieldValue={setFieldValue}
+              labName={formValues.labName}
+              testDate={formValues.testDate}
+              hydratedBatches={hydratedBatches}
+              existingResultsForBatch={existingResultsForBatch}
+              switchToEditMode={switchToEditMode}
+            />
+          </Surface>
+
+          {/* Section 2: Specifications & Criteria Evaluation */}
+          <Surface variant="flat" padding="lg" title="2. Đánh giá Chỉ tiêu Chất lượng" subtitle="Chỉ tiêu chính, an toàn theo TCCS và các chỉ tiêu bổ sung nếu có">
+            <div className="space-y-6">
               <TccsCriteriaSection
                 activeTCCS={activeTCCS}
                 batchId={formValues.batchId}
@@ -277,9 +303,14 @@ const TestResultFormPage: React.FC = () => {
                 updateInArray={updateInArray}
                 removeFromArray={removeFromArray}
               />
+            </div>
+          </Surface>
 
-              <div className="space-y-2 pt-4 border-t border-slate-100">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-2">
+          {/* Section 3: Notes & Evidence Attachments */}
+          <Surface variant="flat" padding="lg" title="3. Hồ sơ Minh chứng & Kết luận" subtitle="Ghi nhận đánh giá cảm quan, lưu ý kiểm nghiệm và tệp đính kèm CoA/Spectra">
+            <div className="space-y-6">
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider pl-1">
                   Ghi chú phiếu kiểm nghiệm
                 </label>
                 <textarea
@@ -287,8 +318,8 @@ const TestResultFormPage: React.FC = () => {
                   value={formValues.notes}
                   onChange={(e) => setFieldValue('notes', e.target.value)}
                   rows={2}
-                  className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl font-bold outline-none shadow-inner text-sm focus:ring-2 focus:ring-indigo-500 transition-all"
-                  placeholder="Ghi chú thêm..."
+                  className="w-full px-3.5 py-2.5 bg-slate-50/80 dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-800 rounded-xl font-medium outline-none text-sm focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 transition-all text-slate-800 dark:text-slate-200"
+                  placeholder="Ghi chú thêm về điều kiện thử nghiệm, độ ẩm phòng lab, lưu ý đặc biệt..."
                 />
               </div>
 
@@ -298,30 +329,37 @@ const TestResultFormPage: React.FC = () => {
                 setFieldValue={setFieldValue}
               />
             </div>
+          </Surface>
 
-            <div className="pt-8 flex justify-end gap-3 border-t bg-white mt-8">
+          {/* Sticky Bottom Workbench Action Bar */}
+          <ActionBar
+            left={
               <button
                 type="button"
                 onClick={() => navigate('/test-results')}
-                className="px-6 py-3 text-slate-400 font-black uppercase text-xs tracking-widest hover:bg-slate-50 rounded-xl transition-colors"
+                className="px-4 py-2 text-slate-500 dark:text-slate-400 font-semibold text-xs tracking-wide hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
               >
-                Hủy &amp; Quay lại
+                ← Hủy &amp; Quay lại danh sách
               </button>
-              <button
-                type="submit"
-                disabled={!activeTCCS || isSubmitting}
-                className={`px-8 py-3 text-white font-black rounded-xl shadow-2xl transition-all uppercase text-xs tracking-widest ${
-                  crud.mode === 'EDIT'
-                    ? 'bg-blue-600 shadow-blue-100 hover:bg-blue-700'
-                    : 'bg-indigo-600 shadow-indigo-100 hover:bg-indigo-700'
-                } disabled:opacity-20 flex items-center gap-2`}
-              >
-                {isSubmitting && <Loader2 size={14} className="animate-spin" />}
-                {crud.mode === 'EDIT' ? 'Cập nhật Phiếu' : 'Lưu Kết quả Mới'}
-              </button>
-            </div>
-          </form>
-        </div>
+            }
+            right={
+              <div className="flex items-center gap-3">
+                <button
+                  type="submit"
+                  disabled={!activeTCCS || isSubmitting}
+                  className={`px-5 py-2 text-white font-bold rounded-lg shadow-xs transition-all text-xs tracking-wide flex items-center gap-2 cursor-pointer ${
+                    crud.mode === 'EDIT'
+                      ? 'bg-blue-600 hover:bg-blue-700 active:bg-blue-800'
+                      : 'bg-primary-600 hover:bg-primary-700 active:bg-primary-800'
+                  } disabled:opacity-40 disabled:cursor-not-allowed`}
+                >
+                  {isSubmitting && <Loader2 size={14} className="animate-spin" />}
+                  {crud.mode === 'EDIT' ? 'Cập nhật Phiếu kiểm nghiệm' : 'Lưu & Hoàn tất Phiếu'}
+                </button>
+              </div>
+            }
+          />
+        </form>
       </div>
 
       <MappingConfirmModal

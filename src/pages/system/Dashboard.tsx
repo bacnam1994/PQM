@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { DSCard } from '../../components';
+import { Surface, StatusBadge } from '../../components/ui';
 import { BATCH_STATUS, PRODUCT_STATUS, TEST_RESULT_STATUS, formatDateStandard } from '../../utils';
 import { useShallow } from 'zustand/react/shallow';
 import { useQualityAlerts } from '../../hooks/useQualityAlerts';
@@ -155,7 +156,7 @@ const Dashboard: React.FC = () => {
     <div className="space-y-6 animate-in fade-in duration-500">
       
       {/* ================= HERO BANNER ================= */}
-      <div className="hero">
+      <Surface variant="flat" padding="lg" className="hero !border-slate-200/80 dark:!border-slate-800">
         <div className="hero-left">
           <div className="hero-eyebrow">
             <Sparkles className="animate-pulse" />
@@ -190,7 +191,7 @@ const Dashboard: React.FC = () => {
         <div className="hero-right">
           <GaugeChart passRate={passRate} />
         </div>
-      </div>
+      </Surface>
 
       {/* ================= QA/QC ACTION WORKBENCH QUEUE ================= */}
       <QAQCActionQueue />
@@ -287,7 +288,7 @@ const Dashboard: React.FC = () => {
       </div>
 
       {/* ================= SIGNATURE PIPELINE ================= */}
-      <div className="pipeline-card">
+      <Surface variant="flat" padding="lg" className="pipeline-card !border-slate-200/80 dark:!border-slate-800">
         <div className="pipeline-head">
           <div>
             <h2 className="text-zinc-900 dark:text-zinc-50 font-bold">Chuỗi xử lý lô — Từ nguyên liệu đến xuất kho</h2>
@@ -363,13 +364,13 @@ const Dashboard: React.FC = () => {
             </div>
           </div>
         </div>
-      </div>
+      </Surface>
 
       {/* ================= TWO COLUMN GRID ================= */}
       <div className="grid-2">
         
         {/* Left Col: Batches List */}
-        <div className="card">
+        <Surface variant="flat" padding="md" className="card !border-slate-200/80 dark:!border-slate-800">
           <div className="card-head">
             <h3 className="font-bold">Lô hàng gần đây</h3>
             <Link to="/batches" className="link">Xem tất cả &rarr;</Link>
@@ -461,13 +462,13 @@ const Dashboard: React.FC = () => {
               </tbody>
             </table>
           </div>
-        </div>
+        </Surface>
 
         {/* Right Col: Alerts & AI Card */}
         <div className="space-y-4">
           
           {/* Quality Alerts */}
-          <div className="card">
+          <Surface variant="flat" padding="md" className="card !border-slate-200/80 dark:!border-slate-800">
             <div className="card-head">
               <h3 className="font-bold">Cảnh báo chất lượng</h3>
               <Link to="/alerts" className="link">Tất cả</Link>
@@ -499,7 +500,7 @@ const Dashboard: React.FC = () => {
                 </div>
               )}
             </div>
-          </div>
+          </Surface>
 
           {/* AI Quick Prompt Widget */}
           <div className="ai-card">

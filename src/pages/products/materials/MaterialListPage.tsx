@@ -1,6 +1,7 @@
 import React from 'react';
 import { BookUser, Sparkles, Plus, FlaskConical, ShieldCheck, Trash2 } from 'lucide-react';
 import { PageHeader, Pagination, Modal } from '../../../components';
+import { Surface } from '../../../components/ui';
 import { COMMON_PHARMA_STANDARDS } from '../MaterialFormPage';
 import { useMaterialListState } from './hooks/useMaterialListState';
 import { MaterialMetricsBar } from './components/MaterialMetricsBar';
@@ -15,7 +16,7 @@ export const MaterialListPage: React.FC = () => {
   const state = useMaterialListState();
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto p-4 md:p-6 animate-in fade-in duration-500">
+    <div className="space-y-6 max-w-7xl mx-auto p-4 md:p-6 animate-in fade-in duration-300">
       <datalist id="standards-datalist">
         {COMMON_PHARMA_STANDARDS.map(s => <option key={s} value={s} />)}
       </datalist>
@@ -30,18 +31,18 @@ export const MaterialListPage: React.FC = () => {
             <button
               type="button"
               onClick={state.handleOpenHarmonizer}
-              className="px-4 py-2.5 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-xl text-xs font-bold flex items-center gap-2 hover:from-indigo-600 hover:to-purple-700 transition-all shadow-md shadow-indigo-500/20 cursor-pointer"
+              className="px-3.5 py-2 bg-gradient-to-r from-primary-600 to-purple-600 text-white rounded-lg text-xs font-bold flex items-center gap-2 hover:opacity-90 transition-all shadow-xs cursor-pointer"
             >
-              <Sparkles size={15} className="animate-pulse" />
+              <Sparkles size={14} className="animate-pulse" />
               <span>AI Rà soát & Chuẩn hóa</span>
             </button>
             {state.isAdmin && (
               <button
                 type="button"
                 onClick={() => state.handleOpenAdd()}
-                className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-2 transition-all shadow-md shadow-emerald-600/20 cursor-pointer"
+                className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white rounded-lg text-xs font-bold flex items-center gap-2 transition-all shadow-xs cursor-pointer"
               >
-                <Plus size={16} />
+                <Plus size={15} />
                 <span>Thêm Nguyên liệu</span>
               </button>
             )}
@@ -53,51 +54,51 @@ export const MaterialListPage: React.FC = () => {
       <MaterialMetricsBar metrics={state.metrics} />
 
       {/* Tabs Navigation */}
-      <div className="flex items-center gap-2 border-b border-slate-200 dark:border-zinc-800 pb-2 overflow-x-auto">
+      <Surface variant="subtle" padding="sm" className="flex items-center gap-1.5 overflow-x-auto scrollbar-hide">
         <button
           type="button"
           onClick={() => state.setActiveTab('CATALOG')}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all whitespace-nowrap cursor-pointer ${
+          className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
             state.activeTab === 'CATALOG'
-              ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20'
-              : 'text-slate-500 dark:text-zinc-400 hover:bg-slate-100 dark:hover:bg-zinc-850'
+              ? 'bg-white dark:bg-slate-800 text-primary-700 dark:text-primary-300 shadow-xs'
+              : 'text-slate-500 dark:text-slate-400 hover:bg-white/60 dark:hover:bg-slate-800/60'
           }`}
         >
-          <BookUser size={15} />
-          <span>Danh mục Nguyên liệu Chuẩn ({state.rawMaterials.length})</span>
+          <BookUser size={14} />
+          <span>Danh mục Chuẩn ({state.rawMaterials.length})</span>
         </button>
 
         <button
           type="button"
           onClick={() => state.setActiveTab('MATRIX')}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all whitespace-nowrap cursor-pointer ${
+          className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
             state.activeTab === 'MATRIX'
-              ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20'
-              : 'text-slate-500 dark:text-zinc-400 hover:bg-slate-100 dark:hover:bg-zinc-850'
+              ? 'bg-white dark:bg-slate-800 text-primary-700 dark:text-primary-300 shadow-xs'
+              : 'text-slate-500 dark:text-slate-400 hover:bg-white/60 dark:hover:bg-slate-800/60'
           }`}
         >
-          <FlaskConical size={15} />
-          <span>Ma trận Sử dụng trong Công thức ({state.aggregatedFormulaItems.length})</span>
+          <FlaskConical size={14} />
+          <span>Ma trận Công thức ({state.aggregatedFormulaItems.length})</span>
         </button>
 
         <button
           type="button"
           onClick={() => state.setActiveTab('CONSISTENCY')}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all whitespace-nowrap cursor-pointer ${
+          className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
             state.activeTab === 'CONSISTENCY'
-              ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20'
-              : 'text-slate-500 dark:text-zinc-400 hover:bg-slate-100 dark:hover:bg-zinc-850'
+              ? 'bg-white dark:bg-slate-800 text-primary-700 dark:text-primary-300 shadow-xs'
+              : 'text-slate-500 dark:text-slate-400 hover:bg-white/60 dark:hover:bg-slate-800/60'
           }`}
         >
-          <ShieldCheck size={15} />
-          <span>Kiểm soát Toàn vẹn & Auto-Link</span>
+          <ShieldCheck size={14} />
+          <span>Toàn vẹn &amp; Auto-Link</span>
           {state.metrics.unlinkedIngredients > 0 && (
-            <span className="px-1.5 py-0.2 rounded-full bg-amber-500 text-white text-[10px] font-bold">
+            <span className="px-1.5 py-0.5 rounded-full bg-amber-500 text-white text-[10px] font-bold">
               {state.metrics.unlinkedIngredients}
             </span>
           )}
         </button>
-      </div>
+      </Surface>
 
       {/* Filter Bar */}
       <MaterialFilterSection

@@ -28,6 +28,11 @@ dist-ssr
 # Playwright
 /test-results/
 /playwright-report/
+
+# Backups & Firebase cache
+*.zip
+.firebase/
+
 /blob-report/
 /playwright/.cache/
 /playwright/.auth/

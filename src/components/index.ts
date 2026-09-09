@@ -3,8 +3,7 @@
  * Giúp gom nhóm tất cả các UI Component lại một nơi để import dễ dàng và tránh nhầm lẫn.
  */
 
-export * from './ui/CommonUI';
-export * from './ui/DesignSystem';
+export * from './ui';
 export * from './ui/CrudControls';
 export { default as SpecialCharToolbar } from './ui/SpecialCharToolbar';
 export { default as ErrorBoundary } from './ui/ErrorBoundary';

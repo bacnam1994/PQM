@@ -17,6 +17,7 @@ import { useCriteriaResolver } from '../../hooks/useCriteriaResolver';
 import { normalizeName } from '../../services/criteriaAliasService';
 import { fetchTestResultsByProductId } from '../../services/testResultService';
 import { Loader2 } from 'lucide-react';
+import { Surface, PageHeader, StatusBadge } from '../../components/ui';
 
 // Helper: Format số sang dạng mũ (VD: 1000 -> 10³)
 const formatScientific = (value: string | number) => {
@@ -342,44 +343,29 @@ const ProductDetail: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
-        <div className="flex items-start gap-4">
-          <button 
-            onClick={() => navigate('/products')}
-            className="p-2 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-all shadow-sm shrink-0"
-          >
-            <ChevronLeft size={20} />
-          </button>
-
-          {product.imageUrl ? (
-            <img src={product.imageUrl} alt={product.name} className="w-16 h-16 rounded-2xl object-cover border border-slate-200 shadow-sm shrink-0" />
-          ) : (
-            <div className="bg-indigo-50 dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 p-4 rounded-2xl shrink-0 border border-slate-100 dark:border-slate-700">
-              <Box size={32} />
-            </div>
-          )}
-
-          <div>
-            <div className="flex items-center gap-2 mb-1">
-              <span className="text-xs font-bold bg-indigo-100 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 px-2 py-0.5 rounded uppercase tracking-wider">{product.code}</span>
-              {getStatusBadge(product.status)}
-            </div>
-            <h1 className="text-2xl font-extrabold text-slate-800 dark:text-slate-100">{product.name}</h1>
+      <PageHeader
+        title={product.name}
+        subtitle={`Mã: ${product.code} • ${product.group || 'Chưa phân nhóm'}`}
+        icon={Box}
+        breadcrumb={[
+          { label: 'Sản phẩm', onClick: () => navigate('/products') },
+          { label: product.name },
+        ]}
+        badge={<StatusBadge status={product.status} />}
+        actions={
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => navigate(`/products/360/${product.id}`)}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-primary-50 dark:bg-primary-950/40 text-primary-700 dark:text-primary-300 hover:bg-primary-100 dark:hover:bg-primary-900/60 rounded-lg font-bold border border-primary-200 dark:border-primary-800 transition-all text-xs cursor-pointer shadow-2xs"
+            >
+              <Activity size={14} /> Hồ sơ Product 360°
+            </button>
           </div>
-        </div>
+        }
+      />
 
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => navigate(`/products/360/${product.id}`)}
-            className="flex items-center gap-2 px-4 py-2.5 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 rounded-xl font-bold border border-indigo-200 dark:border-indigo-800 transition-all text-xs shadow-sm"
-          >
-            <Activity size={16} /> Hồ sơ Product 360°
-          </button>
-        </div>
-      </div>
-
-      <div className="flex border-b border-slate-200 scrollbar-hide overflow-x-auto">
+      <Surface variant="subtle" padding="sm" className="flex gap-1 overflow-x-auto scrollbar-hide">
         {[
           { id: 'info', label: 'Thông tin kỹ thuật', icon: Info },
           { id: 'formula', label: 'Công thức & Thành phần', icon: FlaskConical },
@@ -391,19 +377,19 @@ const ProductDetail: React.FC = () => {
             key={tab.id}
             onClick={() => setActiveTab(tab.id as any)}
             className={`
-              flex items-center gap-2 px-5 py-3 text-sm font-bold border-b-2 transition-all whitespace-nowrap
+              flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all whitespace-nowrap cursor-pointer
               ${activeTab === tab.id 
-                ? 'border-indigo-600 text-indigo-600 bg-indigo-50/30' 
-                : 'border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50'}
+                ? 'bg-white dark:bg-slate-800 text-primary-700 dark:text-primary-300 shadow-xs' 
+                : 'text-slate-500 dark:text-slate-400 hover:bg-white/60 dark:hover:bg-slate-800/60'}
             `}
           >
-            <tab.icon size={18} />
+            <tab.icon size={15} />
             {tab.label}
           </button>
         ))}
-      </div>
+      </Surface>
 
-      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 min-h-[400px]">
+      <Surface variant="flat" padding="lg" className="min-h-[400px]">
         {activeTab === 'info' && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             <div className="space-y-6">
@@ -1134,7 +1120,7 @@ const ProductDetail: React.FC = () => {
             )}
           </div>
         )}
-      </div>
+      </Surface>
     </div>
   );
 };
