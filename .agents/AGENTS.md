@@ -12,10 +12,10 @@
 3. **XUẤT FULL_SOURCE_CODE SAU KHI DEPLOY & PUSH GITHUB**:
    - Sau mỗi lần deploy lên Firebase Hosting **VÀ** push code lên GitHub thành công, AI **BẮT BUỘC** phải tự động chạy lệnh xuất file `FULL_SOURCE_CODE.md` bằng lệnh:
      ```powershell
-     powershell -ExecutionPolicy Bypass -File scripts\export_full_source.ps1
+     npm run export:source
+     # hoặc: powershell -ExecutionPolicy Bypass -File scripts\export_full_source.ps1
      ```
-   - File `FULL_SOURCE_CODE.md` là bản snapshot toàn bộ mã nguồn tại thời điểm deploy, dùng để tham chiếu nhanh và chia sẻ với AI trong phiên làm việc tiếp theo.
-   - Sau khi xuất xong, commit và push file `FULL_SOURCE_CODE.md` lên GitHub cùng.
+   - File `FULL_SOURCE_CODE.md` và `FULL_SOURCE_CODE.txt` là bản snapshot toàn bộ mã nguồn tại thời điểm deploy, dùng để tham chiếu nhanh và chia sẻ với AI trong phiên làm việc tiếp theo.
 
 ---
 
@@ -36,7 +36,7 @@
 3. **Build** → `npm run build`
 4. **Deploy lên Firebase** → `firebase deploy` (hoặc `firebase deploy --only hosting`)
 5. **Commit và Push lên GitHub** → để sao lưu code
-6. **Xuất FULL_SOURCE_CODE** → `powershell -ExecutionPolicy Bypass -File scripts\export_full_source.ps1`
+6. **Xuất FULL_SOURCE_CODE** → `npm run export:source`
 
 ## Cấu hình Vite BASE_URL
 
