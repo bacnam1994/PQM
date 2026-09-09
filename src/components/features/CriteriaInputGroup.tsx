@@ -1,5 +1,5 @@
 import React, { useMemo, useCallback, memo } from 'react';
-import { Sparkles } from 'lucide-react';
+import { SparklesIcon } from '@heroicons/react/24/outline';
 import { Criterion, CriterionType, TCCS, TestResult, TestResultEntry } from '../../types';
 import { evaluateCriterion, ensureArray, parseFlexibleValue, EVALUATION_RULE, normalizeNumericString, checkRange, evaluateCriterionSmart, autoFormatInput } from '../../utils';
 
@@ -62,8 +62,8 @@ const CriteriaInputRow = memo(({ c, criteriaName, currentVal, history, onChange,
         <div className="flex items-center gap-1.5 flex-shrink-0">
           {/* Badge AI đã điền */}
           {isAiFilled && (
-            <div className="flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-600 border border-indigo-200">
-              <Sparkles size={8} />
+            <div className="flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+              <SparklesIcon className="w-2.5 h-2.5" />
               <span className="text-[8px] font-black uppercase tracking-wide">AI</span>
             </div>
           )}

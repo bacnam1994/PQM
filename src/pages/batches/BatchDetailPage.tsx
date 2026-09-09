@@ -1,6 +1,22 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { ArrowLeft, Loader2, FlaskConical, ClipboardCheck, Layers, Printer, CheckCircle2, X, AlertTriangle, ShieldAlert, Sparkles, GitBranch, FileWarning, FileText, ShieldCheck, Activity } from 'lucide-react';
+import { 
+  ArrowLeftIcon, 
+  ArrowPathIcon, 
+  BeakerIcon, 
+  ClipboardDocumentCheckIcon, 
+  Square3Stack3DIcon, 
+  PrinterIcon, 
+  CheckCircleIcon, 
+  XMarkIcon, 
+  ExclamationTriangleIcon, 
+  ShieldExclamationIcon, 
+  SparklesIcon, 
+  ShareIcon, 
+  DocumentTextIcon, 
+  ShieldCheckIcon, 
+  ChartBarSquareIcon 
+} from '@heroicons/react/24/outline';
 import { useDataGraph } from '../../hooks/useDataGraph';
 import { useAppStore } from '../../store/useAppStore';
 import { formatDateStandard, ensureArray, parseNumberFromText } from '../../utils';
@@ -15,7 +31,6 @@ import { ESignatureModal } from '../../components/features/ESignatureModal';
 import { ElectronicSignature } from '../../types/signature';
 import { QualityDeviation } from '../../types/deviation';
 import { firebaseDeviationRepository } from '../../repositories/firebase/FirebaseDeviationRepository';
-import { FileCheck2 } from 'lucide-react';
 import { Surface, PageHeader, StatusBadge } from '../../components/ui';
 
 // Helper tính tiến độ lô
@@ -273,7 +288,7 @@ const BatchDetailPage = () => {
       <PageHeader
         title={`Lô ${batch.batchNo}`}
         subtitle={`${batch.product?.name || 'Chưa gán sản phẩm'} • Mã: ${batch.product?.code || 'N/A'}`}
-        icon={Layers}
+        icon={Square3Stack3DIcon}
         breadcrumb={[
           { label: 'Quản lý Lô', onClick: () => navigate('/batches') },
           { label: batch.batchNo },
@@ -282,42 +297,42 @@ const BatchDetailPage = () => {
         actions={
           <div className="flex items-center gap-2 flex-wrap">
             {batch.status === 'RELEASED' ? (
-              <div className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 rounded-lg font-bold text-xs">
-                <ShieldCheck size={14} className="text-emerald-600 dark:text-emerald-400" />
+              <div className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 rounded-xl font-bold text-xs">
+                <ShieldCheckIcon className="h-4 w-4" />
                 <span>Đã xuất xưởng</span>
               </div>
             ) : canSignRelease ? (
               <button
                 type="button"
                 onClick={handleOpenSignRelease}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white rounded-lg font-bold shadow-xs text-xs cursor-pointer transition-colors"
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white rounded-xl font-bold shadow-sm text-xs cursor-pointer transition-colors"
               >
-                <ShieldCheck size={14} /> Ký xuất xưởng
+                <ShieldCheckIcon className="h-4 w-4" /> Ký xuất xưởng
               </button>
             ) : null}
             <button
               type="button"
               onClick={() => navigate(`/batches/360/${batch.id}`)}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/60 rounded-lg font-bold border border-blue-200 dark:border-blue-800 text-xs cursor-pointer transition-colors"
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-500/10 text-blue-600 dark:text-blue-400 hover:bg-blue-500/20 rounded-xl font-bold border border-blue-500/20 text-xs cursor-pointer transition-colors"
             >
-              <Activity size={14} /> Hồ sơ 360°
+              <ChartBarSquareIcon className="h-4 w-4" /> Hồ sơ 360°
             </button>
             <button
               type="button"
               onClick={() => setIsGenealogyOpen(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/60 rounded-lg font-bold border border-slate-200/80 dark:border-slate-700 text-xs cursor-pointer transition-colors"
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-surface text-ink-soft hover:bg-surface-2 rounded-xl font-bold border border-border text-xs cursor-pointer transition-colors shadow-sm"
             >
-              <GitBranch size={14} /> Truy vết
+              <ShareIcon className="h-4 w-4" /> Truy vết
             </button>
             <button 
               type="button"
               onClick={() => setIsClearanceModalOpen(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 hover:bg-purple-100 dark:hover:bg-purple-900/60 border border-purple-200 dark:border-purple-800 rounded-lg font-bold text-xs cursor-pointer transition-colors"
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-500/10 text-purple-600 dark:text-purple-400 hover:bg-purple-500/20 border border-purple-500/20 rounded-xl font-bold text-xs cursor-pointer transition-colors"
             >
-              <Sparkles size={14} /> Thẩm định AI
+              <SparklesIcon className="h-4 w-4" /> Thẩm định AI
             </button>
-            <button onClick={() => navigate(`/test-results/coa/${batch.id}`)} className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg font-bold text-xs cursor-pointer transition-colors">
-              <Printer size={14} /> In CoA
+            <button onClick={() => navigate(`/test-results/coa/${batch.id}`)} className="flex items-center gap-1.5 px-3 py-1.5 bg-surface-3 hover:bg-surface-3/80 text-white rounded-xl font-bold text-xs cursor-pointer transition-colors shadow-sm">
+              <PrinterIcon className="h-4 w-4" /> In CoA
             </button>
           </div>
         }
@@ -326,50 +341,50 @@ const BatchDetailPage = () => {
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
         <div className="xl:col-span-1 space-y-6">
           <Surface variant="flat" padding="lg">
-            <div className="mb-4 pb-4 border-b border-slate-100 dark:border-slate-800">
-              <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1">Sản phẩm</p>
+            <div className="mb-4 pb-4 border-b border-border">
+              <p className="text-[10px] font-bold text-ink-muted uppercase tracking-wider mb-1">Sản phẩm</p>
               <h4 
                 onClick={() => batch.productId && navigate(`/products/${batch.productId}`)}
-                className="font-bold text-slate-800 dark:text-slate-100 text-base leading-tight mb-1 hover:text-primary-600 dark:hover:text-primary-400 cursor-pointer transition-colors"
+                className="font-bold text-ink text-base leading-tight mb-1 hover:text-emerald-600 dark:hover:text-emerald-400 cursor-pointer transition-colors"
                 title="Nhấn để xem chi tiết hồ sơ sản phẩm"
               >
                 {batch.product?.name}
               </h4>
-              <p className="text-xs font-mono font-bold text-primary-600 dark:text-primary-400">{batch.product?.code}</p>
+              <p className="text-xs font-mono font-bold text-emerald-600 dark:text-emerald-400">{batch.product?.code}</p>
             </div>
-            <div className="mb-4 pb-4 border-b border-slate-100 dark:border-slate-800">
-              <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1">Số Lô</p>
-              <h4 className="font-mono font-bold text-slate-900 dark:text-white text-xl">{batch.batchNo}</h4>
+            <div className="mb-4 pb-4 border-b border-border">
+              <p className="text-[10px] font-bold text-ink-muted uppercase tracking-wider mb-1">Số Lô</p>
+              <h4 className="font-mono font-bold text-ink text-xl">{batch.batchNo}</h4>
             </div>
             <div className="space-y-2.5 text-xs">
-              <div className="flex justify-between"><span className="font-medium text-slate-500 dark:text-slate-400">NSX:</span> <span className="font-semibold text-slate-800 dark:text-slate-200">{formatDateStandard(batch.mfgDate)}</span></div>
-              <div className="flex justify-between"><span className="font-medium text-slate-500 dark:text-slate-400">HSD:</span> <span className="font-semibold text-rose-600 dark:text-rose-400">{formatDateStandard(batch.expDate)}</span></div>
+              <div className="flex justify-between"><span className="font-medium text-ink-muted">NSX:</span> <span className="font-semibold text-ink">{formatDateStandard(batch.mfgDate)}</span></div>
+              <div className="flex justify-between"><span className="font-medium text-ink-muted">HSD:</span> <span className="font-semibold text-rose-600 dark:text-rose-400">{formatDateStandard(batch.expDate)}</span></div>
 
-              <div className="pt-3 border-t border-slate-100 dark:border-slate-800">
-                <span className="font-medium text-slate-500 dark:text-slate-400 block mb-1">Tiêu chuẩn áp dụng:</span>
+              <div className="pt-3 border-t border-border">
+                <span className="font-medium text-ink-muted block mb-1">Tiêu chuẩn áp dụng:</span>
                 {(batch as any).tccs?.id ? (
                   <Link
                     to={`/tccs/detail/${(batch as any).tccs?.id}`}
-                    className="font-semibold text-primary-700 dark:text-primary-400 bg-primary-50 dark:bg-primary-950/50 hover:bg-primary-100 dark:hover:bg-primary-900/60 px-2 py-1 rounded inline-flex items-center gap-1 transition-colors"
+                    className="font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 px-2 py-1 rounded inline-flex items-center gap-1 transition-colors border border-emerald-500/20"
                     title="Nhấn để xem chi tiết TCCS"
                   >
-                    <FileText size={12} /> {(batch as any).tccs?.code || 'Không xác định'}
+                    <DocumentTextIcon className="h-3.5 w-3.5" /> {(batch as any).tccs?.code || 'Không xác định'}
                   </Link>
                 ) : (
-                  <span className="font-medium text-slate-500 dark:text-slate-400">Không xác định</span>
+                  <span className="font-medium text-ink-muted">Không xác định</span>
                 )}
               </div>
 
               {/* Link đến Công thức sản phẩm (nếu có) */}
               {(batch as any).formula && (
-                <div className="pt-2 border-t border-slate-100 dark:border-slate-800">
-                  <span className="font-medium text-slate-500 dark:text-slate-400 block mb-1">Công thức sản phẩm:</span>
+                <div className="pt-2 border-t border-border">
+                  <span className="font-medium text-ink-muted block mb-1">Công thức sản phẩm:</span>
                   <Link
                     to={`/product-formulas`}
-                    className="font-semibold text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-950/40 hover:bg-purple-100 dark:hover:bg-purple-900/40 px-2 py-1 rounded inline-flex items-center gap-1 transition-colors text-[11px]"
+                    className="font-semibold text-purple-600 dark:text-purple-400 bg-purple-500/10 hover:bg-purple-500/20 px-2 py-1 rounded inline-flex items-center gap-1 transition-colors text-[11px] border border-purple-500/20"
                     title="Xem công thức sản phẩm"
                   >
-                    <FlaskConical size={11} /> Xem công thức
+                    <BeakerIcon className="h-3.5 w-3.5" /> Xem công thức
                   </Link>
                 </div>
               )}
@@ -380,20 +395,20 @@ const BatchDetailPage = () => {
             <div className="flex items-center gap-4 mb-4">
               <CircularProgress progress={progressPercent} />
               <div>
-                <h4 className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider flex items-center gap-1.5"><FlaskConical size={12} /> Tiến độ kiểm nghiệm</h4>
-                <p className="text-sm text-slate-800 dark:text-slate-200 font-bold mt-0.5">Hoàn thành {progressPercent}%</p>
+                <h4 className="text-[10px] font-bold text-ink-muted uppercase tracking-wider flex items-center gap-1.5"><BeakerIcon className="h-3.5 w-3.5" /> Tiến độ kiểm nghiệm</h4>
+                <p className="text-sm text-ink font-bold mt-0.5">Hoàn thành {progressPercent}%</p>
               </div>
             </div>
             {missingCriteria.length > 0 ? (
-              <div className="bg-amber-50/80 dark:bg-amber-950/30 border border-amber-200/80 dark:border-amber-900/40 p-3 rounded-xl">
-                <p className="text-[10px] font-bold text-amber-800 dark:text-amber-300 flex items-center gap-1 mb-2"><AlertTriangle size={12} /> Còn thiếu {missingCriteria.length} chỉ tiêu:</p>
+              <div className="bg-amber-500/10 border border-amber-500/20 p-3 rounded-xl">
+                <p className="text-[10px] font-bold text-amber-800 dark:text-amber-300 flex items-center gap-1 mb-2"><ExclamationTriangleIcon className="h-3.5 w-3.5 text-amber-600" /> Còn thiếu {missingCriteria.length} chỉ tiêu:</p>
                 <div className="flex flex-wrap gap-1.5">
-                  {missingCriteria.map((c: any, idx: number) => <span key={idx} className="px-2 py-0.5 bg-white dark:bg-slate-900 text-amber-800 dark:text-amber-300 text-[10px] font-semibold rounded border border-amber-200 dark:border-amber-800">{c.name}</span>)}
+                  {missingCriteria.map((c: any, idx: number) => <span key={idx} className="px-2 py-0.5 bg-surface text-amber-800 dark:text-amber-300 text-[10px] font-semibold rounded border border-amber-500/20">{c.name}</span>)}
                 </div>
               </div>
             ) : (
-              <div className="bg-emerald-50/80 dark:bg-emerald-950/30 p-3 rounded-xl border border-emerald-200/80 dark:border-emerald-900/40 flex items-center gap-2">
-                <CheckCircle2 size={16} className="text-emerald-500" />
+              <div className="bg-emerald-500/10 p-3 rounded-xl border border-emerald-500/20 flex items-center gap-2">
+                <CheckCircleIcon className="h-4 w-4 text-emerald-500" />
                 <span className="text-xs font-semibold text-emerald-800 dark:text-emerald-300">Đã kiểm đủ tất cả chỉ tiêu.</span>
               </div>
             )}
@@ -403,39 +418,39 @@ const BatchDetailPage = () => {
           <Surface variant="flat" padding="md" className="space-y-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <ShieldAlert size={16} className={batchDeviations.some(d => d.status !== 'CLOSED') ? 'text-rose-500' : 'text-slate-400'} />
-                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-200">
+                <ShieldExclamationIcon className={`h-4 w-4 ${batchDeviations.some(d => d.status !== 'CLOSED') ? 'text-rose-500' : 'text-ink-muted'}`} />
+                <h4 className="text-xs font-bold uppercase tracking-wider text-ink">
                   Hồ sơ Sai lệch (CAPA)
                 </h4>
               </div>
               <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
                 batchDeviations.length === 0 
-                  ? 'bg-slate-100 dark:bg-slate-800 text-slate-500' 
+                  ? 'bg-surface-2 text-ink-muted border border-border' 
                   : batchDeviations.some(d => d.status !== 'CLOSED')
-                    ? 'bg-rose-100 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300'
-                    : 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300'
+                    ? 'bg-rose-500/10 text-rose-600 border border-rose-500/20'
+                    : 'bg-emerald-500/10 text-emerald-600 border border-emerald-500/20'
               }`}>
                 {batchDeviations.length} hồ sơ
               </span>
             </div>
 
             {batchDeviations.length === 0 ? (
-              <p className="text-xs text-slate-400 italic">Không có hồ sơ sai lệch nào cho lô này.</p>
+              <p className="text-xs text-ink-muted italic">Không có hồ sơ sai lệch nào cho lô này.</p>
             ) : (
               <div className="space-y-2">
                 {batchDeviations.map(dev => (
-                  <div key={dev.id} className="p-2.5 rounded-lg bg-slate-50/80 dark:bg-slate-900/50 border border-slate-200/60 dark:border-slate-800 text-xs space-y-1">
+                  <div key={dev.id} className="p-2.5 rounded-xl bg-surface-2 border border-border text-xs space-y-1">
                     <div className="flex items-center justify-between">
-                      <span className="font-mono font-bold text-slate-800 dark:text-slate-200">{dev.deviationNo}</span>
+                      <span className="font-mono font-bold text-ink">{dev.deviationNo}</span>
                       <span className={`text-[10px] font-semibold px-2 py-0.5 rounded ${
                         dev.status === 'CLOSED'
-                          ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300'
-                          : 'bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-300'
+                          ? 'bg-emerald-500/10 text-emerald-600 border border-emerald-500/20'
+                          : 'bg-amber-500/10 text-amber-600 border border-amber-500/20'
                       }`}>
                         {dev.status === 'CLOSED' ? 'Đã đóng' : 'Đang xử lý'}
                       </span>
                     </div>
-                    <p className="text-slate-600 dark:text-slate-300 font-medium truncate">{dev.title}</p>
+                    <p className="text-ink-soft font-medium truncate">{dev.title}</p>
                     {dev.failedCriteria && dev.failedCriteria.length > 0 && (
                       <p className="text-[11px] text-rose-600 dark:text-rose-400 font-medium">
                         {dev.failedCriteria.length} chỉ tiêu OOS ({dev.failedCriteria.map(c => c.name).join(', ')})
@@ -446,7 +461,7 @@ const BatchDetailPage = () => {
 
                 <Link
                   to="/deviations"
-                  className="block text-center py-2 px-3 rounded-lg bg-slate-100/80 dark:bg-slate-800 hover:bg-rose-50 dark:hover:bg-rose-950/40 text-slate-700 dark:text-slate-200 hover:text-rose-600 dark:hover:text-rose-400 text-xs font-semibold transition-colors"
+                  className="block text-center py-2 px-3 rounded-xl bg-surface-2 hover:bg-rose-500/10 text-ink-soft hover:text-rose-600 dark:hover:text-rose-400 text-xs font-semibold transition-colors border border-border"
                 >
                   Mở trang Quản lý Sai lệch & CAPA →
                 </Link>
@@ -457,8 +472,8 @@ const BatchDetailPage = () => {
 
         <div className="xl:col-span-2 space-y-6">
           <Surface variant="subtle" padding="sm" className="flex gap-1.5">
-            <button onClick={() => setShowHistoryTable(false)} className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${!showHistoryTable ? 'bg-white dark:bg-slate-800 text-primary-700 dark:text-primary-300 shadow-xs' : 'text-slate-500 dark:text-slate-400 hover:bg-white/60 dark:hover:bg-slate-800/60'}`}>Phiếu Kiểm Nghiệm ({viewBatchResults.length})</button>
-            <button onClick={() => setShowHistoryTable(true)} className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${showHistoryTable ? 'bg-white dark:bg-slate-800 text-primary-700 dark:text-primary-300 shadow-xs' : 'text-slate-500 dark:text-slate-400 hover:bg-white/60 dark:hover:bg-slate-800/60'}`}><Layers size={14} /> Bảng Tổng hợp</button>
+            <button onClick={() => setShowHistoryTable(false)} className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${!showHistoryTable ? 'bg-surface text-emerald-600 dark:text-emerald-400 shadow-sm border border-border' : 'text-ink-muted hover:bg-surface-2'}`}>Phiếu Kiểm Nghiệm ({viewBatchResults.length})</button>
+            <button onClick={() => setShowHistoryTable(true)} className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${showHistoryTable ? 'bg-surface text-emerald-600 dark:text-emerald-400 shadow-sm border border-border' : 'text-ink-muted hover:bg-surface-2'}`}><Square3Stack3DIcon className="h-4 w-4" /> Bảng Tổng hợp</button>
           </Surface>
 
           {showHistoryTable ? (
@@ -466,18 +481,18 @@ const BatchDetailPage = () => {
           ) : (
             <div className="space-y-4">
               {isLoadingHistory ? (
-                <div className="p-10 text-center text-slate-500 dark:text-slate-400 italic text-sm flex justify-center items-center gap-3 bg-white dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm"><Loader2 className="animate-spin" size={20} /> Đang tải dữ liệu kiểm nghiệm...</div>
+                <div className="p-10 text-center text-ink-muted italic text-sm flex justify-center items-center gap-3 bg-surface rounded-2xl border border-border shadow-sm"><ArrowPathIcon className="animate-spin h-5 w-5 text-emerald-600" /> Đang tải dữ liệu kiểm nghiệm...</div>
               ) : viewBatchResults.length === 0 ? (
-                <div className="p-10 text-center border border-slate-100 dark:border-slate-700 rounded-2xl bg-white dark:bg-slate-800 shadow-sm text-slate-400 dark:text-slate-500 italic text-sm">Chưa có kết quả kiểm nghiệm nào.</div>
+                <div className="p-10 text-center border border-border rounded-2xl bg-surface shadow-sm text-ink-muted italic text-sm">Chưa có kết quả kiểm nghiệm nào.</div>
               ) : (
                 viewBatchResults.map(res => (
-                  <div key={res.id} className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-xl overflow-hidden shadow-2xs">
-                    <div className="bg-slate-50/70 dark:bg-slate-800/40 px-4 py-3 flex justify-between items-center border-b border-slate-200/80 dark:border-slate-800">
+                  <div key={res.id} className="bg-surface border border-border rounded-2xl overflow-hidden shadow-sm">
+                    <div className="bg-surface-2 px-4 py-3 flex justify-between items-center border-b border-border">
                       <div className="flex items-center gap-3">
                         <StatusBadge status={res.overallStatus === 'PASS' ? 'PASS' : 'FAIL'} />
                         <div>
-                          <p className="text-sm font-bold text-slate-800 dark:text-slate-200">{res.labName}</p>
-                          <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">Ngày thử: {formatDateStandard(res.testDate)}</p>
+                          <p className="text-sm font-bold text-ink">{res.labName}</p>
+                          <p className="text-[10px] text-ink-muted mt-0.5">Ngày thử: {formatDateStandard(res.testDate)}</p>
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
@@ -485,9 +500,9 @@ const BatchDetailPage = () => {
                           <>
                             <button 
                               onClick={() => handleOpenOOS(res)} 
-                              className="text-[11px] font-bold text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/60 px-2.5 py-1.5 rounded-lg hover:bg-rose-100 dark:hover:bg-rose-900/60 transition-all flex items-center gap-1.5 cursor-pointer"
+                              className="text-[11px] font-bold text-rose-600 dark:text-rose-400 bg-rose-500/10 border border-rose-500/20 px-2.5 py-1.5 rounded-xl hover:bg-rose-500/20 transition-all flex items-center gap-1.5 cursor-pointer"
                             >
-                              <ShieldAlert size={13} className="text-rose-500" /> Điều tra OOS (AI)
+                              <ShieldExclamationIcon className="h-3.5 w-3.5 text-rose-500" /> Điều tra OOS (AI)
                             </button>
                             <button
                               onClick={() => {
@@ -510,20 +525,20 @@ const BatchDetailPage = () => {
                                 });
                                 setIsDeviationOpen(true);
                               }}
-                              className="text-[11px] font-bold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/60 px-2.5 py-1.5 rounded-lg hover:bg-amber-100 dark:hover:bg-amber-900/60 transition-all flex items-center gap-1.5 cursor-pointer"
+                              className="text-[11px] font-bold text-amber-700 dark:text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2.5 py-1.5 rounded-xl hover:bg-amber-500/20 transition-all flex items-center gap-1.5 cursor-pointer"
                             >
-                              <FileWarning size={13} /> Báo cáo sai lệch
+                              <ExclamationTriangleIcon className="h-3.5 w-3.5" /> Báo cáo sai lệch
                             </button>
                           </>
                         )}
-                        <button onClick={() => navigate(`/test-results/print/${res.id}`)} className="text-[11px] font-bold text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700 px-3 py-1.5 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs">
-                          <Printer size={13} /> In phiếu
+                        <button onClick={() => navigate(`/test-results/print/${res.id}`)} className="text-[11px] font-bold text-ink-soft bg-surface border border-border px-3 py-1.5 rounded-xl hover:bg-surface-2 transition-all flex items-center gap-1.5 cursor-pointer shadow-sm">
+                          <PrinterIcon className="h-3.5 w-3.5" /> In phiếu
                         </button>
                       </div>
                     </div>
                     <div className="overflow-x-auto">
-                      <table className="w-full text-xs text-left"><thead className="bg-white dark:bg-slate-800/80 text-slate-400 dark:text-slate-500 font-bold border-b border-slate-50 dark:border-slate-700"><tr><th className="px-5 py-3">Chỉ tiêu</th><th className="px-4 py-3 text-center">Mức Y/C</th><th className="px-5 py-3 text-right">Kết quả</th><th className="px-4 py-3 text-center">ĐVT</th><th className="px-4 py-3 text-center">Đánh giá</th></tr></thead>
-                        <tbody className="divide-y divide-slate-50 dark:divide-slate-700">
+                      <table className="w-full text-xs text-left"><thead className="bg-surface-2 text-ink-muted font-bold border-b border-border"><tr><th className="px-5 py-3">Chỉ tiêu</th><th className="px-4 py-3 text-center">Mức Y/C</th><th className="px-5 py-3 text-right">Kết quả</th><th className="px-4 py-3 text-center">ĐVT</th><th className="px-4 py-3 text-center">Đánh giá</th></tr></thead>
+                        <tbody className="divide-y divide-border">
                           {res.results.map((item, idx) => {
                             const pct = getContentPercent(item.criteriaName, item.value);
                             const cDef = allCriteriaMap.get(item.criteriaName.trim().toLowerCase());
@@ -533,15 +548,15 @@ const BatchDetailPage = () => {
                                 : (cDef.expectedText || '')
                               : '';
                             return (
-                              <tr key={idx} className="hover:bg-slate-50/50 dark:hover:bg-slate-700/30">
-                                <td className="px-5 py-3 font-medium text-slate-700 dark:text-slate-300">{item.criteriaName}</td>
-                                <td className="px-4 py-3 text-center text-slate-500 dark:text-slate-400 font-mono text-[10px] whitespace-nowrap">{reqText || '—'}</td>
-                                <td className="px-5 py-3 text-right font-bold text-slate-800 dark:text-slate-200">
+                              <tr key={idx} className="hover:bg-surface-2 transition-colors">
+                                <td className="px-5 py-3 font-medium text-ink">{item.criteriaName}</td>
+                                <td className="px-4 py-3 text-center text-ink-muted font-mono text-[10px] whitespace-nowrap">{reqText || '—'}</td>
+                                <td className="px-5 py-3 text-right font-bold text-ink">
                                   {item.value}
-                                  {pct && <span className="block text-[10px] font-normal text-indigo-500 dark:text-indigo-400">({pct})</span>}
+                                  {pct && <span className="block text-[10px] font-normal text-emerald-600 dark:text-emerald-400">({pct})</span>}
                                 </td>
-                                <td className="px-4 py-3 text-center text-slate-500 dark:text-slate-400">{item.unit}</td>
-                                <td className="px-4 py-3 text-center">{item.isPass ? <CheckCircle2 size={16} className="mx-auto text-emerald-500" /> : <X size={16} className="mx-auto text-red-500" />}</td>
+                                <td className="px-4 py-3 text-center text-ink-muted">{item.unit}</td>
+                                <td className="px-4 py-3 text-center">{item.isPass ? <CheckCircleIcon className="h-4 w-4 mx-auto text-emerald-500" /> : <XMarkIcon className="h-4 w-4 mx-auto text-rose-500" />}</td>
                               </tr>
                             );
                           })}

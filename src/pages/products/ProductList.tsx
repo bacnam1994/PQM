@@ -1,7 +1,23 @@
-
 import React, { useState, useMemo, useCallback, memo, useEffect } from 'react';
 import { useAppStore } from '../../store/useAppStore';
-import { Plus, Search, Trash2, Edit2, Upload, Eye, FileSpreadsheet, Package, X, Building2, AlertCircle, Info, CheckCircle2, LayoutGrid, List, ArrowUpDown, FileUp, Loader2, PackageSearch, Layers, ClipboardCheck, TrendingUp, FileText } from 'lucide-react';
+import {
+  CubeIcon,
+  Square3Stack3DIcon,
+  ClipboardDocumentCheckIcon,
+  ArrowTrendingUpIcon,
+  DocumentTextIcon,
+  CheckCircleIcon,
+  MagnifyingGlassCircleIcon,
+  ArrowUpTrayIcon,
+  TableCellsIcon,
+  BuildingOffice2Icon,
+  ExclamationCircleIcon,
+  InformationCircleIcon,
+  ChevronUpDownIcon,
+  ArrowPathIcon,
+  Squares2X2Icon,
+  ListBulletIcon,
+} from '@heroicons/react/24/outline';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import { Product, ProductStatus } from '../../types';
 import { logAuditAction } from '../../services/auditService';
@@ -17,83 +33,80 @@ const SELF_ANNOUNCED_COMPANY = "CÔNG TY CỔ PHẦN CÔNG NGHỆ SINH PHẨM NA
 const ProductGridItem = memo(({ product, hProduct, onEdit, onDelete, isAdmin }: { product: Product, hProduct: any, onEdit: (p: Product) => void, onDelete: (p: Product) => void, isAdmin: boolean }) => {
   const isSelf = product.registrant.trim().toUpperCase() === SELF_ANNOUNCED_COMPANY;
   return (
-    <DSCard className="p-5 flex flex-col gap-5 hover:-translate-y-2 hover:shadow-[0_20px_40px_-15px_rgba(16,185,129,0.15)] dark:hover:shadow-[0_20px_40px_-15px_rgba(16,185,129,0.08)] transition-all duration-500 group relative overflow-hidden bg-gradient-to-br from-emerald-50/80 via-white to-teal-50/80 dark:from-emerald-950/20 dark:via-slate-800 dark:to-teal-950/20 dark:border-slate-700/50">
-      {/* Decorative Blob */}
-      <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-emerald-400/10 to-teal-400/10 rounded-full blur-2xl -mr-10 -mt-10 transition-transform group-hover:scale-150 duration-700"></div>
-
+    <DSCard className="p-5 flex flex-col gap-4 hover:-translate-y-1 hover:shadow-md transition-all duration-300 group relative overflow-hidden bg-surface border border-border">
       {/* Header: Eyebrow text and Status */}
       <div className="flex items-start justify-between gap-2 relative z-10">
-        <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400">
-          <Package size={14} className="text-emerald-500" />
+        <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-ink-muted">
+          <CubeIcon className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
           <span className="truncate max-w-[150px]" title={product.group}>{product.group} • {isSelf ? 'Tự công bố' : 'Gia công'}</span>
         </div>
         <StatusBadge type="PRODUCT" status={product.status} />
       </div>
 
-      {/* Glass Box Highlighting Main Content */}
-      <div className="bg-gradient-to-br from-white/60 to-white/30 dark:from-slate-900/60 dark:to-slate-900/30 backdrop-blur-md border border-white/60 dark:border-slate-700/60 shadow-[0_4px_20px_-5px_rgba(16,185,129,0.1)] dark:shadow-[0_4px_20px_-5px_rgba(16,185,129,0.05)] rounded-2xl p-4 flex flex-col gap-4 relative z-10 mt-2 flex-grow">
+      {/* Main Content */}
+      <div className="bg-surface-2/60 border border-border/80 rounded-xl p-4 flex flex-col gap-3 relative z-10 flex-grow">
         {/* Main Info: Name and Icon */}
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
           {product.imageUrl ? (
-            <img src={product.imageUrl} alt={product.name} className="w-14 h-14 rounded-xl object-cover shrink-0 border border-slate-250 dark:border-slate-700 shadow-sm" />
+            <img src={product.imageUrl} alt={product.name} className="w-12 h-12 rounded-lg object-cover shrink-0 border border-border shadow-sm" />
           ) : (
-            <div className="bg-emerald-50/80 dark:bg-emerald-955/50 p-3.5 rounded-xl text-emerald-600 dark:text-emerald-400 shrink-0 border border-emerald-100/50 dark:border-emerald-900/30 shadow-inner">
-              <Package size={24} />
+            <div className="bg-emerald-50 dark:bg-emerald-950/40 p-2.5 rounded-lg text-emerald-600 dark:text-emerald-400 shrink-0 border border-emerald-100 dark:border-emerald-900/30">
+              <CubeIcon className="h-6 w-6" />
             </div>
           )}
-          <Link to={`/products/${product.id}`} className="flex flex-col group/link">
-            <h3 className="font-black text-slate-800 dark:text-slate-200 text-base leading-tight group-hover/link:text-emerald-600 dark:group-hover/link:text-emerald-400 transition-colors line-clamp-2">{product.name}</h3>
-            <p className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mt-1">{product.code}</p>
+          <Link to={`/products/${product.id}`} className="flex flex-col group/link min-w-0">
+            <h3 className="font-bold text-ink text-sm leading-snug group-hover/link:text-emerald-600 dark:group-hover/link:text-emerald-400 transition-colors line-clamp-2">{product.name}</h3>
+            <p className="text-[10px] font-semibold text-ink-muted uppercase tracking-wider mt-0.5">{product.code}</p>
           </Link>
         </div>
 
         {/* Meta Info */}
-        <div className="space-y-1.5 pt-3 border-t border-slate-200/50 dark:border-slate-700/50 mt-auto">
-            <div className="flex justify-between items-start gap-2 text-[11px] font-bold">
-              <span className="text-slate-500 dark:text-slate-400 uppercase whitespace-nowrap shrink-0">Số ĐKCB:</span>
-              <span className="text-slate-700 dark:text-slate-300 text-right break-all">{product.registrationNo || '-'}</span>
+        <div className="space-y-1.5 pt-2.5 border-t border-border/60 mt-auto">
+            <div className="flex justify-between items-start gap-2 text-[11px]">
+              <span className="text-ink-muted font-medium uppercase whitespace-nowrap shrink-0">Số ĐKCB:</span>
+              <span className="text-ink font-semibold text-right break-all">{product.registrationNo || '-'}</span>
             </div>
-            <div className="flex justify-between items-start gap-2 text-[11px] font-bold">
-              <span className="text-slate-500 dark:text-slate-400 uppercase whitespace-nowrap shrink-0">Ngày cấp:</span>
-              <span className="text-slate-700 dark:text-slate-300 text-right">{formatDateStandard(product.registrationDate)}</span>
+            <div className="flex justify-between items-start gap-2 text-[11px]">
+              <span className="text-ink-muted font-medium uppercase whitespace-nowrap shrink-0">Ngày cấp:</span>
+              <span className="text-ink font-semibold text-right">{formatDateStandard(product.registrationDate)}</span>
             </div>
         </div>
 
-        {/* --- MINI STATS: Lô, Kếết quả, Tỷ lệ đạt --- */}
+        {/* --- MINI STATS: Lô, Kết quả, Tỷ lệ đạt --- */}
         {hProduct && (
-          <div className="flex flex-wrap gap-1.5 pt-2 border-t border-slate-100/60 dark:border-slate-700/40">
+          <div className="flex flex-wrap gap-1.5 pt-2 border-t border-border/60">
             <Link
               to={`/batches?productId=${product.id}`}
               onClick={e => e.stopPropagation()}
-              className="flex items-center gap-1 px-2 py-1 rounded-lg bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400 text-[10px] font-black border border-blue-100 dark:border-blue-900/40 hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors"
+              className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-sky-50 dark:bg-sky-950/40 text-sky-700 dark:text-sky-300 text-[10px] font-semibold border border-sky-200 dark:border-sky-900/40 hover:bg-sky-100 dark:hover:bg-sky-900/60 transition-colors"
             >
-              <Layers size={10} /> {hProduct.batchesCount > 0 ? `${hProduct.batchesCount} lô` : 'Chưa có lô'}
+              <Square3Stack3DIcon className="h-3 w-3" /> {hProduct.batchesCount > 0 ? `${hProduct.batchesCount} lô` : 'Chưa có lô'}
             </Link>
             {hProduct.testResultsCount > 0 && (
               <Link
                 to={`/test-results?productId=${product.id}`}
                 onClick={e => e.stopPropagation()}
-                className="flex items-center gap-1 px-2 py-1 rounded-lg bg-cyan-50 dark:bg-cyan-950/30 text-cyan-600 dark:text-cyan-400 text-[10px] font-black border border-cyan-100 dark:border-cyan-900/40 hover:bg-cyan-100 dark:hover:bg-cyan-900/50 transition-colors"
+                className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-teal-50 dark:bg-teal-950/40 text-teal-700 dark:text-teal-300 text-[10px] font-semibold border border-teal-200 dark:border-teal-900/40 hover:bg-teal-100 dark:hover:bg-teal-900/60 transition-colors"
               >
-                <ClipboardCheck size={10} /> {hProduct.testResultsCount} KN
+                <ClipboardDocumentCheckIcon className="h-3 w-3" /> {hProduct.testResultsCount} KN
               </Link>
             )}
             {hProduct.testResultsCount > 0 && (
-              <span className={`flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-black border ${
-                hProduct.passRate >= 80 ? 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 border-emerald-100 dark:border-emerald-900/40'
-                : hProduct.passRate >= 50 ? 'bg-amber-50 dark:bg-amber-950/30 text-amber-600 dark:text-amber-400 border-amber-100 dark:border-amber-900/40'
-                : 'bg-red-50 dark:bg-red-950/30 text-red-600 dark:text-red-400 border-red-100 dark:border-red-900/40'
+              <span className={`flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold border ${
+                hProduct.passRate >= 80 ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-900/40'
+                : hProduct.passRate >= 50 ? 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-900/40'
+                : 'bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-900/40'
               }`}>
-                <TrendingUp size={10} /> {hProduct.passRate}%
+                <ArrowTrendingUpIcon className="h-3 w-3" /> {hProduct.passRate}%
               </span>
             )}
             {hProduct.activeTCCS && (
               <Link
                 to={`/tccs/detail/${hProduct.activeTCCS.id}`}
                 onClick={e => e.stopPropagation()}
-                className="flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-50 dark:bg-slate-900/50 text-slate-500 dark:text-slate-400 text-[10px] font-black border border-slate-100 dark:border-slate-700/60 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-surface text-ink-muted text-[10px] font-semibold border border-border hover:bg-surface-2 transition-colors"
               >
-                <FileText size={10} /> TCCS
+                <DocumentTextIcon className="h-3 w-3" /> TCCS
               </Link>
             )}
           </div>
@@ -101,62 +114,61 @@ const ProductGridItem = memo(({ product, hProduct, onEdit, onDelete, isAdmin }: 
       </div>
 
       {/* Footer: Actions */}
-      <div className="flex items-center justify-between pt-4 mt-auto border-t border-slate-100 dark:border-slate-700 relative z-10">
+      <div className="flex items-center justify-between pt-3 mt-auto border-t border-border/60 relative z-10">
         {isAdmin && (
-          <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+          <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
             <ActionButtons 
               onEdit={() => onEdit(product)}
               onDelete={() => onDelete(product)}
             />
           </div>
         )}
-        <Link to={`/products/${product.id}`} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-bold text-[11px] bg-slate-50 dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-indigo-50 dark:hover:bg-indigo-950 hover:text-indigo-700 dark:hover:text-indigo-400 transition-all ml-auto">
-          Chi tiết hồ sơ <CheckCircle2 size={14} className="opacity-0 group-hover:opacity-100 hidden" />
+        <Link to={`/products/${product.id}`} className="flex items-center gap-1 px-2.5 py-1.5 rounded-md font-semibold text-[11px] bg-surface-2 text-ink-soft hover:bg-surface-3 transition-colors ml-auto">
+          Chi tiết hồ sơ
         </Link>
       </div>
     </DSCard>
   );
 });
 
-
 // --- SUB-COMPONENT: List Item (Memoized) ---
 const ProductListItem = memo(({ product, onEdit, onDelete, isAdmin }: { product: Product, onEdit: (p: Product) => void, onDelete: (p: Product) => void, isAdmin: boolean }) => {
   const isSelf = product.registrant.trim().toUpperCase() === SELF_ANNOUNCED_COMPANY;
   return (
-    <tr className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors group">
-      <td className="px-4 py-3">
+    <tr className="hover:bg-surface-2 transition-colors group">
+      <td className="px-4 py-3.5">
         <div className="flex items-center gap-3">
           {product.imageUrl ? (
-            <img src={product.imageUrl} alt={product.name} className="w-8 h-8 rounded-lg object-cover shrink-0 border border-slate-200 shadow-sm" />
+            <img src={product.imageUrl} alt={product.name} className="w-8 h-8 rounded-lg object-cover shrink-0 border border-border shadow-sm" />
           ) : (
-            <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-white font-bold text-xs shrink-0 ${product.status === PRODUCT_STATUS.ACTIVE ? 'bg-emerald-500' : 'bg-slate-400'}`}>
-              <Package size={16} />
+            <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-white font-bold text-xs shrink-0 ${product.status === PRODUCT_STATUS.ACTIVE ? 'bg-emerald-600' : 'bg-ink-muted'}`}>
+              <CubeIcon className="h-4 w-4" />
             </div>
           )}
           <div>
-            <Link to={`/products/${product.id}`} className="font-bold text-slate-800 dark:text-slate-200 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors block text-sm">{product.name}</Link>
-            <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase">{product.code}</span>
+            <Link to={`/products/${product.id}`} className="font-semibold text-ink hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors block text-sm">{product.name}</Link>
+            <span className="text-[10px] font-bold text-ink-muted uppercase">{product.code}</span>
           </div>
         </div>
       </td>
-      <td className="px-4 py-3 font-bold text-slate-600 dark:text-slate-300 text-xs">
+      <td className="px-4 py-3.5 font-medium text-ink-soft text-xs">
         <div>{product.group}</div>
-        <div className={`text-[9px] uppercase mt-1 ${isSelf ? 'text-blue-650 dark:text-blue-400' : 'text-slate-450 dark:text-slate-500'}`}>
+        <div className={`text-[9px] uppercase font-bold mt-0.5 ${isSelf ? 'text-sky-600 dark:text-sky-400' : 'text-ink-muted'}`}>
           {isSelf ? 'Tự công bố' : 'Gia công'}
         </div>
       </td>
-      <td className="px-4 py-3">
-        <div className="text-xs font-bold text-slate-700 dark:text-slate-300">{product.registrationNo}</div>
-        <div className="text-[10px] text-zinc-400 dark:text-zinc-500">{formatDateStandard(product.registrationDate)}</div>
+      <td className="px-4 py-3.5">
+        <div className="text-xs font-semibold text-ink">{product.registrationNo || '-'}</div>
+        <div className="text-[10px] text-ink-muted">{formatDateStandard(product.registrationDate)}</div>
       </td>
-      <td className="px-4 py-3">
+      <td className="px-4 py-3.5">
         <StatusBadge type="PRODUCT" status={product.status} />
       </td>
-      <td className="px-4 py-3 text-right">
+      <td className="px-4 py-3.5 text-right">
         {isAdmin && (
-          <div className="flex justify-end gap-2">
+          <div className="flex justify-end gap-1">
             <ActionButtons 
-              onView={() => { /* Navigate handled by Link, but kept for consistency if needed */ }}
+              onView={() => { /* Navigate handled by Link */ }}
               onEdit={() => onEdit(product)}
               onDelete={() => onDelete(product)}
             />
@@ -169,7 +181,7 @@ const ProductListItem = memo(({ product, onEdit, onDelete, isAdmin }: { product:
 
 const ProductDataList = ({ viewMode, data, hydratedProductMap, onEdit, onDelete, isAdmin }: any) => {
   if (data.length === 0) {
-     return <DSEmptyState icon={PackageSearch} title="Không tìm thấy Sản phẩm" message="Chưa có sản phẩm nào khớp với từ khóa hoặc bộ lọc." />;
+     return <DSEmptyState icon={MagnifyingGlassCircleIcon} title="Không tìm thấy Sản phẩm" message="Chưa có sản phẩm nào khớp với từ khóa hoặc bộ lọc." />;
   }
 
   if (viewMode === 'grid') {
@@ -183,16 +195,16 @@ const ProductDataList = ({ viewMode, data, hydratedProductMap, onEdit, onDelete,
   }
   return (
     <DSTable>
-      <thead className="bg-slate-50 dark:bg-slate-900 border-b border-slate-100 dark:border-slate-700">
-        <tr className="text-slate-500 dark:text-slate-400 text-[10px] font-black uppercase tracking-widest">
-          <th className="px-4 py-3">Sản phẩm</th>
-          <th className="px-4 py-3">Phân loại</th>
-          <th className="px-4 py-3">Số ĐKCB</th>
-          <th className="px-4 py-3">Trạng thái</th>
+      <thead className="bg-surface-2 border-b border-border">
+        <tr className="text-ink-soft text-[10px] font-bold uppercase tracking-wider">
+          <th className="px-4 py-3 text-left">Sản phẩm</th>
+          <th className="px-4 py-3 text-left">Phân loại</th>
+          <th className="px-4 py-3 text-left">Số ĐKCB</th>
+          <th className="px-4 py-3 text-left">Trạng thái</th>
           <th className="px-4 py-3 text-right">Thao tác</th>
         </tr>
       </thead>
-      <tbody className="divide-y divide-slate-50 dark:divide-slate-800/40">
+      <tbody className="divide-y divide-border">
         {data.map((product: Product) => (
           <ProductListItem key={product.id} product={product} onEdit={onEdit} onDelete={onDelete} isAdmin={isAdmin} />
         ))}
@@ -433,15 +445,15 @@ const ProductList: React.FC = () => {
   }, [crud.selectedItem, deleteProduct, user]);
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500">
+    <div className="space-y-6 animate-in fade-in duration-300">
       <PageHeader 
         title="Danh mục Sản phẩm" 
-        subtitle="Quản lý sản phẩm V-Biotech." 
-        icon={Package}
+        subtitle="Quản lý sản phẩm và hồ sơ pháp lý V-Biotech." 
+        icon={CubeIcon}
         action={isAdmin ? (
-          <div className="flex gap-3">
-            <button onClick={() => setIsImportModalOpen(true)} className="flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-200 text-slate-700 rounded-xl hover:bg-slate-50 font-black uppercase text-[10px] transition-all shadow-sm">
-              <Upload size={16} /> Nhập Excel
+          <div className="flex items-center gap-2.5">
+            <button onClick={() => setIsImportModalOpen(true)} className="flex items-center gap-2 px-3.5 py-2 bg-surface border border-border text-ink-soft rounded-lg hover:bg-surface-2 font-bold text-xs transition-colors shadow-sm">
+              <ArrowUpTrayIcon className="h-4 w-4" /> Nhập Excel
             </button>
             <AddButton onClick={() => navigate('/products/new')} label="Thêm sản phẩm" />
           </div>
@@ -451,44 +463,44 @@ const ProductList: React.FC = () => {
       <DSFilterBar>
         <DSSearchInput placeholder="Tìm theo tên, mã sản phẩm..." value={localSearchTerm} onChange={(e) => setLocalSearchTerm(e.target.value)} onClear={() => setLocalSearchTerm('')} />
         
-        <DSSelect icon={Building2} value={filterType} onChange={(e) => setFilterType(e.target.value as any)} className="w-32">
+        <DSSelect icon={BuildingOffice2Icon} value={filterType} onChange={(e) => setFilterType(e.target.value as any)} className="w-36">
            <option value="ALL">Tất cả nguồn</option>
            <option value="SELF">Tự công bố</option>
            <option value="OUTSOURCE">Gia công</option>
         </DSSelect>
 
-        <DSSelect icon={AlertCircle} value={filterStatus} onChange={(e) => setFilterStatus(e.target.value as any)} className="w-32">
+        <DSSelect icon={ExclamationCircleIcon} value={filterStatus} onChange={(e) => setFilterStatus(e.target.value as any)} className="w-36">
            <option value="ALL">Tất cả trạng thái</option>
            <option value={PRODUCT_STATUS.ACTIVE}>Đang lưu hành</option>
            <option value={PRODUCT_STATUS.DISCONTINUED}>Ngừng sản xuất</option>
            <option value={PRODUCT_STATUS.RECALLED}>Đã thu hồi</option>
         </DSSelect>
 
-        <DSSelect icon={ArrowUpDown} value={`${sortConfig.key}-${sortConfig.direction}`} onChange={(e) => {
+        <DSSelect icon={ChevronUpDownIcon} value={`${sortConfig.key}-${sortConfig.direction}`} onChange={(e) => {
              const [key, direction] = e.target.value.split('-');
              setSortConfig({ key, direction: direction as 'asc' | 'desc' });
-           }} className="w-32">
+           }} className="w-36">
            <option value="createdAt-desc">Mới tạo nhất</option>
            <option value="createdAt-asc">Cũ nhất</option>
            <option value="name-asc">Tên (A-Z)</option>
            <option value="name-desc">Tên (Z-A)</option>
         </DSSelect>
 
-        <DSViewToggle viewMode={viewMode} setViewMode={setViewMode} gridIcon={LayoutGrid} listIcon={List} />
+        <DSViewToggle viewMode={viewMode} setViewMode={setViewMode} gridIcon={Squares2X2Icon} listIcon={ListBulletIcon} />
       </DSFilterBar>
 
-      <div className="flex flex-wrap items-center justify-between gap-4 px-2 animate-in fade-in slide-in-from-top-2 duration-500">
-        <div className="flex items-center gap-2 text-xs font-bold text-slate-500">
-          <span className="bg-slate-100 text-slate-600 px-2.5 py-1 rounded-lg">Tổng: {products.length}</span>
-          <span className="text-slate-300">|</span>
-          <span className="text-indigo-600">Kết quả: {filteredProducts.length}</span>
+      <div className="flex flex-wrap items-center justify-between gap-4 px-1">
+        <div className="flex items-center gap-2 text-xs font-semibold text-ink-muted">
+          <span className="bg-surface-2 text-ink-soft px-2.5 py-1 rounded-md border border-border">Tổng: {products.length}</span>
+          <span className="text-border">|</span>
+          <span className="text-emerald-600 dark:text-emerald-400">Kết quả: {filteredProducts.length}</span>
           {paramSearchTerm && (
-             <span className="text-amber-600 ml-2">• Tìm kiếm: "{paramSearchTerm}"</span>
+             <span className="text-amber-600 dark:text-amber-400 ml-1">• Tìm kiếm: "{paramSearchTerm}"</span>
           )}
         </div>
-        <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+        <div className="text-[10px] font-bold text-ink-muted uppercase tracking-wider flex items-center gap-2">
            <span>Sắp xếp:</span>
-           <span className="text-indigo-600 bg-indigo-50 px-2 py-1 rounded-lg">{sortOptions[`${sortConfig.key}-${sortConfig.direction}`] || 'Tùy chỉnh'}</span>
+           <span className="text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded border border-emerald-200 dark:border-emerald-900/30">{sortOptions[`${sortConfig.key}-${sortConfig.direction}`] || 'Tùy chỉnh'}</span>
         </div>
       </div>
 
@@ -513,13 +525,13 @@ const ProductList: React.FC = () => {
       />
 
       {/* Modal Nhập Excel với Hướng dẫn Chi tiết */}
-      <Modal isOpen={isImportModalOpen} onClose={() => setIsImportModalOpen(false)} title="Nhập dữ liệu hàng loạt" icon={FileSpreadsheet} color="bg-blue-600">
+      <Modal isOpen={isImportModalOpen} onClose={() => setIsImportModalOpen(false)} title="Nhập dữ liệu hàng loạt" icon={TableCellsIcon} color="bg-emerald-600">
         <div className="space-y-6">
-          <div className="bg-blue-50 p-6 rounded-3xl border border-blue-100">
-             <h4 className="flex items-center gap-2 text-blue-700 font-black text-[10px] uppercase tracking-widest mb-4">
-                <Info size={16}/> Hướng dẫn xếp cột (Excel/Google Sheets)
+          <div className="bg-emerald-50 dark:bg-emerald-950/20 p-5 rounded-2xl border border-emerald-100 dark:border-emerald-900/30">
+             <h4 className="flex items-center gap-2 text-emerald-800 dark:text-emerald-300 font-bold text-[10px] uppercase tracking-wider mb-3">
+                <InformationCircleIcon className="h-4 w-4"/> Hướng dẫn xếp cột (Excel/Google Sheets)
              </h4>
-             <p className="text-xs text-blue-600 mb-4 leading-relaxed">
+             <p className="text-xs text-emerald-700 dark:text-emerald-400 mb-3 leading-relaxed">
                 Bạn có thể copy trực tiếp các vùng dữ liệu từ Excel và dán vào ô bên dưới. 
                 Hệ thống sẽ tự nhận diện theo thứ tự các cột như sau:
              </p>
@@ -533,14 +545,14 @@ const ProductList: React.FC = () => {
                   "6. Đơn vị sở hữu",
                   "7. Mô tả tóm tắt"
                 ].map((txt, idx) => (
-                  <div key={idx} className="flex items-center gap-2 text-[10px] font-bold text-blue-800 bg-white/50 px-3 py-1.5 rounded-xl border border-blue-100/50">
-                    <CheckCircle2 size={12} className="text-blue-400" /> {txt}
+                  <div key={idx} className="flex items-center gap-2 text-[10px] font-semibold text-emerald-800 dark:text-emerald-300 bg-surface/60 px-3 py-1.5 rounded-lg border border-emerald-100/50 dark:border-emerald-900/30">
+                    <CheckCircleIcon className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" /> {txt}
                   </div>
                 ))}
              </div>
-             <div className="mt-6 pt-4 border-t border-blue-200/50">
-                <p className="text-[9px] font-black text-blue-400 uppercase mb-2">Ví dụ dữ liệu chuẩn:</p>
-                <code className="block p-3 bg-white rounded-xl text-[10px] text-slate-600 font-mono shadow-inner border border-blue-100">
+             <div className="mt-4 pt-3 border-t border-emerald-200/50 dark:border-emerald-900/30">
+                <p className="text-[9px] font-bold text-emerald-600 dark:text-emerald-400 uppercase mb-1.5">Ví dụ dữ liệu chuẩn:</p>
+                <code className="block p-2.5 bg-surface rounded-lg text-[10px] text-ink font-mono border border-border">
                   VB-001, Nano Curcumin, TPBS, 123/2024, 2024-05-15, V-Biotech, Chiết xuất nghệ Nano
                 </code>
              </div>
@@ -554,32 +566,32 @@ const ProductList: React.FC = () => {
                   onChange={handleFileRead} 
                   className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" 
                 />
-                <button className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold flex items-center gap-2 transition-colors">
-                   <FileUp size={16} /> Tải lên file CSV/TXT
+                <button className="px-3.5 py-2 bg-surface-2 hover:bg-surface-3 text-ink-soft rounded-lg text-xs font-semibold flex items-center gap-2 transition-colors border border-border">
+                   <ArrowUpTrayIcon className="h-4 w-4" /> Tải lên file CSV/TXT
                 </button>
              </div>
-             <p className="text-[10px] text-slate-400 italic">Hỗ trợ file văn bản (.txt, .csv) ngăn cách bởi dấu phẩy hoặc tab.</p>
+             <p className="text-[10px] text-ink-muted italic">Hỗ trợ file văn bản (.txt, .csv) ngăn cách bởi dấu phẩy hoặc tab.</p>
           </div>
 
           <div className="space-y-2">
-            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-2">Dán dữ liệu vào đây</label>
+            <label className="text-[10px] font-bold text-ink-muted uppercase tracking-wider pl-1">Dán dữ liệu vào đây</label>
             <textarea 
               value={importText} 
               onChange={(e) => setImportText(e.target.value)} 
-              rows={8} 
-              className="w-full p-6 bg-slate-50 border-2 border-dashed border-slate-200 rounded-[2rem] font-mono text-xs focus:ring-4 focus:ring-blue-50 outline-none transition-all" 
+              rows={7} 
+              className="w-full p-4 bg-surface-2 border border-dashed border-border rounded-xl font-mono text-xs focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-ink" 
               placeholder="Copy từ Excel và dán tại đây..." 
             />
           </div>
 
-          <div className="flex justify-end gap-3 pt-4">
-            <button onClick={() => setIsImportModalOpen(false)} className="px-8 py-4 text-slate-400 font-black uppercase text-xs">Hủy</button>
+          <div className="flex justify-end gap-3 pt-2">
+            <button onClick={() => setIsImportModalOpen(false)} className="px-5 py-2.5 text-ink-soft hover:text-ink font-semibold text-xs rounded-lg transition-colors">Hủy</button>
             <button 
               onClick={handleBulkImport} 
               disabled={!importText.trim() || isSubmitting}
-              className="px-12 py-4 bg-blue-600 text-white rounded-2xl font-black uppercase text-xs shadow-xl shadow-blue-100 disabled:opacity-30 disabled:shadow-none flex items-center gap-2"
+              className="px-6 py-2.5 bg-emerald-600 text-white rounded-lg font-bold uppercase text-xs hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2 shadow-sm transition-colors"
             >
-              {isSubmitting && <Loader2 size={14} className="animate-spin" />}
+              {isSubmitting && <ArrowPathIcon className="h-4 w-4 animate-spin" />}
               Tiến hành nhập kho dữ liệu
             </button>
           </div>

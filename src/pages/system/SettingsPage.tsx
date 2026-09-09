@@ -3,7 +3,40 @@ import React, { useState } from 'react';
 import { useAppStore } from '../../store/useAppStore';
 import { get, ref, update } from 'firebase/database';
 import { db } from '../../firebase';
-import { Database, Download, Upload, Trash2, RefreshCcw, ShieldAlert, FileJson, Settings2, Hash, Calendar, FlaskConical, Wand2, UserCircle2, RotateCcw, Search, Cookie, ChevronRight, BarChart3, ListFilter, Rows3, Sparkles, KeyRound, Eye, EyeOff, Bot, CheckCircle2, AlertTriangle, HardDrive, FolderOpen, ExternalLink } from 'lucide-react';
+import { 
+  CircleStackIcon, 
+  ArrowDownTrayIcon, 
+  ArrowUpTrayIcon, 
+  TrashIcon, 
+  ArrowPathIcon, 
+  ShieldExclamationIcon, 
+  DocumentTextIcon, 
+  AdjustmentsHorizontalIcon, 
+  HashtagIcon, 
+  CalendarIcon, 
+  SparklesIcon, 
+  UserCircleIcon, 
+  MagnifyingGlassIcon, 
+  ChevronRightIcon, 
+  ChartBarIcon, 
+  FunnelIcon, 
+  Bars3Icon, 
+  KeyIcon, 
+  EyeIcon, 
+  EyeSlashIcon, 
+  CpuChipIcon, 
+  CheckCircleIcon, 
+  ExclamationTriangleIcon, 
+  FolderOpenIcon, 
+  ArrowTopRightOnSquareIcon 
+} from '@heroicons/react/24/outline';
+
+const CookieIcon = ({ className = "w-4 h-4" }: { className?: string }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M12 2a10 10 0 1 0 10 10 4 4 0 0 1-5-5 4 4 0 0 1-5-5" />
+    <path d="M8.5 8.5v.01" /><path d="M16 15.5v.01" /><path d="M12 12v.01" /><path d="M11 17v.01" /><path d="M7 14v.01" />
+  </svg>
+);
 import { ConfirmationModal } from '../../components';
 import { DataConsistencyCenter } from '../../components/features/DataConsistencyCenter';
 import { generateId } from '../../utils';
@@ -46,23 +79,23 @@ const FilterStatusPanel: React.FC = () => {
   const resetTestResultFilters = () => useUIStore.setState({ testResultFilterYear: 'ALL', testResultFilterMonth: 'ALL', testResultFilterProductId: '', testResultSortConfig: { key: 'testDate', direction: 'desc' } });
 
   return (
-    <div className="pt-2 border-t border-slate-100">
+    <div className="pt-2 border-t border-border">
       <div className="flex items-center justify-between mb-3">
-        <label className="text-sm font-bold text-slate-600 flex items-center gap-2">
-          <ListFilter size={15} className="text-indigo-500" />
+        <label className="text-sm font-bold text-ink flex items-center gap-2">
+          <FunnelIcon className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
           Bộ lọc đã lưu
           {anyFilter ? (
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-indigo-50 text-indigo-600 text-[10px] font-black rounded-full border border-indigo-100">
-              <span className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-pulse" />
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 text-[10px] font-black rounded-full border border-emerald-200 dark:border-emerald-800">
+              <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
               Đang lưu
             </span>
           ) : (
-            <span className="text-[10px] font-normal text-slate-400">(mặc định)</span>
+            <span className="text-[10px] font-normal text-ink-muted">(mặc định)</span>
           )}
         </label>
         {anyFilter && (
-          <button onClick={resetPreferences} className="text-xs text-red-400 hover:text-red-600 hover:underline transition-colors flex items-center gap-1">
-            <RotateCcw size={11} /> Xóa tất cả bộ lọc
+          <button onClick={resetPreferences} className="text-xs text-rose-500 hover:text-rose-600 hover:underline transition-colors flex items-center gap-1">
+            <ArrowPathIcon className="w-3 h-3" /> Xóa tất cả bộ lọc
           </button>
         )}
       </div>
@@ -303,59 +336,59 @@ const SettingsPage: React.FC = () => {
   return (
     <div className="max-w-4xl mx-auto space-y-10 animate-in fade-in duration-700">
       <div>
-        <h1 className="text-2xl font-extrabold text-slate-800">Cấu hình Hệ thống</h1>
-        <p className="text-slate-500 mt-1">Quản lý cơ sở dữ liệu và các thiết lập nâng cao.</p>
+        <h1 className="text-2xl font-black text-ink tracking-tight">Cấu hình Hệ thống</h1>
+        <p className="text-ink-muted mt-1 text-sm">Quản lý cơ sở dữ liệu và các thiết lập nâng cao.</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Format Configuration */}
-        <section className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm space-y-4 lg:col-span-2">
-          <div className="flex items-center gap-3 border-b pb-3">
-            <div className="p-2 bg-slate-50 text-slate-600 rounded-lg">
-              <Settings2 size={20} />
+        <section className="bg-surface p-6 rounded-2xl border border-border shadow-sm space-y-4 lg:col-span-2">
+          <div className="flex items-center gap-3 border-b border-border pb-3">
+            <div className="p-2 bg-surface-2 text-ink-muted rounded-xl">
+              <AdjustmentsHorizontalIcon className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
             </div>
-            <h3 className="text-xl font-bold text-slate-800">Cấu hình Định dạng</h3>
+            <h3 className="text-xl font-bold text-ink">Cấu hình Định dạng</h3>
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             {/* Number Format */}
             <div className="space-y-3">
-               <label className="text-sm font-bold text-slate-600 flex items-center gap-2">
-                 <Hash size={16} /> Định dạng số (Thập phân)
+               <label className="text-sm font-bold text-ink-muted flex items-center gap-2">
+                 <HashtagIcon className="w-4 h-4 text-emerald-600 dark:text-emerald-400" /> Định dạng số (Thập phân)
                </label>
                <div className="grid grid-cols-2 gap-3">
                  <button 
                    onClick={() => setDecimalSeparator('dot')}
-                   className={`p-3 rounded-xl border text-left transition-all ${decimalSeparator === 'dot' ? 'bg-indigo-50 border-indigo-200 ring-1 ring-indigo-200' : 'bg-white border-slate-200 hover:bg-slate-50'}`}
+                   className={`p-3 rounded-xl border text-left transition-all ${decimalSeparator === 'dot' ? 'bg-emerald-500/10 border-emerald-500/30 ring-1 ring-emerald-500/30' : 'bg-surface border-border hover:bg-surface-2'}`}
                  >
-                    <div className="font-bold text-slate-800 text-sm">Dấu chấm (.)</div>
-                    <div className="text-[10px] text-slate-500 mt-1">VD: 1,234.56</div>
+                    <div className="font-bold text-ink text-sm">Dấu chấm (.)</div>
+                    <div className="text-[10px] text-ink-muted mt-1">VD: 1,234.56</div>
                  </button>
                  <button 
                    onClick={() => setDecimalSeparator('comma')}
-                   className={`p-3 rounded-xl border text-left transition-all ${decimalSeparator === 'comma' ? 'bg-indigo-50 border-indigo-200 ring-1 ring-indigo-200' : 'bg-white border-slate-200 hover:bg-slate-50'}`}
+                   className={`p-3 rounded-xl border text-left transition-all ${decimalSeparator === 'comma' ? 'bg-emerald-500/10 border-emerald-500/30 ring-1 ring-emerald-500/30' : 'bg-surface border-border hover:bg-surface-2'}`}
                  >
-                    <div className="font-bold text-slate-800 text-sm">Dấu phẩy (,)</div>
-                    <div className="text-[10px] text-slate-500 mt-1">VD: 1.234,56</div>
+                    <div className="font-bold text-ink text-sm">Dấu phẩy (,)</div>
+                    <div className="text-[10px] text-ink-muted mt-1">VD: 1.234,56</div>
                  </button>
                </div>
             </div>
 
             {/* Date Format */}
             <div className="space-y-3">
-               <label className="text-sm font-bold text-slate-600 flex items-center gap-2">
-                 <Calendar size={16} /> Định dạng ngày tháng
+               <label className="text-sm font-bold text-ink-muted flex items-center gap-2">
+                 <CalendarIcon className="w-4 h-4 text-emerald-600 dark:text-emerald-400" /> Định dạng ngày tháng
                </label>
                <select 
                  value={dateFormat} 
                  onChange={(e) => setDateFormat(e.target.value)}
-                 className="w-full p-3 bg-slate-50 border-none rounded-xl font-bold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-100"
+                 className="w-full p-3 bg-surface-2 border border-border rounded-xl font-bold text-ink outline-none focus:ring-2 focus:ring-emerald-500/20"
                >
                  <option value="DD/MM/YYYY">DD/MM/YYYY (31/12/2024)</option>
                  <option value="YYYY-MM-DD">YYYY-MM-DD (2024-12-31)</option>
                  <option value="MM/DD/YYYY">MM/DD/YYYY (12/31/2024)</option>
                </select>
-               <p className="text-[10px] text-slate-400 italic">
+               <p className="text-[10px] text-ink-muted italic">
                  Lưu ý: Cấu hình này áp dụng cho việc hiển thị và nhập liệu ngày tháng trên toàn hệ thống.
                </p>
             </div>
@@ -363,15 +396,15 @@ const SettingsPage: React.FC = () => {
         </section>
 
         {/* === PERSONALIZATION SECTION === */}
-        <section className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm space-y-5 lg:col-span-2">
-          <div className="flex items-center justify-between border-b pb-3">
+        <section className="bg-surface p-6 rounded-2xl border border-border shadow-sm space-y-5 lg:col-span-2">
+          <div className="flex items-center justify-between border-b border-border pb-3">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-violet-50 text-violet-600 rounded-lg">
-                <UserCircle2 size={20} />
+              <div className="p-2 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-xl">
+                <UserCircleIcon className="w-5 h-5" />
               </div>
               <div>
-                <h3 className="text-xl font-bold text-slate-800">Cá nhân hóa</h3>
-                <p className="text-xs text-slate-400">Tùy chỉnh thói quen sử dụng — lưu riêng cho từng tài khoản trên thiết bị này.</p>
+                <h3 className="text-xl font-bold text-ink">Cá nhân hóa</h3>
+                <p className="text-xs text-ink-muted">Tùy chỉnh thói quen sử dụng — lưu riêng cho từng tài khoản trên thiết bị này.</p>
               </div>
             </div>
             <button
@@ -380,9 +413,9 @@ const SettingsPage: React.FC = () => {
                 'Toàn bộ tùy chỉnh cá nhân (bộ lọc, số dòng, v.v.) sẽ bị reset. Bạn có chắc chắn?',
                 resetPreferences
               )}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-500 border border-slate-200 rounded-lg hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition-all"
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-ink-muted border border-border rounded-xl hover:bg-rose-500/10 hover:text-rose-600 dark:hover:text-rose-400 hover:border-rose-500/30 transition-all"
             >
-              <RotateCcw size={13} />
+              <ArrowPathIcon className="w-3.5 h-3.5" />
               Reset mặc định
             </button>
           </div>
@@ -390,8 +423,8 @@ const SettingsPage: React.FC = () => {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {/* Rows per page */}
             <div className="space-y-2.5">
-              <label className="text-sm font-bold text-slate-600 flex items-center gap-2">
-                <Rows3 size={15} /> Số dòng mỗi trang
+              <label className="text-sm font-bold text-ink-muted flex items-center gap-2">
+                <Bars3Icon className="w-4 h-4 text-emerald-600 dark:text-emerald-400" /> Số dòng mỗi trang
               </label>
               <div className="grid grid-cols-4 gap-2">
                 {([10, 20, 50, 100] as const).map((n) => (
@@ -400,8 +433,8 @@ const SettingsPage: React.FC = () => {
                     onClick={() => setRowsPerPage(n)}
                     className={`py-2 rounded-xl border text-sm font-bold transition-all ${
                       rowsPerPage === n
-                        ? 'bg-violet-50 border-violet-200 text-violet-700 ring-1 ring-violet-200'
-                        : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-white hover:shadow-sm'
+                        ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400 ring-1 ring-emerald-500/30'
+                        : 'bg-surface-2 border-border text-ink-muted hover:bg-surface hover:text-ink hover:shadow-sm'
                     }`}
                   >
                     {n}
@@ -412,13 +445,13 @@ const SettingsPage: React.FC = () => {
 
             {/* Default Batch Filter */}
             <div className="space-y-2.5">
-              <label className="text-sm font-bold text-slate-600 flex items-center gap-2">
-                <ListFilter size={15} /> Bộ lọc Lô hàng mặc định
+              <label className="text-sm font-bold text-ink-muted flex items-center gap-2">
+                <FunnelIcon className="w-4 h-4 text-emerald-600 dark:text-emerald-400" /> Bộ lọc Lô hàng mặc định
               </label>
               <select
                 value={defaultBatchFilter}
                 onChange={(e) => setDefaultBatchFilter(e.target.value as any)}
-                className="w-full p-2.5 bg-slate-50 border-none rounded-xl font-semibold text-slate-700 text-sm outline-none focus:ring-2 focus:ring-violet-100"
+                className="w-full p-2.5 bg-surface-2 border border-border rounded-xl font-semibold text-ink text-sm outline-none focus:ring-2 focus:ring-emerald-500/20"
               >
                 <option value="ALL">Tất cả</option>
                 <option value="PENDING">Chờ kiểm</option>
@@ -430,13 +463,13 @@ const SettingsPage: React.FC = () => {
 
             {/* Default Test Result Filter */}
             <div className="space-y-2.5">
-              <label className="text-sm font-bold text-slate-600 flex items-center gap-2">
-                <BarChart3 size={15} /> Bộ lọc KQ kiểm nghiệm
+              <label className="text-sm font-bold text-ink-muted flex items-center gap-2">
+                <ChartBarIcon className="w-4 h-4 text-emerald-600 dark:text-emerald-400" /> Bộ lọc KQ kiểm nghiệm
               </label>
               <select
                 value={defaultTestResultFilter}
                 onChange={(e) => setDefaultTestResultFilter(e.target.value as any)}
-                className="w-full p-2.5 bg-slate-50 border-none rounded-xl font-semibold text-slate-700 text-sm outline-none focus:ring-2 focus:ring-violet-100"
+                className="w-full p-2.5 bg-surface-2 border border-border rounded-xl font-semibold text-ink text-sm outline-none focus:ring-2 focus:ring-emerald-500/20"
               >
                 <option value="ALL">Tất cả</option>
                 <option value="PASS">Đạt (PASS)</option>
@@ -446,11 +479,11 @@ const SettingsPage: React.FC = () => {
           </div>
 
           {/* Search History */}
-          <div className="pt-2 border-t border-slate-100">
+          <div className="pt-2 border-t border-border">
             <div className="flex items-center justify-between mb-3">
-              <label className="text-sm font-bold text-slate-600 flex items-center gap-2">
-                <Search size={15} /> Lịch sử tìm kiếm
-                <span className="text-xs font-normal text-slate-400">({searchHistory.length}/10 mục)</span>
+              <label className="text-sm font-bold text-ink-muted flex items-center gap-2">
+                <MagnifyingGlassIcon className="w-4 h-4 text-emerald-600 dark:text-emerald-400" /> Lịch sử tìm kiếm
+                <span className="text-xs font-normal text-ink-muted">({searchHistory.length}/10 mục)</span>
               </label>
               {searchHistory.length > 0 && (
                 <button
@@ -459,7 +492,7 @@ const SettingsPage: React.FC = () => {
                     'Toàn bộ lịch sử tìm kiếm đã lưu sẽ bị xóa.',
                     clearSearchHistory
                   )}
-                  className="text-xs text-red-400 hover:text-red-600 hover:underline transition-colors"
+                  className="text-xs text-rose-500 hover:text-rose-600 hover:underline transition-colors font-medium"
                 >
                   Xóa tất cả
                 </button>
@@ -470,26 +503,26 @@ const SettingsPage: React.FC = () => {
                 {searchHistory.map((q, i) => (
                   <span
                     key={i}
-                    className="flex items-center gap-1.5 px-3 py-1 bg-slate-100 text-slate-600 rounded-full text-xs font-medium"
+                    className="flex items-center gap-1.5 px-3 py-1 bg-surface-2 text-ink border border-border rounded-full text-xs font-medium"
                   >
-                    <Search size={10} className="text-slate-400" />
+                    <MagnifyingGlassIcon className="w-3 h-3 text-ink-muted" />
                     {q}
                   </span>
                 ))}
               </div>
             ) : (
-              <p className="text-sm text-slate-400 italic">Chưa có lịch sử tìm kiếm nào.</p>
+              <p className="text-sm text-ink-muted italic">Chưa có lịch sử tìm kiếm nào.</p>
             )}
           </div>
 
           {/* Cookie Management */}
-          <div className="pt-2 border-t border-slate-100">
+          <div className="pt-2 border-t border-border">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Cookie size={15} className="text-amber-500" />
+              <div className="flex items-center gap-3">
+                <CookieIcon className="w-5 h-5 text-amber-500 flex-shrink-0" />
                 <div>
-                  <p className="text-sm font-bold text-slate-600">Quản lý Cookie</p>
-                  <p className="text-xs text-slate-400">Đặt lại lựa chọn đồng ý cookie để hiển thị lại banner thông báo.</p>
+                  <p className="text-sm font-bold text-ink">Quản lý Cookie</p>
+                  <p className="text-xs text-ink-muted">Đặt lại lựa chọn đồng ý cookie để hiển thị lại banner thông báo.</p>
                 </div>
               </div>
               <button
@@ -497,9 +530,9 @@ const SettingsPage: React.FC = () => {
                   resetConsent();
                   window.location.reload();
                 }}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-amber-600 border border-amber-200 bg-amber-50 rounded-lg hover:bg-amber-100 transition-all"
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-amber-600 dark:text-amber-400 border border-amber-500/20 bg-amber-500/10 rounded-xl hover:bg-amber-500/20 transition-all"
               >
-                <ChevronRight size={13} />
+                <ChevronRightIcon className="w-3.5 h-3.5" />
                 Đặt lại Cookie
               </button>
             </div>
@@ -510,26 +543,26 @@ const SettingsPage: React.FC = () => {
         </section>
 
         {/* === AI CONFIGURATION SECTION === */}
-        <section className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm space-y-5 lg:col-span-2">
-          <div className="flex items-center gap-3 border-b pb-3">
-            <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg">
-              <Sparkles size={20} />
+        <section className="bg-surface p-6 rounded-2xl border border-border shadow-sm space-y-5 lg:col-span-2">
+          <div className="flex items-center gap-3 border-b border-border pb-3">
+            <div className="p-2 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-xl">
+              <SparklesIcon className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="text-xl font-bold text-slate-800">Cấu hình AI (Gemini)</h3>
-              <p className="text-xs text-slate-400">Quản lý API Key và xem thống kê học máy của hệ thống AI.</p>
+              <h3 className="text-xl font-bold text-ink">Cấu hình AI (Gemini)</h3>
+              <p className="text-xs text-ink-muted">Quản lý API Key và xem thống kê học máy của hệ thống AI.</p>
             </div>
           </div>
 
           {/* Trạng thái AI */}
           <div className={`flex items-center gap-3 px-4 py-3 rounded-xl border ${
             isAiConfigured
-              ? 'bg-emerald-50 border-emerald-100 text-emerald-700'
-              : 'bg-amber-50 border-amber-100 text-amber-700'
+              ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-700 dark:text-emerald-300'
+              : 'bg-amber-500/10 border-amber-500/20 text-amber-700 dark:text-amber-300'
           }`}>
             {isAiConfigured
-              ? <CheckCircle2 size={18} className="flex-shrink-0" />
-              : <AlertTriangle size={18} className="flex-shrink-0" />}
+              ? <CheckCircleIcon className="w-5 h-5 flex-shrink-0" />
+              : <ExclamationTriangleIcon className="w-5 h-5 flex-shrink-0" />}
             <div>
               <p className="text-sm font-bold">
                 {isAiConfigured ? 'AI đang hoạt động ✅' : 'Chưa cấu hình API Key ⚠️'}
@@ -546,35 +579,35 @@ const SettingsPage: React.FC = () => {
 
           {/* Nhập API Key cá nhân */}
           <div className="space-y-2">
-            <label className="text-sm font-bold text-slate-600 flex items-center gap-2">
-              <KeyRound size={15} />
+            <label className="text-sm font-bold text-ink-muted flex items-center gap-2">
+              <KeyIcon className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
               Gemini API Key cá nhân
-              <span className="text-[10px] font-normal text-slate-400">(lưu cục bộ trên thiết bị này, không đồng bộ cloud)</span>
+              <span className="text-[10px] font-normal text-ink-muted">(lưu cục bộ trên thiết bị này, không đồng bộ cloud)</span>
             </label>
             <div className="flex gap-2">
               <div className="relative flex-1">
-                <Bot size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <CpuChipIcon className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-ink-muted" />
                 <input
                   type={showApiKey ? 'text' : 'password'}
                   value={apiKeyInput}
                   onChange={(e) => setApiKeyInput(e.target.value)}
                   placeholder="Dán Gemini API Key vào đây (AIza...)"
-                  className="w-full pl-9 pr-10 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-mono text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-400 transition"
+                  className="w-full pl-9 pr-10 py-2.5 bg-surface-2 border border-border rounded-xl text-sm font-mono text-ink focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition"
                 />
                 <button
                   type="button"
                   onClick={() => setShowApiKey(v => !v)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-ink-muted hover:text-ink transition-colors"
                 >
-                  {showApiKey ? <EyeOff size={15} /> : <Eye size={15} />}
+                  {showApiKey ? <EyeSlashIcon className="w-4 h-4" /> : <EyeIcon className="w-4 h-4" />}
                 </button>
               </div>
               <button
                 onClick={handleSaveApiKey}
                 className={`px-4 py-2.5 rounded-xl text-sm font-bold transition-all shadow-sm ${
                   apiKeySaved
-                    ? 'bg-emerald-500 text-white shadow-emerald-100'
-                    : 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-indigo-100'
+                    ? 'bg-emerald-500 text-white shadow-emerald-500/20'
+                    : 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-emerald-600/20'
                 }`}
               >
                 {apiKeySaved ? '✓ Đã lưu!' : 'Lưu Key'}
@@ -582,30 +615,30 @@ const SettingsPage: React.FC = () => {
               {(apiKeyInput || hasLocalKey) && (
                 <button
                   onClick={handleClearApiKey}
-                  className="px-3 py-2.5 rounded-xl text-sm font-bold text-red-500 border border-red-100 hover:bg-red-50 transition-all"
+                  className="px-3 py-2.5 rounded-xl text-sm font-bold text-rose-500 border border-rose-500/20 hover:bg-rose-500/10 transition-all"
                 >
                   Xóa
                 </button>
               )}
             </div>
-            <p className="text-[10px] text-slate-400 italic pl-1">
+            <p className="text-[10px] text-ink-muted italic pl-1">
               Lấy API Key miễn phí tại{' '}
-              <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" className="text-indigo-500 hover:underline font-medium">Google AI Studio</a>.
+              <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" className="text-emerald-600 dark:text-emerald-400 hover:underline font-medium">Google AI Studio</a>.
               {' '}Key cá nhân sẽ ưu tiên dùng thay cho key chung, giúp tránh lỗi vượt hạn mức (429).
             </p>
           </div>
 
           {/* Cấu hình mô hình và suy luận */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-3 border-t border-slate-100">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-3 border-t border-border">
             <div className="space-y-1.5">
-              <label className="text-sm font-bold text-slate-600 flex items-center gap-2">
-                <Bot size={15} className="text-indigo-500" />
+              <label className="text-sm font-bold text-ink-muted flex items-center gap-2">
+                <CpuChipIcon className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
                 Mô hình mặc định
               </label>
               <select
                 value={defaultModel}
                 onChange={(e) => handleSaveModel(e.target.value)}
-                className="w-full p-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl font-semibold text-slate-700 dark:text-slate-200 text-xs outline-none focus:ring-2 focus:ring-indigo-100 dark:focus:ring-indigo-900/50 cursor-pointer"
+                className="w-full p-2.5 bg-surface-2 border border-border rounded-xl font-semibold text-ink text-xs outline-none focus:ring-2 focus:ring-emerald-500/20 cursor-pointer"
               >
                 <optgroup label="⚡ Gemini 2.5 (Tiêu chuẩn)">
                   {AVAILABLE_GEMINI_MODELS.filter(m => m.group.includes('2.5')).map(m => (
@@ -622,24 +655,24 @@ const SettingsPage: React.FC = () => {
               {(() => {
                 const activeModelInfo = AVAILABLE_GEMINI_MODELS.find(m => m.id === defaultModel);
                 return activeModelInfo ? (
-                  <div className="p-2.5 rounded-xl bg-indigo-50/70 dark:bg-indigo-950/30 border border-indigo-100 dark:border-indigo-900/40 text-[11px] text-indigo-700 dark:text-indigo-300 animate-in fade-in duration-200">
-                    <div className="font-bold flex items-center gap-1.5 mb-0.5">
-                      <Sparkles size={13} className="text-indigo-500" />
+                  <div className="p-2.5 rounded-xl bg-surface-2 border border-border text-[11px] text-ink animate-in fade-in duration-200">
+                    <div className="font-bold flex items-center gap-1.5 mb-0.5 text-emerald-600 dark:text-emerald-400">
+                      <SparklesIcon className="w-3.5 h-3.5" />
                       {activeModelInfo.name}
                     </div>
-                    <p className="text-[10px] text-slate-600 dark:text-slate-400 leading-relaxed">{activeModelInfo.description}</p>
+                    <p className="text-[10px] text-ink-muted leading-relaxed">{activeModelInfo.description}</p>
                   </div>
                 ) : null;
               })()}
             </div>
             
             <div className="space-y-1.5 flex flex-col justify-between">
-              <label className="text-sm font-bold text-slate-650 flex items-center gap-2">
-                <Sparkles size={15} className="text-indigo-500" />
+              <label className="text-sm font-bold text-ink-muted flex items-center gap-2">
+                <SparklesIcon className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
                 Chế độ suy luận (Chain of Thought)
               </label>
-              <div className="flex items-center justify-between p-2 bg-slate-50 border border-slate-200 rounded-xl h-[42px] px-3.5">
-                <span className="text-xs text-slate-600 font-semibold">Hiện quy trình suy nghĩ</span>
+              <div className="flex items-center justify-between p-2 bg-surface-2 border border-border rounded-xl h-[42px] px-3.5">
+                <span className="text-xs text-ink font-semibold">Hiện quy trình suy nghĩ</span>
                 <label className="relative inline-flex items-center cursor-pointer">
                   <input
                     type="checkbox"
@@ -647,40 +680,40 @@ const SettingsPage: React.FC = () => {
                     onChange={(e) => handleToggleThinking(e.target.checked)}
                     className="sr-only peer"
                   />
-                  <div className="w-8 h-4 bg-slate-205 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-350 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-indigo-650"></div>
+                  <div className="w-8 h-4 bg-slate-300 dark:bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-emerald-600"></div>
                 </label>
               </div>
-              <p className="text-[10px] text-slate-400 italic pl-1">
+              <p className="text-[10px] text-ink-muted italic pl-1">
                 AI sẽ giải thích quy trình lập luận từng bước trước khi trả lời.
               </p>
             </div>
           </div>
 
           {/* Thống kê Learned Mappings */}
-          <div className="pt-3 border-t border-slate-100">
+          <div className="pt-3 border-t border-border">
             <div className="flex items-center justify-between mb-3">
-              <label className="text-sm font-bold text-slate-600 flex items-center gap-2">
-                <Bot size={15} className="text-indigo-500" />
+              <label className="text-sm font-bold text-ink-muted flex items-center gap-2">
+                <CpuChipIcon className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
                 Cơ sở Kiến thức AI đã học
-                <span className="text-xs font-normal text-slate-400">({aiLearnedMappings.length} ánh xạ)</span>
+                <span className="text-xs font-normal text-ink-muted">({aiLearnedMappings.length} ánh xạ)</span>
               </label>
             </div>
             {aiLearnedMappings.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-40 overflow-y-auto pr-1">
                 {aiLearnedMappings.slice(0, 20).map((m: any, i: number) => (
-                  <div key={i} className="flex items-center gap-2 text-[11px] bg-slate-50 rounded-lg px-3 py-1.5 border border-slate-100">
-                    <span className="text-slate-500 truncate max-w-[120px]" title={m.originalName}>{m.originalName}</span>
-                    <span className="text-slate-300 flex-shrink-0">→</span>
-                    <span className="text-indigo-700 font-bold truncate max-w-[120px]" title={m.systemName}>{m.systemName}</span>
-                    <span className="ml-auto text-[9px] text-slate-400 flex-shrink-0">×{m.frequency}</span>
+                  <div key={i} className="flex items-center gap-2 text-[11px] bg-surface-2 rounded-xl px-3 py-1.5 border border-border">
+                    <span className="text-ink-muted truncate max-w-[120px]" title={m.originalName}>{m.originalName}</span>
+                    <span className="text-ink-muted/50 flex-shrink-0">→</span>
+                    <span className="text-emerald-600 dark:text-emerald-400 font-bold truncate max-w-[120px]" title={m.systemName}>{m.systemName}</span>
+                    <span className="ml-auto text-[9px] text-ink-muted flex-shrink-0">×{m.frequency}</span>
                   </div>
                 ))}
                 {aiLearnedMappings.length > 20 && (
-                  <p className="text-[10px] text-slate-400 italic col-span-2 text-center">... và {aiLearnedMappings.length - 20} ánh xạ khác</p>
+                  <p className="text-[10px] text-ink-muted italic col-span-2 text-center">... và {aiLearnedMappings.length - 20} ánh xạ khác</p>
                 )}
               </div>
             ) : (
-              <p className="text-sm text-slate-400 italic">
+              <p className="text-sm text-ink-muted italic">
                 Chưa có dữ liệu học máy. AI sẽ tự học khi bạn xác nhận ánh xạ tên chỉ tiêu trong quá trình nhập liệu.
               </p>
             )}
@@ -688,21 +721,21 @@ const SettingsPage: React.FC = () => {
         </section>
 
         {/* === GOOGLE DRIVE STORAGE CONFIGURATION === */}
-        <section className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm space-y-5 lg:col-span-2">
-          <div className="flex items-center gap-3 border-b pb-3">
-            <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg">
-              <HardDrive size={20} />
+        <section className="bg-surface p-6 rounded-2xl border border-border shadow-sm space-y-5 lg:col-span-2">
+          <div className="flex items-center gap-3 border-b border-border pb-3">
+            <div className="p-2 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-xl">
+              <CircleStackIcon className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="text-xl font-bold text-slate-800">Cấu hình Lưu trữ Google Drive</h3>
-              <p className="text-xs text-slate-400">Thiết lập thư mục Google Drive để lưu trữ các tài liệu, ảnh chụp, file đính kèm.</p>
+              <h3 className="text-xl font-bold text-ink">Cấu hình Lưu trữ Google Drive</h3>
+              <p className="text-xs text-ink-muted">Thiết lập thư mục Google Drive để lưu trữ các tài liệu, ảnh chụp, file đính kèm.</p>
             </div>
           </div>
 
           {/* URL thư mục */}
           <div className="space-y-2">
-            <label className="text-sm font-bold text-slate-600 flex items-center gap-2">
-              <FolderOpen size={16} className="text-indigo-500" />
+            <label className="text-sm font-bold text-ink-muted flex items-center gap-2">
+              <FolderOpenIcon className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
               Đường dẫn Thư mục Google Drive lưu trữ *
             </label>
             <div className="flex gap-2">
@@ -711,31 +744,31 @@ const SettingsPage: React.FC = () => {
                 value={googleDriveFolderUrl}
                 onChange={(e) => setGoogleDriveFolderUrl(e.target.value)}
                 placeholder="VD: https://drive.google.com/drive/folders/..."
-                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-400 transition"
+                className="w-full px-4 py-2.5 bg-surface-2 border border-border rounded-xl text-sm font-semibold text-ink focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition"
               />
               <button
                 type="button"
                 onClick={() => window.open(googleDriveFolderUrl || 'https://drive.google.com', '_blank')}
-                className="px-4 py-2.5 bg-slate-105 text-slate-700 rounded-xl text-sm font-bold hover:bg-slate-200 transition flex items-center gap-2"
+                className="px-4 py-2.5 bg-surface-2 text-ink border border-border rounded-xl text-sm font-bold hover:bg-surface hover:border-emerald-500/30 transition flex items-center gap-2"
                 title="Mở thư mục kiểm tra"
               >
-                <ExternalLink size={15} />
+                <ArrowTopRightOnSquareIcon className="w-4 h-4 text-ink-muted" />
                 Mở thư mục
               </button>
             </div>
             {googleDriveFolderId && (
-              <p className="text-[10px] text-emerald-600 font-bold pl-1">
+              <p className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold pl-1">
                 ✓ Trích xuất ID thư mục thành công: <span className="font-mono">{googleDriveFolderId}</span>
               </p>
             )}
           </div>
 
           {/* Checkbox kích hoạt tự động API upload */}
-          <div className="pt-2 border-t border-slate-100 space-y-4">
+          <div className="pt-2 border-t border-border space-y-4">
             <div className="flex items-center justify-between">
               <div className="space-y-0.5">
-                <p className="text-sm font-bold text-slate-700">Tự động tải lên qua Google API</p>
-                <p className="text-xs text-slate-400">Kích hoạt để tự động đẩy file lên Google Drive ngay khi chọn file trên ứng dụng (yêu cầu cấu hình API cá nhân).</p>
+                <p className="text-sm font-bold text-ink">Tự động tải lên qua Google API</p>
+                <p className="text-xs text-ink-muted">Kích hoạt để tự động đẩy file lên Google Drive ngay khi chọn file trên ứng dụng (yêu cầu cấu hình API cá nhân).</p>
               </div>
               <label className="relative inline-flex items-center cursor-pointer">
                 <input
@@ -744,35 +777,35 @@ const SettingsPage: React.FC = () => {
                   onChange={(e) => setUseGoogleDriveUpload(e.target.checked)}
                   className="sr-only peer"
                 />
-                <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                <div className="w-11 h-6 bg-slate-300 dark:bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
               </label>
             </div>
 
             {useGoogleDriveUpload && (
-              <div className="p-4 bg-slate-50 rounded-xl border border-slate-100 space-y-4 animate-in slide-in-from-top-2 duration-300">
+              <div className="p-4 bg-surface-2 rounded-xl border border-border space-y-4 animate-in slide-in-from-top-2 duration-300">
                 <div className="space-y-1.5">
-                  <label className="text-xs font-black text-slate-500 uppercase tracking-wider pl-1">Google OAuth Client ID</label>
+                  <label className="text-xs font-black text-ink-muted uppercase tracking-wider pl-1">Google OAuth Client ID</label>
                   <input
                     type="text"
                     value={googleDriveClientId}
                     onChange={(e) => setGoogleDriveClientId(e.target.value)}
                     placeholder="VD: 123456-abcdef.apps.googleusercontent.com"
-                    className="w-full px-3 py-2 bg-white border border-slate-250 rounded-lg text-xs font-mono focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                    className="w-full px-3 py-2 bg-surface border border-border rounded-lg text-xs font-mono text-ink focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
                   />
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-xs font-black text-slate-500 uppercase tracking-wider pl-1">Google API Key</label>
+                  <label className="text-xs font-black text-ink-muted uppercase tracking-wider pl-1">Google API Key</label>
                   <input
                     type="password"
                     value={googleDriveApiKey}
                     onChange={(e) => setGoogleDriveApiKey(e.target.value)}
                     placeholder="Nhập Google API Key của bạn..."
-                    className="w-full px-3 py-2 bg-white border border-slate-250 rounded-lg text-xs font-mono focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                    className="w-full px-3 py-2 bg-surface border border-border rounded-lg text-xs font-mono text-ink focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
                   />
                 </div>
 
-                <p className="text-[10px] text-slate-400 italic font-medium">
+                <p className="text-[10px] text-ink-muted italic font-medium">
                   💡 Nếu không bật API tự động tải lên hoặc chưa điền thông tin, hệ thống sẽ sử dụng **Firebase Storage** sẵn có để lưu file, hoặc cho phép bạn nhấn nút mở thư mục Google Drive để thả file rồi dán liên kết thủ công.
                 </p>
               </div>
@@ -786,23 +819,23 @@ const SettingsPage: React.FC = () => {
         </div>
 
         {/* Backup & Restore */}
-        <section className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm space-y-4">
-          <div className="flex items-center gap-3 border-b pb-3">
-            <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg">
-              <Database size={20} />
+        <section className="bg-surface p-6 rounded-2xl border border-border shadow-sm space-y-4">
+          <div className="flex items-center gap-3 border-b border-border pb-3">
+            <div className="p-2 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-xl">
+              <CircleStackIcon className="w-5 h-5" />
             </div>
-            <h3 className="text-xl font-bold text-slate-800">Dữ liệu & Sao lưu</h3>
+            <h3 className="text-xl font-bold text-ink">Dữ liệu & Sao lưu</h3>
           </div>
           <div className="space-y-3">
             <button 
               onClick={handleExportData}
-              className="w-full flex items-center justify-between p-3 bg-slate-50 border border-slate-100 rounded-xl hover:bg-white hover:shadow-md transition-all group"
+              className="w-full flex items-center justify-between p-3 bg-surface-2 border border-border rounded-xl hover:bg-surface hover:shadow-md transition-all group"
             >
               <div className="flex items-center gap-3">
-                <Download className="text-indigo-500 group-hover:scale-110 transition-transform" />
+                <ArrowDownTrayIcon className="w-5 h-5 text-emerald-600 dark:text-emerald-400 group-hover:scale-110 transition-transform" />
                 <div className="text-left">
-                  <p className="font-bold text-slate-700">Xuất dữ liệu (.json)</p>
-                  <p className="text-xs text-slate-400">Tải toàn bộ cơ sở dữ liệu về máy.</p>
+                  <p className="font-bold text-ink">Xuất dữ liệu (.json)</p>
+                  <p className="text-xs text-ink-muted">Tải toàn bộ cơ sở dữ liệu về máy.</p>
                 </div>
               </div>
             </button>
@@ -810,13 +843,13 @@ const SettingsPage: React.FC = () => {
               <input type="file" accept=".json" onChange={handleImportData} className="hidden" id="import-input" />
               <label 
                 htmlFor="import-input"
-                className="w-full flex items-center justify-between p-3 bg-slate-50 border border-slate-100 rounded-xl hover:bg-white hover:shadow-md transition-all group cursor-pointer"
+                className="w-full flex items-center justify-between p-3 bg-surface-2 border border-border rounded-xl hover:bg-surface hover:shadow-md transition-all group cursor-pointer"
               >
                 <div className="flex items-center gap-3">
-                  <Upload className="text-emerald-500 group-hover:scale-110 transition-transform" />
+                  <ArrowUpTrayIcon className="w-5 h-5 text-emerald-600 dark:text-emerald-400 group-hover:scale-110 transition-transform" />
                   <div className="text-left">
-                    <p className="font-bold text-slate-700">Khôi phục dữ liệu</p>
-                    <p className="text-xs text-slate-400">Tải lên tệp sao lưu .json đã có.</p>
+                    <p className="font-bold text-ink">Khôi phục dữ liệu</p>
+                    <p className="text-xs text-ink-muted">Tải lên tệp sao lưu .json đã có.</p>
                   </div>
                 </div>
               </label>
@@ -825,12 +858,12 @@ const SettingsPage: React.FC = () => {
         </section>
 
         {/* Development Tools */}
-        <section className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm space-y-4">
-          <div className="flex items-center gap-3 border-b pb-3">
-            <div className="p-2 bg-orange-50 text-orange-600 rounded-lg">
-              <ShieldAlert size={20} />
+        <section className="bg-surface p-6 rounded-2xl border border-border shadow-sm space-y-4">
+          <div className="flex items-center gap-3 border-b border-border pb-3">
+            <div className="p-2 bg-amber-500/10 text-amber-600 dark:text-amber-400 rounded-xl">
+              <ShieldExclamationIcon className="w-5 h-5" />
             </div>
-            <h3 className="text-xl font-bold text-slate-800">Tiện ích Admin</h3>
+            <h3 className="text-xl font-bold text-ink">Tiện ích Admin</h3>
           </div>
           <div className="space-y-3">
             <button 
@@ -839,13 +872,13 @@ const SettingsPage: React.FC = () => {
                 'Tải dữ liệu mẫu sẽ xóa sạch dữ liệu hiện tại. Bạn có chắc chắn muốn đồng ý?',
                 resetToDemoData
               )}
-              className="w-full flex items-center justify-between p-3 border border-slate-200 rounded-xl hover:bg-indigo-50 hover:border-indigo-100 transition-all group"
+              className="w-full flex items-center justify-between p-3 border border-border rounded-xl hover:bg-emerald-500/10 hover:border-emerald-500/30 transition-all group"
             >
               <div className="flex items-center gap-3">
-                <RefreshCcw className="text-indigo-500 group-hover:rotate-180 transition-transform duration-500" />
+                <ArrowPathIcon className="w-5 h-5 text-emerald-600 dark:text-emerald-400 group-hover:rotate-180 transition-transform duration-500" />
                 <div className="text-left">
-                  <p className="font-bold text-slate-700">Nạp dữ liệu mẫu</p>
-                  <p className="text-xs text-slate-400">Reset và dùng bộ dữ liệu demo.</p>
+                  <p className="font-bold text-ink">Nạp dữ liệu mẫu</p>
+                  <p className="text-xs text-ink-muted">Reset và dùng bộ dữ liệu demo.</p>
                 </div>
               </div>
             </button>
@@ -855,13 +888,13 @@ const SettingsPage: React.FC = () => {
                 'HÀNH ĐỘNG NÀY KHÔNG THỂ KHÔI PHỤC! Bạn có hoàn toàn chắc chắn muốn xóa toàn bộ dữ liệu ngay bây giờ không?',
                 clearAllData
               )}
-              className="w-full flex items-center justify-between p-3 border border-red-50 rounded-xl hover:bg-red-50 hover:border-red-100 transition-all group"
+              className="w-full flex items-center justify-between p-3 border border-rose-500/20 rounded-xl hover:bg-rose-500/10 hover:border-rose-500/30 transition-all group"
             >
               <div className="flex items-center gap-3">
-                <Trash2 className="text-red-500 group-hover:animate-bounce" />
+                <TrashIcon className="w-5 h-5 text-rose-500 group-hover:animate-bounce" />
                 <div className="text-left">
-                  <p className="font-bold text-red-700">Xóa sạch vĩnh viễn</p>
-                  <p className="text-xs text-red-400">Xóa dữ liệu trên Cloud và Máy cục bộ.</p>
+                  <p className="font-bold text-rose-600 dark:text-rose-400">Xóa sạch vĩnh viễn</p>
+                  <p className="text-xs text-rose-500/70">Xóa dữ liệu trên Cloud và Máy cục bộ.</p>
                 </div>
               </div>
             </button>
@@ -869,18 +902,18 @@ const SettingsPage: React.FC = () => {
         </section>
       </div>
 
-      <div className="bg-indigo-900 rounded-2xl p-8 text-white relative overflow-hidden shadow-xl">
+      <div className="bg-gradient-to-r from-emerald-900 to-teal-900 rounded-2xl p-8 text-white relative overflow-hidden shadow-xl border border-emerald-800/30">
         <div className="relative z-10 flex flex-col md:flex-row items-center gap-6">
           <div className="bg-white/10 p-3 rounded-xl backdrop-blur-md border border-white/20">
-             <FileJson size={32} />
+             <DocumentTextIcon className="w-8 h-8 text-white" />
           </div>
           <div className="space-y-2">
             <h4 className="text-2xl font-bold">QA Manager v2.5 Enterprise</h4>
-            <p className="text-indigo-200 text-sm leading-relaxed max-w-xl">Hệ thống đang hoạt động trong chế độ <b>Offline-First</b>. Dữ liệu của bạn được đồng bộ tự động lên Firebase Realtime Database ngay khi có kết nối mạng. Hãy đảm bảo bạn đã sao lưu dữ liệu trước khi thực hiện các thay đổi cấu trúc lớn.</p>
+            <p className="text-emerald-100 text-sm leading-relaxed max-w-xl">Hệ thống đang hoạt động trong chế độ <b>Offline-First</b>. Dữ liệu của bạn được đồng bộ tự động lên Firebase Realtime Database ngay khi có kết nối mạng. Hãy đảm bảo bạn đã sao lưu dữ liệu trước khi thực hiện các thay đổi cấu trúc lớn.</p>
           </div>
         </div>
         <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full -mr-20 -mt-20 blur-3xl" />
-        <div className="absolute bottom-0 left-0 w-48 h-48 bg-indigo-500/10 rounded-full -ml-10 -mb-10 blur-3xl" />
+        <div className="absolute bottom-0 left-0 w-48 h-48 bg-emerald-500/10 rounded-full -ml-10 -mb-10 blur-3xl" />
       </div>
 
       <ConfirmationModal
@@ -890,7 +923,7 @@ const SettingsPage: React.FC = () => {
         message={confirmProps.message}
         onConfirm={() => { confirmProps.onConfirm(); setIsConfirmOpen(false); }}
         confirmText="Xác nhận"
-        icon={ShieldAlert}
+        icon={ShieldExclamationIcon}
       />
     </div>
   );

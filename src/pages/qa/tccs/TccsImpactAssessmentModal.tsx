@@ -5,9 +5,16 @@
 
 import React from 'react';
 import { 
-  X, AlertOctagon, AlertTriangle, ShieldCheck, 
-  Layers, ClipboardCheck, ArrowRight, CheckCircle2, Info 
-} from 'lucide-react';
+  XMarkIcon, 
+  ExclamationCircleIcon, 
+  ExclamationTriangleIcon, 
+  ShieldCheckIcon, 
+  Square3Stack3DIcon, 
+  ClipboardDocumentCheckIcon, 
+  ArrowRightIcon, 
+  CheckCircleIcon, 
+  InformationCircleIcon 
+} from '@heroicons/react/24/outline';
 import { TCCSChangeImpactReport } from '../../../services/changeImpactEngine';
 
 interface TccsImpactAssessmentModalProps {
@@ -27,24 +34,24 @@ export const TccsImpactAssessmentModal: React.FC<TccsImpactAssessmentModalProps>
 
   const riskConfig = {
     HIGH: {
-      bg: 'bg-rose-50 dark:bg-rose-950/40 border-rose-200 dark:border-rose-800',
+      bg: 'bg-rose-500/10 border-rose-500/20',
       badge: 'bg-rose-600 text-white',
       text: 'text-rose-700 dark:text-rose-300',
-      icon: AlertOctagon,
+      icon: ExclamationCircleIcon,
       title: 'Mức độ Rủi ro Cao (High Risk)'
     },
     MEDIUM: {
-      bg: 'bg-amber-50 dark:bg-amber-950/40 border-amber-200 dark:border-amber-800',
+      bg: 'bg-amber-500/10 border-amber-500/20',
       badge: 'bg-amber-600 text-white',
       text: 'text-amber-700 dark:text-amber-300',
-      icon: AlertTriangle,
+      icon: ExclamationTriangleIcon,
       title: 'Mức độ Rủi ro Trung bình (Medium Risk)'
     },
     LOW: {
-      bg: 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800',
+      bg: 'bg-emerald-500/10 border-emerald-500/20',
       badge: 'bg-emerald-600 text-white',
       text: 'text-emerald-700 dark:text-emerald-300',
-      icon: ShieldCheck,
+      icon: ShieldCheckIcon,
       title: 'Mức độ Rủi ro Thấp (Low Risk)'
     }
   }[report.riskLevel];
@@ -52,33 +59,33 @@ export const TccsImpactAssessmentModal: React.FC<TccsImpactAssessmentModalProps>
   const RiskIcon = riskConfig.icon;
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
-      <div className="bg-white dark:bg-slate-900 w-full max-w-4xl rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 flex flex-col max-h-[90vh] overflow-hidden">
+    <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
+      <div className="bg-surface w-full max-w-4xl rounded-2xl shadow-2xl border border-border flex flex-col max-h-[90vh] overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/60">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-surface-2">
           <div className="flex items-center gap-3">
             <div className={`p-2.5 rounded-xl ${riskConfig.bg} ${riskConfig.text}`}>
-              <RiskIcon size={22} />
+              <RiskIcon className="w-5 h-5" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="text-lg font-black text-slate-800 dark:text-slate-100 uppercase tracking-tight">
+                <h2 className="text-lg font-black text-ink uppercase tracking-tight">
                   Báo cáo Đánh giá Tác động Thay đổi TCCS
                 </h2>
                 <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider ${riskConfig.badge}`}>
                   {report.riskLevel}
                 </span>
               </div>
-              <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">
-                Sự dịch chuyển từ <span className="font-bold text-slate-700 dark:text-slate-200">{report.oldTccsCode}</span> sang <span className="font-bold text-indigo-600 dark:text-indigo-400">{report.newTccsCode}</span>
+              <p className="text-xs text-ink-muted font-medium">
+                Sự dịch chuyển từ <span className="font-bold text-ink">{report.oldTccsCode}</span> sang <span className="font-bold text-emerald-600 dark:text-emerald-400">{report.newTccsCode}</span>
               </p>
             </div>
           </div>
           <button 
             onClick={onClose}
-            className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+            className="p-2 text-ink-muted hover:text-ink rounded-xl hover:bg-surface-3 transition-colors"
           >
-            <X size={20} />
+            <XMarkIcon className="w-5 h-5" />
           </button>
         </div>
 
@@ -86,10 +93,10 @@ export const TccsImpactAssessmentModal: React.FC<TccsImpactAssessmentModalProps>
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
           {/* Risk Level Banner */}
           <div className={`p-4 rounded-xl border flex items-start gap-3.5 ${riskConfig.bg}`}>
-            <RiskIcon className={`shrink-0 mt-0.5 ${riskConfig.text}`} size={20} />
+            <RiskIcon className={`shrink-0 mt-0.5 w-5 h-5 ${riskConfig.text}`} />
             <div>
               <h4 className={`font-bold text-sm ${riskConfig.text}`}>{riskConfig.title}</h4>
-              <p className="text-xs text-slate-600 dark:text-slate-300 mt-1">
+              <p className="text-xs text-ink-soft mt-1">
                 {report.hasCriticalSpecificationChanges 
                   ? 'Có sự siết chặt đáng kể về giới hạn chấp nhận chỉ tiêu kỹ thuật. Cần đánh giá kỹ khả năng đáp ứng của các lô đang sản xuất.'
                   : 'Thay đổi không ảnh hưởng nghiêm trọng đến giới hạn kỹ thuật cốt lõi.'}
@@ -99,23 +106,23 @@ export const TccsImpactAssessmentModal: React.FC<TccsImpactAssessmentModalProps>
 
           {/* Quick Metrics */}
           <div className="grid grid-cols-2 gap-4">
-            <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60">
-              <div className="flex items-center gap-2 text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">
-                <Layers size={14} className="text-blue-500" />
+            <div className="p-4 rounded-xl bg-surface-2 border border-border">
+              <div className="flex items-center gap-2 text-xs font-bold text-ink-muted uppercase tracking-wider mb-1">
+                <Square3Stack3DIcon className="w-4 h-4 text-blue-500" />
                 Lô sản xuất đang mở bị ảnh hưởng
               </div>
-              <p className="text-2xl font-black text-slate-800 dark:text-slate-100">
-                {report.affectedActiveBatches.length} <span className="text-xs font-semibold text-slate-400">lô</span>
+              <p className="text-2xl font-black text-ink">
+                {report.affectedActiveBatches.length} <span className="text-xs font-semibold text-ink-muted">lô</span>
               </p>
             </div>
 
-            <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60">
-              <div className="flex items-center gap-2 text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">
-                <ClipboardCheck size={14} className="text-rose-500" />
+            <div className="p-4 rounded-xl bg-surface-2 border border-border">
+              <div className="flex items-center gap-2 text-xs font-bold text-ink-muted uppercase tracking-wider mb-1">
+                <ClipboardDocumentCheckIcon className="w-4 h-4 text-rose-500" />
                 Phiếu KN có nguy cơ xung đột / FAIL
               </div>
-              <p className="text-2xl font-black text-slate-800 dark:text-slate-100">
-                {report.potentialTestResultConflicts.length} <span className="text-xs font-semibold text-slate-400">phiếu</span>
+              <p className="text-2xl font-black text-ink">
+                {report.potentialTestResultConflicts.length} <span className="text-xs font-semibold text-ink-muted">phiếu</span>
               </p>
             </div>
           </div>
@@ -123,16 +130,16 @@ export const TccsImpactAssessmentModal: React.FC<TccsImpactAssessmentModalProps>
           {/* Danh sách Lô đang mở bị ảnh hưởng */}
           {report.affectedActiveBatches.length > 0 && (
             <div className="space-y-2">
-              <h4 className="text-xs font-black text-slate-700 dark:text-slate-300 uppercase tracking-wider flex items-center gap-2">
-                <Layers size={14} className="text-blue-500" />
+              <h4 className="text-xs font-black text-ink uppercase tracking-wider flex items-center gap-2">
+                <Square3Stack3DIcon className="w-4 h-4 text-blue-500" />
                 Chi tiết các lô sản xuất đang hoạt động
               </h4>
-              <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden divide-y divide-slate-100 dark:divide-slate-800">
+              <div className="border border-border rounded-xl overflow-hidden divide-y divide-border">
                 {report.affectedActiveBatches.map(b => (
-                  <div key={b.batchId} className="p-3 bg-white dark:bg-slate-900 flex items-center justify-between text-xs">
+                  <div key={b.batchId} className="p-3 bg-surface flex items-center justify-between text-xs">
                     <div>
-                      <span className="font-bold text-slate-800 dark:text-slate-200">Lô: {b.batchNo}</span>
-                      <span className="ml-2 text-slate-400">({b.status})</span>
+                      <span className="font-bold text-ink">Lô: {b.batchNo}</span>
+                      <span className="ml-2 text-ink-muted">({b.status})</span>
                     </div>
                     <span className="text-amber-600 dark:text-amber-400 font-medium">{b.impactNote}</span>
                   </div>
@@ -145,16 +152,16 @@ export const TccsImpactAssessmentModal: React.FC<TccsImpactAssessmentModalProps>
           {report.potentialTestResultConflicts.length > 0 && (
             <div className="space-y-2">
               <h4 className="text-xs font-black text-rose-600 uppercase tracking-wider flex items-center gap-2">
-                <AlertOctagon size={14} className="text-rose-500" />
+                <ExclamationCircleIcon className="w-4 h-4 text-rose-500" />
                 Cảnh báo phiếu kiểm nghiệm xung đột chỉ tiêu mới
               </h4>
-              <div className="border border-rose-200 dark:border-rose-900/60 rounded-xl overflow-hidden divide-y divide-rose-100 dark:divide-rose-900/40">
+              <div className="border border-rose-500/20 rounded-xl overflow-hidden divide-y divide-rose-500/20">
                 {report.potentialTestResultConflicts.map(c => (
-                  <div key={c.testResultId} className="p-3 bg-rose-50/40 dark:bg-rose-950/20 text-xs">
+                  <div key={c.testResultId} className="p-3 bg-rose-500/5 text-xs">
                     <div className="font-bold text-rose-700 dark:text-rose-300 mb-1">
                       Phiếu #{c.testResultId} (Ngày KN: {c.testDate || 'N/A'})
                     </div>
-                    <ul className="list-disc pl-4 space-y-0.5 text-slate-600 dark:text-slate-300">
+                    <ul className="list-disc pl-4 space-y-0.5 text-ink-soft">
                       {c.conflictDetails.map((det, idx) => (
                         <li key={idx}>{det}</li>
                       ))}
@@ -167,14 +174,14 @@ export const TccsImpactAssessmentModal: React.FC<TccsImpactAssessmentModalProps>
 
           {/* Hành động khuyến nghị GMP */}
           <div className="space-y-2">
-            <h4 className="text-xs font-black text-indigo-600 dark:text-indigo-400 uppercase tracking-wider flex items-center gap-2">
-              <Info size={14} />
+            <h4 className="text-xs font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-wider flex items-center gap-2">
+              <InformationCircleIcon className="w-4 h-4" />
               Khuyến nghị QA / Kiểm soát Thay đổi (Change Control)
             </h4>
-            <div className="p-4 bg-indigo-50/40 dark:bg-indigo-950/20 rounded-xl border border-indigo-200 dark:border-indigo-800/60 space-y-2">
+            <div className="p-4 bg-emerald-500/5 rounded-xl border border-emerald-500/20 space-y-2">
               {report.recommendedActions.map((act, idx) => (
-                <div key={idx} className="flex items-start gap-2 text-xs text-slate-700 dark:text-slate-300">
-                  <CheckCircle2 size={14} className="text-indigo-600 dark:text-indigo-400 shrink-0 mt-0.5" />
+                <div key={idx} className="flex items-start gap-2 text-xs text-ink-soft">
+                  <CheckCircleIcon className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
                   <span>{act}</span>
                 </div>
               ))}
@@ -183,10 +190,10 @@ export const TccsImpactAssessmentModal: React.FC<TccsImpactAssessmentModalProps>
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/60 flex items-center justify-between">
+        <div className="px-6 py-4 border-t border-border bg-surface-2 flex items-center justify-between">
           <button
             onClick={onClose}
-            className="px-5 py-2.5 text-slate-500 hover:text-slate-700 dark:text-slate-400 font-bold text-xs uppercase tracking-wider rounded-xl transition-colors"
+            className="px-5 py-2.5 text-ink-muted hover:text-ink font-bold text-xs uppercase tracking-wider rounded-xl transition-colors"
           >
             Đóng
           </button>
@@ -196,10 +203,10 @@ export const TccsImpactAssessmentModal: React.FC<TccsImpactAssessmentModalProps>
                 onClose();
                 onConfirmApprove();
               }}
-              className="px-6 py-2.5 bg-indigo-600 text-white hover:bg-indigo-700 rounded-xl font-bold text-xs uppercase tracking-wider shadow-md transition-colors flex items-center gap-2"
+              className="px-6 py-2.5 bg-emerald-600 text-white hover:bg-emerald-700 rounded-xl font-bold text-xs uppercase tracking-wider shadow-sm transition-colors flex items-center gap-2"
             >
               Tiến hành Ký duyệt Phiên bản TCCS
-              <ArrowRight size={14} />
+              <ArrowRightIcon className="w-3.5 h-3.5" />
             </button>
           )}
         </div>

@@ -1,6 +1,18 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { ArrowLeft, Loader2, Save, Activity, Package, FileText, CheckCircle2, AlertCircle, Sparkles, RefreshCw, ShieldCheck, ArrowRight } from 'lucide-react';
+import {
+  ArrowLeftIcon,
+  ArrowPathIcon,
+  CheckIcon,
+  ChartBarSquareIcon,
+  CubeIcon,
+  DocumentTextIcon,
+  CheckCircleIcon,
+  ExclamationCircleIcon,
+  SparklesIcon,
+  ShieldCheckIcon,
+  ArrowRightIcon
+} from '@heroicons/react/24/outline';
 import { useAppStore } from '../../store/useAppStore';
 import { DSFormInput, SpecialCharToolbar, DSCard, PageHeader } from '../../components';
 import { normalizeName, createAliasRecord } from '../../services/criteriaAliasService';
@@ -252,36 +264,49 @@ const CriteriaFormPage: React.FC = () => {
   };
 
   return (
-    <div className="p-6 max-w-5xl mx-auto animate-in fade-in duration-500 space-y-6">
-      <div className="flex items-center justify-between gap-4">
-        <div className="flex items-center gap-4">
-          <button onClick={() => navigate('/criteria')} className="p-2 bg-white text-slate-500 hover:text-indigo-600 rounded-xl shadow-sm border border-slate-100 transition-all">
-            <ArrowLeft size={20} />
+    <div className="p-6 max-w-5xl mx-auto space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => navigate('/criteria')}
+            className="p-2 bg-surface hover:bg-surface-2 text-ink-muted hover:text-ink rounded-lg border border-border transition-colors"
+            title="Quay lại danh sách"
+          >
+            <ArrowLeftIcon className="h-5 w-5" />
           </button>
           <div>
-            <h1 className="text-2xl font-black text-slate-800 uppercase tracking-tight flex items-center gap-2">
-              <Activity className="text-violet-600" size={24} />
+            <h1 className="text-xl font-bold text-ink flex items-center gap-2">
+              <ChartBarSquareIcon className="h-6 w-6 text-emerald-600 dark:text-emerald-400" />
               Quản lý & Chuẩn hóa Chỉ tiêu
             </h1>
-            <p className="text-xs text-slate-400 font-bold">Tra cứu hồ sơ áp dụng, chuẩn hóa tên gọi và đồng bộ bảng ánh xạ toàn hệ thống.</p>
+            <p className="text-xs text-ink-muted mt-0.5">
+              Tra cứu hồ sơ áp dụng, chuẩn hóa tên gọi và đồng bộ bảng ánh xạ toàn hệ thống.
+            </p>
           </div>
         </div>
-        <Link to="/system/criteria-aliases" className="flex items-center gap-1.5 px-4 py-2 bg-indigo-50 text-indigo-700 rounded-xl font-bold text-xs hover:bg-indigo-100 transition-colors">
-          <Sparkles size={14} /> Quản lý Alias
+        <Link
+          to="/system/criteria-aliases"
+          className="inline-flex items-center gap-1.5 px-3 py-2 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/40 rounded-lg font-medium text-xs hover:bg-emerald-100 dark:hover:bg-emerald-950/50 transition-colors"
+        >
+          <SparklesIcon className="h-4 w-4" />
+          Quản lý Alias
         </Link>
       </div>
 
       {/* Selector chọn chỉ tiêu nếu không đi từ đường dẫn trực tiếp */}
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 space-y-4">
-        <label className="text-xs font-black text-slate-500 uppercase tracking-widest block">Chọn chỉ tiêu cần quản lý / chuẩn hóa:</label>
-        <div className="flex gap-3">
+      <div className="bg-surface rounded-xl shadow-sm border border-border p-5 space-y-3">
+        <label className="text-xs font-semibold text-ink-muted uppercase tracking-wider block">
+          Chọn chỉ tiêu cần quản lý / chuẩn hóa:
+        </label>
+        <div className="flex flex-col sm:flex-row gap-3">
           <select 
             value={selectedName} 
             onChange={(e) => {
               setSelectedName(e.target.value);
               setNewName(e.target.value);
             }} 
-            className="flex-1 px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm text-slate-700 outline-none focus:ring-2 focus:ring-violet-500"
+            className="flex-1 px-3 py-2 bg-surface-2 border border-border rounded-lg font-medium text-sm text-ink outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
           >
             {allCriteriaNames.map(name => (
               <option key={name} value={name}>{name}</option>
@@ -296,7 +321,7 @@ const CriteriaFormPage: React.FC = () => {
                 setNewName(customName.trim());
               }
             }}
-            className="px-4 py-3 bg-violet-50 text-violet-700 font-bold rounded-xl text-xs hover:bg-violet-100 transition-colors whitespace-nowrap"
+            className="px-4 py-2 bg-surface-2 hover:bg-surface-3 text-ink font-semibold rounded-lg text-xs border border-border transition-colors whitespace-nowrap"
           >
             + Nhập tên khác
           </button>
@@ -307,44 +332,51 @@ const CriteriaFormPage: React.FC = () => {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {/* Card Thông tin sử dụng */}
           <div className="md:col-span-1 space-y-4">
-            <DSCard className="p-5 bg-gradient-to-br from-violet-50 via-white to-purple-50 border border-violet-100">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="p-3 bg-violet-600 text-white rounded-xl shadow-md shadow-violet-200">
-                  <Activity size={20} />
+            <div className="p-5 bg-surface rounded-xl border border-border shadow-sm space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 rounded-lg border border-emerald-200 dark:border-emerald-800/50">
+                  <ChartBarSquareIcon className="h-5 w-5" />
                 </div>
-                <div>
-                  <h3 className="font-black text-slate-800 text-base leading-tight truncate">{currentInfo.name}</h3>
-                  <p className="text-[10px] font-bold text-violet-600 uppercase tracking-widest">
+                <div className="min-w-0">
+                  <h3 className="font-bold text-ink text-sm leading-tight truncate">{currentInfo.name}</h3>
+                  <p className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">
                     {Array.from(currentInfo.types).join(', ') || 'Chỉ tiêu phân tích'}
                   </p>
                 </div>
               </div>
 
-              <div className="space-y-3 pt-3 border-t border-slate-100 text-xs">
+              <div className="space-y-2.5 pt-3 border-t border-border text-xs">
                 <div className="flex justify-between items-center">
-                  <span className="text-slate-500 font-medium">Hồ sơ TCCS sử dụng:</span>
-                  <span className="font-black text-slate-800 bg-white px-2 py-0.5 rounded border border-slate-100">{currentInfo.relatedTCCS.length}</span>
+                  <span className="text-ink-muted">Hồ sơ TCCS sử dụng:</span>
+                  <span className="font-semibold text-ink bg-surface-2 px-2 py-0.5 rounded border border-border">
+                    {currentInfo.relatedTCCS.length}
+                  </span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-slate-500 font-medium">Lô kiểm nghiệm áp dụng:</span>
-                  <span className="font-black text-slate-800 bg-white px-2 py-0.5 rounded border border-slate-100">{currentInfo.relatedBatchesCount}</span>
+                  <span className="text-ink-muted">Lô kiểm nghiệm áp dụng:</span>
+                  <span className="font-semibold text-ink bg-surface-2 px-2 py-0.5 rounded border border-border">
+                    {currentInfo.relatedBatchesCount}
+                  </span>
                 </div>
               </div>
-            </DSCard>
+            </div>
 
             {/* Danh sách TCCS & Sản phẩm */}
-            <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm space-y-3">
-              <h4 className="text-[11px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
-                <Package size={14} className="text-indigo-500" /> Sản phẩm áp dụng ({currentInfo.relatedTCCS.length})
+            <div className="bg-surface rounded-xl p-5 border border-border shadow-sm space-y-3">
+              <h4 className="text-[11px] font-semibold text-ink-muted uppercase tracking-wider flex items-center gap-1.5">
+                <CubeIcon className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                Sản phẩm áp dụng ({currentInfo.relatedTCCS.length})
               </h4>
               <div className="space-y-2 max-h-60 overflow-y-auto custom-scrollbar pr-1">
                 {currentInfo.relatedTCCS.length === 0 ? (
-                  <p className="text-xs text-slate-400 italic">Chưa gắn vào TCCS nào.</p>
+                  <p className="text-xs text-ink-muted italic">Chưa gắn vào TCCS nào.</p>
                 ) : (
                   currentInfo.relatedTCCS.map((t, idx) => (
-                    <div key={idx} className="p-2.5 bg-slate-50 rounded-xl border border-slate-100 space-y-1">
-                      <p className="text-xs font-bold text-slate-700 line-clamp-1">{t.product}</p>
-                      <p className="text-[10px] font-mono font-bold text-indigo-600 uppercase">TCCS: {t.code}</p>
+                    <div key={idx} className="p-2.5 bg-surface-2 rounded-lg border border-border space-y-1">
+                      <p className="text-xs font-semibold text-ink line-clamp-1">{t.product}</p>
+                      <p className="text-[10px] font-mono font-medium text-emerald-600 dark:text-emerald-400 uppercase">
+                        TCCS: {t.code}
+                      </p>
                     </div>
                   ))
                 )}
@@ -353,15 +385,16 @@ const CriteriaFormPage: React.FC = () => {
 
             {/* Danh sách Alias đã lưu */}
             {activeAliases.length > 0 && (
-              <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm space-y-2">
-                <h4 className="text-[11px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
-                  <RefreshCw size={14} className="text-amber-500" /> Alias đã ánh xạ ({activeAliases.length})
+              <div className="bg-surface rounded-xl p-5 border border-border shadow-sm space-y-2">
+                <h4 className="text-[11px] font-semibold text-ink-muted uppercase tracking-wider flex items-center gap-1.5">
+                  <ArrowPathIcon className="h-4 w-4 text-amber-500" />
+                  Alias đã ánh xạ ({activeAliases.length})
                 </h4>
                 <div className="space-y-1.5 text-xs">
                   {activeAliases.map(a => (
-                    <div key={a.id} className="p-2 bg-amber-50/60 rounded-lg border border-amber-100">
-                      <p className="font-bold text-amber-900">{a.canonicalName}</p>
-                      <p className="text-[10px] text-amber-700 mt-0.5">Biến thể: {a.aliases?.join(', ') || '---'}</p>
+                    <div key={a.id} className="p-2 bg-amber-50 dark:bg-amber-950/30 rounded-lg border border-amber-200 dark:border-amber-800/40">
+                      <p className="font-semibold text-amber-900 dark:text-amber-300">{a.canonicalName}</p>
+                      <p className="text-[10px] text-amber-700 dark:text-amber-400 mt-0.5">Biến thể: {a.aliases?.join(', ') || '---'}</p>
                     </div>
                   ))}
                 </div>
@@ -371,71 +404,77 @@ const CriteriaFormPage: React.FC = () => {
 
           {/* Form Đổi tên & Chuẩn hóa */}
           <div className="md:col-span-2">
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 space-y-6">
-              <div className="border-b border-slate-100 pb-4">
-                <h3 className="text-base font-black text-slate-800 uppercase tracking-tight flex items-center gap-2">
-                  <Sparkles size={18} className="text-violet-600" />
+            <div className="bg-surface rounded-xl shadow-sm border border-border p-6 space-y-6">
+              <div className="border-b border-border pb-4">
+                <h3 className="text-base font-bold text-ink flex items-center gap-2">
+                  <SparklesIcon className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
                   Chuẩn hóa / Đổi tên Chỉ tiêu
                 </h3>
-                <p className="text-xs text-slate-500 mt-1">Thay đổi tên chỉ tiêu đồng loạt trên các hồ sơ TCCS và phiếu kiểm nghiệm mà không làm mất dữ liệu lịch sử.</p>
+                <p className="text-xs text-ink-muted mt-1">
+                  Thay đổi tên chỉ tiêu đồng loạt trên các hồ sơ TCCS và phiếu kiểm nghiệm mà không làm mất dữ liệu lịch sử.
+                </p>
               </div>
 
-              <form onSubmit={handleSave} className="space-y-6">
+              <form onSubmit={handleSave} className="space-y-5">
                 <SpecialCharToolbar />
 
                 <div>
-                  <label className="text-xs font-black text-slate-600 uppercase tracking-widest block mb-2">Tên chỉ tiêu mới *</label>
+                  <label className="text-xs font-semibold text-ink-muted uppercase tracking-wider block mb-1.5">
+                    Tên chỉ tiêu mới *
+                  </label>
                   <input 
                     type="text" 
                     value={newName} 
                     onChange={(e) => setNewName(e.target.value)} 
                     placeholder="Nhập tên chuẩn hóa (VD: Độ ẩm, Định lượng Paracetamol...)"
-                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm text-slate-800 outline-none focus:ring-2 focus:ring-violet-500 shadow-inner"
+                    className="w-full px-3.5 py-2.5 bg-surface-2 border border-border rounded-lg font-medium text-sm text-ink outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 shadow-inner"
                     required
                   />
                 </div>
 
-                <div className="space-y-3 bg-slate-50 p-4 rounded-xl border border-slate-200/60">
-                  <label className="text-xs font-black text-slate-700 uppercase tracking-widest block">Phạm vi áp dụng</label>
+                <div className="space-y-3 bg-surface-2 p-4 rounded-xl border border-border">
+                  <label className="text-xs font-semibold text-ink uppercase tracking-wider block">Phạm vi áp dụng</label>
                   <div className="space-y-2">
-                    <label className="flex items-center gap-3 cursor-pointer">
+                    <label className="flex items-start sm:items-center gap-3 cursor-pointer">
                       <input 
                         type="radio" 
                         name="scope" 
                         value="global" 
                         checked={renameScope === 'global'} 
                         onChange={() => setRenameScope('global')}
-                        className="text-violet-600 focus:ring-violet-500 h-4 w-4"
+                        className="mt-0.5 sm:mt-0 text-emerald-600 focus:ring-emerald-500 h-4 w-4"
                       />
                       <div>
-                        <span className="text-xs font-bold text-slate-800">Toàn hệ thống (Khuyến nghị)</span>
-                        <p className="text-[10px] text-slate-500">Cập nhật tất cả hồ sơ TCCS ({currentInfo.relatedTCCS.length}) và toàn bộ phiếu kiểm nghiệm có chỉ tiêu này.</p>
+                        <span className="text-xs font-semibold text-ink">Toàn hệ thống (Khuyến nghị)</span>
+                        <p className="text-[11px] text-ink-muted">Cập nhật tất cả hồ sơ TCCS ({currentInfo.relatedTCCS.length}) và toàn bộ phiếu kiểm nghiệm có chỉ tiêu này.</p>
                       </div>
                     </label>
 
-                    <label className="flex items-center gap-3 cursor-pointer pt-2 border-t border-slate-200/50">
+                    <label className="flex items-start sm:items-center gap-3 cursor-pointer pt-2 border-t border-border">
                       <input 
                         type="radio" 
                         name="scope" 
                         value="product" 
                         checked={renameScope === 'product'} 
                         onChange={() => setRenameScope('product')}
-                        className="text-violet-600 focus:ring-violet-500 h-4 w-4"
+                        className="mt-0.5 sm:mt-0 text-emerald-600 focus:ring-emerald-500 h-4 w-4"
                       />
                       <div>
-                        <span className="text-xs font-bold text-slate-800">Chỉ áp dụng cho 1 Sản phẩm cụ thể</span>
-                        <p className="text-[10px] text-slate-500">Chỉ đổi tên trên hồ sơ TCCS và phiếu kiểm nghiệm thuộc sản phẩm được chọn.</p>
+                        <span className="text-xs font-semibold text-ink">Chỉ áp dụng cho 1 Sản phẩm cụ thể</span>
+                        <p className="text-[11px] text-ink-muted">Chỉ đổi tên trên hồ sơ TCCS và phiếu kiểm nghiệm thuộc sản phẩm được chọn.</p>
                       </div>
                     </label>
                   </div>
 
                   {renameScope === 'product' && (
-                    <div className="mt-3 pt-3 border-t border-slate-200">
-                      <label className="text-[10px] font-black text-slate-600 uppercase tracking-widest block mb-1">Chọn sản phẩm:</label>
+                    <div className="mt-3 pt-3 border-t border-border">
+                      <label className="text-[10px] font-semibold text-ink-muted uppercase tracking-wider block mb-1">
+                        Chọn sản phẩm:
+                      </label>
                       <select 
                         value={targetProductId} 
                         onChange={(e) => setTargetProductId(e.target.value)}
-                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-bold outline-none focus:ring-2 focus:ring-violet-500"
+                        className="w-full px-3 py-2 bg-surface border border-border rounded-lg text-xs font-medium text-ink outline-none focus:ring-2 focus:ring-emerald-500"
                         required
                       >
                         <option value="">-- Chọn sản phẩm --</option>
@@ -447,7 +486,7 @@ const CriteriaFormPage: React.FC = () => {
                   )}
                 </div>
 
-                <div className="p-4 bg-emerald-50/70 rounded-xl border border-emerald-100 flex items-start gap-3">
+                <div className="p-4 bg-emerald-50/70 dark:bg-emerald-950/20 rounded-xl border border-emerald-200 dark:border-emerald-800/40 flex items-start gap-3">
                   <input 
                     type="checkbox" 
                     id="auto-alias-check" 
@@ -455,26 +494,32 @@ const CriteriaFormPage: React.FC = () => {
                     onChange={(e) => setAutoCreateAlias(e.target.checked)}
                     className="mt-0.5 text-emerald-600 focus:ring-emerald-500 rounded h-4 w-4"
                   />
-                  <label htmlFor="auto-alias-check" className="text-xs text-emerald-900 cursor-pointer">
-                    <span className="font-bold">Tự động tạo Alias ánh xạ</span>
-                    <p className="text-[11px] text-emerald-700 mt-0.5">Lưu tên cũ ("{selectedName}") làm alias của tên mới ("{newName}") để các báo cáo và biểu đồ xu hướng cũ vẫn hiển thị đồng bộ.</p>
+                  <label htmlFor="auto-alias-check" className="text-xs text-ink cursor-pointer">
+                    <span className="font-semibold text-emerald-900 dark:text-emerald-300">Tự động tạo Alias ánh xạ</span>
+                    <p className="text-[11px] text-emerald-700 dark:text-emerald-400 mt-0.5">
+                      Lưu tên cũ ("{selectedName}") làm alias của tên mới ("{newName}") để các báo cáo và biểu đồ xu hướng cũ vẫn hiển thị đồng bộ.
+                    </p>
                   </label>
                 </div>
 
-                <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
+                <div className="flex justify-end gap-3 pt-4 border-t border-border">
                   <button 
                     type="button" 
                     onClick={() => navigate('/criteria')} 
-                    className="px-6 py-3 text-slate-500 font-bold text-xs uppercase tracking-wider hover:bg-slate-50 rounded-xl transition-colors"
+                    className="px-4 py-2 text-ink-muted font-semibold text-xs hover:bg-surface-2 rounded-lg border border-border transition-colors"
                   >
                     Hủy
                   </button>
                   <button 
                     type="submit" 
                     disabled={isSubmitting || !isAdmin}
-                    className="px-8 py-3 bg-violet-600 hover:bg-violet-700 text-white font-black text-xs uppercase tracking-wider rounded-xl shadow-lg shadow-violet-200 transition-all flex items-center gap-2 disabled:opacity-50"
+                    className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs rounded-lg shadow-sm transition-all flex items-center gap-1.5 disabled:opacity-50"
                   >
-                    {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+                    {isSubmitting ? (
+                      <ArrowPathIcon className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <CheckIcon className="h-4 w-4" />
+                    )}
                     Xác nhận & Cập nhật
                   </button>
                 </div>

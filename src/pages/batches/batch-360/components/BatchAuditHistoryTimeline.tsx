@@ -1,8 +1,17 @@
 import React from 'react';
 import { 
-  Calendar, Clock, CheckCircle2, XCircle, AlertTriangle, 
-  FileCheck2, ShieldCheck, UserCheck, Activity, Layers, FileText 
-} from 'lucide-react';
+  CalendarIcon, 
+  ClockIcon, 
+  CheckCircleIcon, 
+  XCircleIcon, 
+  ExclamationTriangleIcon, 
+  ClipboardDocumentCheckIcon, 
+  ShieldCheckIcon, 
+  CheckBadgeIcon, 
+  ChartBarSquareIcon, 
+  Square3Stack3DIcon, 
+  DocumentTextIcon 
+} from '@heroicons/react/24/outline';
 import { formatDateStandard } from '../../../../utils';
 import { ElectronicSignature } from '../../../../types/signature';
 import { QualityDeviation } from '../../../../types/deviation';
@@ -36,89 +45,89 @@ export const BatchAuditHistoryTimeline: React.FC<BatchAuditHistoryTimelineProps>
   const getEventIcon = (type: BatchTimelineEvent['type'], status?: string) => {
     switch (type) {
       case 'E_SIGNATURE':
-        return <ShieldCheck className="w-4 h-4 text-purple-600 dark:text-purple-400" />;
+        return <ShieldCheckIcon className="w-4 h-4 text-purple-600 dark:text-purple-400" />;
       case 'DEVIATION':
-        return <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400" />;
+        return <ExclamationTriangleIcon className="w-4 h-4 text-amber-600 dark:text-amber-400" />;
       case 'TEST_RESULT':
         return status === 'FAIL' 
-          ? <XCircle className="w-4 h-4 text-rose-600 dark:text-rose-400" />
-          : <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />;
+          ? <XCircleIcon className="w-4 h-4 text-rose-600 dark:text-rose-400" />
+          : <CheckCircleIcon className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />;
       case 'STATUS_CHANGE':
-        return <Activity className="w-4 h-4 text-blue-600 dark:text-blue-400" />;
+        return <ChartBarSquareIcon className="w-4 h-4 text-blue-600 dark:text-blue-400" />;
       case 'CREATED':
       default:
-        return <Layers className="w-4 h-4 text-slate-600 dark:text-slate-400" />;
+        return <Square3Stack3DIcon className="w-4 h-4 text-ink-muted" />;
     }
   };
 
   const getEventBorderColor = (type: BatchTimelineEvent['type'], status?: string) => {
-    if (type === 'E_SIGNATURE') return 'border-purple-200 dark:border-purple-900/40 bg-purple-50/50 dark:bg-purple-950/20';
-    if (type === 'DEVIATION') return 'border-amber-200 dark:border-amber-900/40 bg-amber-50/50 dark:bg-amber-950/20';
+    if (type === 'E_SIGNATURE') return 'border-purple-500/20 bg-purple-500/5';
+    if (type === 'DEVIATION') return 'border-amber-500/20 bg-amber-500/5';
     if (type === 'TEST_RESULT') {
       return status === 'FAIL'
-        ? 'border-rose-200 dark:border-rose-900/40 bg-rose-50/50 dark:bg-rose-950/20'
-        : 'border-emerald-200 dark:border-emerald-900/40 bg-emerald-50/50 dark:bg-emerald-950/20';
+        ? 'border-rose-500/20 bg-rose-500/5'
+        : 'border-emerald-500/20 bg-emerald-500/5';
     }
-    return 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800/80';
+    return 'border-border bg-surface';
   };
 
   return (
     <div className="space-y-6">
       {/* Thống kê nhanh chữ ký số & hồ sơ tuân thủ */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        <div className="p-4 bg-white dark:bg-slate-800/90 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm flex items-center gap-3">
-          <div className="p-3 bg-purple-50 dark:bg-purple-950/40 rounded-xl">
-            <FileCheck2 className="w-6 h-6 text-purple-600 dark:text-purple-400" />
+        <div className="p-4 bg-surface rounded-xl border border-border shadow-sm flex items-center gap-3">
+          <div className="p-3 bg-purple-500/10 rounded-xl">
+            <ClipboardDocumentCheckIcon className="w-6 h-6 text-purple-600 dark:text-purple-400" />
           </div>
           <div>
-            <p className="text-xs text-slate-500 dark:text-slate-400">Chữ ký điện tử (21 CFR Part 11)</p>
-            <p className="text-xl font-bold text-slate-800 dark:text-slate-100">{signatures.length} lượt ký</p>
+            <p className="text-xs text-ink-muted">Chữ ký điện tử (21 CFR Part 11)</p>
+            <p className="text-xl font-bold text-ink">{signatures.length} lượt ký</p>
           </div>
         </div>
 
-        <div className="p-4 bg-white dark:bg-slate-800/90 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm flex items-center gap-3">
-          <div className="p-3 bg-amber-50 dark:bg-amber-950/40 rounded-xl">
-            <AlertTriangle className="w-6 h-6 text-amber-600 dark:text-amber-400" />
+        <div className="p-4 bg-surface rounded-xl border border-border shadow-sm flex items-center gap-3">
+          <div className="p-3 bg-amber-500/10 rounded-xl">
+            <ExclamationTriangleIcon className="w-6 h-6 text-amber-600 dark:text-amber-400" />
           </div>
           <div>
-            <p className="text-xs text-slate-500 dark:text-slate-400">Sai lệch phát sinh (Deviations)</p>
-            <p className="text-xl font-bold text-slate-800 dark:text-slate-100">{deviations.length} vụ việc</p>
+            <p className="text-xs text-ink-muted">Sai lệch phát sinh (Deviations)</p>
+            <p className="text-xl font-bold text-ink">{deviations.length} vụ việc</p>
           </div>
         </div>
 
-        <div className="p-4 bg-white dark:bg-slate-800/90 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm flex items-center gap-3">
-          <div className="p-3 bg-emerald-50 dark:bg-emerald-950/40 rounded-xl">
-            <UserCheck className="w-6 h-6 text-emerald-600 dark:text-emerald-400" />
+        <div className="p-4 bg-surface rounded-xl border border-border shadow-sm flex items-center gap-3">
+          <div className="p-3 bg-emerald-500/10 rounded-xl">
+            <CheckBadgeIcon className="w-6 h-6 text-emerald-600 dark:text-emerald-400" />
           </div>
           <div>
-            <p className="text-xs text-slate-500 dark:text-slate-400">Tổng số mốc sự kiện</p>
-            <p className="text-xl font-bold text-slate-800 dark:text-slate-100">{sortedEvents.length} mốc ghi nhận</p>
+            <p className="text-xs text-ink-muted">Tổng số mốc sự kiện</p>
+            <p className="text-xl font-bold text-ink">{sortedEvents.length} mốc ghi nhận</p>
           </div>
         </div>
       </div>
 
       {/* Dòng thời gian chi tiết */}
-      <div className="bg-white dark:bg-slate-800/90 rounded-xl border border-slate-200 dark:border-slate-700 p-5 shadow-sm">
-        <div className="flex items-center justify-between pb-4 border-b border-slate-200 dark:border-slate-700 mb-6">
-          <div className="flex items-center gap-2 font-semibold text-slate-800 dark:text-slate-200">
-            <Clock className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+      <div className="bg-surface rounded-xl border border-border p-5 shadow-sm">
+        <div className="flex items-center justify-between pb-4 border-b border-border mb-6">
+          <div className="flex items-center gap-2 font-semibold text-ink">
+            <ClockIcon className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
             <span>Dòng Thời gian Thẩm định & Hồ sơ Tuân thủ (Audit History Timeline)</span>
           </div>
-          <span className="text-xs text-slate-500 dark:text-slate-400">
+          <span className="text-xs text-ink-muted">
             Sắp xếp theo thứ tự thời gian mới nhất trước
           </span>
         </div>
 
         {sortedEvents.length === 0 ? (
-          <div className="text-center py-10 text-slate-500 dark:text-slate-400 text-sm">
+          <div className="text-center py-10 text-ink-muted text-sm">
             Chưa có sự kiện nào được ghi nhận cho lô sản xuất này.
           </div>
         ) : (
-          <div className="relative pl-6 sm:pl-8 space-y-6 before:absolute before:left-3 sm:before:left-4 before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-200 dark:before:bg-slate-700">
+          <div className="relative pl-6 sm:pl-8 space-y-6 before:absolute before:left-3 sm:before:left-4 before:top-2 before:bottom-2 before:w-0.5 before:bg-border">
             {sortedEvents.map((evt) => (
               <div key={evt.id} className="relative group">
                 {/* Icon tròn trên trục thời gian */}
-                <div className="absolute -left-6 sm:-left-8 top-1.5 w-6 h-6 rounded-full bg-white dark:bg-slate-900 border-2 border-slate-300 dark:border-slate-600 flex items-center justify-center shadow-sm group-hover:scale-110 transition-transform">
+                <div className="absolute -left-6 sm:-left-8 top-1.5 w-6 h-6 rounded-full bg-surface border-2 border-border flex items-center justify-center shadow-sm group-hover:scale-110 transition-transform">
                   {getEventIcon(evt.type, evt.status)}
                 </div>
 
@@ -126,38 +135,38 @@ export const BatchAuditHistoryTimeline: React.FC<BatchAuditHistoryTimelineProps>
                 <div className={`p-4 rounded-xl border transition-all ${getEventBorderColor(evt.type, evt.status)} hover:shadow-sm`}>
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div className="flex items-center gap-2">
-                      <span className="font-semibold text-sm text-slate-900 dark:text-slate-100">{evt.title}</span>
+                      <span className="font-semibold text-sm text-ink">{evt.title}</span>
                       {evt.badge && (
-                        <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                        <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-surface-3 text-ink-soft border border-border">
                           {evt.badge}
                         </span>
                       )}
                     </div>
-                    <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
-                      <Calendar className="w-3.5 h-3.5" />
+                    <div className="flex items-center gap-1.5 text-xs text-ink-muted">
+                      <CalendarIcon className="w-3.5 h-3.5" />
                       <span>{formatDateStandard(evt.timestamp)}</span>
                     </div>
                   </div>
 
                   {evt.description && (
-                    <p className="text-xs text-slate-600 dark:text-slate-300 mt-1 leading-relaxed">
+                    <p className="text-xs text-ink-soft mt-1 leading-relaxed">
                       {evt.description}
                     </p>
                   )}
 
                   {evt.actor && (
-                    <div className="flex items-center gap-1 mt-2 text-xs text-slate-500 dark:text-slate-400">
-                      <span className="font-medium text-slate-700 dark:text-slate-300">Thực hiện bởi:</span>
+                    <div className="flex items-center gap-1 mt-2 text-xs text-ink-muted">
+                      <span className="font-medium text-ink">Thực hiện bởi:</span>
                       <span>{evt.actor}</span>
                     </div>
                   )}
 
                   {evt.details && Object.keys(evt.details).length > 0 && (
-                    <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2 pt-2 border-t border-slate-200/60 dark:border-slate-800/60 text-xs">
+                    <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2 pt-2 border-t border-border/60 text-xs">
                       {Object.entries(evt.details).map(([k, v]) => v !== undefined && (
-                        <div key={k} className="flex items-center justify-between gap-2 px-2.5 py-1 bg-white/80 dark:bg-slate-900/60 rounded border border-slate-200/50 dark:border-slate-800/50">
-                          <span className="text-slate-500 dark:text-slate-400">{k}:</span>
-                          <span className="font-medium text-slate-800 dark:text-slate-200">{String(v)}</span>
+                        <div key={k} className="flex items-center justify-between gap-2 px-2.5 py-1 bg-surface/80 rounded border border-border">
+                          <span className="text-ink-muted">{k}:</span>
+                          <span className="font-medium text-ink">{String(v)}</span>
                         </div>
                       ))}
                     </div>

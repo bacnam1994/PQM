@@ -1,7 +1,20 @@
 import React, { useState } from 'react';
 import { useAppStore } from '../../store/useAppStore';
 import { Navigate, useNavigate, Link } from 'react-router-dom';
-import { Leaf, Lock, Mail, Loader2, AlertCircle, UserPlus } from 'lucide-react';
+import { 
+  LockClosedIcon, 
+  EnvelopeIcon, 
+  ArrowPathIcon, 
+  ExclamationCircleIcon, 
+  UserPlusIcon 
+} from '@heroicons/react/24/outline';
+
+const LeafIcon = ({ className = "w-10 h-10" }: { className?: string }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10Z" />
+    <path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12" />
+  </svg>
+);
 
 const SignupPage: React.FC = () => {
   const user = useAppStore(state => state.user);
@@ -45,23 +58,23 @@ const SignupPage: React.FC = () => {
       <div className="w-full max-w-md relative z-10 animate-in fade-in zoom-in-95 duration-500">
         <div className="bg-white dark:bg-zinc-950/80 rounded-[2.5rem] shadow-2xl shadow-emerald-900/5 dark:shadow-black/50 border border-white dark:border-zinc-800/40 p-10 backdrop-blur-md">
           <div className="flex flex-col items-center mb-8">
-            <div className="bg-[#009639] p-4 rounded-3xl text-white shadow-xl shadow-emerald-100 dark:shadow-none mb-6">
-              <Leaf size={40} fill="currentColor" />
+            <div className="bg-emerald-600 p-4 rounded-3xl text-white shadow-xl shadow-emerald-500/20 mb-6">
+              <LeafIcon className="w-10 h-10" />
             </div>
             <h1 className="text-2xl font-bold text-slate-800 dark:text-zinc-100 tracking-tight text-center">Đăng ký tài khoản</h1>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             {error && (
-              <div className="p-4 bg-red-50 dark:bg-red-950/20 border border-red-100 dark:border-red-900/30 rounded-2xl flex items-center gap-3 text-red-600 dark:text-red-400 text-sm animate-in slide-in-from-top-2">
-                <AlertCircle size={18} />
+              <div className="p-4 bg-rose-50 dark:bg-rose-950/20 border border-rose-100 dark:border-rose-900/30 rounded-2xl flex items-center gap-3 text-rose-600 dark:text-rose-400 text-sm animate-in slide-in-from-top-2">
+                <ExclamationCircleIcon className="w-5 h-5 shrink-0" />
                 <span className="font-semibold">{error}</span>
               </div>
             )}
 
             <div className="space-y-1.5">
               <div className="relative">
-                <Mail className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-300 dark:text-zinc-500" size={18} />
+                <EnvelopeIcon className="w-5 h-5 absolute left-5 top-1/2 -translate-y-1/2 text-slate-300 dark:text-zinc-500" />
                 <input 
                   type="email" 
                   required 
@@ -75,7 +88,7 @@ const SignupPage: React.FC = () => {
 
             <div className="space-y-1.5">
               <div className="relative">
-                <Lock className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-300 dark:text-zinc-500" size={18} />
+                <LockClosedIcon className="w-5 h-5 absolute left-5 top-1/2 -translate-y-1/2 text-slate-300 dark:text-zinc-500" />
                 <input 
                   type="password" 
                   required 
@@ -89,7 +102,7 @@ const SignupPage: React.FC = () => {
 
             <div className="space-y-1.5">
               <div className="relative">
-                <Lock className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-300 dark:text-zinc-500" size={18} />
+                <LockClosedIcon className="w-5 h-5 absolute left-5 top-1/2 -translate-y-1/2 text-slate-300 dark:text-zinc-500" />
                 <input 
                   type="password" 
                   required 
@@ -104,9 +117,9 @@ const SignupPage: React.FC = () => {
             <button 
               type="submit" 
               disabled={isSubmitting} 
-              className="w-full py-4 bg-[#009639] text-white rounded-2xl font-bold uppercase text-xs tracking-widest shadow-xl shadow-emerald-200/50 dark:shadow-emerald-950/20 hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-2 mt-4"
+              className="w-full py-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl font-bold uppercase text-xs tracking-widest shadow-xl shadow-emerald-500/20 hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-2 mt-4"
             >
-              {isSubmitting ? <Loader2 className="animate-spin" size={18} /> : <UserPlus size={18} />}
+              {isSubmitting ? <ArrowPathIcon className="w-5 h-5 animate-spin" /> : <UserPlusIcon className="w-5 h-5" />}
               {isSubmitting ? 'ĐANG TẠO...' : 'ĐĂNG KÝ NGAY'}
             </button>
           </form>
@@ -114,7 +127,7 @@ const SignupPage: React.FC = () => {
           <div className="mt-8 text-center">
             <p className="text-sm text-slate-500 dark:text-slate-400 font-medium">
               Đã có tài khoản?{' '}
-              <Link to="/login" className="font-bold text-[#009639] dark:text-emerald-400 hover:underline">Đăng nhập</Link>
+              <Link to="/login" className="font-bold text-emerald-600 dark:text-emerald-400 hover:underline">Đăng nhập</Link>
             </p>
           </div>
         </div>

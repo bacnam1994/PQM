@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { Loader2, AlertTriangle } from 'lucide-react';
+import { ArrowPathIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 import { useTestResultForm } from '../../hooks/test-results/useTestResultForm';
 import { useAppStore } from '../../store/useAppStore';
 import { useDataGraph } from '../../hooks/useDataGraph';
@@ -192,18 +192,18 @@ const TestResultFormPage: React.FC = () => {
   if (id && editItemNotFound) {
     return (
       <div className="min-h-[70vh] flex items-center justify-center p-4">
-        <div className="bg-white dark:bg-slate-800 p-8 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 flex flex-col items-center gap-3 text-center max-w-md w-full">
-          <AlertTriangle size={40} className="text-amber-500" />
-          <h2 className="font-black text-slate-800 dark:text-slate-100 text-lg uppercase tracking-tight">
+        <div className="bg-surface p-8 rounded-2xl shadow-sm border border-border flex flex-col items-center gap-3 text-center max-w-md w-full">
+          <ExclamationTriangleIcon className="h-10 w-10 text-amber-500" />
+          <h2 className="font-bold text-ink text-lg uppercase tracking-tight">
             Không tìm thấy phiếu kiểm nghiệm
           </h2>
-          <p className="text-sm text-slate-500 dark:text-slate-400">
+          <p className="text-sm text-ink-muted">
             Phiếu kết quả kiểm nghiệm này không tồn tại hoặc đã bị xóa khỏi hệ thống.
           </p>
           <button
             type="button"
             onClick={() => navigate('/test-results')}
-            className="mt-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-xs uppercase tracking-wider transition-all shadow-md shadow-indigo-100 dark:shadow-none"
+            className="mt-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-semibold text-xs uppercase tracking-wider transition-all shadow-sm"
           >
             Quay lại danh sách
           </button>
@@ -215,8 +215,8 @@ const TestResultFormPage: React.FC = () => {
   if (id && isLoadingEditItem) {
     return (
       <div className="min-h-[70vh] flex items-center justify-center p-4">
-        <div className="bg-white dark:bg-slate-800 p-8 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 flex items-center gap-3 text-slate-600 dark:text-slate-300 font-bold text-sm">
-          <Loader2 className="animate-spin text-indigo-600 dark:text-indigo-400" size={24} /> Đang tải dữ liệu phiếu kiểm nghiệm...
+        <div className="bg-surface p-8 rounded-2xl shadow-sm border border-border flex items-center gap-3 text-ink font-semibold text-sm">
+          <ArrowPathIcon className="animate-spin text-emerald-600 dark:text-emerald-400 h-6 w-6" /> Đang tải dữ liệu phiếu kiểm nghiệm...
         </div>
       </div>
     );
@@ -347,13 +347,13 @@ const TestResultFormPage: React.FC = () => {
                 <button
                   type="submit"
                   disabled={!activeTCCS || isSubmitting}
-                  className={`px-5 py-2 text-white font-bold rounded-lg shadow-xs transition-all text-xs tracking-wide flex items-center gap-2 cursor-pointer ${
+                  className={`px-6 py-2.5 text-white font-semibold rounded-xl shadow-sm transition-all text-xs tracking-wide flex items-center gap-2 cursor-pointer ${
                     crud.mode === 'EDIT'
                       ? 'bg-blue-600 hover:bg-blue-700 active:bg-blue-800'
-                      : 'bg-primary-600 hover:bg-primary-700 active:bg-primary-800'
+                      : 'bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800'
                   } disabled:opacity-40 disabled:cursor-not-allowed`}
                 >
-                  {isSubmitting && <Loader2 size={14} className="animate-spin" />}
+                  {isSubmitting && <ArrowPathIcon className="w-4 h-4 animate-spin" />}
                   {crud.mode === 'EDIT' ? 'Cập nhật Phiếu kiểm nghiệm' : 'Lưu & Hoàn tất Phiếu'}
                 </button>
               </div>

@@ -5,9 +5,13 @@
 
 import React from 'react';
 import { 
-  ShieldAlert, AlertTriangle, AlertOctagon, Clock, 
-  CheckCircle2, Activity, ListChecks 
-} from 'lucide-react';
+  ChartBarSquareIcon,
+  ExclamationCircleIcon,
+  ExclamationTriangleIcon,
+  ClockIcon,
+  ClipboardDocumentCheckIcon,
+  CheckCircleIcon
+} from '@heroicons/react/24/outline';
 import { QualityDeviation } from '../../../types/deviation';
 
 interface DeviationMetricsBarProps {
@@ -40,60 +44,60 @@ export const DeviationMetricsBar: React.FC<DeviationMetricsBarProps> = ({
       label: 'Tổng hồ sơ',
       count: total,
       sub: 'Tất cả nguồn',
-      icon: Activity,
-      color: 'text-indigo-600 dark:text-indigo-400',
-      bg: 'bg-indigo-50 dark:bg-indigo-950/30',
-      border: 'border-indigo-100 dark:border-indigo-900/50'
+      icon: ChartBarSquareIcon,
+      color: 'text-ink',
+      bg: 'bg-surface',
+      border: 'border-border'
     },
     {
       id: 'CRITICAL',
       label: 'Critical mở',
       count: criticalCount,
       sub: 'Cần giải quyết ngay',
-      icon: AlertOctagon,
+      icon: ExclamationCircleIcon,
       color: 'text-rose-600 dark:text-rose-400',
-      bg: 'bg-rose-50 dark:bg-rose-950/30',
-      border: 'border-rose-100 dark:border-rose-900/50'
+      bg: 'bg-rose-500/10',
+      border: 'border-rose-500/20'
     },
     {
       id: 'LOGGED',
       label: 'Mới ghi nhận',
       count: loggedCount,
       sub: 'Chờ điều tra Phase 1',
-      icon: AlertTriangle,
+      icon: ExclamationTriangleIcon,
       color: 'text-amber-600 dark:text-amber-400',
-      bg: 'bg-amber-50 dark:bg-amber-950/30',
-      border: 'border-amber-100 dark:border-amber-900/50'
+      bg: 'bg-amber-500/10',
+      border: 'border-amber-500/20'
     },
     {
       id: 'UNDER_INVESTIGATION',
       label: 'Đang điều tra RCA',
       count: investigatingCount,
       sub: '5-Why / Ishikawa',
-      icon: Clock,
+      icon: ClockIcon,
       color: 'text-blue-600 dark:text-blue-400',
-      bg: 'bg-blue-50 dark:bg-blue-950/30',
-      border: 'border-blue-100 dark:border-blue-900/50'
+      bg: 'bg-blue-500/10',
+      border: 'border-blue-500/20'
     },
     {
       id: 'CAPA_PLANNED',
       label: 'Đang thực thi CAPA',
       count: capaCount,
       sub: overdueCapaCount > 0 ? `${overdueCapaCount} hành động quá hạn` : 'Đúng tiến độ',
-      icon: ListChecks,
+      icon: ClipboardDocumentCheckIcon,
       color: overdueCapaCount > 0 ? 'text-orange-600 dark:text-orange-400' : 'text-purple-600 dark:text-purple-400',
-      bg: overdueCapaCount > 0 ? 'bg-orange-50 dark:bg-orange-950/30' : 'bg-purple-50 dark:bg-purple-950/30',
-      border: overdueCapaCount > 0 ? 'border-orange-200 dark:border-orange-800' : 'border-purple-100 dark:border-purple-900/50'
+      bg: overdueCapaCount > 0 ? 'bg-orange-500/10' : 'bg-purple-500/10',
+      border: overdueCapaCount > 0 ? 'border-orange-500/30' : 'border-purple-500/20'
     },
     {
       id: 'CLOSED',
       label: 'Đã đóng (Closed)',
       count: closedCount,
       sub: 'Đạt chuẩn xuất xưởng',
-      icon: CheckCircle2,
+      icon: CheckCircleIcon,
       color: 'text-emerald-600 dark:text-emerald-400',
-      bg: 'bg-emerald-50 dark:bg-emerald-950/30',
-      border: 'border-emerald-100 dark:border-emerald-900/50'
+      bg: 'bg-emerald-500/10',
+      border: 'border-emerald-500/20'
     }
   ];
 
@@ -109,19 +113,19 @@ export const DeviationMetricsBar: React.FC<DeviationMetricsBarProps> = ({
             type="button"
             onClick={() => onSelectFilter?.(c.id)}
             className={`p-3.5 rounded-2xl border text-left transition-all ${c.bg} ${c.border} ${
-              isSelected ? 'ring-2 ring-indigo-500 shadow-md scale-[1.02]' : 'hover:shadow-sm'
+              isSelected ? 'ring-2 ring-emerald-500 shadow-md scale-[1.02]' : 'hover:shadow-sm'
             }`}
           >
             <div className="flex items-center justify-between gap-2 mb-2">
-              <span className="text-[10px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400">
+              <span className="text-[10px] font-black uppercase tracking-wider text-ink-muted">
                 {c.label}
               </span>
-              <Icon size={16} className={c.color} />
+              <Icon className={`h-4 w-4 ${c.color}`} />
             </div>
             <div className="flex items-baseline gap-2">
               <span className={`text-2xl font-black ${c.color}`}>{c.count}</span>
             </div>
-            <p className="text-[10px] font-medium text-slate-400 dark:text-slate-500 truncate mt-1">
+            <p className="text-[10px] font-medium text-ink-muted truncate mt-1">
               {c.sub}
             </p>
           </button>

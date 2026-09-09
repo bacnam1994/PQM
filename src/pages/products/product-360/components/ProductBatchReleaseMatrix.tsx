@@ -1,9 +1,15 @@
 import React, { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { 
-  Layers, CheckCircle2, XCircle, AlertTriangle, 
-  TrendingUp, Calendar, ExternalLink, Activity 
-} from 'lucide-react';
+  Square3Stack3DIcon, 
+  CheckCircleIcon, 
+  XCircleIcon, 
+  ExclamationTriangleIcon, 
+  ArrowTrendingUpIcon, 
+  CalendarIcon, 
+  ArrowTopRightOnSquareIcon, 
+  ChartBarSquareIcon 
+} from '@heroicons/react/24/outline';
 import { formatDateStandard } from '../../../../utils';
 import { Batch } from '../../../../types';
 
@@ -45,48 +51,48 @@ export const ProductBatchReleaseMatrix: React.FC<ProductBatchReleaseMatrixProps>
     <div className="space-y-6">
       {/* Thẻ chỉ số tổng quan sản xuất */}
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-        <div className="p-4 bg-white dark:bg-slate-800/90 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
-          <p className="text-xs text-slate-500 dark:text-slate-400">Tổng số lô đã sản xuất</p>
-          <p className="text-2xl font-bold text-slate-900 dark:text-slate-100 mt-1">{totalBatches}</p>
+        <div className="p-4 bg-surface rounded-xl border border-border shadow-sm">
+          <p className="text-xs text-ink-muted">Tổng số lô đã sản xuất</p>
+          <p className="text-2xl font-bold text-ink mt-1">{totalBatches}</p>
         </div>
-        <div className="p-4 bg-white dark:bg-slate-800/90 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
-          <p className="text-xs text-slate-500 dark:text-slate-400">Số lô xuất xưởng thành công</p>
+        <div className="p-4 bg-surface rounded-xl border border-border shadow-sm">
+          <p className="text-xs text-ink-muted">Số lô xuất xưởng thành công</p>
           <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400 mt-1">{releasedBatches}</p>
         </div>
-        <div className="p-4 bg-white dark:bg-slate-800/90 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
-          <p className="text-xs text-slate-500 dark:text-slate-400">Số lô bị từ chối (OOS)</p>
+        <div className="p-4 bg-surface rounded-xl border border-border shadow-sm">
+          <p className="text-xs text-ink-muted">Số lô bị từ chối (OOS)</p>
           <p className="text-2xl font-bold text-rose-600 dark:text-rose-400 mt-1">{rejectedBatches}</p>
         </div>
-        <div className="p-4 bg-white dark:bg-slate-800/90 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
-          <p className="text-xs text-slate-500 dark:text-slate-400">Tỷ lệ xuất xưởng (Release Rate)</p>
+        <div className="p-4 bg-surface rounded-xl border border-border shadow-sm">
+          <p className="text-xs text-ink-muted">Tỷ lệ xuất xưởng (Release Rate)</p>
           <div className="flex items-baseline gap-1 mt-1">
-            <span className="text-2xl font-bold text-blue-600 dark:text-blue-400">{releaseRate}%</span>
+            <span className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">{releaseRate}%</span>
           </div>
         </div>
       </div>
 
       {/* Ma trận phân bổ theo từng năm */}
-      <div className="bg-white dark:bg-slate-800/90 rounded-2xl border border-slate-200 dark:border-slate-700 p-5 shadow-sm space-y-4">
-        <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-700">
+      <div className="bg-surface rounded-2xl border border-border p-5 shadow-sm space-y-4">
+        <div className="flex items-center justify-between pb-3 border-b border-border">
           <div className="flex items-center gap-2">
-            <TrendingUp className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-            <h3 className="font-semibold text-slate-800 dark:text-slate-200 text-sm">
+            <ArrowTrendingUpIcon className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+            <h3 className="font-semibold text-ink text-sm">
               Ma trận Xuất xưởng qua các năm (Yearly Release Matrix)
             </h3>
           </div>
-          <span className="text-xs font-medium text-slate-500">
+          <span className="text-xs font-medium text-ink-muted">
             {statsByYear.length} năm ghi nhận
           </span>
         </div>
 
         {statsByYear.length === 0 ? (
-          <div className="text-center py-6 text-slate-500 text-sm">
+          <div className="text-center py-6 text-ink-muted text-sm">
             Chưa có số liệu sản xuất cho sản phẩm này.
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-xs text-left">
-              <thead className="bg-slate-50 dark:bg-slate-700/50 text-slate-700 dark:text-slate-300 uppercase font-semibold">
+              <thead className="bg-surface-2 text-ink uppercase font-semibold">
                 <tr>
                   <th className="p-3">Năm sản xuất</th>
                   <th className="p-3">Tổng số lô</th>
@@ -96,20 +102,20 @@ export const ProductBatchReleaseMatrix: React.FC<ProductBatchReleaseMatrixProps>
                   <th className="p-3">Tỷ lệ đạt</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
+              <tbody className="divide-y divide-border">
                 {statsByYear.map(([year, stat]) => {
                   const rate = stat.total > 0 ? Math.round((stat.released / stat.total) * 100) : 100;
                   return (
-                    <tr key={year} className="hover:bg-slate-50/50 dark:hover:bg-slate-700/30">
-                      <td className="p-3 font-bold text-slate-900 dark:text-slate-100">{year}</td>
-                      <td className="p-3 font-semibold text-slate-800 dark:text-slate-200">{stat.total} lô</td>
+                    <tr key={year} className="hover:bg-surface-2 transition-colors">
+                      <td className="p-3 font-bold text-ink">{year}</td>
+                      <td className="p-3 font-semibold text-ink-soft">{stat.total} lô</td>
                       <td className="p-3 text-emerald-600 dark:text-emerald-400 font-medium">{stat.released} lô</td>
                       <td className="p-3 text-rose-600 dark:text-rose-400 font-medium">{stat.rejected} lô</td>
                       <td className="p-3 text-amber-600 dark:text-amber-400 font-medium">{stat.pending} lô</td>
                       <td className="p-3">
                         <div className="flex items-center gap-2">
-                          <span className="font-bold text-slate-800 dark:text-slate-200">{rate}%</span>
-                          <div className="w-20 h-2 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
+                          <span className="font-bold text-ink">{rate}%</span>
+                          <div className="w-20 h-2 bg-surface-3 rounded-full overflow-hidden">
                             <div 
                               className={`h-full ${rate >= 90 ? 'bg-emerald-500' : rate >= 75 ? 'bg-amber-500' : 'bg-rose-500'}`} 
                               style={{ width: `${rate}%` }} 
@@ -127,24 +133,24 @@ export const ProductBatchReleaseMatrix: React.FC<ProductBatchReleaseMatrixProps>
       </div>
 
       {/* Danh sách 10 lô sản xuất gần nhất */}
-      <div className="bg-white dark:bg-slate-800/90 rounded-2xl border border-slate-200 dark:border-slate-700 p-5 shadow-sm space-y-4">
-        <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-700">
+      <div className="bg-surface rounded-2xl border border-border p-5 shadow-sm space-y-4">
+        <div className="flex items-center justify-between pb-3 border-b border-border">
           <div className="flex items-center gap-2">
-            <Layers className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-            <h3 className="font-semibold text-slate-800 dark:text-slate-200 text-sm">
+            <Square3Stack3DIcon className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+            <h3 className="font-semibold text-ink text-sm">
               10 Lô sản xuất gần nhất
             </h3>
           </div>
         </div>
 
         {recentBatches.length === 0 ? (
-          <div className="text-center py-6 text-slate-500 text-sm">
+          <div className="text-center py-6 text-ink-muted text-sm">
             Chưa có lô sản xuất nào.
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-xs text-left">
-              <thead className="bg-slate-50 dark:bg-slate-700/50 text-slate-700 dark:text-slate-300 uppercase font-semibold">
+              <thead className="bg-surface-2 text-ink uppercase font-semibold">
                 <tr>
                   <th className="p-3">Số lô</th>
                   <th className="p-3">Ngày sản xuất</th>
@@ -154,20 +160,20 @@ export const ProductBatchReleaseMatrix: React.FC<ProductBatchReleaseMatrixProps>
                   <th className="p-3 text-right">Thao tác 360°</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
+              <tbody className="divide-y divide-border">
                 {recentBatches.map((b) => (
-                  <tr key={b.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-700/30">
-                    <td className="p-3 font-bold text-slate-900 dark:text-slate-100">{b.batchNo}</td>
-                    <td className="p-3 text-slate-700 dark:text-slate-300">{formatDateStandard(b.mfgDate)}</td>
-                    <td className="p-3 text-slate-700 dark:text-slate-300">{formatDateStandard(b.expDate)}</td>
-                    <td className="p-3 text-slate-700 dark:text-slate-300">
+                  <tr key={b.id} className="hover:bg-surface-2 transition-colors">
+                    <td className="p-3 font-bold text-ink">{b.batchNo}</td>
+                    <td className="p-3 text-ink-soft">{formatDateStandard(b.mfgDate)}</td>
+                    <td className="p-3 text-ink-soft">{formatDateStandard(b.expDate)}</td>
+                    <td className="p-3 text-ink-soft">
                       {b.actualYield ? `${b.actualYield} ${b.yieldUnit || ''}` : '—'}
                     </td>
                     <td className="p-3">
                       <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
-                        b.status === 'RELEASED' ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300' :
-                        b.status === 'REJECTED' ? 'bg-rose-100 dark:bg-rose-950 text-rose-800 dark:text-rose-300' :
-                        'bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300'
+                        b.status === 'RELEASED' ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20' :
+                        b.status === 'REJECTED' ? 'bg-rose-500/10 text-rose-700 dark:text-rose-300 border border-rose-500/20' :
+                        'bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/20'
                       }`}>
                         {b.status}
                       </span>
@@ -175,9 +181,9 @@ export const ProductBatchReleaseMatrix: React.FC<ProductBatchReleaseMatrixProps>
                     <td className="p-3 text-right">
                       <Link
                         to={`/batches/360/${b.id}`}
-                        className="text-blue-600 hover:text-blue-700 dark:text-blue-400 font-semibold inline-flex items-center gap-1"
+                        className="text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 font-semibold inline-flex items-center gap-1 hover:underline"
                       >
-                        <Activity className="w-3.5 h-3.5" /> Batch 360°
+                        <ChartBarSquareIcon className="w-3.5 h-3.5" /> Batch 360°
                       </Link>
                     </td>
                   </tr>

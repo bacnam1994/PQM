@@ -1,10 +1,19 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { 
-  Search, Package, Layers, FileText, Activity, TrendingUp, AlertTriangle, 
-  Settings, Users, ArrowRight, CornerDownLeft, Sparkles, X, ShieldAlert,
-  FlaskConical, GitPullRequest, Zap
-} from 'lucide-react';
+import {
+  MagnifyingGlassIcon,
+  CubeIcon,
+  Square3Stack3DIcon,
+  DocumentTextIcon,
+  ClipboardDocumentCheckIcon,
+  BeakerIcon,
+  ExclamationTriangleIcon,
+  ArrowPathRoundedSquareIcon,
+  BoltIcon,
+  ArrowRightIcon,
+  XMarkIcon,
+  ArrowUturnLeftIcon
+} from '@heroicons/react/24/outline';
 import { useAppStore } from '../../store/useAppStore';
 import { useShallow } from 'zustand/react/shallow';
 import { 
@@ -14,15 +23,15 @@ import {
 } from '../../services/core/universalSearchIndex';
 
 const categoryIconMap: Record<SearchResultCategory, React.ElementType> = {
-  PRODUCT: Package,
-  BATCH: Layers,
-  TCCS: FileText,
-  TEST_RESULT: Activity,
-  MATERIAL: FlaskConical,
-  DEVIATION: AlertTriangle,
-  CHANGE_CONTROL: GitPullRequest,
-  ACTION: Zap,
-  PAGE: ArrowRight
+  PRODUCT: CubeIcon,
+  BATCH: Square3Stack3DIcon,
+  TCCS: DocumentTextIcon,
+  TEST_RESULT: ClipboardDocumentCheckIcon,
+  MATERIAL: BeakerIcon,
+  DEVIATION: ExclamationTriangleIcon,
+  CHANGE_CONTROL: ArrowPathRoundedSquareIcon,
+  ACTION: BoltIcon,
+  PAGE: ArrowRightIcon
 };
 
 const categoryLabelMap: Record<SearchResultCategory, string> = {
@@ -45,14 +54,13 @@ export const GlobalCommandPalette: React.FC = () => {
   const listRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
 
-  const { products, batches, tccsList, testResults, rawMaterials, role } = useAppStore(
+  const { products, batches, tccsList, testResults, rawMaterials } = useAppStore(
     useShallow(s => ({
       products: s.products,
       batches: s.batches,
       tccsList: s.tccsList,
       testResults: s.testResults,
       rawMaterials: s.rawMaterials,
-      role: s.role,
     }))
   );
 
@@ -126,14 +134,14 @@ export const GlobalCommandPalette: React.FC = () => {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[150] flex items-start justify-center pt-20 px-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-[150] flex items-start justify-center pt-20 px-4 bg-black/40 dark:bg-black/60 backdrop-blur-xs animate-in fade-in duration-150">
       <div 
-        className="w-full max-w-2xl bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden flex flex-col max-h-[75vh] animate-in zoom-in-95 duration-200"
+        className="w-full max-w-2xl bg-surface rounded-2xl shadow-2xl border border-border overflow-hidden flex flex-col max-h-[75vh] animate-in zoom-in-95 duration-150"
         onClick={e => e.stopPropagation()}
       >
         {/* Search Header */}
-        <div className="relative flex items-center px-4 py-3.5 border-b border-slate-100 dark:border-slate-800">
-          <Search className="w-5 h-5 text-slate-400 dark:text-slate-500 shrink-0 mr-3" />
+        <div className="relative flex items-center px-4 py-3.5 border-b border-border/80 bg-surface">
+          <MagnifyingGlassIcon className="w-5 h-5 text-ink-faint shrink-0 mr-3" />
           <input
             ref={inputRef}
             type="text"
@@ -141,26 +149,27 @@ export const GlobalCommandPalette: React.FC = () => {
             onChange={e => { setSearchQuery(e.target.value); setSelectedIndex(0); }}
             onKeyDown={handleKeyDown}
             placeholder="Tìm nhanh Sản phẩm, Số lô, TCCS, Hoạt chất, CAS, Sai lệch... (Ctrl+K)"
-            className="w-full bg-transparent text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 text-base outline-none font-medium"
+            className="w-full bg-transparent text-ink placeholder-ink-faint text-sm sm:text-base outline-none font-medium"
           />
           <button 
+            type="button"
             onClick={() => setIsOpen(false)}
-            className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors ml-2"
+            className="p-1 rounded-lg text-ink-faint hover:text-ink hover:bg-surface-2 transition-colors ml-2"
           >
-            <X size={18} />
+            <XMarkIcon className="w-5 h-5" />
           </button>
         </div>
 
         {/* Search Results List */}
         <div ref={listRef} className="overflow-y-auto p-2 flex-1 space-y-1">
           {searchResults.length === 0 ? (
-            <div className="py-12 text-center text-slate-400 dark:text-slate-500">
-              <Search className="w-10 h-10 mx-auto mb-3 opacity-30" />
+            <div className="py-12 text-center text-ink-faint">
+              <MagnifyingGlassIcon className="w-10 h-10 mx-auto mb-3 opacity-30" />
               <p className="text-sm font-medium">Không tìm thấy kết quả phù hợp cho "{searchQuery}"</p>
             </div>
           ) : (
             searchResults.map((item, index) => {
-              const Icon = categoryIconMap[item.category] || ArrowRight;
+              const Icon = categoryIconMap[item.category] || ArrowRightIcon;
               const isSelected = index === selectedIndex;
               const categoryLabel = categoryLabelMap[item.category] || item.category;
 
@@ -171,40 +180,40 @@ export const GlobalCommandPalette: React.FC = () => {
                   onMouseEnter={() => setSelectedIndex(index)}
                   className={`flex items-center justify-between px-3.5 py-2.5 rounded-xl cursor-pointer transition-all ${
                     isSelected 
-                      ? 'bg-blue-50/80 dark:bg-blue-950/40 text-blue-900 dark:text-blue-100 border border-blue-200/60 dark:border-blue-800/60' 
-                      : 'hover:bg-slate-50 dark:hover:bg-slate-800/50 text-slate-700 dark:text-slate-300 border border-transparent'
+                      ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-900 dark:text-emerald-100 ring-1 ring-inset ring-emerald-600/30' 
+                      : 'hover:bg-surface-2 text-ink border border-transparent'
                   }`}
                 >
                   <div className="flex items-center gap-3 min-w-0 flex-1">
                     <div className={`p-2 rounded-lg shrink-0 ${
                       isSelected 
-                        ? 'bg-blue-600 text-white shadow-sm' 
-                        : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'
+                        ? 'bg-emerald-600 text-white shadow-xs' 
+                        : 'bg-surface-2 text-ink-faint'
                     }`}>
-                      <Icon size={16} />
+                      <Icon className="w-4 h-4" />
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-semibold text-sm truncate text-slate-900 dark:text-slate-100">
+                        <span className="font-semibold text-sm truncate text-ink">
                           {item.title}
                         </span>
-                        <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700">
+                        <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-surface-3/60 text-ink-faint border border-border">
                           {categoryLabel}
                         </span>
                         {item.badge && (
                           <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                            item.badgeColor === 'green' ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300' :
-                            item.badgeColor === 'red' ? 'bg-rose-100 dark:bg-rose-950 text-rose-800 dark:text-rose-300' :
-                            item.badgeColor === 'amber' ? 'bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300' :
-                            item.badgeColor === 'purple' ? 'bg-purple-100 dark:bg-purple-950 text-purple-800 dark:text-purple-300' :
-                            'bg-blue-100 dark:bg-blue-950 text-blue-800 dark:text-blue-300'
+                            item.badgeColor === 'green' ? 'bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300' :
+                            item.badgeColor === 'red' ? 'bg-rose-100 dark:bg-rose-950/80 text-rose-800 dark:text-rose-300' :
+                            item.badgeColor === 'amber' ? 'bg-amber-100 dark:bg-amber-950/80 text-amber-800 dark:text-amber-300' :
+                            item.badgeColor === 'purple' ? 'bg-purple-100 dark:bg-purple-950/80 text-purple-800 dark:text-purple-300' :
+                            'bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300'
                           }`}>
                             {item.badge}
                           </span>
                         )}
                       </div>
                       {item.subtitle && (
-                        <p className="text-xs text-slate-500 dark:text-slate-400 truncate mt-0.5">
+                        <p className="text-xs text-ink-faint truncate mt-0.5">
                           {item.subtitle}
                         </p>
                       )}
@@ -212,9 +221,9 @@ export const GlobalCommandPalette: React.FC = () => {
                   </div>
 
                   {isSelected && (
-                    <div className="flex items-center gap-1 text-blue-600 dark:text-blue-400 text-xs font-semibold pl-2 shrink-0">
+                    <div className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400 text-xs font-semibold pl-2 shrink-0">
                       <span>Mở</span>
-                      <CornerDownLeft size={13} />
+                      <ArrowUturnLeftIcon className="w-3.5 h-3.5" />
                     </div>
                   )}
                 </div>
@@ -224,22 +233,23 @@ export const GlobalCommandPalette: React.FC = () => {
         </div>
 
         {/* Footer phím tắt */}
-        <div className="px-4 py-2.5 bg-slate-50 dark:bg-slate-950/60 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
+        <div className="px-4 py-2.5 bg-surface-2 border-t border-border flex items-center justify-between text-xs text-ink-faint">
           <div className="flex items-center gap-3">
             <span className="flex items-center gap-1">
-              <kbd className="px-1.5 py-0.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded shadow-xs text-[10px]">↑</kbd>
-              <kbd className="px-1.5 py-0.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded shadow-xs text-[10px]">↓</kbd> Di chuyển
+              <kbd className="px-1.5 py-0.5 bg-surface border border-border rounded shadow-2xs text-[10px] font-mono">↑</kbd>
+              <kbd className="px-1.5 py-0.5 bg-surface border border-border rounded shadow-2xs text-[10px] font-mono">↓</kbd> Di chuyển
             </span>
             <span className="flex items-center gap-1">
-              <kbd className="px-1.5 py-0.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded shadow-xs text-[10px]">Enter</kbd> Chọn
+              <kbd className="px-1.5 py-0.5 bg-surface border border-border rounded shadow-2xs text-[10px] font-mono">Enter</kbd> Chọn
             </span>
             <span className="flex items-center gap-1">
-              <kbd className="px-1.5 py-0.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded shadow-xs text-[10px]">Esc</kbd> Đóng
+              <kbd className="px-1.5 py-0.5 bg-surface border border-border rounded shadow-2xs text-[10px] font-mono">Esc</kbd> Đóng
             </span>
           </div>
-          <span className="font-semibold text-blue-600 dark:text-blue-400">PQM Universal 2.0</span>
+          <span className="font-semibold text-emerald-600 dark:text-emerald-400">PQM Universal 2.0</span>
         </div>
       </div>
     </div>
   );
 };
+

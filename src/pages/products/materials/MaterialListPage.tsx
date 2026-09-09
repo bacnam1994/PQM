@@ -1,5 +1,12 @@
 import React from 'react';
-import { BookUser, Sparkles, Plus, FlaskConical, ShieldCheck, Trash2 } from 'lucide-react';
+import {
+  IdentificationIcon,
+  SparklesIcon,
+  PlusIcon,
+  BeakerIcon,
+  ShieldCheckIcon,
+  TrashIcon,
+} from '@heroicons/react/24/outline';
 import { PageHeader, Pagination, Modal } from '../../../components';
 import { Surface } from '../../../components/ui';
 import { COMMON_PHARMA_STANDARDS } from '../MaterialFormPage';
@@ -25,24 +32,24 @@ export const MaterialListPage: React.FC = () => {
       <PageHeader 
         title="Quản lý Nguyên liệu & Thành phần" 
         subtitle="Trung tâm Quản lý Danh mục Nguyên liệu chuẩn (Master Catalog), Tiêu chuẩn Dược điển, Ma trận Công thức và Rà soát AI"
-        icon={BookUser}
+        icon={IdentificationIcon}
         action={
           <div className="flex items-center gap-2.5">
             <button
               type="button"
               onClick={state.handleOpenHarmonizer}
-              className="px-3.5 py-2 bg-gradient-to-r from-primary-600 to-purple-600 text-white rounded-lg text-xs font-bold flex items-center gap-2 hover:opacity-90 transition-all shadow-xs cursor-pointer"
+              className="px-3.5 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-lg text-xs font-bold flex items-center gap-2 hover:opacity-95 transition-all shadow-sm cursor-pointer"
             >
-              <Sparkles size={14} className="animate-pulse" />
+              <SparklesIcon className="h-4 w-4 animate-pulse" />
               <span>AI Rà soát & Chuẩn hóa</span>
             </button>
             {state.isAdmin && (
               <button
                 type="button"
                 onClick={() => state.handleOpenAdd()}
-                className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white rounded-lg text-xs font-bold flex items-center gap-2 transition-all shadow-xs cursor-pointer"
+                className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white rounded-lg text-xs font-bold flex items-center gap-2 transition-all shadow-sm cursor-pointer"
               >
-                <Plus size={15} />
+                <PlusIcon className="h-4 w-4" />
                 <span>Thêm Nguyên liệu</span>
               </button>
             )}
@@ -60,11 +67,11 @@ export const MaterialListPage: React.FC = () => {
           onClick={() => state.setActiveTab('CATALOG')}
           className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
             state.activeTab === 'CATALOG'
-              ? 'bg-white dark:bg-slate-800 text-primary-700 dark:text-primary-300 shadow-xs'
-              : 'text-slate-500 dark:text-slate-400 hover:bg-white/60 dark:hover:bg-slate-800/60'
+              ? 'bg-surface text-emerald-700 dark:text-emerald-300 shadow-sm border border-border'
+              : 'text-ink-muted hover:bg-surface-2'
           }`}
         >
-          <BookUser size={14} />
+          <IdentificationIcon className="h-4 w-4" />
           <span>Danh mục Chuẩn ({state.rawMaterials.length})</span>
         </button>
 
@@ -73,11 +80,11 @@ export const MaterialListPage: React.FC = () => {
           onClick={() => state.setActiveTab('MATRIX')}
           className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
             state.activeTab === 'MATRIX'
-              ? 'bg-white dark:bg-slate-800 text-primary-700 dark:text-primary-300 shadow-xs'
-              : 'text-slate-500 dark:text-slate-400 hover:bg-white/60 dark:hover:bg-slate-800/60'
+              ? 'bg-surface text-emerald-700 dark:text-emerald-300 shadow-sm border border-border'
+              : 'text-ink-muted hover:bg-surface-2'
           }`}
         >
-          <FlaskConical size={14} />
+          <BeakerIcon className="h-4 w-4" />
           <span>Ma trận Công thức ({state.aggregatedFormulaItems.length})</span>
         </button>
 
@@ -86,11 +93,11 @@ export const MaterialListPage: React.FC = () => {
           onClick={() => state.setActiveTab('CONSISTENCY')}
           className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
             state.activeTab === 'CONSISTENCY'
-              ? 'bg-white dark:bg-slate-800 text-primary-700 dark:text-primary-300 shadow-xs'
-              : 'text-slate-500 dark:text-slate-400 hover:bg-white/60 dark:hover:bg-slate-800/60'
+              ? 'bg-surface text-emerald-700 dark:text-emerald-300 shadow-sm border border-border'
+              : 'text-ink-muted hover:bg-surface-2'
           }`}
         >
-          <ShieldCheck size={14} />
+          <ShieldCheckIcon className="h-4 w-4" />
           <span>Toàn vẹn &amp; Auto-Link</span>
           {state.metrics.unlinkedIngredients > 0 && (
             <span className="px-1.5 py-0.5 rounded-full bg-amber-500 text-white text-[10px] font-bold">
@@ -214,7 +221,7 @@ export const MaterialListPage: React.FC = () => {
           isOpen={state.crud.mode === 'DELETE'}
           onClose={state.crud.close}
           title="Xác nhận Xóa Nguyên liệu"
-          icon={Trash2}
+          icon={TrashIcon}
         >
           <div className="space-y-4">
             <p className="text-sm text-slate-600 dark:text-zinc-300">

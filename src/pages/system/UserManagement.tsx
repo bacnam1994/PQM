@@ -2,7 +2,16 @@ import React, { useState, useEffect } from 'react';
 import { db } from '../../firebase';
 import { ref, onValue, set, remove, push, query, limitToLast, orderByChild, serverTimestamp } from 'firebase/database';
 import { useAppStore } from '../../store/useAppStore';
-import { Users, Shield, Search, Calendar, UserCog, AlertTriangle, FileClock, History } from 'lucide-react';
+import { 
+  UserGroupIcon, 
+  ShieldCheckIcon, 
+  MagnifyingGlassIcon, 
+  CalendarIcon, 
+  Cog6ToothIcon, 
+  ExclamationTriangleIcon, 
+  ClockIcon,
+  UserIcon 
+} from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 import { DSFilterBar, DSSearchInput, DSTable } from '../../components/ui/DesignSystem';
 import { ConfirmationModal, Modal } from '../../components/ui/CommonUI';
@@ -152,63 +161,63 @@ const UserManagement: React.FC = () => {
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
       <div>
-        <h1 className="text-2xl font-extrabold text-slate-800 dark:text-zinc-150 flex items-center gap-3">
-          <UserCog className="text-indigo-600" size={32} /> Quản lý Người dùng
+        <h1 className="text-2xl font-extrabold text-ink flex items-center gap-3">
+          <UserGroupIcon className="text-emerald-600 dark:text-emerald-400 w-8 h-8" /> Quản lý Người dùng
         </h1>
-        <p className="text-slate-500 dark:text-zinc-400 mt-1">Phân quyền và quản lý tài khoản truy cập hệ thống.</p>
+        <p className="text-ink-muted mt-1">Phân quyền và quản lý tài khoản truy cập hệ thống.</p>
       </div>
 
       <DSFilterBar>
         <DSSearchInput placeholder="Tìm kiếm theo email..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
-        <div className="px-4 py-2 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-400 rounded-xl text-xs font-bold whitespace-nowrap">
+        <div className="px-4 py-2 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 rounded-xl text-xs font-bold whitespace-nowrap">
           Tổng: {filteredUsers.length} tài khoản
         </div>
         <button 
           onClick={() => setIsLogOpen(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 text-slate-600 dark:text-zinc-355 rounded-xl text-xs font-bold hover:bg-slate-50 dark:hover:bg-zinc-800 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors shadow-sm ml-auto"
+          className="flex items-center gap-2 px-4 py-2 bg-surface border border-border text-ink-muted rounded-xl text-xs font-bold hover:bg-surface-2 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors shadow-sm ml-auto"
         >
-          <FileClock size={16} /> Lịch sử phân quyền
+          <ClockIcon className="w-4 h-4" /> Lịch sử phân quyền
         </button>
       </DSFilterBar>
 
       <DSTable>
-            <thead className="bg-slate-50 dark:bg-zinc-900 border-b border-slate-100 dark:border-zinc-800/80">
-              <tr className="text-slate-500 dark:text-zinc-400 text-[10px] font-black uppercase tracking-widest">
+            <thead className="bg-surface-2 border-b border-border">
+              <tr className="text-ink-muted text-[10px] font-black uppercase tracking-widest">
                 <th className="px-6 py-4">Người dùng</th>
                 <th className="px-6 py-4">Ngày đăng ký</th>
                 <th className="px-6 py-4 text-center">Vai trò</th>
                 <th className="px-6 py-4 text-right">Thao tác</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-50 dark:divide-zinc-850">
+            <tbody className="divide-y divide-border">
               {loading ? (
                 <tr>
-                  <td colSpan={4} className="p-8 text-center text-slate-400 dark:text-zinc-500 text-sm font-bold">Đang tải dữ liệu...</td>
+                  <td colSpan={4} className="p-8 text-center text-ink-muted text-sm font-bold">Đang tải dữ liệu...</td>
                 </tr>
               ) : filteredUsers.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="p-8 text-center text-slate-400 dark:text-zinc-550 text-sm">Không tìm thấy người dùng nào.</td>
+                  <td colSpan={4} className="p-8 text-center text-ink-muted text-sm">Không tìm thấy người dùng nào.</td>
                 </tr>
               ) : (
                 filteredUsers.map((u) => (
-                  <tr key={u.uid} className="hover:bg-slate-50 dark:hover:bg-zinc-900/40 transition-colors">
+                  <tr key={u.uid} className="hover:bg-surface-2/50 transition-colors">
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-950/40 flex items-center justify-center text-indigo-600 dark:text-indigo-400 font-bold text-xs shrink-0">
+                        <div className="w-8 h-8 rounded-full bg-emerald-100 dark:bg-emerald-950/40 flex items-center justify-center text-emerald-600 dark:text-emerald-400 font-bold text-xs shrink-0">
                           {u.email?.charAt(0).toUpperCase()}
                         </div>
                         <div>
-                          <p className="font-bold text-slate-700 dark:text-zinc-200 text-sm flex items-center gap-2">
+                          <p className="font-bold text-ink text-sm flex items-center gap-2">
                             {u.email}
                             {u.uid === currentUser?.uid && <span className="text-[9px] bg-emerald-100 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 px-1.5 py-0.5 rounded uppercase font-black">Bạn</span>}
                           </p>
-                          <p className="text-[10px] text-slate-400 dark:text-zinc-500 font-mono">{u.uid}</p>
+                          <p className="text-[10px] text-ink-muted font-mono">{u.uid}</p>
                         </div>
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      <div className="flex items-center gap-2 text-slate-500 dark:text-zinc-400 text-xs font-medium">
-                        <Calendar size={14} />
+                      <div className="flex items-center gap-2 text-ink-muted text-xs font-medium">
+                        <CalendarIcon className="w-3.5 h-3.5" />
                         {u.createdAt ? formatDateStandard(u.createdAt) : '---'}
                       </div>
                     </td>
@@ -220,14 +229,14 @@ const UserManagement: React.FC = () => {
                             ? 'bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400' 
                             : 'bg-amber-100 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400'
                       }`}>
-                        {u.role === 'ADMIN' ? <Shield size={12} /> : <Users size={12} />}
+                        {u.role === 'ADMIN' ? <ShieldCheckIcon className="w-3 h-3" /> : <UserGroupIcon className="w-3 h-3" />}
                         {u.role}
                       </span>
                     </td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex justify-end items-center gap-2">
                         {u.uid === currentUser?.uid ? (
-                          <span className="text-[11px] text-slate-400 dark:text-zinc-500 font-bold bg-slate-50 dark:bg-zinc-900 px-2.5 py-1.5 rounded-lg border border-slate-100 dark:border-zinc-800">
+                          <span className="text-[11px] text-ink-muted font-bold bg-surface-2 px-2.5 py-1.5 rounded-lg border border-border">
                             Không thể tự sửa
                           </span>
                         ) : (
@@ -250,7 +259,7 @@ const UserManagement: React.FC = () => {
                                 </button>
                                 <button
                                   onClick={() => handleRoleChange(u.uid, 'USER', 'GUEST')}
-                                  className="text-xs font-bold px-3 py-1.5 bg-rose-50 dark:bg-rose-950/20 text-rose-600 dark:text-rose-455 hover:bg-rose-100 dark:hover:bg-rose-900/30 hover:text-rose-700 rounded-lg border border-rose-100 dark:border-rose-900/50 transition-all"
+                                  className="text-xs font-bold px-3 py-1.5 bg-rose-50 dark:bg-rose-950/20 text-rose-600 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-900/30 hover:text-rose-700 rounded-lg border border-rose-100 dark:border-rose-900/50 transition-all"
                                 >
                                   Hạ xuống Khách
                                 </button>
@@ -281,30 +290,30 @@ const UserManagement: React.FC = () => {
         title="Xác nhận thay đổi quyền"
         message={confirmMessage}
         confirmText="Xác nhận"
-        icon={AlertTriangle}
-        confirmButtonColor="bg-indigo-600 hover:bg-indigo-700"
+        icon={ExclamationTriangleIcon}
+        confirmButtonColor="bg-emerald-600 hover:bg-emerald-700"
       />
 
       <Modal
         isOpen={isLogOpen}
         onClose={() => setIsLogOpen(false)}
         title="Nhật ký Phân quyền Hệ thống"
-        icon={History}
-        color="bg-slate-700"
+        icon={ClockIcon}
+        color="bg-emerald-600"
       >
         <div className="max-h-[60vh] overflow-y-auto custom-scrollbar pr-2">
           {logs.length === 0 ? (
-            <p className="text-center text-slate-400 dark:text-zinc-500 text-sm py-8">Chưa có dữ liệu nhật ký.</p>
+            <p className="text-center text-ink-muted text-sm py-8">Chưa có dữ liệu nhật ký.</p>
           ) : (
             <div className="space-y-3">
               {logs.map(log => (
-                <div key={log.id} className="bg-slate-50 dark:bg-zinc-900 p-3 rounded-xl border border-slate-100 dark:border-zinc-800 text-xs">
+                <div key={log.id} className="bg-surface-2 p-3 rounded-xl border border-border text-xs">
                   <div className="flex justify-between items-start mb-1">
-                    <span className="font-bold text-slate-700 dark:text-zinc-200">{log.performedBy}</span>
-                    <span className="text-[10px] text-slate-400 dark:text-zinc-500 font-mono">{formatDateTime(log.timestamp)}</span>
+                    <span className="font-bold text-ink">{log.performedBy}</span>
+                    <span className="text-[10px] text-ink-muted font-mono">{formatDateTime(log.timestamp)}</span>
                   </div>
-                  <div className="text-slate-600 dark:text-zinc-350">
-                    Đã thay đổi quyền của <span className="font-bold text-indigo-600 dark:text-indigo-400">{log.targetEmail}</span> từ <span className="font-mono bg-slate-200 dark:bg-zinc-800 dark:text-zinc-300 px-1 rounded text-[10px]">{log.oldRole}</span> sang <span className="font-mono bg-indigo-100 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-400 px-1 rounded text-[10px] font-bold">{log.newRole}</span>
+                  <div className="text-ink-muted">
+                    Đã thay đổi quyền của <span className="font-bold text-emerald-600 dark:text-emerald-400">{log.targetEmail}</span> từ <span className="font-mono bg-surface text-ink px-1 rounded text-[10px]">{log.oldRole}</span> sang <span className="font-mono bg-emerald-100 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 px-1 rounded text-[10px] font-bold">{log.newRole}</span>
                   </div>
                 </div>
               ))}

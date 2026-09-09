@@ -6,10 +6,21 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
-  History, Search, Filter, RefreshCw, Shield, 
-  PlusCircle, Edit3, Trash2, Download, LogIn, Database,
-  Calendar, User, ArrowUpDown, ChevronLeft, ChevronRight, FileSpreadsheet
-} from 'lucide-react';
+  ClockIcon, 
+  MagnifyingGlassIcon, 
+  ArrowPathIcon, 
+  ShieldCheckIcon, 
+  PlusCircleIcon, 
+  PencilSquareIcon, 
+  TrashIcon, 
+  ArrowDownTrayIcon, 
+  ArrowRightOnRectangleIcon, 
+  CircleStackIcon,
+  UserIcon, 
+  ChevronLeftIcon, 
+  ChevronRightIcon, 
+  TableCellsIcon
+} from '@heroicons/react/24/outline';
 import { subscribeAuditLogs, AuditLogRecord } from '../../services/auditService';
 import { formatDateStandard } from '../../utils';
 import { ALCOAWatchdogWidget } from '../../components/features/ALCOAWatchdogWidget';
@@ -19,49 +30,49 @@ const ACTION_CONFIG = {
     label: 'Thêm mới',
     color: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800',
     badge: 'bg-emerald-500',
-    icon: PlusCircle
+    icon: PlusCircleIcon
   },
   UPDATE: {
     label: 'Cập nhật',
-    color: 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-800',
-    badge: 'bg-blue-500',
-    icon: Edit3
+    color: 'bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-950/40 dark:text-sky-300 dark:border-sky-800',
+    badge: 'bg-sky-500',
+    icon: PencilSquareIcon
   },
   DELETE: {
     label: 'Xóa',
     color: 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-800',
     badge: 'bg-rose-500',
-    icon: Trash2
+    icon: TrashIcon
   },
   IMPORT: {
     label: 'Nhập dữ liệu',
     color: 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/40 dark:text-purple-300 dark:border-purple-800',
     badge: 'bg-purple-500',
-    icon: Download
+    icon: ArrowDownTrayIcon
   },
   RESTORE: {
     label: 'Khôi phục',
     color: 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800',
     badge: 'bg-amber-500',
-    icon: RefreshCw
+    icon: ArrowPathIcon
   },
   LOGIN: {
     label: 'Đăng nhập',
-    color: 'bg-slate-50 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700',
+    color: 'bg-surface-2 text-ink-muted border-border',
     badge: 'bg-slate-500',
-    icon: LogIn
+    icon: ArrowRightOnRectangleIcon
   },
   SYNC_MERGE: {
     label: 'Hợp nhất đồng bộ',
     color: 'bg-teal-50 text-teal-700 border-teal-200 dark:bg-teal-950/40 dark:text-teal-300 dark:border-teal-800',
     badge: 'bg-teal-500',
-    icon: RefreshCw
+    icon: ArrowPathIcon
   },
   SYNC_CONFLICT: {
     label: 'Xung đột đồng bộ',
     color: 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800',
     badge: 'bg-amber-500',
-    icon: Shield
+    icon: ShieldCheckIcon
   }
 };
 
@@ -182,13 +193,13 @@ const AuditLogPage: React.FC = () => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-black text-slate-900 dark:text-slate-100 tracking-tight flex items-center gap-2.5">
-            <div className="p-2 rounded-xl bg-primary-50 dark:bg-primary-950/60 text-primary-600 dark:text-primary-400">
-              <History size={24} />
+          <h1 className="text-2xl font-black text-ink tracking-tight flex items-center gap-2.5">
+            <div className="p-2 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400">
+              <ClockIcon className="w-6 h-6" />
             </div>
             Nhật ký Hoạt động (Audit Logs)
           </h1>
-          <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">
+          <p className="text-ink-muted text-sm mt-1">
             Theo dõi, truy vết toàn bộ thao tác thêm, sửa, xóa và thay đổi dữ liệu theo chuẩn GMP
           </p>
         </div>
@@ -196,17 +207,17 @@ const AuditLogPage: React.FC = () => {
         <div className="flex items-center gap-2.5">
           <button
             onClick={exportToCSV}
-            className="flex items-center gap-2 px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/60 text-sm font-semibold text-slate-700 dark:text-slate-200 transition-all shadow-xs"
+            className="flex items-center gap-2 px-3.5 py-2 rounded-xl border border-border bg-surface hover:bg-surface-2 text-sm font-semibold text-ink transition-all shadow-xs"
             title="Xuất file CSV báo cáo kiểm toán"
           >
-            <FileSpreadsheet size={16} className="text-emerald-600" />
+            <TableCellsIcon className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
             <span>Xuất CSV</span>
           </button>
 
           <select
             value={limitCount}
             onChange={(e) => setLimitCount(Number(e.target.value))}
-            className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-semibold text-slate-700 dark:text-slate-200"
+            className="px-3 py-2 rounded-xl border border-border bg-surface text-xs font-semibold text-ink"
           >
             <option value={100}>Tải 100 bản ghi</option>
             <option value={200}>Tải 200 bản ghi</option>
@@ -221,45 +232,45 @@ const AuditLogPage: React.FC = () => {
 
       {/* Thẻ Thống kê nhanh */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
-        <div className="p-4 rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs">
-          <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 text-xs font-semibold uppercase">
+        <div className="p-4 rounded-2xl border border-border bg-surface shadow-xs">
+          <div className="flex items-center justify-between text-ink-muted text-xs font-semibold uppercase">
             <span>Tổng nhật ký</span>
-            <Database size={16} className="text-primary-500" />
+            <CircleStackIcon className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
           </div>
-          <p className="text-2xl font-black text-slate-900 dark:text-white mt-1">{stats.total}</p>
+          <p className="text-2xl font-black text-ink mt-1">{stats.total}</p>
         </div>
 
-        <div className="p-4 rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs">
+        <div className="p-4 rounded-2xl border border-border bg-surface shadow-xs">
           <div className="flex items-center justify-between text-emerald-600 dark:text-emerald-400 text-xs font-semibold uppercase">
             <span>Tạo mới</span>
-            <PlusCircle size={16} />
+            <PlusCircleIcon className="w-4 h-4" />
           </div>
           <p className="text-2xl font-black text-emerald-600 dark:text-emerald-400 mt-1">{stats.createCount}</p>
         </div>
 
-        <div className="p-4 rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs">
-          <div className="flex items-center justify-between text-blue-600 dark:text-blue-400 text-xs font-semibold uppercase">
+        <div className="p-4 rounded-2xl border border-border bg-surface shadow-xs">
+          <div className="flex items-center justify-between text-sky-600 dark:text-sky-400 text-xs font-semibold uppercase">
             <span>Cập nhật</span>
-            <Edit3 size={16} />
+            <PencilSquareIcon className="w-4 h-4" />
           </div>
-          <p className="text-2xl font-black text-blue-600 dark:text-blue-400 mt-1">{stats.updateCount}</p>
+          <p className="text-2xl font-black text-sky-600 dark:text-sky-400 mt-1">{stats.updateCount}</p>
         </div>
 
-        <div className="p-4 rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs">
+        <div className="p-4 rounded-2xl border border-border bg-surface shadow-xs">
           <div className="flex items-center justify-between text-rose-600 dark:text-rose-400 text-xs font-semibold uppercase">
             <span>Đã xóa</span>
-            <Trash2 size={16} />
+            <TrashIcon className="w-4 h-4" />
           </div>
           <p className="text-2xl font-black text-rose-600 dark:text-rose-400 mt-1">{stats.deleteCount}</p>
         </div>
       </div>
 
       {/* Thanh Tìm kiếm & Bộ lọc */}
-      <div className="p-4 rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs space-y-3">
+      <div className="p-4 rounded-2xl border border-border bg-surface shadow-xs space-y-3">
         <div className="flex flex-col sm:flex-row gap-3">
           {/* Ô tìm kiếm */}
           <div className="relative flex-1">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+            <MagnifyingGlassIcon className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-muted" />
             <input
               type="text"
               placeholder="Tìm kiếm theo chi tiết thao tác, email người dùng, mã tài liệu..."
@@ -268,7 +279,7 @@ const AuditLogPage: React.FC = () => {
                 setSearchTerm(e.target.value);
                 setCurrentPage(1);
               }}
-              className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800 text-sm focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 outline-none text-slate-900 dark:text-slate-100"
+              className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-border bg-surface-2 text-sm focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none text-ink"
             />
           </div>
 
@@ -280,7 +291,7 @@ const AuditLogPage: React.FC = () => {
                 setActionFilter(e.target.value);
                 setCurrentPage(1);
               }}
-              className="w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800 text-sm font-medium text-slate-700 dark:text-slate-200 outline-none"
+              className="w-full px-3 py-2.5 rounded-xl border border-border bg-surface-2 text-sm font-medium text-ink outline-none"
             >
               <option value="ALL">Tất cả hành động</option>
               <option value="CREATE">Thêm mới (CREATE)</option>
@@ -300,7 +311,7 @@ const AuditLogPage: React.FC = () => {
                 setCollectionFilter(e.target.value);
                 setCurrentPage(1);
               }}
-              className="w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800 text-sm font-medium text-slate-700 dark:text-slate-200 outline-none"
+              className="w-full px-3 py-2.5 rounded-xl border border-border bg-surface-2 text-sm font-medium text-ink outline-none"
             >
               <option value="ALL">Tất cả phân hệ</option>
               <option value="PRODUCTS">Sản phẩm</option>
@@ -321,7 +332,7 @@ const AuditLogPage: React.FC = () => {
                 setUserFilter(e.target.value);
                 setCurrentPage(1);
               }}
-              className="w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800 text-sm font-medium text-slate-700 dark:text-slate-200 outline-none"
+              className="w-full px-3 py-2.5 rounded-xl border border-border bg-surface-2 text-sm font-medium text-ink outline-none"
             >
               <option value="ALL">Tất cả người dùng</option>
               {uniqueUsers.map(email => (
@@ -332,7 +343,7 @@ const AuditLogPage: React.FC = () => {
         </div>
 
         {/* Thông báo số kết quả lọc */}
-        <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 pt-1">
+        <div className="flex items-center justify-between text-xs text-ink-muted pt-1">
           <span>
             Hiển thị <strong>{filteredLogs.length}</strong> trên tổng số <strong>{logs.length}</strong> bản ghi
           </span>
@@ -345,7 +356,7 @@ const AuditLogPage: React.FC = () => {
                 setUserFilter('ALL');
                 setCurrentPage(1);
               }}
-              className="text-primary-600 dark:text-primary-400 font-semibold hover:underline cursor-pointer"
+              className="text-emerald-600 dark:text-emerald-400 font-semibold hover:underline cursor-pointer"
             >
               Xóa bộ lọc
             </button>
@@ -354,22 +365,22 @@ const AuditLogPage: React.FC = () => {
       </div>
 
       {/* Bảng Danh sách Logs */}
-      <div className="rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs overflow-hidden">
+      <div className="rounded-2xl border border-border bg-surface shadow-xs overflow-hidden">
         {loading ? (
-          <div className="py-20 text-center text-slate-400 flex flex-col items-center gap-3">
-            <RefreshCw size={28} className="animate-spin text-primary-500" />
+          <div className="py-20 text-center text-ink-muted flex flex-col items-center gap-3">
+            <ArrowPathIcon className="w-7 h-7 animate-spin text-emerald-600 dark:text-emerald-400" />
             <span className="text-sm font-medium">Đang nạp nhật ký kiểm toán...</span>
           </div>
         ) : paginatedLogs.length === 0 ? (
-          <div className="py-16 text-center text-slate-400">
-            <Shield size={36} className="mx-auto mb-2 text-slate-300 dark:text-slate-600" />
-            <p className="text-sm font-semibold text-slate-600 dark:text-slate-300">Không tìm thấy nhật ký phù hợp</p>
-            <p className="text-xs text-slate-400 mt-1">Hãy thử thay đổi từ khóa hoặc bộ lọc</p>
+          <div className="py-16 text-center text-ink-muted">
+            <ShieldCheckIcon className="w-9 h-9 mx-auto mb-2 text-ink-muted/50" />
+            <p className="text-sm font-semibold text-ink">Không tìm thấy nhật ký phù hợp</p>
+            <p className="text-xs text-ink-muted mt-1">Hãy thử thay đổi từ khóa hoặc bộ lọc</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
-              <thead className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 text-xs font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wider">
+              <thead className="bg-surface-2 border-b border-border text-xs font-bold text-ink-muted uppercase tracking-wider">
                 <tr>
                   <th className="py-3 px-4 w-[16%]">Thời gian</th>
                   <th className="py-3 px-4 w-[12%]">Hành động</th>
@@ -378,47 +389,47 @@ const AuditLogPage: React.FC = () => {
                   <th className="py-3 px-4 w-[20%]">Người thực hiện</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80">
+              <tbody className="divide-y divide-border">
                 {paginatedLogs.map((log) => {
                   const cfg = ACTION_CONFIG[log.action as keyof typeof ACTION_CONFIG] || ACTION_CONFIG.LOGIN;
                   const Icon = cfg.icon;
 
                   return (
-                    <tr key={log.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors">
+                    <tr key={log.id} className="hover:bg-surface-2/50 transition-colors">
                       {/* Thời gian */}
-                      <td className="py-3 px-4 text-xs font-mono text-slate-500 dark:text-slate-400">
+                      <td className="py-3 px-4 text-xs font-mono text-ink-muted">
                         {formatDateStandard(log.timestamp)}
                       </td>
 
                       {/* Hành động */}
                       <td className="py-3 px-4">
                         <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold border ${cfg.color}`}>
-                          <Icon size={13} />
+                          <Icon className="w-3.5 h-3.5" />
                           {cfg.label}
                         </span>
                       </td>
 
                       {/* Phân hệ */}
-                      <td className="py-3 px-4 font-semibold text-slate-700 dark:text-slate-300 text-xs">
-                        <span className="px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200/60 dark:border-slate-700">
+                      <td className="py-3 px-4 font-semibold text-ink text-xs">
+                        <span className="px-2 py-0.5 rounded-md bg-surface-2 text-ink border border-border">
                           {COLLECTION_LABELS[log.collection] || log.collection}
                         </span>
                         {log.documentId && (
-                          <span className="block text-[11px] font-mono text-slate-400 mt-0.5 truncate max-w-[140px]" title={log.documentId}>
+                          <span className="block text-[11px] font-mono text-ink-muted mt-0.5 truncate max-w-[140px]" title={log.documentId}>
                             ID: {log.documentId}
                           </span>
                         )}
                       </td>
 
                       {/* Chi tiết */}
-                      <td className="py-3 px-4 text-slate-800 dark:text-slate-200">
+                      <td className="py-3 px-4 text-ink">
                         <p className="leading-snug break-words">{log.details}</p>
                       </td>
 
                       {/* Người thực hiện */}
                       <td className="py-3 px-4 text-xs">
-                        <div className="flex items-center gap-1.5 font-medium text-slate-700 dark:text-slate-300">
-                          <User size={13} className="text-slate-400 shrink-0" />
+                        <div className="flex items-center gap-1.5 font-medium text-ink">
+                          <UserIcon className="w-3.5 h-3.5 text-ink-muted shrink-0" />
                           <span className="truncate max-w-[180px]" title={log.performedBy}>
                             {log.performedBy || 'Hệ thống'}
                           </span>
@@ -434,8 +445,8 @@ const AuditLogPage: React.FC = () => {
 
         {/* Phân trang */}
         {!loading && totalPages > 1 && (
-          <div className="flex items-center justify-between px-4 py-3 border-t border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/60">
-            <span className="text-xs text-slate-500 dark:text-slate-400">
+          <div className="flex items-center justify-between px-4 py-3 border-t border-border bg-surface-2">
+            <span className="text-xs text-ink-muted">
               Trang <strong>{currentPage}</strong> / <strong>{totalPages}</strong>
             </span>
 
@@ -443,17 +454,17 @@ const AuditLogPage: React.FC = () => {
               <button
                 disabled={currentPage === 1}
                 onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50"
+                className="p-1.5 rounded-lg border border-border bg-surface text-ink disabled:opacity-40 disabled:cursor-not-allowed hover:bg-surface-2 transition-colors"
               >
-                <ChevronLeft size={16} />
+                <ChevronLeftIcon className="w-4 h-4" />
               </button>
 
               <button
                 disabled={currentPage === totalPages}
                 onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50"
+                className="p-1.5 rounded-lg border border-border bg-surface text-ink disabled:opacity-40 disabled:cursor-not-allowed hover:bg-surface-2 transition-colors"
               >
-                <ChevronRight size={16} />
+                <ChevronRightIcon className="w-4 h-4" />
               </button>
             </div>
           </div>

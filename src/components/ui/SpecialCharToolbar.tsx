@@ -1,5 +1,5 @@
 import React from 'react';
-import { Keyboard } from 'lucide-react';
+import { CommandLineIcon } from '@heroicons/react/24/outline';
 
 const SPECIAL_CHARS = ['\u00b0C', '\u00b5', '\u2264', '\u2265', '\u00b1', '\u2070', '\u00b9', '\u00b2', '\u00b3', '\u2074', '\u2075', '\u2076', '\u2077', '\u2078', '\u2079', '\u207b'];
 
@@ -11,7 +11,7 @@ export const insertSpecialChar = (char: string) => {
     const val = active.value;
     const newVal = val.slice(0, start) + char + val.slice(end);
 
-    // Hack để kích hoạt sự kiện onChange của React
+    // Kích hoạt sự kiện onChange của React
     const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
     const nativeTextAreaValueSetter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value')?.set;
 
@@ -43,20 +43,20 @@ const SCI_SHORTCUTS: { label: string; insert: string }[] = [
 
 export const SpecialCharToolbar: React.FC<{ className?: string }> = ({ className }) => {
   return (
-    <div className={`fixed top-20 left-1/2 -translate-x-1/2 z-[100] w-[95%] md:w-auto max-w-[980px] bg-white/85 dark:bg-slate-800/85 backdrop-blur-xl border border-white/40 dark:border-slate-700 shadow-glass rounded-2xl px-4 py-2.5 flex items-center gap-3 overflow-x-auto no-scrollbar transition-all duration-300 hover:shadow-glass-hover group ${className || ''}`}>
+    <div className={`fixed top-20 left-1/2 -translate-x-1/2 z-[100] w-[95%] md:w-auto max-w-[980px] bg-surface/90 backdrop-blur-xl border border-border shadow-xl rounded-2xl px-4 py-2 flex items-center gap-3 overflow-x-auto no-scrollbar transition-all duration-300 group ${className || ''}`}>
 
       {/* Nhóm 1: Ký tự đặc biệt */}
-      <div className="flex items-center gap-1 text-[10px] uppercase tracking-widest font-black text-primary-600 dark:text-primary-400 shrink-0">
-        <Keyboard size={14} className="group-hover:animate-bounce" />
+      <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider font-bold text-emerald-700 dark:text-emerald-400 shrink-0">
+        <CommandLineIcon className="w-4 h-4" />
         <span>Ký tự</span>
       </div>
-      <div className="flex items-center gap-1.5 pb-1 pt-1">
+      <div className="flex items-center gap-1.5 py-0.5">
         {SPECIAL_CHARS.map(char => (
           <button
             key={char}
             type="button"
             onMouseDown={(e) => { e.preventDefault(); insertSpecialChar(char); }}
-            className="px-3 py-1.5 bg-slate-50/80 dark:bg-slate-900/80 hover:bg-primary-50 dark:hover:bg-primary-900/50 hover:text-primary-600 dark:hover:text-primary-400 border border-slate-200/50 dark:border-slate-700 rounded-lg text-sm font-black transition-all shrink-0 shadow-sm hover:shadow hover:scale-110 active:scale-95"
+            className="px-2.5 py-1 bg-surface-2 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 hover:text-emerald-700 dark:hover:text-emerald-300 text-ink border border-border/80 rounded-lg text-xs font-bold transition-all shrink-0 shadow-2xs hover:shadow-xs active:scale-95"
           >
             {char}
           </button>
@@ -64,20 +64,20 @@ export const SpecialCharToolbar: React.FC<{ className?: string }> = ({ className
       </div>
 
       {/* Divider */}
-      <div className="w-px h-6 bg-slate-200 dark:bg-slate-600 shrink-0" />
+      <div className="w-px h-5 bg-border shrink-0" />
 
       {/* Nhóm 2: Số mũ nhanh */}
-      <div className="flex items-center gap-1 text-[10px] uppercase tracking-widest font-black text-indigo-500 dark:text-indigo-400 shrink-0">
+      <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider font-bold text-teal-700 dark:text-teal-400 shrink-0">
         <span>Số mũ</span>
       </div>
-      <div className="flex items-center gap-1.5 pb-1 pt-1">
+      <div className="flex items-center gap-1.5 py-0.5">
         {SCI_SHORTCUTS.map(({ label, insert }) => (
           <button
             key={label}
             type="button"
             onMouseDown={(e) => { e.preventDefault(); insertSpecialChar(insert); }}
             title={`Chèn: ${insert}`}
-            className="px-3 py-1.5 bg-indigo-50/80 dark:bg-indigo-900/40 hover:bg-indigo-100 dark:hover:bg-indigo-800/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200/50 dark:border-indigo-700/50 rounded-lg text-xs font-black transition-all shrink-0 shadow-sm hover:shadow hover:scale-110 active:scale-95"
+            className="px-2.5 py-1 bg-teal-50/60 dark:bg-teal-950/30 hover:bg-teal-100/70 dark:hover:bg-teal-900/40 text-teal-800 dark:text-teal-300 border border-teal-200/60 dark:border-teal-800/40 rounded-lg text-xs font-bold transition-all shrink-0 shadow-2xs hover:shadow-xs active:scale-95"
           >
             {label}
           </button>
@@ -87,4 +87,4 @@ export const SpecialCharToolbar: React.FC<{ className?: string }> = ({ className
   );
 };
 
-export default SpecialCharToolbar;
+export default SpecialCharToolbar;

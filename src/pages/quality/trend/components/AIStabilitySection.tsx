@@ -1,5 +1,9 @@
 import React from 'react';
-import { Clock, Sparkles, Loader2 } from 'lucide-react';
+import { 
+  ClockIcon, 
+  SparklesIcon, 
+  ArrowPathIcon 
+} from '@heroicons/react/24/outline';
 
 interface AIStabilitySectionProps {
   stabilityReport: any;
@@ -17,20 +21,20 @@ export const AIStabilitySection: React.FC<AIStabilitySectionProps> = ({
   if (!stabilityReport || stabilityReport.forecasts.length === 0) return null;
 
   return (
-    <div className="bg-gradient-to-br from-indigo-500/10 via-purple-500/5 to-cyan-500/10 p-5 rounded-2xl border border-indigo-200/80 dark:border-indigo-800/60 space-y-4">
+    <div className="bg-gradient-to-br from-emerald-500/10 via-surface to-teal-500/10 p-5 rounded-2xl border border-emerald-500/20 space-y-4 shadow-sm">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2.5">
-          <div className="p-2 bg-gradient-to-br from-indigo-600 to-purple-600 text-white rounded-xl shadow-md">
-            <Clock size={18} />
+          <div className="p-2 bg-gradient-to-br from-emerald-600 to-teal-600 text-white rounded-xl shadow-md">
+            <ClockIcon className="w-5 h-5" />
           </div>
           <div>
-            <h4 className="font-black text-slate-800 dark:text-zinc-100 text-sm flex items-center gap-2">
+            <h4 className="font-bold text-ink text-sm flex items-center gap-2">
               Dự báo Động học Suy giảm & Độ ổn định (ICH Q1A)
-              <span className="text-[10px] bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 font-black px-2 py-0.5 rounded-full uppercase">
+              <span className="text-[10px] bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 font-bold px-2 py-0.5 rounded-full uppercase border border-emerald-500/20">
                 AI Forecasting
               </span>
             </h4>
-            <p className="text-xs text-slate-500 dark:text-zinc-400">
+            <p className="text-xs text-ink-muted">
               Ước tính tốc độ suy giảm hoạt chất và thời điểm chạm ngưỡng Min theo thời gian bảo quản.
             </p>
           </div>
@@ -40,14 +44,14 @@ export const AIStabilitySection: React.FC<AIStabilitySectionProps> = ({
           type="button"
           onClick={handleEnrichStabilityWithAI}
           disabled={isGeneratingAiStability}
-          className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black uppercase tracking-wider rounded-xl flex items-center gap-1.5 shadow-sm transition-all disabled:opacity-50 cursor-pointer"
+          className="px-3.5 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white text-xs font-bold uppercase tracking-wider rounded-xl flex items-center gap-1.5 shadow-md shadow-emerald-500/20 transition-all disabled:opacity-50 cursor-pointer"
         >
-          {isGeneratingAiStability ? <Loader2 size={13} className="animate-spin" /> : <Sparkles size={13} />}
+          {isGeneratingAiStability ? <ArrowPathIcon className="w-4 h-4 animate-spin" /> : <SparklesIcon className="w-4 h-4 text-amber-300" />}
           Phân tích sâu bằng AI
         </button>
       </div>
 
-      <div className="p-3.5 bg-white/80 dark:bg-zinc-900/80 rounded-xl border border-indigo-100/80 dark:border-indigo-900/40 text-xs font-medium text-slate-700 dark:text-zinc-200">
+      <div className="p-4 bg-surface rounded-xl border border-border text-xs font-medium text-ink leading-relaxed shadow-xs">
         {aiStabilitySummary || stabilityReport.executiveSummary}
       </div>
 
@@ -58,35 +62,35 @@ export const AIStabilitySection: React.FC<AIStabilitySectionProps> = ({
           return (
             <div
               key={f.criteriaName}
-              className={`p-3 rounded-xl border transition-all ${
+              className={`p-3.5 rounded-xl border transition-all ${
                 isHighRisk
-                  ? 'bg-rose-50/80 dark:bg-rose-950/20 border-rose-200 dark:border-rose-800'
+                  ? 'bg-rose-500/10 border-rose-500/30'
                   : isModRisk
-                  ? 'bg-amber-50/80 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800'
-                  : 'bg-white/90 dark:bg-zinc-900/80 border-slate-200/80 dark:border-zinc-800'
+                  ? 'bg-amber-500/10 border-amber-500/30'
+                  : 'bg-surface border-border shadow-xs'
               }`}
             >
               <div className="flex justify-between items-start">
-                <span className="font-black text-slate-800 dark:text-zinc-100 truncate pr-2">{f.criteriaName}</span>
-                <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full ${
-                  isHighRisk ? 'bg-rose-100 text-rose-700 dark:bg-rose-900/50 dark:text-rose-300' :
-                  isModRisk ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300' :
-                  'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300'
+                <span className="font-bold text-ink truncate pr-2 text-xs">{f.criteriaName}</span>
+                <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${
+                  isHighRisk ? 'bg-rose-500/20 text-rose-700 dark:text-rose-300 border border-rose-500/30' :
+                  isModRisk ? 'bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-500/30' :
+                  'bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30'
                 }`}>
                   {isHighRisk ? 'Nguy cơ cao 🚨' : isModRisk ? 'Cần lưu ý ⚠️' : 'Ổn định tốt ✓'}
                 </span>
               </div>
-              <div className="mt-2 space-y-1 text-[11px] font-medium text-slate-600 dark:text-zinc-400">
+              <div className="mt-2.5 space-y-1.5 text-[11px] font-medium text-ink-muted">
                 <div className="flex justify-between">
                   <span>Tốc độ suy giảm:</span>
-                  <span className="font-bold text-slate-800 dark:text-zinc-200">
+                  <span className="font-bold text-ink">
                     {(f.decayRatePerMonth * 12).toFixed(1)}{f.unit}/năm (R²={f.rSquared})
                   </span>
                 </div>
                 {f.projectedMonthToMinLimit ? (
                   <div className="flex justify-between">
                     <span>Dự kiến chạm Min ({f.minLimit}{f.unit}):</span>
-                    <span className="font-black text-indigo-600 dark:text-indigo-400">
+                    <span className="font-bold text-emerald-600 dark:text-emerald-400">
                       Sau {f.projectedMonthToMinLimit} tháng
                     </span>
                   </div>

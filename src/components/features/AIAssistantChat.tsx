@@ -1,5 +1,16 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
-import { UploadCloud, Loader2, Sparkles, Send, CheckCircle2, User, AlertCircle, X, Settings, Brain, Trash2 } from 'lucide-react';
+import { 
+  CloudArrowUpIcon, 
+  ArrowPathIcon, 
+  SparklesIcon, 
+  PaperAirplaneIcon, 
+  CheckCircleIcon, 
+  ExclamationCircleIcon, 
+  XMarkIcon, 
+  Cog6ToothIcon, 
+  CpuChipIcon, 
+  TrashIcon 
+} from '@heroicons/react/24/outline';
 import { geminiService, validateOCRFile, formatGeminiError, AVAILABLE_GEMINI_MODELS, DEFAULT_GEMINI_MODEL } from '../../services/ai/geminiService';
 import { buildExtractionPrompt } from '../../services/ai/prompts';
 import { useAppStore } from '../../store/useAppStore';
@@ -660,11 +671,11 @@ export const AIAssistantChat: React.FC = () => {
     return (
       <button 
         onClick={() => setIsOpen(true)}
-        className="fixed bottom-6 right-6 w-14 h-14 bg-indigo-600 rounded-full flex items-center justify-center text-white shadow-[0_8px_30px_rgb(0,0,0,0.2)] hover:scale-105 hover:bg-indigo-700 transition-all z-50 group"
+        className="fixed bottom-6 right-6 w-14 h-14 bg-gradient-to-r from-emerald-600 to-teal-600 rounded-full flex items-center justify-center text-white shadow-lg shadow-emerald-500/25 hover:scale-105 hover:from-emerald-700 hover:to-teal-700 transition-all z-50 group cursor-pointer"
       >
-        <Sparkles size={24} className="group-hover:animate-pulse" />
+        <SparklesIcon className="w-7 h-7 group-hover:animate-pulse" />
         {messages.length > 1 && (
-          <span className="absolute top-0 right-0 w-4 h-4 bg-red-500 rounded-full border-2 border-white shadow-sm" />
+          <span className="absolute top-0 right-0 w-3.5 h-3.5 bg-rose-500 rounded-full border-2 border-white dark:border-zinc-900 shadow-xs" />
         )}
       </button>
     );
@@ -682,17 +693,17 @@ export const AIAssistantChat: React.FC = () => {
         onConfirm={handleMappingConfirmed}
       />
 
-      <div className="fixed bottom-6 right-6 w-[380px] bg-white dark:bg-zinc-950 rounded-2xl border border-slate-200 dark:border-zinc-800 shadow-[0_10px_40px_-10px_rgba(0,0,0,0.2)] dark:shadow-[0_10px_40px_-10px_rgba(0,0,0,0.6)] flex flex-col overflow-hidden z-50 animate-in slide-in-from-bottom-8 duration-300" style={{ height: '600px', maxHeight: 'calc(100vh - 40px)' }}>
+      <div className="fixed bottom-6 right-6 w-[380px] bg-surface rounded-2xl border border-border shadow-2xl flex flex-col overflow-hidden z-50 animate-in slide-in-from-bottom-8 duration-300" style={{ height: '600px', maxHeight: 'calc(100vh - 40px)' }}>
         {/* Header */}
-        <div className="bg-gradient-to-r from-indigo-600 to-purple-600 px-4 py-3 flex items-center justify-between shadow-sm">
+        <div className="bg-gradient-to-r from-emerald-600 to-teal-600 px-4 py-3 flex items-center justify-between shadow-xs">
           <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-white overflow-hidden p-1 shadow-sm">
+              <div className="w-8 h-8 rounded-lg bg-white overflow-hidden p-1 shadow-xs">
                   <img src={`${import.meta.env.BASE_URL}logo.png`} alt="Logo" className="w-full h-full object-contain" onError={(e) => { e.currentTarget.style.display='none'; }} />
               </div>
               <div className="flex flex-col">
-                  <h3 className="font-black text-white text-sm tracking-wide">V-Biotech AI</h3>
-                  <span className="text-[10px] font-bold text-indigo-100 flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse" />
+                  <h3 className="font-bold text-white text-sm tracking-wide">V-Biotech AI</h3>
+                  <span className="text-[10px] font-medium text-emerald-100 flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 bg-emerald-300 rounded-full animate-pulse" />
                     {AVAILABLE_GEMINI_MODELS.find(m => m.id === currentModel)?.name.replace('Gemini ', '') || currentModel}
                   </span>
               </div>
@@ -705,36 +716,36 @@ export const AIAssistantChat: React.FC = () => {
                 setMessages([WELCOME_MESSAGE]);
                 toast.success('Đã xóa lịch sử trò chuyện');
               }}
-              className="p-1.5 rounded-lg text-white/70 hover:text-white hover:bg-white/10 transition-colors"
+              className="p-1.5 rounded-lg text-white/70 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
               title="Xóa lịch sử chat"
             >
-              <Trash2 size={16} />
+              <TrashIcon className="w-4 h-4" />
             </button>
             <button 
               onClick={() => setShowConfig(!showConfig)}
-              className={`p-1.5 rounded-lg transition-colors ${showConfig ? 'bg-white/20 text-white' : 'text-white/70 hover:text-white hover:bg-white/10'}`}
+              className={`p-1.5 rounded-lg transition-colors cursor-pointer ${showConfig ? 'bg-white/20 text-white' : 'text-white/70 hover:text-white hover:bg-white/10'}`}
               title="Cấu hình AI nhanh"
             >
-              <Settings size={18} />
+              <Cog6ToothIcon className="w-5 h-5" />
             </button>
-            <button onClick={handleCloseChat} className="text-white/70 hover:text-white hover:bg-white/10 p-1.5 rounded-lg transition-colors">
-              <X size={20} />
+            <button onClick={handleCloseChat} className="text-white/70 hover:text-white hover:bg-white/10 p-1.5 rounded-lg transition-colors cursor-pointer">
+              <XMarkIcon className="w-5 h-5" />
             </button>
           </div>
         </div>
 
         {/* Panel Cấu hình nhanh AI */}
         {showConfig && (
-          <div className="bg-slate-50 dark:bg-zinc-900 border-b border-slate-200 dark:border-zinc-800 px-4 py-2.5 space-y-2 animate-in slide-in-from-top duration-200">
+          <div className="bg-surface-2 border-b border-border px-4 py-2.5 space-y-2 animate-in slide-in-from-top duration-200">
             <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold text-slate-600 dark:text-zinc-400 flex items-center gap-1.5">
-                <Brain size={13} className="text-indigo-500" />
+              <span className="text-[11px] font-bold text-ink-muted flex items-center gap-1.5">
+                <CpuChipIcon className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
                 Mô hình AI:
               </span>
               <select
                 value={currentModel}
                 onChange={(e) => handleModelChange(e.target.value)}
-                className="bg-white dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 text-[10px] font-bold text-slate-700 dark:text-zinc-300 px-2 py-1 rounded outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer shadow-sm max-w-[200px]"
+                className="bg-surface border border-border text-[10px] font-bold text-ink px-2 py-1 rounded-lg outline-none focus:ring-1 focus:ring-emerald-500 cursor-pointer shadow-xs max-w-[200px]"
               >
                 <optgroup label="⚡ Gemini 2.5 (Tiêu chuẩn)">
                   {AVAILABLE_GEMINI_MODELS.filter(m => m.group.includes('2.5')).map(m => (
@@ -749,8 +760,8 @@ export const AIAssistantChat: React.FC = () => {
               </select>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold text-slate-600 dark:text-zinc-400 flex items-center gap-1.5">
-                <Sparkles size={13} className="text-indigo-500" />
+              <span className="text-[11px] font-bold text-ink-muted flex items-center gap-1.5">
+                <SparklesIcon className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
                 Quy trình suy luận:
               </span>
               <label className="relative inline-flex items-center cursor-pointer">
@@ -760,7 +771,7 @@ export const AIAssistantChat: React.FC = () => {
                   onChange={(e) => handleThinkingToggle(e.target.checked)}
                   className="sr-only peer"
                 />
-                <div className="w-8 h-4 bg-slate-200 dark:bg-zinc-850 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-350 dark:after:border-zinc-700 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-indigo-650 dark:peer-checked:bg-indigo-600"></div>
+                <div className="w-8 h-4 bg-surface-3 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-border after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-emerald-600"></div>
               </label>
             </div>
           </div>
@@ -768,16 +779,16 @@ export const AIAssistantChat: React.FC = () => {
 
         {/* Message List */}
         <div 
-          className={`flex-1 overflow-y-auto p-4 space-y-4 relative transition-colors ${isDragging ? 'bg-indigo-50/50 dark:bg-indigo-950/20' : 'bg-slate-50/30 dark:bg-zinc-900/10'}`}
+          className={`flex-1 overflow-y-auto p-4 space-y-4 relative transition-colors ${isDragging ? 'bg-emerald-500/10' : 'bg-surface-2/40'}`}
           onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
           onDragLeave={() => setIsDragging(false)}
           onDrop={handleDrop}
         >
           {isDragging && (
-            <div className="absolute inset-0 z-10 flex items-center justify-center bg-indigo-500/10 backdrop-blur-sm border-2 border-dashed border-indigo-400 m-2 rounded-xl">
-               <div className="bg-white dark:bg-zinc-900 px-6 py-4 rounded-2xl shadow-xl flex items-center gap-3 border border-zinc-200 dark:border-zinc-800 animate-bounce">
-                  <UploadCloud className="text-indigo-500" size={32} />
-                  <span className="font-black text-indigo-700 dark:text-indigo-450">Thả file vào đây...</span>
+            <div className="absolute inset-0 z-10 flex items-center justify-center bg-emerald-500/10 backdrop-blur-xs border-2 border-dashed border-emerald-500 m-2 rounded-xl">
+               <div className="bg-surface px-6 py-4 rounded-2xl shadow-xl flex items-center gap-3 border border-border animate-bounce">
+                  <CloudArrowUpIcon className="w-8 h-8 text-emerald-600" />
+                  <span className="font-bold text-emerald-700 dark:text-emerald-300">Thả file vào đây...</span>
                </div>
             </div>
           )}
@@ -790,23 +801,23 @@ export const AIAssistantChat: React.FC = () => {
                  </div>
               )}
               {msg.sender === 'system' && (
-                 <div className="w-7 h-7 rounded-full bg-emerald-500 flex items-center justify-center flex-shrink-0 mt-1 shadow-sm">
-                    <CheckCircle2 size={14} className="text-white" />
+                 <div className="w-7 h-7 rounded-full bg-emerald-500 flex items-center justify-center shrink-0 mt-1 shadow-xs">
+                    <CheckCircleIcon className="w-4 h-4 text-white" />
                  </div>
               )}
 
               <div className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 text-[13px] ${
-                msg.sender === 'user' ? 'bg-indigo-600 text-white rounded-tr-sm shadow-md' : 
-                msg.sender === 'system' ? 'bg-emerald-50 dark:bg-emerald-950/20 text-emerald-800 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-900/30 rounded-tl-sm font-medium' :
-                'bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 shadow-sm rounded-tl-sm text-slate-700 dark:text-zinc-255 leading-relaxed'
+                msg.sender === 'user' ? 'bg-emerald-600 text-white rounded-tr-xs shadow-md' : 
+                msg.sender === 'system' ? 'bg-emerald-500/10 text-emerald-800 dark:text-emerald-300 border border-emerald-500/20 rounded-tl-xs font-medium' :
+                'bg-surface border border-border shadow-xs rounded-tl-xs text-ink leading-relaxed'
               }`}>
                 {msg.thinking && thinkingEnabled && (
-                  <details className="mb-2 bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 rounded-lg overflow-hidden group shadow-sm">
-                    <summary className="px-2 py-1 text-[11px] text-indigo-600 dark:text-indigo-400 font-bold hover:bg-indigo-100/50 dark:hover:bg-indigo-900/30 cursor-pointer flex items-center gap-1 transition-colors select-none">
-                      <Sparkles size={12} className="text-indigo-500 dark:text-indigo-455 animate-pulse" />
+                  <details className="mb-2 bg-surface-2 border border-border rounded-lg overflow-hidden group shadow-xs">
+                    <summary className="px-2 py-1 text-[11px] text-emerald-600 dark:text-emerald-400 font-bold hover:bg-emerald-500/10 cursor-pointer flex items-center gap-1 transition-colors select-none">
+                      <SparklesIcon className="w-3.5 h-3.5 text-emerald-500 animate-pulse" />
                       <span>Quy trình suy luận của AI</span>
                     </summary>
-                    <div className="p-2 text-[10px] text-slate-500 dark:text-zinc-400 border-t border-slate-100 dark:border-zinc-800 whitespace-pre-wrap font-mono leading-relaxed bg-slate-50/50 dark:bg-zinc-950/50 max-h-[150px] overflow-y-auto">
+                    <div className="p-2 text-[10px] text-ink-muted border-t border-border whitespace-pre-wrap font-mono leading-relaxed bg-surface-3/50 max-h-[150px] overflow-y-auto">
                       {msg.thinking}
                     </div>
                   </details>
@@ -818,10 +829,10 @@ export const AIAssistantChat: React.FC = () => {
                 />
                 
                 {msg.isActionable && msg.actionType === 'CREATE_BATCH' && (
-                  <div className="mt-3 p-3 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/30 rounded-xl space-y-2">
-                     <p className="text-[11px] font-bold text-amber-800 dark:text-amber-400 flex items-center gap-1.5"><AlertCircle size={12}/> Chọn sản phẩm cho lô mới:</p>
+                  <div className="mt-3 p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl space-y-2">
+                     <p className="text-[11px] font-bold text-amber-800 dark:text-amber-300 flex items-center gap-1.5"><ExclamationCircleIcon className="w-3.5 h-3.5"/> Chọn sản phẩm cho lô mới:</p>
                      <select 
-                       className="w-full bg-white dark:bg-zinc-900 border border-amber-300 dark:border-amber-900/50 text-xs font-bold text-slate-800 dark:text-zinc-200 px-2 py-2 rounded-lg outline-none focus:ring-2 focus:ring-amber-500"
+                       className="w-full bg-surface border border-amber-500/30 text-xs font-bold text-ink px-2 py-2 rounded-lg outline-none focus:ring-2 focus:ring-amber-500"
                        value={selectedProductId}
                        onChange={(e) => setSelectedProductId(e.target.value)}
                      >
@@ -833,9 +844,9 @@ export const AIAssistantChat: React.FC = () => {
                      <button 
                        disabled={isCreatingBatch || !selectedProductId}
                        onClick={() => handleCreateBatch(msg.id, msg.metadata)}
-                       className="w-full mt-2 py-2 bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white font-black uppercase text-[10px] tracking-wider rounded-lg shadow-sm transition-colors flex items-center justify-center gap-2"
+                       className="w-full mt-2 py-2 bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white font-black uppercase text-[10px] tracking-wider rounded-lg shadow-xs transition-colors flex items-center justify-center gap-2 cursor-pointer"
                      >
-                       {isCreatingBatch && <Loader2 size={12} className="animate-spin" />}
+                       {isCreatingBatch && <ArrowPathIcon className="w-3.5 h-3.5 animate-spin" />}
                        Tạo Lô Nhanh
                      </button>
                   </div>
@@ -844,7 +855,7 @@ export const AIAssistantChat: React.FC = () => {
                 {msg.isActionable && msg.actionType === 'REDIRECT' && (
                   <button 
                      onClick={() => handleRedirect(msg.metadata)}
-                     className="mt-3 w-full py-2 bg-indigo-50 dark:bg-indigo-950/20 hover:bg-indigo-100 dark:hover:bg-indigo-900/30 border border-indigo-200 dark:border-indigo-900/50 text-indigo-700 dark:text-indigo-400 font-black uppercase text-[10px] tracking-wider rounded-lg shadow-sm transition-colors flex items-center justify-center gap-2"
+                     className="mt-3 w-full py-2 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-700 dark:text-emerald-300 font-bold uppercase text-[10px] tracking-wider rounded-lg shadow-xs transition-colors flex items-center justify-center gap-2 cursor-pointer"
                   >
                      {msg.metadata?.path ? 'Xem Báo cáo chi tiết →' : 'Tới Form Điền Kết Quả ➔'}
                   </button>
@@ -855,14 +866,14 @@ export const AIAssistantChat: React.FC = () => {
 
           {isLoading && (
             <div className="flex gap-2.5">
-               <div className="w-7 h-7 rounded-full bg-white dark:bg-zinc-800 flex items-center justify-center flex-shrink-0 mt-1 shadow-sm border border-slate-100 dark:border-zinc-800 overflow-hidden p-0.5">
+               <div className="w-7 h-7 rounded-full bg-white dark:bg-zinc-800 flex items-center justify-center shrink-0 mt-1 shadow-xs border border-border overflow-hidden p-0.5">
                   <img src={`${import.meta.env.BASE_URL}logo.png`} alt="V-Biotech" className="w-full h-full object-contain" onError={(e) => { e.currentTarget.style.display='none'; }} />
                </div>
-               <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 shadow-sm rounded-2xl rounded-tl-sm px-3 py-2 flex items-center gap-2">
+               <div className="bg-surface border border-border shadow-xs rounded-2xl rounded-tl-xs px-3 py-2 flex items-center gap-2">
                  <span className="flex gap-1">
-                   <span className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                   <span className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                   <span className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                   <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                   <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                   <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
                  </span>
                </div>
             </div>
@@ -871,8 +882,8 @@ export const AIAssistantChat: React.FC = () => {
         </div>
 
         {/* Quick Action Chips (Context-Aware) */}
-        <div className="px-3 pt-1.5 pb-1 bg-slate-50/80 dark:bg-zinc-900/60 border-t border-slate-100 dark:border-zinc-900 flex items-center gap-1.5 overflow-x-auto scrollbar-none">
-          <span className="text-[9px] font-black uppercase text-indigo-500 dark:text-indigo-400 shrink-0 bg-indigo-50 dark:bg-indigo-950/40 px-1.5 py-0.5 rounded">
+        <div className="px-3 pt-1.5 pb-1 bg-surface-2 border-t border-border flex items-center gap-1.5 overflow-x-auto scrollbar-none">
+          <span className="text-[9px] font-bold uppercase text-emerald-700 dark:text-emerald-300 shrink-0 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
             {currentContext.label}
           </span>
           {contextualChips.map((chip) => (
@@ -916,7 +927,7 @@ export const AIAssistantChat: React.FC = () => {
                   }
                 }, 0);
               }}
-              className="flex-shrink-0 flex items-center gap-1 px-2.5 py-1 bg-indigo-50 dark:bg-indigo-950/20 hover:bg-indigo-100 dark:hover:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 text-[10px] font-bold rounded-full border border-indigo-100 dark:border-indigo-900/50 transition-colors whitespace-nowrap disabled:opacity-40"
+              className="shrink-0 flex items-center gap-1 px-2.5 py-1 bg-surface hover:bg-surface-3 text-ink text-[10px] font-semibold rounded-full border border-border transition-colors whitespace-nowrap disabled:opacity-40 cursor-pointer"
             >
               <span>{chip.icon}</span>
               <span>{chip.text}</span>
@@ -925,7 +936,7 @@ export const AIAssistantChat: React.FC = () => {
         </div>
 
         {/* Input Area */}
-        <form onSubmit={handleSendTextMessage} className="p-3 bg-white dark:bg-zinc-950 border-t border-slate-200 dark:border-zinc-900 flex items-center gap-2">
+        <form onSubmit={handleSendTextMessage} className="p-3 bg-surface border-t border-border flex items-center gap-2">
           <input 
             type="file" 
             ref={fileInputRef} 
@@ -942,7 +953,7 @@ export const AIAssistantChat: React.FC = () => {
           />
           {/* Batch progress indicator */}
           {batchProgress && (
-            <div className="absolute bottom-[70px] left-3 right-3 bg-indigo-600 text-white text-[11px] font-bold px-3 py-1.5 rounded-lg flex items-center gap-2 shadow-lg animate-in slide-in-from-bottom duration-200">
+            <div className="absolute bottom-[70px] left-3 right-3 bg-emerald-600 text-white text-[11px] font-bold px-3 py-1.5 rounded-lg flex items-center gap-2 shadow-lg animate-in slide-in-from-bottom duration-200">
               <div className="flex-1">
                 <div className="flex justify-between mb-1">
                   <span>🗂️ Batch OCR: {batchProgress.current}/{batchProgress.total}</span>
@@ -961,9 +972,9 @@ export const AIAssistantChat: React.FC = () => {
             type="button"
             disabled={isLoading}
             onClick={() => fileInputRef.current?.click()}
-            className="flex items-center justify-center w-9 h-9 rounded-full bg-indigo-50 dark:bg-indigo-950/20 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/30 transition-colors flex-shrink-0"
+            className="flex items-center justify-center w-9 h-9 rounded-full bg-surface-2 text-ink-muted hover:text-emerald-600 hover:bg-surface-3 transition-colors shrink-0 cursor-pointer border border-border"
           >
-            <UploadCloud size={18} />
+            <CloudArrowUpIcon className="w-5 h-5" />
           </button>
           <input
             type="text"
@@ -971,14 +982,14 @@ export const AIAssistantChat: React.FC = () => {
             onChange={(e) => setChatInputText(e.target.value)}
             placeholder="Hỏi thông tin dữ liệu phần mềm..."
             disabled={isLoading}
-            className="flex-1 bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-full px-4 py-2 text-[13px] text-slate-700 dark:text-zinc-200 font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white dark:focus:bg-zinc-950 transition-all"
+            className="flex-1 bg-surface-2 border border-border rounded-full px-4 py-2 text-[13px] text-ink placeholder:text-ink-muted font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-surface transition-all"
           />
           <button 
             type="submit" 
             disabled={!chatInputText.trim() || isLoading}
-            className="w-9 h-9 flex items-center justify-center rounded-full bg-indigo-600 text-white hover:bg-indigo-700 disabled:bg-slate-200 transition-colors flex-shrink-0"
+            className="w-9 h-9 flex items-center justify-center rounded-full bg-emerald-600 text-white hover:bg-emerald-700 disabled:bg-surface-3 disabled:text-ink-muted transition-colors shrink-0 cursor-pointer"
           >
-            <Send size={16} className="ml-0.5" />
+            <PaperAirplaneIcon className="w-4 h-4 ml-0.5" />
           </button>
         </form>
       </div>

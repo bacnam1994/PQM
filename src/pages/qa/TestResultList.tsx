@@ -2,11 +2,28 @@
 import React, { useState, useMemo, useCallback, memo, useEffect, lazy, Suspense } from 'react';
 import { useAppStore } from '../../store/useAppStore';
 import { 
-  Plus, Search, ClipboardCheck, CheckCircle2, AlertCircle, Trash2,
-  Calendar, Beaker, X, FileText,
-  History, ListPlus, FlaskConical, Printer, Eye, Edit2, Loader2,
-  Package, Hash, Clock, Filter, ShieldCheck, LayoutGrid, List, ArrowUpDown, FileSearch, RefreshCcw, ShieldAlert, Scale
-} from 'lucide-react';
+  ClipboardDocumentCheckIcon,
+  CheckCircleIcon,
+  ExclamationCircleIcon,
+  TrashIcon,
+  CalendarDaysIcon,
+  BeakerIcon,
+  DocumentTextIcon,
+  ClockIcon,
+  PrinterIcon,
+  EyeIcon,
+  PencilSquareIcon,
+  ArrowPathIcon,
+  CubeIcon,
+  FunnelIcon,
+  ShieldCheckIcon,
+  Squares2X2Icon,
+  ListBulletIcon,
+  ChevronUpDownIcon,
+  MagnifyingGlassIcon,
+  ShieldExclamationIcon,
+  ScaleIcon
+} from '@heroicons/react/24/outline';
 import { Link } from 'react-router-dom';
 import { TestResult, TestResultEntry } from '../../types';
 import { TEST_RESULT_STATUS, BATCH_STATUS, ensureArray, formatDateStandard, normalizeSearch } from '../../utils';
@@ -32,55 +49,61 @@ const TestResultGridItem = memo(({ res, onEdit, onDelete, onPrint, onOOS, isAdmi
   onOOS: (res: HydratedTestResult) => void,
   isAdmin: boolean
 }) => {
-  return (
-    <DSCard className="p-5 flex flex-col gap-5 hover:-translate-y-2 hover:shadow-[0_20px_40px_-15px_rgba(6,182,212,0.15)] dark:hover:shadow-[0_20px_40px_-15px_rgba(6,182,212,0.08)] transition-all duration-500 group relative overflow-hidden h-full bg-gradient-to-br from-cyan-50/80 via-white to-blue-50/80 dark:from-cyan-950/20 dark:via-slate-800 dark:to-blue-950/20 dark:border-slate-700/50">
-      <div className={`absolute top-0 right-0 w-32 h-32 rounded-full opacity-40 blur-2xl transition-transform group-hover:scale-150 duration-700 -mr-10 -mt-10 ${res.overallStatus === TEST_RESULT_STATUS.PASS ? 'bg-emerald-400/30' : 'bg-red-400/30'}`} />
+  const isPass = res.overallStatus === TEST_RESULT_STATUS.PASS;
 
-      {/* Header: Eyebrow and Status */}
+  return (
+    <DSCard className="p-5 flex flex-col gap-4 hover:-translate-y-1 hover:shadow-lg transition-all duration-300 group relative overflow-hidden h-full bg-surface border border-border">
+      {/* Header: Product and Status */}
       <div className="flex items-start justify-between gap-2 relative z-10">
-        <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400 truncate pr-2" title={res.product?.name}>
-          <ClipboardCheck size={14} className="text-cyan-500 shrink-0" />
+        <div className="flex items-center gap-1.5 text-xs font-semibold text-ink-muted truncate pr-2" title={res.product?.name}>
+          <ClipboardDocumentCheckIcon className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
           <span className="truncate">{res.product?.name || 'Sản phẩm'}</span>
         </div>
-        <span className={`shrink-0 px-2 py-1 rounded text-[9px] font-black uppercase tracking-widest ${res.overallStatus === TEST_RESULT_STATUS.PASS ? 'bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400' : 'bg-red-100 dark:bg-red-950/40 text-red-700 dark:text-red-400'}`}>
+        <span className={`shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${
+          isPass 
+            ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400 border-emerald-200/60 dark:border-emerald-800/40' 
+            : 'bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-400 border-rose-200/60 dark:border-rose-800/40'
+        }`}>
           {res.overallStatus}
         </span>
       </div>
 
-      {/* Glass Box Highlighting Main Content */}
-      <div className={`bg-gradient-to-br from-white/60 to-white/30 dark:from-slate-900/60 dark:to-slate-900/30 backdrop-blur-md border border-white/60 dark:border-slate-700/60 shadow-sm rounded-2xl p-4 flex flex-col gap-4 relative z-10 mt-2 flex-grow ${res.overallStatus === TEST_RESULT_STATUS.PASS ? 'shadow-[0_4px_20px_-5px_rgba(16,185,129,0.1)] dark:shadow-[0_4px_20px_-5px_rgba(16,185,129,0.05)]' : 'shadow-[0_4px_20px_-5px_rgba(239,68,68,0.1)]'}`}>
+      {/* Main Content Box */}
+      <div className="bg-surface-2 border border-border rounded-xl p-4 flex flex-col gap-3 relative z-10 flex-grow">
         {/* Main Info */}
-        <div className="flex items-center gap-4">
-          <div className={`bg-gradient-to-br p-3.5 rounded-xl shrink-0 border shadow-inner ${res.overallStatus === TEST_RESULT_STATUS.PASS ? 'from-emerald-50 to-emerald-100/50 dark:from-emerald-950/50 dark:to-emerald-900/20 text-emerald-600 dark:text-emerald-400 border-emerald-100 dark:border-emerald-900/30' : 'from-red-50 to-red-100/50 dark:from-red-950/50 dark:to-red-900/20 text-red-650 dark:text-red-400 border-red-100 dark:border-red-900/30'}`}>
-            {res.overallStatus === TEST_RESULT_STATUS.PASS ? <CheckCircle2 size={24} /> : <AlertCircle size={24} />}
+        <div className="flex items-center gap-3.5">
+          <div className={`p-2.5 rounded-lg shrink-0 border ${
+            isPass 
+              ? 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 border-emerald-100 dark:border-emerald-900/30' 
+              : 'bg-rose-50 dark:bg-rose-950/50 text-rose-600 dark:text-rose-400 border-rose-100 dark:border-rose-900/30'
+          }`}>
+            {isPass ? <CheckCircleIcon className="w-6 h-6" /> : <ExclamationCircleIcon className="w-6 h-6" />}
           </div>
           <div className="flex flex-col flex-1 min-w-0">
-            {/* batchNo như một clickable link đến trang chi tiết lô */}
             {res.batch?.id ? (
               <Link
                 to={`/batches/${res.batch.id}`}
                 onClick={e => e.stopPropagation()}
-                className={`font-black text-slate-800 dark:text-slate-100 text-base leading-tight transition-colors line-clamp-1 hover:underline ${
-                  res.overallStatus === TEST_RESULT_STATUS.PASS ? 'hover:text-emerald-600 dark:hover:text-emerald-400' : 'hover:text-red-600 dark:hover:text-red-400'
+                className={`font-semibold text-ink text-base leading-tight transition-colors line-clamp-1 hover:underline ${
+                  isPass ? 'hover:text-emerald-600 dark:hover:text-emerald-400' : 'hover:text-rose-600 dark:hover:text-rose-400'
                 }`}
               >
                 {res.batch?.batchNo || `Lô ${res.batchId || 'N/A'}`}
               </Link>
             ) : (
-              <h3 className={`font-black text-slate-800 dark:text-slate-100 text-base leading-tight transition-colors line-clamp-1 group-hover/link:${
-                res.overallStatus === TEST_RESULT_STATUS.PASS ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'
-              }`}>{res.batch?.batchNo || `Lô ${res.batchId || 'N/A'}`}</h3>
+              <h3 className="font-semibold text-ink text-base leading-tight line-clamp-1">
+                {res.batch?.batchNo || `Lô ${res.batchId || 'N/A'}`}
+              </h3>
             )}
-            <div className="flex flex-wrap items-center gap-1 mt-1">
-              <p className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest">Phiếu số: {res.id.slice(-6)}</p>
-              {/* Badge TCCS */}
+            <div className="flex flex-wrap items-center gap-1.5 mt-1">
+              <span className="text-xs text-ink-muted">Phiếu số: {res.id.slice(-6)}</span>
               {res.tccs && (
                 <Link
                   to={`/tccs/detail/${res.tccs.id}`}
                   onClick={e => e.stopPropagation()}
-                  className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400 text-[9px] font-black border border-blue-100 dark:border-blue-900/40 hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors"
+                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-surface text-ink-soft border border-border hover:border-emerald-300 hover:text-emerald-600 transition-colors"
                 >
-                  <FileText size={9} /> {res.tccs.code}
+                  <DocumentTextIcon className="w-3 h-3" /> {res.tccs.code}
                 </Link>
               )}
             </div>
@@ -88,37 +111,40 @@ const TestResultGridItem = memo(({ res, onEdit, onDelete, onPrint, onOOS, isAdmi
         </div>
 
         {/* Meta Info */}
-        <div className="space-y-1.5 pt-3 border-t border-slate-200/50 dark:border-slate-700/50 mt-auto">
-            <div className="flex justify-between items-start gap-2 text-[11px] font-bold">
-              <span className="text-slate-500 dark:text-slate-400 uppercase whitespace-nowrap shrink-0">Ngày xuất phiếu:</span>
-              <span className="text-slate-700 dark:text-slate-300 text-right">{formatDateStandard(res.testDate)}</span>
-            </div>
-            <div className="flex justify-between items-start gap-2 text-[11px] font-bold">
-              <span className="text-slate-500 dark:text-slate-400 uppercase whitespace-nowrap shrink-0">Phòng Lab:</span>
-              <span className="text-cyan-600 dark:text-cyan-400 text-right break-words">{res.labName}</span>
-            </div>
+        <div className="space-y-1.5 pt-2.5 border-t border-border mt-auto text-xs">
+          <div className="flex justify-between items-start gap-2">
+            <span className="text-ink-muted whitespace-nowrap shrink-0">Ngày xuất phiếu:</span>
+            <span className="text-ink font-medium text-right">{formatDateStandard(res.testDate)}</span>
+          </div>
+          <div className="flex justify-between items-start gap-2">
+            <span className="text-ink-muted whitespace-nowrap shrink-0">Phòng Lab:</span>
+            <span className="text-emerald-600 dark:text-emerald-400 font-medium text-right break-words">{res.labName}</span>
+          </div>
         </div>
       </div>
 
       {/* Footer: Actions */}
-      <div className="flex items-center justify-between pt-4 mt-auto border-t border-slate-200/50 dark:border-slate-700/50 relative z-10">
-        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+      <div className="flex items-center justify-between pt-3 mt-auto border-t border-border relative z-10">
+        <div className="flex gap-1 opacity-90 group-hover:opacity-100 transition-opacity">
           <ActionButtons 
             onEdit={isAdmin ? () => onEdit(res) : undefined}
             onDelete={isAdmin ? () => onDelete(res) : undefined}
           />
         </div>
         <div className="flex items-center gap-1.5 ml-auto">
-          {res.overallStatus !== TEST_RESULT_STATUS.PASS && (
+          {!isPass && (
             <button 
               onClick={() => onOOS(res)} 
-              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg font-bold text-[10px] bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 hover:bg-rose-100 border border-rose-200 dark:border-rose-900/60 transition-all uppercase tracking-wider shadow-2xs"
+              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-400 hover:bg-rose-100 border border-rose-200 dark:border-rose-900/60 transition-all shadow-xs"
             >
-              <ShieldAlert size={12} /> OOS (AI)
+              <ShieldExclamationIcon className="w-3.5 h-3.5" /> OOS (AI)
             </button>
           )}
-          <button onClick={() => onPrint(res)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-bold text-[11px] bg-slate-50/80 dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-cyan-50 dark:hover:bg-cyan-950/30 hover:text-cyan-700 dark:hover:text-cyan-400 transition-all border border-slate-200/50 dark:border-slate-700">
-            Xem phiếu <Printer size={14} className="opacity-0 group-hover:opacity-100 hidden" />
+          <button 
+            onClick={() => onPrint(res)} 
+            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-surface-2 text-ink-soft hover:bg-surface-3 hover:text-emerald-600 dark:hover:text-emerald-400 transition-all border border-border"
+          >
+            <PrinterIcon className="w-3.5 h-3.5" /> Xem phiếu
           </button>
         </div>
       </div>
@@ -135,46 +161,52 @@ const TestResultListItem = memo(({ res, onEdit, onDelete, onPrint, onOOS, isAdmi
   onOOS: (res: HydratedTestResult) => void,
   isAdmin: boolean
 }) => {
+  const isPass = res.overallStatus === TEST_RESULT_STATUS.PASS;
+
   return (
-    <tr className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
-      <td className="px-4 py-3 font-bold text-slate-700 dark:text-slate-300 text-xs">{formatDateStandard(res.testDate)}</td>
+    <tr className="hover:bg-surface-2 transition-colors">
+      <td className="px-4 py-3 font-medium text-ink text-xs">{formatDateStandard(res.testDate)}</td>
       <td className="px-4 py-3">
         <div className="flex flex-col gap-0.5">
           {res.batch?.id ? (
-            <Link to={`/batches/${res.batch.id}`} className="font-black text-slate-800 dark:text-slate-200 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors text-sm">
+            <Link to={`/batches/${res.batch.id}`} className="font-semibold text-ink hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors text-sm">
               {res.batch?.batchNo || `Lô ${res.batchId || 'N/A'}`}
             </Link>
           ) : (
-            <span className="font-black text-slate-800 dark:text-slate-200 text-sm">{res.batch?.batchNo || `Lô ${res.batchId || 'N/A'}`}</span>
+            <span className="font-semibold text-ink text-sm">{res.batch?.batchNo || `Lô ${res.batchId || 'N/A'}`}</span>
           )}
           {res.tccs && (
-            <Link to={`/tccs/detail/${res.tccs.id}`} className="text-[10px] font-bold text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1">
-              <FileText size={10} /> {res.tccs.code}
+            <Link to={`/tccs/detail/${res.tccs.id}`} className="text-xs text-ink-muted hover:text-emerald-600 transition-colors inline-flex items-center gap-1">
+              <DocumentTextIcon className="w-3 h-3" /> {res.tccs.code}
             </Link>
           )}
         </div>
       </td>
       <td className="px-4 py-3 text-xs font-medium">
         {res.product ? (
-          <Link to={`/products/${res.product.id}`} className="text-slate-600 dark:text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors font-bold">
+          <Link to={`/products/${res.product.id}`} className="text-ink-soft hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors">
             {res.product.name}
           </Link>
-        ) : <span className="text-slate-500 dark:text-slate-400">Sản phẩm đã xóa</span>}
+        ) : <span className="text-ink-muted">Sản phẩm đã xóa</span>}
       </td>
-      <td className="px-4 py-3 text-xs text-indigo-600 dark:text-indigo-400 font-bold">{res.labName}</td>
+      <td className="px-4 py-3 text-xs text-ink font-medium">{res.labName}</td>
       <td className="px-4 py-3 text-center">
-        <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase ${res.overallStatus === TEST_RESULT_STATUS.PASS ? 'bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400' : 'bg-red-100 dark:bg-red-950/40 text-red-700 dark:text-red-400'}`}>
+        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${
+          isPass 
+            ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400 border-emerald-200/60 dark:border-emerald-800/40' 
+            : 'bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-400 border-rose-200/60 dark:border-rose-800/40'
+        }`}>
           {res.overallStatus}
         </span>
       </td>
       <td className="px-4 py-3 text-right">
-        <div className="flex justify-end items-center gap-2">
-          {res.overallStatus !== TEST_RESULT_STATUS.PASS && (
+        <div className="flex justify-end items-center gap-1.5">
+          {!isPass && (
             <button 
               onClick={() => onOOS(res)} 
-              className="flex items-center gap-1 px-2.5 py-1 rounded-lg font-bold text-[10px] bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 hover:bg-rose-100 border border-rose-200 dark:border-rose-900/60 transition-all uppercase tracking-wider"
+              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-400 hover:bg-rose-100 border border-rose-200 dark:border-rose-900/60 transition-all"
             >
-              <ShieldAlert size={12} /> OOS
+              <ShieldExclamationIcon className="w-3.5 h-3.5" /> OOS
             </button>
           )}
           <ActionButtons 
@@ -191,15 +223,15 @@ const TestResultListItem = memo(({ res, onEdit, onDelete, onPrint, onOOS, isAdmi
 const TestResultDataList = ({ viewMode, data, onEdit, onDelete, onPrint, onOOS, isAdmin, isLoading }: any) => {
   if (isLoading) {
     return (
-      <div className="flex flex-col items-center justify-center py-16 gap-3 bg-white dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm">
-        <Loader2 className="animate-spin text-cyan-600 dark:text-cyan-400" size={32} />
-        <p className="text-xs font-bold text-slate-500 dark:text-slate-400">Đang tải dữ liệu kết quả kiểm nghiệm...</p>
+      <div className="flex flex-col items-center justify-center py-16 gap-3 bg-surface rounded-xl border border-border">
+        <ArrowPathIcon className="animate-spin text-emerald-600 dark:text-emerald-400 w-8 h-8" />
+        <p className="text-xs font-medium text-ink-muted">Đang tải dữ liệu kết quả kiểm nghiệm...</p>
       </div>
     );
   }
 
   if (data.length === 0) {
-     return <DSEmptyState icon={FileSearch} title="Không có phiếu kiểm nghiệm" message="Hệ thống chưa ghi nhận kết quả kiểm nghiệm nào khớp với thông tin tìm kiếm." />;
+     return <DSEmptyState icon={MagnifyingGlassIcon} title="Không có phiếu kiểm nghiệm" message="Hệ thống chưa ghi nhận kết quả kiểm nghiệm nào khớp với thông tin tìm kiếm." />;
   }
 
   if (viewMode === 'grid') {
@@ -213,8 +245,8 @@ const TestResultDataList = ({ viewMode, data, onEdit, onDelete, onPrint, onOOS, 
   }
   return (
     <DSTable>
-      <thead className="bg-slate-50 dark:bg-slate-900 border-b border-slate-100 dark:border-slate-700">
-        <tr className="text-slate-500 dark:text-slate-400 text-[10px] font-black uppercase tracking-widest">
+      <thead className="bg-surface-2 border-b border-border">
+        <tr className="text-ink-muted text-xs font-semibold uppercase tracking-wider">
           <th className="px-4 py-3">Ngày xuất phiếu</th>
           <th className="px-4 py-3">Lô hàng</th>
           <th className="px-4 py-3">Sản phẩm</th>
@@ -223,7 +255,7 @@ const TestResultDataList = ({ viewMode, data, onEdit, onDelete, onPrint, onOOS, 
           <th className="px-4 py-3 text-right">Thao tác</th>
         </tr>
       </thead>
-      <tbody className="divide-y divide-slate-50 dark:divide-slate-800/40">
+      <tbody className="divide-y divide-border">
         {data.map((res: any) => (
           <TestResultListItem key={res.id} res={res} onEdit={onEdit} onDelete={onDelete} onPrint={onPrint} onOOS={onOOS} isAdmin={isAdmin} />
         ))}
@@ -241,28 +273,24 @@ const TestResultList: React.FC = () => {
   const testResultLimit = useAppStore(state => state.testResultLimit);
   const fetchAllTestResultsForDashboard = useAppStore(state => state.fetchAllTestResultsForDashboard);
   const syncStatus = useAppStore(state => state.syncStatus);
-  const { testResults: hydratedResults, allTestResultsHydrated, batches: hydratedBatches } = useDataGraph();
+  const { testResults: hydratedResults, allTestResultsHydrated } = useDataGraph();
   const [searchTerm, setSearchTerm] = useState('');
   const debouncedSearchTerm = useDebounce(searchTerm, 300);
 
   const viewMode = useUIStore(s => s.testResultViewMode);
   const setViewMode = useUIStore(s => s.setTestResultViewMode);
-  // --- FILTER & SORT (persisted via UIStore / localStorage) ---
   const filterYear = useUIStore(s => s.testResultFilterYear);
   const filterMonth = useUIStore(s => s.testResultFilterMonth);
   const filterProductId = useUIStore(s => s.testResultFilterProductId);
   const sortConfig = useUIStore(s => s.testResultSortConfig);
 
-  // Phân trang
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = viewMode === 'grid' ? 12 : 15;
 
-  // Reset phân trang về đầu khi đổi filter để tránh hành vi không nhất quán
   const handleSetFilterProductId = (v: string) => { useUIStore.getState().setTestResultFilterProductId(v); useAppStore.setState({ testResultLimit: 50 }); };
   const handleSetFilterMonth = (v: string) => { useUIStore.getState().setTestResultFilterMonth(v); useAppStore.setState({ testResultLimit: 50 }); };
   const handleSetFilterYear = (v: string) => { useUIStore.getState().setTestResultFilterYear(v); useAppStore.setState({ testResultLimit: 50 }); };
 
-  // --- USE CUSTOM HOOK ---
   const {
     crud,
     handleEditResult,
@@ -310,12 +338,10 @@ const TestResultList: React.FC = () => {
     setIsOOSOpen(true);
   }, [productFormulas]);
 
-  // Reset trang hiện tại khi thay đổi tìm kiếm, bộ lọc hoặc chế độ hiển thị
   useEffect(() => {
     setCurrentPage(1);
   }, [debouncedSearchTerm, filterProductId, filterMonth, filterYear, sortConfig, viewMode]);
 
-  // Giải quyết "Hố đen tìm kiếm": Tải toàn bộ dữ liệu (Index) một lần duy nhất khi người dùng bắt đầu tìm kiếm
   useEffect(() => {
     if (debouncedSearchTerm.length >= 2 && allTestResultsHydrated.length === 0) {
       fetchAllTestResultsForDashboard();
@@ -323,7 +349,6 @@ const TestResultList: React.FC = () => {
   }, [debouncedSearchTerm, allTestResultsHydrated.length, fetchAllTestResultsForDashboard]);
 
   const filteredResults = useMemo(() => {
-    // Nếu đang search và đã có full data thì dùng full data, ngược lại dùng data giới hạn mặc định
     const sourceData = (debouncedSearchTerm.length >= 2 && allTestResultsHydrated.length > 0) ? allTestResultsHydrated : hydratedResults;
     const searchNormalized = normalizeSearch(debouncedSearchTerm);
     
@@ -331,8 +356,6 @@ const TestResultList: React.FC = () => {
       const matchesSearch = !searchNormalized || normalizeSearch(r.batch?.batchNo).includes(searchNormalized) || normalizeSearch(r.product?.name).includes(searchNormalized);
       const matchesProduct = filterProductId === '' || r.batch?.productId === filterProductId;
       
-      // TỐI ƯU CPU: Lọc Năm/Tháng bằng xử lý chuỗi (String manipulation) cực nhanh
-      // Tránh khởi tạo new Date() trong vòng lặp lớn
       let matchesYear = true;
       let matchesMonth = true;
       
@@ -350,9 +373,8 @@ const TestResultList: React.FC = () => {
       if (sortConfig.key === 'batchNo') {
         const batchA = a.batch?.batchNo || '';
         const batchB = b.batch?.batchNo || '';
-        return sortConfig.direction === 'asc' ? batchA.localeCompare(batchB) : batchB.localeCompare(batchA);
+        return sortConfig.direction === 'asc' ? batchA.localeCompare(batchB) : batchB.localeCompare(a.batch?.batchNo || '');
       }
-      // TỐI ƯU CPU: So sánh chuỗi ISO Date trực tiếp bằng localeCompare thay vì new Date().getTime()
       const dateA = a.testDate || '';
       const dateB = b.testDate || '';
       return sortConfig.direction === 'asc' ? dateA.localeCompare(dateB) : dateB.localeCompare(dateA);
@@ -365,7 +387,6 @@ const TestResultList: React.FC = () => {
     return filteredResults.slice(startIndex, startIndex + ITEMS_PER_PAGE);
   }, [filteredResults, currentPage, ITEMS_PER_PAGE]);
   
-  // Kiểm tra xem còn dữ liệu trên Server để tải thêm không
   const hasMoreData = hydratedResults.length >= testResultLimit && debouncedSearchTerm.length < 2;
 
   return (
@@ -374,15 +395,15 @@ const TestResultList: React.FC = () => {
         <PageHeader 
           title="Kết quả Lab (QC)" 
           subtitle="Ghi nhận dữ liệu phân tích dựa trên hồ sơ Lô hàng hiện có." 
-          icon={ClipboardCheck}
+          icon={ClipboardDocumentCheckIcon}
           action={
             <div className="flex items-center gap-2">
               <button
                 type="button"
                 onClick={() => setIsComparisonOpen(true)}
-                className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/40 dark:hover:bg-blue-900/50 text-blue-700 dark:text-blue-300 font-bold text-xs border border-blue-200 dark:border-blue-800 shadow-sm transition-all uppercase tracking-wider"
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-surface text-ink-soft hover:text-emerald-600 dark:hover:text-emerald-400 font-medium text-xs border border-border shadow-xs transition-all"
               >
-                <Scale size={14} className="text-blue-600 dark:text-blue-400" />
+                <ScaleIcon className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
                 Đối chiếu Lab (AI)
               </button>
               {isAdmin && <AddButton onClick={handleOpenAdd} label="NHẬP KẾT QUẢ MỚI" />}
@@ -405,23 +426,23 @@ const TestResultList: React.FC = () => {
           {Array.from({ length: 12 }, (_, i) => i + 1).map(m => <option key={m} value={m}>Tháng {m}</option>)}
         </DSSelect>
 
-        <DSSelect icon={Filter} value={filterProductId} onChange={(e) => handleSetFilterProductId(e.target.value)} className="w-full md:w-64">
-            <option value="">Tất cả sản phẩm</option>
-        {products.map(p => (
-              <option key={p.id} value={p.id}>{p.name}</option>
-            ))}
+        <DSSelect icon={FunnelIcon} value={filterProductId} onChange={(e) => handleSetFilterProductId(e.target.value)} className="w-full md:w-64">
+          <option value="">Tất cả sản phẩm</option>
+          {products.map(p => (
+            <option key={p.id} value={p.id}>{p.name}</option>
+          ))}
         </DSSelect>
 
-        <DSSelect icon={ArrowUpDown} value={`${sortConfig.key}-${sortConfig.direction}`} onChange={(e) => {
+        <DSSelect icon={ChevronUpDownIcon} value={`${sortConfig.key}-${sortConfig.direction}`} onChange={(e) => {
              const [key, direction] = e.target.value.split('-');
              useUIStore.getState().setTestResultSortConfig({ key: key as any, direction: direction as any });
-           }} className="w-32">
+           }} className="w-36">
            <option value="testDate-desc">Mới nhất</option>
            <option value="testDate-asc">Cũ nhất</option>
            <option value="batchNo-asc">Số lô (A-Z)</option>
         </DSSelect>
 
-        <DSViewToggle viewMode={viewMode} setViewMode={setViewMode} gridIcon={LayoutGrid} listIcon={List} />
+        <DSViewToggle viewMode={viewMode} setViewMode={setViewMode} gridIcon={Squares2X2Icon} listIcon={ListBulletIcon} />
       </DSFilterBar>
 
       <TestResultDataList 
@@ -443,16 +464,16 @@ const TestResultList: React.FC = () => {
           <button 
             onClick={loadMoreTestResults} 
             disabled={syncStatus === 'SAVING'}
-            className="text-xs font-bold text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all flex items-center gap-2 bg-white dark:bg-slate-800 px-5 py-2.5 rounded-full border border-slate-200 dark:border-slate-700 hover:border-indigo-300 dark:hover:border-indigo-900/50 disabled:opacity-50 disabled:pointer-events-none shadow-sm active:scale-95"
+            className="text-xs font-medium text-ink-muted hover:text-emerald-600 dark:hover:text-emerald-400 transition-all inline-flex items-center gap-2 bg-surface px-4 py-2 rounded-lg border border-border hover:border-emerald-300 disabled:opacity-50 disabled:pointer-events-none shadow-xs"
           >
-            {syncStatus === 'SAVING' ? <RefreshCcw size={14} className="animate-spin" /> : <History size={14} />}
+            {syncStatus === 'SAVING' ? <ArrowPathIcon className="w-4 h-4 animate-spin" /> : <ClockIcon className="w-4 h-4" />}
             Tải thêm dữ liệu cũ hơn ({hydratedResults.length} bản ghi đang hiển thị)
           </button>
         </div>
       )}
 
       {!hasMoreData && hydratedResults.length > 0 && (
-        <div className="text-center mt-6 text-[11px] font-medium text-slate-400 dark:text-slate-500 no-print italic">
+        <div className="text-center mt-6 text-xs text-ink-muted no-print italic">
           Đã tải toàn bộ {hydratedResults.length} kết quả kiểm nghiệm hiện có trên hệ thống.
         </div>
       )}
@@ -484,3 +505,4 @@ const TestResultList: React.FC = () => {
 };
 
 export default TestResultList;
+

@@ -1,5 +1,10 @@
 import React from 'react';
-import { Activity, Download, BarChart2, Info } from 'lucide-react';
+import { 
+  ArrowTrendingUpIcon, 
+  ArrowDownTrayIcon, 
+  ChartBarIcon, 
+  InformationCircleIcon 
+} from '@heroicons/react/24/outline';
 import { PageHeader, DSCard } from '../../../components';
 import { Surface } from '../../../components/ui';
 import { useTrendAnalyticsState } from './hooks/useTrendAnalyticsState';
@@ -17,14 +22,14 @@ export const TrendAnalysisPage: React.FC = () => {
       <PageHeader
         title="Phân tích xu hướng chất lượng"
         subtitle="Statistical Process Control (SPC) — Biểu đồ kiểm soát quá trình sản xuất"
-        icon={Activity}
+        icon={ArrowTrendingUpIcon}
         action={
           state.chartData.length > 0 ? (
             <button
               onClick={state.handleExport}
               className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold uppercase text-[11px] tracking-wider transition-all shadow-md shadow-emerald-500/20 cursor-pointer"
             >
-              <Download size={15} /> Xuất Excel
+              <ArrowDownTrayIcon className="w-4 h-4" /> Xuất Excel
             </button>
           ) : undefined
         }
@@ -75,15 +80,15 @@ export const TrendAnalysisPage: React.FC = () => {
       {/* Trạng thái tải dữ liệu */}
       {state.loading && (
         <div className="flex justify-center py-16">
-          <div className="animate-spin w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full" />
+          <div className="animate-spin w-8 h-8 border-2 border-emerald-500 border-t-transparent rounded-full" />
         </div>
       )}
 
       {!state.loading && !state.selectedProductId && (
         <Surface variant="flat" padding="lg" className="text-center py-12">
-          <BarChart2 size={44} className="text-slate-300 dark:text-zinc-700 mx-auto mb-3" />
-          <p className="text-slate-700 dark:text-zinc-300 font-bold text-base">Chọn một sản phẩm để bắt đầu phân tích xu hướng SPC</p>
-          <p className="text-slate-400 dark:text-zinc-500 text-xs mt-1.5 max-w-md mx-auto leading-relaxed">
+          <ChartBarIcon className="w-12 h-12 text-ink-muted mx-auto mb-3" />
+          <p className="text-ink font-bold text-base">Chọn một sản phẩm để bắt đầu phân tích xu hướng SPC</p>
+          <p className="text-ink-muted text-xs mt-1.5 max-w-md mx-auto leading-relaxed">
             Hệ thống sẽ tự động tổng hợp kết quả kiểm nghiệm, tính toán năng lực quy trình Cpk, giới hạn kiểm soát 3σ (UCL, LCL) và dự báo độ ổn định theo thời gian bảo quản.
           </p>
         </Surface>
@@ -91,9 +96,9 @@ export const TrendAnalysisPage: React.FC = () => {
 
       {!state.loading && state.selectedProductId && state.selectedCriteriaName && state.chartData.length === 0 && (
         <Surface variant="flat" padding="lg" className="text-center py-12">
-          <Info size={38} className="text-slate-300 dark:text-zinc-700 mx-auto mb-3" />
-          <p className="text-slate-700 dark:text-zinc-300 font-bold">Chưa có dữ liệu định lượng cho chỉ tiêu: &quot;{state.selectedCriteriaName}&quot;</p>
-          <p className="text-slate-400 dark:text-zinc-500 text-xs mt-1">Vui lòng chọn chỉ tiêu khác hoặc kiểm tra lại phiếu kiểm nghiệm của sản phẩm này.</p>
+          <InformationCircleIcon className="w-10 h-10 text-ink-muted mx-auto mb-3" />
+          <p className="text-ink font-bold">Chưa có dữ liệu định lượng cho chỉ tiêu: &quot;{state.selectedCriteriaName}&quot;</p>
+          <p className="text-ink-muted text-xs mt-1">Vui lòng chọn chỉ tiêu khác hoặc kiểm tra lại phiếu kiểm nghiệm của sản phẩm này.</p>
         </Surface>
       )}
 
@@ -133,9 +138,9 @@ export const TrendAnalysisPage: React.FC = () => {
 
       {!state.loading && state.chartData.length === 1 && (
         <Surface variant="flat" padding="md" className="text-center py-8">
-          <Info size={32} className="text-amber-500 mx-auto mb-2" />
-          <p className="text-slate-700 dark:text-zinc-300 font-semibold text-sm">Cần ít nhất 2 điểm dữ liệu để tính toán SPC</p>
-          <p className="text-slate-400 dark:text-zinc-500 text-xs mt-1">Hiện có 1 lô: <strong>{state.chartData[0].batchNo}</strong> = {state.chartData[0].value}</p>
+          <InformationCircleIcon className="w-8 h-8 text-amber-500 mx-auto mb-2" />
+          <p className="text-ink font-semibold text-sm">Cần ít nhất 2 điểm dữ liệu để tính toán SPC</p>
+          <p className="text-ink-muted text-xs mt-1">Hiện có 1 lô: <strong>{state.chartData[0].batchNo}</strong> = {state.chartData[0].value}</p>
         </Surface>
       )}
     </div>

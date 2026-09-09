@@ -1,13 +1,39 @@
-
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useAppStore } from '../../store/useAppStore';
 import { 
-  ChevronLeft, Info, FileText, History, BarChart3, ArrowRight,
-  Plus, Beaker, Calendar, Tag, Hash, Activity, CheckCircle2,
-  AlertCircle, Building2, ShieldCheck, X, Eye, Box, Thermometer, BookOpen, Clock, FlaskConical,
-  ChevronDown, ChevronUp, AlertTriangle, TrendingUp, Percent, SlidersHorizontal, Table, Sparkles, Layers, Package
-} from 'lucide-react';
+  ChevronLeftIcon, 
+  InformationCircleIcon, 
+  DocumentTextIcon, 
+  ClockIcon, 
+  ChartBarIcon, 
+  ArrowRightIcon,
+  PlusIcon, 
+  BeakerIcon, 
+  CalendarIcon, 
+  TagIcon, 
+  HashtagIcon, 
+  ChartBarSquareIcon, 
+  CheckCircleIcon,
+  ExclamationCircleIcon, 
+  BuildingOffice2Icon, 
+  ShieldCheckIcon, 
+  XMarkIcon, 
+  EyeIcon, 
+  CubeIcon, 
+  FireIcon, 
+  BookOpenIcon, 
+  ChevronDownIcon, 
+  ChevronUpIcon, 
+  ExclamationTriangleIcon, 
+  ArrowTrendingUpIcon, 
+  ReceiptPercentIcon, 
+  AdjustmentsHorizontalIcon, 
+  TableCellsIcon, 
+  SparklesIcon, 
+  Square3Stack3DIcon, 
+  ArrowPathIcon
+} from '@heroicons/react/24/outline';
 import { 
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine 
 } from 'recharts';
@@ -16,7 +42,6 @@ import { parseNumberFromText, formatDateStandard, getActiveLocale, resolveDeclar
 import { useCriteriaResolver } from '../../hooks/useCriteriaResolver';
 import { normalizeName } from '../../services/criteriaAliasService';
 import { fetchTestResultsByProductId } from '../../services/testResultService';
-import { Loader2 } from 'lucide-react';
 import { Surface, PageHeader, StatusBadge } from '../../components/ui';
 
 // Helper: Format số sang dạng mũ (VD: 1000 -> 10³)
@@ -329,11 +354,11 @@ const ProductDetail: React.FC = () => {
   const getStatusBadge = (status: ProductStatus) => {
     switch (status) {
       case 'ACTIVE':
-        return <span className="bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider flex items-center gap-1.5"><ShieldCheck size={14}/> Đang công bố</span>;
+        return <span className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 border border-emerald-500/20"><ShieldCheckIcon className="h-3.5 w-3.5"/> Đang công bố</span>;
       case 'DISCONTINUED':
-        return <span className="bg-amber-100 text-amber-700 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider flex items-center gap-1.5"><AlertCircle size={14}/> Ngừng sản xuất</span>;
+        return <span className="bg-amber-500/10 text-amber-600 dark:text-amber-400 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 border border-amber-500/20"><ExclamationCircleIcon className="h-3.5 w-3.5"/> Ngừng sản xuất</span>;
       case 'RECALLED':
-        return <span className="bg-red-100 text-red-700 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider flex items-center gap-1.5"><X size={14}/> Đã thu hồi</span>;
+        return <span className="bg-rose-500/10 text-rose-600 dark:text-rose-400 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 border border-rose-500/20"><XMarkIcon className="h-3.5 w-3.5"/> Đã thu hồi</span>;
       default:
         return null;
     }
@@ -346,7 +371,7 @@ const ProductDetail: React.FC = () => {
       <PageHeader
         title={product.name}
         subtitle={`Mã: ${product.code} • ${product.group || 'Chưa phân nhóm'}`}
-        icon={Box}
+        icon={CubeIcon}
         breadcrumb={[
           { label: 'Sản phẩm', onClick: () => navigate('/products') },
           { label: product.name },
@@ -357,9 +382,9 @@ const ProductDetail: React.FC = () => {
             <button
               type="button"
               onClick={() => navigate(`/products/360/${product.id}`)}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-primary-50 dark:bg-primary-950/40 text-primary-700 dark:text-primary-300 hover:bg-primary-100 dark:hover:bg-primary-900/60 rounded-lg font-bold border border-primary-200 dark:border-primary-800 transition-all text-xs cursor-pointer shadow-2xs"
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 rounded-xl font-bold border border-emerald-500/20 transition-all text-xs cursor-pointer shadow-sm"
             >
-              <Activity size={14} /> Hồ sơ Product 360°
+              <ChartBarSquareIcon className="h-3.5 w-3.5" /> Hồ sơ Product 360°
             </button>
           </div>
         }
@@ -367,23 +392,23 @@ const ProductDetail: React.FC = () => {
 
       <Surface variant="subtle" padding="sm" className="flex gap-1 overflow-x-auto scrollbar-hide">
         {[
-          { id: 'info', label: 'Thông tin kỹ thuật', icon: Info },
-          { id: 'formula', label: 'Công thức & Thành phần', icon: FlaskConical },
-          { id: 'tccs', label: 'Hồ sơ TCCS', icon: FileText },
-          { id: 'history', label: 'Lịch sử Kiểm nghiệm', icon: Activity },
-          { id: 'analytics', label: 'Biến động Chất lượng', icon: BarChart3 },
+          { id: 'info', label: 'Thông tin kỹ thuật', icon: InformationCircleIcon },
+          { id: 'formula', label: 'Công thức & Thành phần', icon: BeakerIcon },
+          { id: 'tccs', label: 'Hồ sơ TCCS', icon: DocumentTextIcon },
+          { id: 'history', label: 'Lịch sử Kiểm nghiệm', icon: ChartBarSquareIcon },
+          { id: 'analytics', label: 'Biến động Chất lượng', icon: ChartBarIcon },
         ].map(tab => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id as any)}
             className={`
-              flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all whitespace-nowrap cursor-pointer
+              flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer
               ${activeTab === tab.id 
-                ? 'bg-white dark:bg-slate-800 text-primary-700 dark:text-primary-300 shadow-xs' 
-                : 'text-slate-500 dark:text-slate-400 hover:bg-white/60 dark:hover:bg-slate-800/60'}
+                ? 'bg-surface text-emerald-600 dark:text-emerald-400 shadow-sm border border-border' 
+                : 'text-ink-muted hover:bg-surface-2'}
             `}
           >
-            <tab.icon size={15} />
+            <tab.icon className="h-4 w-4" />
             {tab.label}
           </button>
         ))}
@@ -393,8 +418,8 @@ const ProductDetail: React.FC = () => {
         {activeTab === 'info' && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             <div className="space-y-6">
-              <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2 border-b pb-2">
-                <Tag size={18} className="text-indigo-500" />
+              <h3 className="text-lg font-bold text-ink flex items-center gap-2 border-b border-border pb-2">
+                <TagIcon className="h-4 w-4 text-emerald-600" />
                 Hồ sơ Pháp lý
               </h3>
               <div className="grid grid-cols-2 gap-6">
@@ -404,117 +429,117 @@ const ProductDetail: React.FC = () => {
                 <InfoItem label="Nhóm sản phẩm" value={product.group} />
               </div>
               <div className="pt-4 space-y-2">
-                 <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Mô tả tóm lược</p>
-                 <p className="text-slate-700 leading-relaxed text-sm">{product.description || 'Không có mô tả.'}</p>
+                 <p className="text-xs font-bold text-ink-muted uppercase tracking-widest">Mô tả tóm lược</p>
+                 <p className="text-ink-soft leading-relaxed text-sm">{product.description || 'Không có mô tả.'}</p>
               </div>
             </div>
             <div className="space-y-6">
-              <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2 border-b pb-2">
-                <Eye size={18} className="text-indigo-500" />
+              <h3 className="text-lg font-bold text-ink flex items-center gap-2 border-b border-border pb-2">
+                <EyeIcon className="h-4 w-4 text-emerald-600" />
                 Đặc tính & Nhận diện
               </h3>
               {productFormula ? (
                  <div className="grid grid-cols-2 gap-4">
-                   <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
-                      <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">Dạng bào chế</p>
-                      <p className="text-xs font-bold text-slate-700">{productFormula.sensory?.dosageForm || '---'}</p>
+                   <div className="p-3 bg-surface-2 rounded-xl border border-border">
+                      <p className="text-[10px] font-bold text-ink-muted uppercase mb-1">Dạng bào chế</p>
+                      <p className="text-xs font-bold text-ink">{productFormula.sensory?.dosageForm || '---'}</p>
                    </div>
-                   <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
-                      <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">Quy cách</p>
-                      <p className="text-xs font-bold text-slate-700">{productFormula.packaging || '---'}</p>
+                   <div className="p-3 bg-surface-2 rounded-xl border border-border">
+                      <p className="text-[10px] font-bold text-ink-muted uppercase mb-1">Quy cách</p>
+                      <p className="text-xs font-bold text-ink">{productFormula.packaging || '---'}</p>
                    </div>
-                   <div className="col-span-2 p-3 bg-indigo-50/50 rounded-xl border border-indigo-100">
-                      <p className="text-[10px] font-bold text-indigo-400 uppercase mb-1">Đặc điểm cảm quan</p>
-                      <p className="text-xs font-medium text-slate-700 italic">"{productFormula.sensory?.appearance || '---'}"</p>
+                   <div className="col-span-2 p-3 bg-emerald-500/10 rounded-xl border border-emerald-500/20">
+                      <p className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase mb-1">Đặc điểm cảm quan</p>
+                      <p className="text-xs font-medium text-ink italic">"{productFormula.sensory?.appearance || '---'}"</p>
                    </div>
-                   <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
-                      <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">Hạn dùng</p>
-                      <p className="text-xs font-bold text-slate-700">{productFormula.shelfLife || '---'}</p>
+                   <div className="p-3 bg-surface-2 rounded-xl border border-border">
+                      <p className="text-[10px] font-bold text-ink-muted uppercase mb-1">Hạn dùng</p>
+                      <p className="text-xs font-bold text-ink">{productFormula.shelfLife || '---'}</p>
                    </div>
-                   <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
-                      <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">Bảo quản</p>
-                      <p className="text-xs font-bold text-slate-700">{productFormula.storage || '---'}</p>
+                   <div className="p-3 bg-surface-2 rounded-xl border border-border">
+                      <p className="text-[10px] font-bold text-ink-muted uppercase mb-1">Bảo quản</p>
+                      <p className="text-xs font-bold text-ink">{productFormula.storage || '---'}</p>
                    </div>
                    
                    {/* Ecosystem Linkages Card */}
-                   <div className="col-span-1 md:col-span-2 pt-6 border-t border-slate-100 dark:border-slate-800">
-                     <h3 className="text-sm font-black text-slate-800 dark:text-slate-200 uppercase tracking-wider mb-4 flex items-center gap-2">
-                       <Layers size={16} className="text-indigo-500" />
+                   <div className="col-span-1 md:col-span-2 pt-6 border-t border-border">
+                     <h3 className="text-sm font-black text-ink uppercase tracking-wider mb-4 flex items-center gap-2">
+                       <Square3Stack3DIcon className="h-4 w-4 text-emerald-600" />
                        Hệ sinh thái Liên kết Dữ liệu (Data Ecosystem)
                      </h3>
                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
                        {/* Formula Link */}
                        <div 
                          onClick={() => setActiveTab('formula')}
-                         className="p-4 bg-slate-50 dark:bg-slate-900/60 rounded-xl border border-slate-200/80 dark:border-slate-800 hover:border-indigo-300 dark:hover:border-indigo-700 cursor-pointer transition-all group"
+                         className="p-4 bg-surface-2 rounded-xl border border-border hover:border-emerald-500 cursor-pointer transition-all group"
                        >
                          <div className="flex items-center justify-between mb-2">
-                           <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Công thức</span>
-                           <FlaskConical size={16} className="text-indigo-500 group-hover:scale-110 transition-transform" />
+                           <span className="text-[10px] font-black text-ink-muted uppercase tracking-widest">Công thức</span>
+                           <BeakerIcon className="h-4 w-4 text-emerald-600 group-hover:scale-110 transition-transform" />
                          </div>
-                         <p className="text-sm font-bold text-slate-800 dark:text-slate-200">
+                         <p className="text-sm font-bold text-ink">
                            {productFormula ? `${productFormula.ingredients.length} hoạt chất` : 'Chưa có'}
                          </p>
-                         <span className="text-[11px] text-indigo-600 dark:text-indigo-400 font-semibold mt-1 inline-flex items-center gap-1 group-hover:underline">
-                           Xem công thức <ArrowRight size={12} />
+                         <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold mt-1 inline-flex items-center gap-1 group-hover:underline">
+                           Xem công thức <ArrowRightIcon className="h-3 w-3" />
                          </span>
                        </div>
 
                        {/* TCCS Link */}
                        <div 
                          onClick={() => setActiveTab('tccs')}
-                         className="p-4 bg-slate-50 dark:bg-slate-900/60 rounded-xl border border-slate-200/80 dark:border-slate-800 hover:border-emerald-300 dark:hover:border-emerald-700 cursor-pointer transition-all group"
+                         className="p-4 bg-surface-2 rounded-xl border border-border hover:border-emerald-500 cursor-pointer transition-all group"
                        >
                          <div className="flex items-center justify-between mb-2">
-                           <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Tiêu chuẩn TCCS</span>
-                           <FileText size={16} className="text-emerald-500 group-hover:scale-110 transition-transform" />
+                           <span className="text-[10px] font-black text-ink-muted uppercase tracking-widest">Tiêu chuẩn TCCS</span>
+                           <DocumentTextIcon className="h-4 w-4 text-emerald-600 group-hover:scale-110 transition-transform" />
                          </div>
-                         <p className="text-sm font-bold text-slate-800 dark:text-slate-200 truncate" title={activeTCCS?.code || 'Chưa có'}>
+                         <p className="text-sm font-bold text-ink truncate" title={activeTCCS?.code || 'Chưa có'}>
                            {activeTCCS?.code || 'Chưa có TCCS'}
                          </p>
                          <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold mt-1 inline-flex items-center gap-1 group-hover:underline">
-                           {productTCCSList.length} phiên bản <ArrowRight size={12} />
+                           {productTCCSList.length} phiên bản <ArrowRightIcon className="h-3 w-3" />
                          </span>
                        </div>
 
                        {/* Batches Link */}
                        <div 
                          onClick={() => navigate(`/batches?productId=${product.id}`)}
-                         className="p-4 bg-slate-50 dark:bg-slate-900/60 rounded-xl border border-slate-200/80 dark:border-slate-800 hover:border-amber-300 dark:hover:border-amber-700 cursor-pointer transition-all group"
+                         className="p-4 bg-surface-2 rounded-xl border border-border hover:border-amber-500 cursor-pointer transition-all group"
                        >
                          <div className="flex items-center justify-between mb-2">
-                           <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Lô sản xuất</span>
-                           <Package size={16} className="text-amber-500 group-hover:scale-110 transition-transform" />
+                           <span className="text-[10px] font-black text-ink-muted uppercase tracking-widest">Lô sản xuất</span>
+                           <CubeIcon className="h-4 w-4 text-amber-500 group-hover:scale-110 transition-transform" />
                          </div>
-                         <p className="text-sm font-bold text-slate-800 dark:text-slate-200">
+                         <p className="text-sm font-bold text-ink">
                            {batches.filter(b => b.productId === product.id).length} lô đã tạo
                          </p>
                          <span className="text-[11px] text-amber-600 dark:text-amber-400 font-semibold mt-1 inline-flex items-center gap-1 group-hover:underline">
-                           Quản lý lô hàng <ArrowRight size={12} />
+                           Quản lý lô hàng <ArrowRightIcon className="h-3 w-3" />
                          </span>
                        </div>
 
                        {/* Quality / Lab Results Link */}
                        <div 
                          onClick={() => setActiveTab('history')}
-                         className="p-4 bg-slate-50 dark:bg-slate-900/60 rounded-xl border border-slate-200/80 dark:border-slate-800 hover:border-violet-300 dark:hover:border-violet-700 cursor-pointer transition-all group"
+                         className="p-4 bg-surface-2 rounded-xl border border-border hover:border-violet-500 cursor-pointer transition-all group"
                        >
                          <div className="flex items-center justify-between mb-2">
-                           <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Kiểm nghiệm Lab</span>
-                           <Activity size={16} className="text-violet-500 group-hover:scale-110 transition-transform" />
+                           <span className="text-[10px] font-black text-ink-muted uppercase tracking-widest">Kiểm nghiệm Lab</span>
+                           <ChartBarSquareIcon className="h-4 w-4 text-violet-500 group-hover:scale-110 transition-transform" />
                          </div>
-                         <p className="text-sm font-bold text-slate-800 dark:text-slate-200">
+                         <p className="text-sm font-bold text-ink">
                            {allProductResults.length} phiếu đã nhập
                          </p>
                          <span className="text-[11px] text-violet-600 dark:text-violet-400 font-semibold mt-1 inline-flex items-center gap-1 group-hover:underline">
-                           Lịch sử chi tiết <ArrowRight size={12} />
+                           Lịch sử chi tiết <ArrowRightIcon className="h-3 w-3" />
                          </span>
                        </div>
                      </div>
                    </div>
                  </div>
               ) : (
-                <div className="p-6 bg-slate-50 rounded-xl border border-dashed text-center text-slate-400 text-sm italic">
+                <div className="p-6 bg-surface-2 rounded-xl border border-dashed border-border text-center text-ink-muted text-sm italic">
                   Chưa cập nhật thông tin đặc tính sản phẩm (Công thức).
                 </div>
               )}
@@ -525,16 +550,16 @@ const ProductDetail: React.FC = () => {
         {activeTab === 'formula' && (
           <div className="space-y-6">
             <div className="flex justify-between items-center">
-              <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-                <FlaskConical size={18} className="text-indigo-500" />
+              <h3 className="text-lg font-bold text-ink flex items-center gap-2">
+                <BeakerIcon className="h-5 w-5 text-emerald-600" />
                 Thành phần công thức
               </h3>
               <div className="flex items-center gap-4">
-                {productFormula && <span className="text-xs text-zinc-400 italic">Cập nhật: {formatDateStandard(productFormula.updatedAt)}</span>}
+                {productFormula && <span className="text-xs text-ink-muted italic">Cập nhật: {formatDateStandard(productFormula.updatedAt)}</span>}
                 {isAdmin && (
                   <button 
                     onClick={() => navigate(productFormula ? `/product-formulas/edit/${productFormula.id}` : '/product-formulas/new')}
-                    className="text-xs font-black text-indigo-600 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-lg transition-all"
+                    className="text-xs font-black text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 px-3 py-1.5 rounded-xl transition-all border border-emerald-500/20"
                   >
                     {productFormula ? 'CHỈNH SỬA' : 'TẠO MỚI'}
                   </button>
@@ -542,26 +567,26 @@ const ProductDetail: React.FC = () => {
               </div>
             </div>
             
-            <div className="bg-slate-50 rounded-xl border border-slate-100 overflow-hidden">
+            <div className="bg-surface rounded-2xl border border-border overflow-hidden">
               {productFormula && productFormula.ingredients.length > 0 ? (
                 <table className="w-full text-left text-sm">
-                  <thead className="bg-white border-b border-slate-100 text-[10px] font-black text-slate-400 uppercase">
+                  <thead className="bg-surface-2 border-b border-border text-[10px] font-black text-ink-muted uppercase">
                     <tr><th className="px-6 py-3">Tên hoạt chất</th><th className="px-6 py-3 text-right">Hàm lượng</th><th className="px-6 py-3 text-center">Đơn vị</th></tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100">
+                  <tbody className="divide-y divide-border">
                     {productFormula.ingredients.map((ing, idx) => (
-                      <tr key={idx} className="hover:bg-white transition-colors">
-                        <td className="px-6 py-3 font-bold text-slate-700">{ing.name}</td>
-                        <td className="px-6 py-3 text-right font-mono font-bold text-indigo-600">
+                      <tr key={idx} className="hover:bg-surface-2 transition-colors">
+                        <td className="px-6 py-3 font-bold text-ink">{ing.name}</td>
+                        <td className="px-6 py-3 text-right font-mono font-bold text-emerald-600 dark:text-emerald-400">
                           {formatScientific(ing.declaredContent)}
                         </td>
-                        <td className="px-6 py-3 text-center text-slate-500">{ing.unit}</td>
+                        <td className="px-6 py-3 text-center text-ink-muted">{ing.unit}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               ) : (
-                <div className="p-8 text-center text-slate-400 text-sm italic">Chưa có dữ liệu công thức.</div>
+                <div className="p-8 text-center text-ink-muted text-sm italic">Chưa có dữ liệu công thức.</div>
               )}
             </div>
           </div>
@@ -570,24 +595,24 @@ const ProductDetail: React.FC = () => {
         {activeTab === 'tccs' && (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
             {productTCCSList.map(tccs => (
-              <div key={tccs.id} className={`p-6 rounded-2xl border transition-all ${tccs.isActive ? 'border-indigo-600 bg-indigo-50/20' : 'border-slate-100 bg-white'}`}>
+              <div key={tccs.id} className={`p-6 rounded-2xl border transition-all ${tccs.isActive ? 'border-emerald-600 bg-emerald-500/5' : 'border-border bg-surface'}`}>
                 <div className="flex items-center gap-2 mb-4">
-                  <FileText size={20} className={tccs.isActive ? 'text-indigo-600' : 'text-slate-400'} />
-                  <h4 className="font-bold text-slate-800">{tccs.code}</h4>
+                  <DocumentTextIcon className={`h-5 w-5 ${tccs.isActive ? 'text-emerald-600 dark:text-emerald-400' : 'text-ink-muted'}`} />
+                  <h4 className="font-bold text-ink">{tccs.code}</h4>
                 </div>
                 <div className="space-y-3 mb-4">
-                   <div className="p-3 bg-slate-50 rounded-lg text-xs text-slate-500 italic">
+                   <div className="p-3 bg-surface-2 rounded-xl border border-border text-xs text-ink-muted italic">
                      Các chỉ tiêu chất lượng được quy định trong phiên bản này.
                    </div>
                 </div>
                 <div className="flex items-center justify-between mt-6">
-                   <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{tccs.mainQualityCriteria.length + tccs.safetyCriteria.length} Chỉ tiêu</span>
+                   <span className="text-[10px] font-bold text-ink-muted uppercase tracking-widest">{tccs.mainQualityCriteria.length + tccs.safetyCriteria.length} Chỉ tiêu</span>
                    {tccs.standardRefs && (
-                      <span className="text-[9px] font-black text-indigo-400 bg-indigo-50 px-2 py-1 rounded uppercase tracking-tighter max-w-[100px] truncate" title={tccs.standardRefs}>
+                      <span className="text-[9px] font-black text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-1 rounded uppercase tracking-tighter max-w-[100px] truncate border border-emerald-500/20" title={tccs.standardRefs}>
                         {tccs.standardRefs}
                       </span>
                    )}
-                   <button onClick={() => navigate(`/tccs/detail/${tccs.id}`)} className="text-indigo-600 text-xs font-black hover:underline">CHI TIẾT</button>
+                   <button onClick={() => navigate(`/tccs/detail/${tccs.id}`)} className="text-emerald-600 dark:text-emerald-400 text-xs font-black hover:underline">CHI TIẾT</button>
                 </div>
               </div>
             ))}
@@ -597,87 +622,89 @@ const ProductDetail: React.FC = () => {
         {activeTab === 'history' && (
           <div className="space-y-3">
             {isFetchingAll && (
-              <div className="flex items-center gap-2 text-xs text-indigo-500 font-bold bg-indigo-50 px-4 py-2 rounded-lg">
-                <Loader2 size={14} className="animate-spin" /> Đang tải đầy đủ lịch sử kiểm nghiệm từ cơ sở dữ liệu...
+              <div className="flex items-center gap-2 text-xs text-emerald-600 dark:text-emerald-400 font-bold bg-emerald-500/10 px-4 py-2 rounded-xl border border-emerald-500/20">
+                <ArrowPathIcon className="h-3.5 w-3.5 animate-spin" /> Đang tải đầy đủ lịch sử kiểm nghiệm từ cơ sở dữ liệu...
               </div>
             )}
             {hasFetchedAll && !isFetchingAll && (
-              <div className="text-[10px] text-emerald-600 font-bold bg-emerald-50 px-4 py-2 rounded-lg">
+              <div className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold bg-emerald-500/10 px-4 py-2 rounded-xl border border-emerald-500/20">
                 ✓ Đã tải đầy đủ {allProductResults.length} phiếu kiểm nghiệm
               </div>
             )}
-            <table className="w-full text-left text-sm">
-              <thead className="border-b border-slate-100">
-                <tr className="text-slate-400 font-bold uppercase text-[10px] tracking-widest">
-                  <th className="py-4">Lô hàng</th>
-                  <th className="py-4">Ngày kiểm</th>
-                  <th className="py-4">Phòng Lab</th>
-                  <th className="py-4 text-center">Kết quả</th>
-                  <th className="py-4 text-right">Thao tác</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-50">
-                {allProductResults.map(res => {
-                  const batch = batches.find(b => b.id === res.batchId);
-                  return (
-                    <tr key={res.id} className="hover:bg-slate-50 transition-colors">
-                      <td className="py-4 font-bold text-slate-700 uppercase">
-                        {batch ? <Link to={`/batches/${batch.id}`} className="hover:text-indigo-600 hover:underline">{batch.batchNo}</Link> : <span className="text-slate-400 italic text-xs">{res.batchId?.slice(-6)}</span>}
-                      </td>
-                      <td className="py-4 text-zinc-500">{formatDateStandard(res.testDate)}</td>
-                      <td className="py-4 text-zinc-500 text-xs">{res.labName}</td>
-                      <td className="py-4 text-center">
-                        <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase ${res.overallStatus === 'PASS' ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'}`}>
-                          {res.overallStatus}
-                        </span>
-                      </td>
-                      <td className="py-4 text-right">
-                        {isAdmin && (
-                          <button onClick={() => navigate(`/test-results/edit/${res.id}`)} title="Sửa kết quả" className="text-indigo-600 hover:bg-indigo-50 p-2 rounded-lg transition-all"><ArrowRight size={18} /></button>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-                {!isFetchingAll && allProductResults.length === 0 && (
-                  <tr><td colSpan={5} className="py-12 text-center text-slate-400 italic text-sm">Chưa có phiếu kiểm nghiệm nào cho sản phẩm này.</td></tr>
-                )}
-              </tbody>
-            </table>
+            <div className="bg-surface rounded-2xl border border-border overflow-hidden">
+              <table className="w-full text-left text-sm">
+                <thead className="bg-surface-2 border-b border-border">
+                  <tr className="text-ink-muted font-bold uppercase text-[10px] tracking-widest">
+                    <th className="py-4 px-4">Lô hàng</th>
+                    <th className="py-4 px-4">Ngày kiểm</th>
+                    <th className="py-4 px-4">Phòng Lab</th>
+                    <th className="py-4 px-4 text-center">Kết quả</th>
+                    <th className="py-4 px-4 text-right">Thao tác</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {allProductResults.map(res => {
+                    const batch = batches.find(b => b.id === res.batchId);
+                    return (
+                      <tr key={res.id} className="hover:bg-surface-2 transition-colors">
+                        <td className="py-4 px-4 font-bold text-ink uppercase">
+                          {batch ? <Link to={`/batches/${batch.id}`} className="hover:text-emerald-600 hover:underline">{batch.batchNo}</Link> : <span className="text-ink-muted italic text-xs">{res.batchId?.slice(-6)}</span>}
+                        </td>
+                        <td className="py-4 px-4 text-ink-soft">{formatDateStandard(res.testDate)}</td>
+                        <td className="py-4 px-4 text-ink-soft text-xs">{res.labName}</td>
+                        <td className="py-4 px-4 text-center">
+                          <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase border ${res.overallStatus === 'PASS' ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20' : 'bg-rose-500/10 text-rose-600 border-rose-500/20'}`}>
+                            {res.overallStatus}
+                          </span>
+                        </td>
+                        <td className="py-4 px-4 text-right">
+                          {isAdmin && (
+                            <button onClick={() => navigate(`/test-results/edit/${res.id}`)} title="Sửa kết quả" className="text-emerald-600 hover:bg-emerald-500/10 p-2 rounded-xl transition-all"><ArrowRightIcon className="h-4 w-4" /></button>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  {!isFetchingAll && allProductResults.length === 0 && (
+                    <tr><td colSpan={5} className="py-12 text-center text-ink-muted italic text-sm">Chưa có phiếu kiểm nghiệm nào cho sản phẩm này.</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
 
         {activeTab === 'analytics' && (
           <div className="space-y-6">
             {/* Panel chọn chỉ tiêu */}
-            <div className="bg-slate-50 dark:bg-slate-800/40 p-4 rounded-xl border border-slate-100 dark:border-slate-800 space-y-3">
-              <div className="flex items-center justify-between">
+            <div className="bg-surface-2 p-4 rounded-xl border border-border space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>
-                  <p className="text-xs font-black text-slate-700 dark:text-slate-200 uppercase tracking-widest flex items-center gap-2">
-                    <TrendingUp size={14} className="text-indigo-500" />
+                  <p className="text-xs font-black text-ink uppercase tracking-widest flex items-center gap-2">
+                    <ArrowTrendingUpIcon className="w-4 h-4 text-emerald-500" />
                     Chọn chỉ tiêu chất lượng để phân tích biến động:
                   </p>
-                  <p className="text-[11px] text-slate-400 mt-0.5">
+                  <p className="text-[11px] text-ink-muted mt-0.5">
                     Hệ thống tự động quy đổi tỉ lệ % theo hàm lượng công bố / chuẩn TCCS và đánh giá hệ số biến động (CV%).
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
                   <button
                     onClick={selectAllCriteria}
-                    className="text-[10px] font-black text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/50 hover:bg-indigo-100 px-3 py-1.5 rounded-lg transition-all uppercase tracking-wider"
+                    className="text-[10px] font-black text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/30 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 px-3 py-1.5 rounded-lg transition-all uppercase tracking-wider"
                   >
                     Chọn tất cả
                   </button>
                   <button
                     onClick={clearAllCriteria}
-                    className="text-[10px] font-black text-slate-500 dark:text-slate-400 bg-white dark:bg-slate-800 hover:bg-slate-100 border border-slate-200 dark:border-slate-700 px-3 py-1.5 rounded-lg transition-all uppercase tracking-wider"
+                    className="text-[10px] font-black text-ink-muted bg-surface hover:bg-surface-3 border border-border px-3 py-1.5 rounded-lg transition-all uppercase tracking-wider"
                   >
                     Bỏ chọn
                   </button>
                 </div>
               </div>
               {allQualityCriteriaNames.length === 0 ? (
-                <p className="text-xs text-slate-400 italic">Chưa có TCCS nào được khai báo chỉ tiêu chất lượng.</p>
+                <p className="text-xs text-ink-muted italic">Chưa có TCCS nào được khai báo chỉ tiêu chất lượng.</p>
               ) : (
                 <div className="flex flex-wrap gap-2 pt-1">
                   {allQualityCriteriaNames.map(name => {
@@ -690,14 +717,14 @@ const ProductDetail: React.FC = () => {
                         onClick={() => toggleCriterion(name)}
                         className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${
                           isSelected
-                            ? 'bg-indigo-600 text-white border-indigo-600 shadow-md shadow-indigo-100 dark:shadow-none'
-                            : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-indigo-300 hover:text-indigo-600'
+                            ? 'bg-emerald-600 text-white border-emerald-600 shadow-md shadow-emerald-600/10'
+                            : 'bg-surface text-ink-soft border-border hover:border-emerald-300 hover:text-emerald-600'
                         }`}
                       >
                         {isSelected && <span className="text-[10px]">✓</span>}
                         <span>{name}</span>
                         {count > 0 && (
-                          <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${isSelected ? 'bg-indigo-700 text-white' : 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400'}`}>
+                          <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${isSelected ? 'bg-emerald-700 text-white' : 'bg-surface-3 text-ink-muted'}`}>
                             {count}
                           </span>
                         )}
@@ -710,11 +737,11 @@ const ProductDetail: React.FC = () => {
 
             {/* Biểu đồ & Thống kê cho từng chỉ tiêu đã chọn */}
             {selectedCriteria.size === 0 ? (
-              <div className="h-[240px] flex flex-col items-center justify-center text-slate-400 italic text-sm gap-3 bg-slate-50/50 dark:bg-slate-800/20 rounded-2xl border border-dashed border-slate-200 dark:border-slate-700">
-                <BarChart3 size={40} className="text-slate-300 dark:text-slate-600" />
+              <div className="h-[240px] flex flex-col items-center justify-center text-ink-muted italic text-sm gap-3 bg-surface-2/40 rounded-2xl border border-dashed border-border">
+                <ChartBarIcon className="w-10 h-10 text-ink-muted opacity-40" />
                 <div className="text-center">
-                  <p className="font-bold text-slate-600 dark:text-slate-300">Chưa chọn chỉ tiêu nào</p>
-                  <p className="text-xs text-slate-400 mt-0.5">Chọn một hoặc nhiều chỉ tiêu ở trên để xem biểu đồ và tỉ lệ % biến động.</p>
+                  <p className="font-bold text-ink">Chưa chọn chỉ tiêu nào</p>
+                  <p className="text-xs text-ink-muted mt-0.5">Chọn một hoặc nhiều chỉ tiêu ở trên để xem biểu đồ và tỉ lệ % biến động.</p>
                 </div>
               </div>
             ) : (
@@ -743,23 +770,23 @@ const ProductDetail: React.FC = () => {
                   });
 
                   return (
-                    <div key={criterionName} className="bg-white dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700 rounded-2xl p-5 shadow-sm space-y-4">
+                    <div key={criterionName} className="bg-surface border border-border rounded-2xl p-5 shadow-sm space-y-4">
                       {/* Card Header & Controls */}
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100 dark:border-slate-700/60">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-border">
                         <div className="flex items-center gap-3">
-                          <div className="w-3 h-3 rounded-full bg-indigo-500 shrink-0" />
+                          <div className="w-3 h-3 rounded-full bg-emerald-500 shrink-0" />
                           <div>
                             <div className="flex items-center gap-2">
-                              <h4 className="text-base font-black text-slate-800 dark:text-slate-100 uppercase tracking-tight">
+                              <h4 className="text-base font-black text-ink uppercase tracking-tight">
                                 {criterionName}
                               </h4>
-                              {unit && <span className="text-xs font-bold text-slate-400">({unit})</span>}
+                              {unit && <span className="text-xs font-bold text-ink-muted">({unit})</span>}
                             </div>
-                            <p className="text-[11px] text-slate-400">
+                            <p className="text-[11px] text-ink-muted">
                               {declaredContent ? (
-                                <>Mức công bố: <span className="font-bold text-slate-600 dark:text-slate-300 font-mono">{declaredContent.toLocaleString(getActiveLocale())} {unit}</span> (Chuẩn 100%)</>
+                                <>Mức công bố: <span className="font-bold text-ink font-mono">{declaredContent.toLocaleString(getActiveLocale())} {unit}</span> (Chuẩn 100%)</>
                               ) : targetBasis ? (
-                                <>Mức chuẩn tham chiếu: <span className="font-bold text-slate-600 dark:text-slate-300 font-mono">{targetBasis.toLocaleString(getActiveLocale())} {unit}</span></>
+                                <>Mức chuẩn tham chiếu: <span className="font-bold text-ink font-mono">{targetBasis.toLocaleString(getActiveLocale())} {unit}</span></>
                               ) : (
                                 <>Chưa thiết lập hàm lượng công bố</>
                               )}
@@ -769,30 +796,30 @@ const ProductDetail: React.FC = () => {
 
                         {/* View mode toggle: Tỉ lệ % vs Giá trị thực tế */}
                         <div className="flex items-center gap-2">
-                          <div className="inline-flex rounded-lg p-0.5 bg-slate-100 dark:bg-slate-700/60 border border-slate-200 dark:border-slate-600">
+                          <div className="inline-flex rounded-lg p-0.5 bg-surface-2 border border-border">
                             <button
                               type="button"
                               onClick={() => setCriteriaViewModes(prev => ({ ...prev, [criterionName]: 'PERCENT' }))}
                               disabled={!targetBasis}
-                              className={`flex items-center gap-1 px-2.5 py-1 text-xs font-bold rounded-md transition-all ${
+                              className={`flex items-center gap-1.5 px-2.5 py-1 text-xs font-bold rounded-md transition-all ${
                                 isPercentMode
-                                  ? 'bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-sm'
-                                  : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 disabled:opacity-40'
+                                  ? 'bg-surface text-emerald-600 dark:text-emerald-400 shadow-sm'
+                                  : 'text-ink-muted hover:text-ink disabled:opacity-40'
                               }`}
                               title={!targetBasis ? 'Chưa có mức công bố để tính %' : 'Xem theo tỉ lệ % so với công bố'}
                             >
-                              <Percent size={12} /> Tỉ lệ %
+                              <ReceiptPercentIcon className="w-3.5 h-3.5" /> Tỉ lệ %
                             </button>
                             <button
                               type="button"
                               onClick={() => setCriteriaViewModes(prev => ({ ...prev, [criterionName]: 'VALUE' }))}
-                              className={`flex items-center gap-1 px-2.5 py-1 text-xs font-bold rounded-md transition-all ${
+                              className={`flex items-center gap-1.5 px-2.5 py-1 text-xs font-bold rounded-md transition-all ${
                                 !isPercentMode
-                                  ? 'bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-sm'
-                                  : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+                                  ? 'bg-surface text-emerald-600 dark:text-emerald-400 shadow-sm'
+                                  : 'text-ink-muted hover:text-ink'
                               }`}
                             >
-                              <SlidersHorizontal size={12} /> Giá trị thực ({unit || 'Số'})
+                              <AdjustmentsHorizontalIcon className="w-3.5 h-3.5" /> Giá trị thực ({unit || 'Số'})
                             </button>
                           </div>
                         </div>
@@ -802,43 +829,43 @@ const ProductDetail: React.FC = () => {
                       {stats && (
                         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
                           {/* 1. Mức công bố / Tiêu chuẩn */}
-                          <div className="bg-slate-50 dark:bg-slate-800/60 p-3 rounded-xl border border-slate-100 dark:border-slate-700/60 flex flex-col justify-between">
-                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Mức chuẩn / Công bố</span>
+                          <div className="bg-surface-2 p-3 rounded-xl border border-border flex flex-col justify-between">
+                            <span className="text-[10px] font-black text-ink-muted uppercase tracking-wider">Mức chuẩn / Công bố</span>
                             <div className="mt-1">
-                              <span className="text-sm font-black text-slate-800 dark:text-slate-100 font-mono">
+                              <span className="text-sm font-black text-ink font-mono">
                                 {declaredContent ? `${declaredContent.toLocaleString(getActiveLocale())} ${unit}` : (min !== undefined && max !== undefined ? `${min} ~ ${max} ${unit}` : '---')}
                               </span>
-                              <p className="text-[10px] text-slate-400 mt-0.5 font-medium">
+                              <p className="text-[10px] text-ink-muted mt-0.5 font-medium">
                                 {min !== undefined && max !== undefined ? `TCCS: ${min} ~ ${max} ${unit}` : expectedText || 'Mức danh định 100%'}
                               </p>
                             </div>
                           </div>
 
                           {/* 2. Trung bình thực tế & % TB */}
-                          <div className="bg-indigo-50/50 dark:bg-indigo-950/20 p-3 rounded-xl border border-indigo-100 dark:border-indigo-900/40 flex flex-col justify-between">
-                            <span className="text-[10px] font-black text-indigo-500 uppercase tracking-wider">Trung bình thực tế (X̄)</span>
+                          <div className="bg-emerald-50/50 dark:bg-emerald-950/20 p-3 rounded-xl border border-emerald-200 dark:border-emerald-900/40 flex flex-col justify-between">
+                            <span className="text-[10px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">Trung bình thực tế (X̄)</span>
                             <div className="mt-1">
                               <div className="flex items-baseline gap-1.5 font-mono">
-                                <span className="text-base font-black text-indigo-700 dark:text-indigo-400">
+                                <span className="text-base font-black text-emerald-700 dark:text-emerald-300">
                                   {stats.mean.toLocaleString(getActiveLocale(), { maximumFractionDigits: 2 })}
                                 </span>
-                                <span className="text-[10px] text-indigo-400 font-bold">{unit}</span>
+                                <span className="text-[10px] text-emerald-500 font-bold">{unit}</span>
                               </div>
                               {stats.meanPercent !== null ? (
-                                <p className="text-[11px] font-black text-indigo-600 dark:text-indigo-300 mt-0.5 font-mono">
+                                <p className="text-[11px] font-black text-emerald-600 dark:text-emerald-400 mt-0.5 font-mono">
                                   = {stats.meanPercent.toFixed(1)}% <span className="font-normal text-[10px] opacity-75">công bố</span>
                                 </p>
                               ) : (
-                                <p className="text-[10px] text-slate-400 mt-0.5">σ = {stats.stdDev.toFixed(2)}</p>
+                                <p className="text-[10px] text-ink-muted mt-0.5">σ = {stats.stdDev.toFixed(2)}</p>
                               )}
                             </div>
                           </div>
 
                           {/* 3. Mức độ biến động (CV%) */}
-                          <div className="bg-slate-50 dark:bg-slate-800/60 p-3 rounded-xl border border-slate-100 dark:border-slate-700/60 flex flex-col justify-between">
-                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Hệ số biến động (CV)</span>
+                          <div className="bg-surface-2 p-3 rounded-xl border border-border flex flex-col justify-between">
+                            <span className="text-[10px] font-black text-ink-muted uppercase tracking-wider">Hệ số biến động (CV)</span>
                             <div className="mt-1">
-                              <div className="text-base font-black text-slate-800 dark:text-slate-100 font-mono">
+                              <div className="text-base font-black text-ink font-mono">
                                 {stats.cv.toFixed(1)}%
                               </div>
                               <div className="mt-1">
@@ -850,30 +877,30 @@ const ProductDetail: React.FC = () => {
                           </div>
 
                           {/* 4. Biên độ dao động (%) */}
-                          <div className="bg-slate-50 dark:bg-slate-800/60 p-3 rounded-xl border border-slate-100 dark:border-slate-700/60 flex flex-col justify-between">
-                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Biên độ dao động</span>
+                          <div className="bg-surface-2 p-3 rounded-xl border border-border flex flex-col justify-between">
+                            <span className="text-[10px] font-black text-ink-muted uppercase tracking-wider">Biên độ dao động</span>
                             <div className="mt-1">
-                              <div className="text-xs font-black text-slate-700 dark:text-slate-200 font-mono">
+                              <div className="text-xs font-black text-ink font-mono">
                                 {stats.minPercent !== null && stats.maxPercent !== null ? (
                                   <>{stats.minPercent.toFixed(1)}% ~ {stats.maxPercent.toFixed(1)}%</>
                                 ) : (
                                   <>{stats.minVal.toLocaleString(getActiveLocale())} ~ {stats.maxVal.toLocaleString(getActiveLocale())} {unit}</>
                                 )}
                               </div>
-                              <p className="text-[10px] text-slate-400 mt-0.5 font-mono">
+                              <p className="text-[10px] text-ink-muted mt-0.5 font-mono">
                                 {stats.spreadPercent !== null ? `Độ lệch: Δ = ${stats.spreadPercent.toFixed(1)}%` : `σ = ${stats.stdDev.toFixed(2)}`}
                               </p>
                             </div>
                           </div>
 
                           {/* 5. Tỷ lệ Đạt TCCS */}
-                          <div className="bg-slate-50 dark:bg-slate-800/60 p-3 rounded-xl border border-slate-100 dark:border-slate-700/60 flex flex-col justify-between">
-                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Tỷ lệ Đạt TCCS</span>
+                          <div className="bg-surface-2 p-3 rounded-xl border border-border flex flex-col justify-between">
+                            <span className="text-[10px] font-black text-ink-muted uppercase tracking-wider">Tỷ lệ Đạt TCCS</span>
                             <div className="mt-1">
                               <div className={`text-base font-black font-mono ${stats.passRate === 100 ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}`}>
                                 {stats.passRate.toFixed(1)}%
                               </div>
-                              <p className="text-[10px] text-slate-400 mt-0.5 font-medium">
+                              <p className="text-[10px] text-ink-muted mt-0.5 font-medium">
                                 {stats.passCount}/{stats.totalBatches} lô đạt chuẩn
                               </p>
                             </div>
@@ -886,17 +913,17 @@ const ProductDetail: React.FC = () => {
                         <div className="h-[280px] w-full pt-2">
                           <ResponsiveContainer width="100%" height="100%">
                             <LineChart data={displayChartData} margin={{ top: 15, right: 30, left: 0, bottom: 5 }}>
-                              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" opacity={0.4} />
                               <XAxis
                                 dataKey="name"
                                 axisLine={false}
                                 tickLine={false}
-                                tick={{ fill: '#94a3b8', fontSize: 10, fontWeight: 600 }}
+                                tick={{ fill: 'var(--ink-muted)', fontSize: 10, fontWeight: 600 }}
                               />
                               <YAxis
                                 axisLine={false}
                                 tickLine={false}
-                                tick={{ fill: '#94a3b8', fontSize: 10 }}
+                                tick={{ fill: 'var(--ink-muted)', fontSize: 10 }}
                                 width={50}
                                 domain={isPercentMode ? (['auto', 'auto'] as any) : undefined}
                                 unit={isPercentMode ? '%' : ''}
@@ -905,10 +932,10 @@ const ProductDetail: React.FC = () => {
                                 content={({ active, payload, label }) => {
                                   if (!active || !payload?.length) return null;
                                   return (
-                                    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl p-3 text-xs space-y-2 min-w-[200px] z-50">
-                                      <div className="border-b border-slate-100 dark:border-slate-800 pb-1.5 flex items-center justify-between">
-                                        <span className="font-black text-slate-800 dark:text-slate-100">Lô: {label}</span>
-                                        <span className="text-[10px] text-slate-400 font-mono">
+                                    <div className="bg-surface border border-border rounded-xl shadow-xl p-3 text-xs space-y-2 min-w-[200px] z-50">
+                                      <div className="border-b border-border pb-1.5 flex items-center justify-between">
+                                        <span className="font-black text-ink">Lô: {label}</span>
+                                        <span className="text-[10px] text-ink-muted font-mono">
                                           {payload[0]?.payload?.mfgDate ? formatDateStandard(payload[0]?.payload?.mfgDate) : ''}
                                         </span>
                                       </div>
@@ -921,7 +948,7 @@ const ProductDetail: React.FC = () => {
                                         return (
                                           <div key={p.dataKey} className="space-y-1 pt-1">
                                             <div className="flex items-center justify-between gap-2">
-                                              <span className="font-bold text-slate-600 dark:text-slate-300 flex items-center gap-1.5">
+                                              <span className="font-bold text-ink-soft flex items-center gap-1.5">
                                                 <span className="w-2 h-2 rounded-full" style={{ backgroundColor: p.color }} />
                                                 {p.dataKey}
                                               </span>
@@ -930,15 +957,15 @@ const ProductDetail: React.FC = () => {
                                               </span>
                                             </div>
                                             <div className="flex items-center justify-between text-[11px] pl-3.5">
-                                              <span className="text-slate-400">Giá trị đo:</span>
-                                              <span className="font-mono font-bold text-slate-800 dark:text-slate-200">
+                                              <span className="text-ink-muted">Giá trị đo:</span>
+                                              <span className="font-mono font-bold text-ink">
                                                 {rawVal != null ? `${rawVal.toLocaleString(getActiveLocale())} ${unit}` : '---'}
                                               </span>
                                             </div>
                                             {pct !== null && pct !== undefined && (
                                               <div className="flex items-center justify-between text-[11px] pl-3.5">
-                                                <span className="text-slate-400">Tỉ lệ % công bố:</span>
-                                                <span className="font-mono font-black text-indigo-600 dark:text-indigo-400 flex items-center gap-1">
+                                                <span className="text-ink-muted">Tỉ lệ % công bố:</span>
+                                                <span className="font-mono font-black text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
                                                   {pct.toFixed(1)}%
                                                   {diffPct !== null && (
                                                     <span className={`text-[9px] font-normal ${diffPct >= 0 ? 'text-emerald-600' : 'text-amber-600'}`}>
@@ -1038,29 +1065,29 @@ const ProductDetail: React.FC = () => {
                           </ResponsiveContainer>
                         </div>
                       ) : (
-                        <div className="h-[80px] flex items-center justify-center text-slate-300 italic text-xs">
+                        <div className="h-[80px] flex items-center justify-center text-ink-muted italic text-xs">
                           Không có dữ liệu số cho chỉ tiêu này.
                         </div>
                       )}
 
                       {/* Bảng chi tiết từng lô (Collapsible) */}
                       {batchDataList.length > 0 && (
-                        <div className="pt-2 border-t border-slate-100 dark:border-slate-700/50">
+                        <div className="pt-2 border-t border-border">
                           <button
                             type="button"
                             onClick={() => toggleCriterionTable(criterionName)}
-                            className="flex items-center gap-1.5 text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:underline"
+                            className="flex items-center gap-1.5 text-xs font-bold text-emerald-600 dark:text-emerald-400 hover:underline"
                           >
-                            <Table size={13} />
+                            <TableCellsIcon className="w-4 h-4" />
                             {isTableExpanded ? 'Thu gọn bảng dữ liệu lô' : `Xem bảng dữ liệu chi tiết (${batchDataList.length} lô kiểm nghiệm)`}
-                            {isTableExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                            {isTableExpanded ? <ChevronUpIcon className="w-3.5 h-3.5" /> : <ChevronDownIcon className="w-3.5 h-3.5" />}
                           </button>
 
                           {isTableExpanded && (
-                            <div className="mt-3 overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/40 dark:bg-slate-900/30">
+                            <div className="mt-3 overflow-x-auto rounded-xl border border-border bg-surface-2/40">
                               <table className="w-full text-left text-xs">
                                 <thead>
-                                  <tr className="bg-slate-100/70 dark:bg-slate-800/80 text-[10px] font-black text-slate-400 uppercase tracking-wider">
+                                  <tr className="bg-surface-3 text-[10px] font-black text-ink-muted uppercase tracking-wider">
                                     <th className="px-3 py-2.5">STT</th>
                                     <th className="px-3 py-2.5">Số lô</th>
                                     <th className="px-3 py-2.5">Ngày kiểm / SX</th>
@@ -1071,25 +1098,25 @@ const ProductDetail: React.FC = () => {
                                     <th className="px-3 py-2.5 text-center">Trạng thái</th>
                                   </tr>
                                 </thead>
-                                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                                <tbody className="divide-y divide-border">
                                   {batchDataList.map((item: any, idx: number) => {
                                     const diff = item.percent !== null ? item.percent - 100 : null;
                                     return (
-                                      <tr key={idx} className="hover:bg-white dark:hover:bg-slate-800/50 transition-colors">
-                                        <td className="px-3 py-2 text-slate-400 font-mono">{idx + 1}</td>
-                                        <td className="px-3 py-2 font-bold text-slate-700 dark:text-slate-200">
-                                          <Link to={`/batches/${item.batchId}`} className="hover:text-indigo-600 hover:underline">
+                                      <tr key={idx} className="hover:bg-surface-3 transition-colors">
+                                        <td className="px-3 py-2 text-ink-muted font-mono">{idx + 1}</td>
+                                        <td className="px-3 py-2 font-bold text-ink">
+                                          <Link to={`/batches/${item.batchId}`} className="hover:text-emerald-600 hover:underline">
                                             {item.batchNo}
                                           </Link>
                                         </td>
-                                        <td className="px-3 py-2 text-slate-500 font-mono text-[11px]">
+                                        <td className="px-3 py-2 text-ink-muted font-mono text-[11px]">
                                           {formatDateStandard(item.testDate || item.mfgDate)}
                                         </td>
-                                        <td className="px-3 py-2 text-slate-500">{item.labName}</td>
-                                        <td className="px-3 py-2 text-right font-mono font-bold text-slate-800 dark:text-slate-100">
+                                        <td className="px-3 py-2 text-ink-muted">{item.labName}</td>
+                                        <td className="px-3 py-2 text-right font-mono font-bold text-ink">
                                           {item.value.toLocaleString(getActiveLocale())}
                                         </td>
-                                        <td className="px-3 py-2 text-center font-mono font-black text-indigo-600 dark:text-indigo-400">
+                                        <td className="px-3 py-2 text-center font-mono font-black text-emerald-600 dark:text-emerald-400">
                                           {item.percent !== null ? `${item.percent.toFixed(1)}%` : '---'}
                                         </td>
                                         <td className="px-3 py-2 text-center font-mono text-[11px]">
@@ -1127,8 +1154,8 @@ const ProductDetail: React.FC = () => {
 
 const InfoItem: React.FC<{ label: string; value: string }> = ({ label, value }) => (
   <div className="space-y-1">
-    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{label}</p>
-    <p className="font-bold text-slate-800">{value || '--'}</p>
+    <p className="text-[10px] font-bold text-ink-muted uppercase tracking-widest">{label}</p>
+    <p className="font-bold text-ink">{value || '--'}</p>
   </div>
 );
 

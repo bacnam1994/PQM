@@ -1,5 +1,11 @@
 import React, { useState, useMemo } from 'react';
-import { X, CheckCircle2, AlertCircle, ArrowRight, Brain } from 'lucide-react';
+import { 
+  XMarkIcon, 
+  CheckCircleIcon, 
+  ExclamationCircleIcon, 
+  ArrowRightIcon, 
+  SparklesIcon 
+} from '@heroicons/react/24/outline';
 
 export interface AIExtractedItem {
   criteriaName: string;   // Tên gốc từ phiếu
@@ -97,26 +103,29 @@ export const MappingConfirmModal: React.FC<MappingConfirmModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col animate-in slide-in-from-bottom-4 duration-300">
+    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
+      <div className="bg-surface rounded-2xl shadow-2xl border border-border w-full max-w-2xl max-h-[90vh] flex flex-col animate-in zoom-in-95 duration-300 overflow-hidden">
         
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-surface-2">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-indigo-100 flex items-center justify-center">
-              <Brain size={20} className="text-indigo-600" />
+            <div className="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
+              <SparklesIcon className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="font-black text-slate-800 text-sm uppercase tracking-wider">Xác nhận Ánh xạ Chỉ tiêu</h2>
-              <p className="text-[11px] text-slate-400 font-medium mt-0.5">
-                AI đọc được <b>{highConfidenceItems.length + lowConfidenceItems.length}</b> chỉ tiêu · 
-                <span className="text-emerald-600"> {highConfidenceItems.length} tự động</span> · 
-                <span className="text-amber-600"> {lowConfidenceItems.length} cần xác nhận</span>
+              <h2 className="font-black text-ink text-sm uppercase tracking-wider">Xác nhận Ánh xạ Chỉ tiêu</h2>
+              <p className="text-[11px] text-ink-muted font-medium mt-0.5">
+                AI trích xuất <b>{highConfidenceItems.length + lowConfidenceItems.length}</b> chỉ tiêu · 
+                <span className="text-emerald-600 dark:text-emerald-400 font-bold"> {highConfidenceItems.length} tự động</span> · 
+                <span className="text-amber-600 dark:text-amber-400 font-bold"> {lowConfidenceItems.length} cần xác nhận</span>
               </p>
             </div>
           </div>
-          <button onClick={onClose} className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition-colors">
-            <X size={18} />
+          <button 
+            onClick={onClose} 
+            className="p-2 text-ink-muted hover:text-ink hover:bg-surface-3 rounded-xl transition-colors"
+          >
+            <XMarkIcon className="w-5 h-5" />
           </button>
         </div>
 
@@ -125,17 +134,17 @@ export const MappingConfirmModal: React.FC<MappingConfirmModalProps> = ({
 
           {/* High confidence items — chỉ hiển thị tóm tắt */}
           {highConfidenceItems.length > 0 && (
-            <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-4">
-              <p className="text-[11px] font-black text-emerald-700 uppercase tracking-widest flex items-center gap-1.5 mb-3">
-                <CheckCircle2 size={13} /> AI tự động điền ({highConfidenceItems.length} chỉ tiêu)
+            <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-4">
+              <p className="text-[11px] font-black text-emerald-700 dark:text-emerald-400 uppercase tracking-widest flex items-center gap-1.5 mb-3">
+                <CheckCircleIcon className="w-4 h-4" /> AI tự động điền ({highConfidenceItems.length} chỉ tiêu)
               </p>
-              <div className="grid grid-cols-1 gap-1">
+              <div className="grid grid-cols-1 gap-1.5">
                 {highConfidenceItems.map(item => (
                   <div key={item.criteriaName} className="flex items-center gap-2 text-xs">
-                    <span className="text-slate-500 truncate flex-1">"{item.criteriaName}"</span>
-                    <ArrowRight size={12} className="text-emerald-400 shrink-0" />
-                    <span className="font-bold text-emerald-700 truncate flex-1">{item.mappedName}</span>
-                    <span className="font-black text-slate-700 font-mono bg-white px-2 py-0.5 rounded border border-emerald-100 shrink-0">{item.value}</span>
+                    <span className="text-ink-muted truncate flex-1">"{item.criteriaName}"</span>
+                    <ArrowRightIcon className="w-3 h-3 text-emerald-500 shrink-0" />
+                    <span className="font-bold text-emerald-700 dark:text-emerald-300 truncate flex-1">{item.mappedName}</span>
+                    <span className="font-black text-ink font-mono bg-surface px-2 py-0.5 rounded border border-emerald-500/20 shrink-0">{item.value}</span>
                   </div>
                 ))}
               </div>
@@ -145,24 +154,24 @@ export const MappingConfirmModal: React.FC<MappingConfirmModalProps> = ({
           {/* Low confidence items — cần user xác nhận */}
           {lowConfidenceItems.length > 0 && (
             <div className="space-y-3">
-              <p className="text-[11px] font-black text-amber-700 uppercase tracking-widest flex items-center gap-1.5">
-                <AlertCircle size={13} /> Cần xác nhận ({lowConfidenceItems.length} chỉ tiêu)
+              <p className="text-[11px] font-black text-amber-700 dark:text-amber-400 uppercase tracking-widest flex items-center gap-1.5">
+                <ExclamationCircleIcon className="w-4 h-4" /> Cần xác nhận ({lowConfidenceItems.length} chỉ tiêu)
               </p>
               {lowConfidenceItems.map(item => (
-                <div key={item.criteriaName} className="bg-amber-50/50 border border-amber-100 rounded-xl p-3 space-y-2">
-                  <div className="flex items-center gap-2">
+                <div key={item.criteriaName} className="bg-amber-500/5 border border-amber-500/20 rounded-xl p-3.5 space-y-2">
+                  <div className="flex items-center gap-3">
                     <div className="flex-1 min-w-0">
-                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">AI đọc được từ phiếu</p>
-                      <p className="text-xs font-bold text-slate-700 mt-0.5 truncate">"{item.criteriaName}"</p>
-                      <p className="text-[10px] text-slate-500 mt-0.5">Kết quả: <span className="font-black text-slate-700">{item.value} {item.unit}</span></p>
+                      <p className="text-[10px] font-bold text-ink-muted uppercase tracking-widest">AI đọc được từ phiếu</p>
+                      <p className="text-xs font-bold text-ink mt-0.5 truncate">"{item.criteriaName}"</p>
+                      <p className="text-[10px] text-ink-muted mt-0.5">Kết quả: <span className="font-black text-ink">{item.value} {item.unit}</span></p>
                     </div>
-                    <ArrowRight size={16} className="text-amber-400 shrink-0" />
+                    <ArrowRightIcon className="w-4 h-4 text-amber-500 shrink-0" />
                     <div className="flex-1 min-w-0">
-                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Ghép với chỉ tiêu TCCS</p>
+                      <p className="text-[10px] font-bold text-ink-muted uppercase tracking-widest mb-1">Ghép với chỉ tiêu TCCS</p>
                       <select
                         value={userMappings[item.criteriaName] || ''}
                         onChange={e => setUserMappings(prev => ({ ...prev, [item.criteriaName]: e.target.value }))}
-                        className="w-full px-2 py-1.5 bg-white border border-amber-200 rounded-lg text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-amber-400"
+                        className="w-full px-2.5 py-1.5 bg-surface border border-border rounded-lg text-xs font-bold text-ink outline-none focus:ring-2 focus:ring-emerald-500"
                       >
                         <option value="">-- Bỏ qua chỉ tiêu này --</option>
                         {tccsNames.map(name => (
@@ -178,41 +187,41 @@ export const MappingConfirmModal: React.FC<MappingConfirmModalProps> = ({
 
           {/* Trường hợp không có gì để xác nhận */}
           {lowConfidenceItems.length === 0 && highConfidenceItems.length === 0 && (
-            <div className="text-center py-8 text-slate-400">
-              <AlertCircle size={32} className="mx-auto mb-2 opacity-50" />
+            <div className="text-center py-8 text-ink-muted">
+              <ExclamationCircleIcon className="w-8 h-8 mx-auto mb-2 opacity-50" />
               <p className="text-sm font-bold">AI không đọc được chỉ tiêu nào.</p>
             </div>
           )}
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 border-t border-slate-100 space-y-3">
+        <div className="px-6 py-4 border-t border-border bg-surface-2 space-y-3">
           <label className="flex items-center gap-2.5 cursor-pointer group">
             <input
               type="checkbox"
               checked={rememberMappings}
               onChange={e => setRememberMappings(e.target.checked)}
-              className="w-4 h-4 accent-indigo-600 cursor-pointer"
+              className="w-4 h-4 accent-emerald-600 cursor-pointer rounded"
             />
             <div>
-              <p className="text-xs font-bold text-slate-700 group-hover:text-indigo-700 transition-colors">
+              <p className="text-xs font-bold text-ink group-hover:text-emerald-600 transition-colors">
                 Nhớ các lựa chọn này cho lần sau
               </p>
-              <p className="text-[10px] text-slate-400">AI sẽ tự động map tên tương tự trong tương lai</p>
+              <p className="text-[10px] text-ink-muted">AI sẽ tự động map tên tương tự trong tương lai</p>
             </div>
           </label>
           <div className="flex gap-3">
             <button
               onClick={onClose}
-              className="flex-1 py-2.5 text-slate-500 font-black uppercase text-[10px] tracking-widest hover:bg-slate-50 rounded-xl transition-colors border border-slate-200"
+              className="flex-1 py-2.5 text-ink-muted font-black uppercase text-[10px] tracking-widest hover:bg-surface-3 rounded-xl transition-colors border border-border"
             >
               Hủy
             </button>
             <button
               onClick={handleConfirm}
-              className="flex-[2] py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-black uppercase text-[10px] tracking-widest rounded-xl transition-colors shadow-lg shadow-indigo-100 flex items-center justify-center gap-2"
+              className="flex-[2] py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black uppercase text-[10px] tracking-widest rounded-xl transition-colors shadow-sm flex items-center justify-center gap-2"
             >
-              <CheckCircle2 size={14} />
+              <CheckCircleIcon className="w-4 h-4" />
               Xác nhận &amp; Điền form
               {confirmedCount + highConfidenceItems.length > 0 && (
                 <span className="bg-white/20 px-1.5 py-0.5 rounded text-[9px]">

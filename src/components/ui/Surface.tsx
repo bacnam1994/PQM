@@ -12,8 +12,8 @@ export interface SurfaceProps extends Omit<React.HTMLAttributes<HTMLDivElement>,
 }
 
 /**
- * Surface - Bề mặt chuẩn phẳng cho QMS Workbench
- * Thay thế cho các pattern Card nổi lồng ghép, tạo chiều sâu giao diện tinh tế bằng viền mảnh và nền trung tính.
+ * Surface - Tailwind UI Card & Panel Container
+ * Đảm bảo hỗ trợ Dark Mode hoàn hảo với bg-surface, text-ink, border-border.
  */
 export const Surface: React.FC<SurfaceProps> = ({
   children,
@@ -34,18 +34,19 @@ export const Surface: React.FC<SurfaceProps> = ({
     glass: 'subtle'
   };
   const resolvedVariant = variant || (intensity ? intensityToVariant[intensity] : 'default') || 'default';
+  
   const variantStyles = {
-    default: 'bg-white dark:bg-slate-900 shadow-xs',
-    flat: 'bg-white dark:bg-slate-900 shadow-2xs',
-    subtle: 'bg-slate-50/70 dark:bg-slate-900/60 shadow-none',
-    inset: 'bg-slate-100/60 dark:bg-slate-950/60 shadow-inner',
-    elevated: 'bg-white dark:bg-slate-900 shadow-sm'
+    default: 'bg-surface text-ink shadow-sm ring-1 ring-border/50 dark:ring-border',
+    flat: 'bg-surface text-ink shadow-none',
+    subtle: 'bg-surface-2 text-ink shadow-none',
+    inset: 'bg-surface-3/50 text-ink shadow-inner',
+    elevated: 'bg-surface text-ink shadow-md ring-1 ring-border/60'
   };
 
   const paddingStyles = {
     none: 'p-0',
     sm: 'p-3 sm:p-4',
-    md: 'p-4 sm:p-5',
+    md: 'p-4 sm:p-6',
     lg: 'p-6 sm:p-8'
   };
 
@@ -57,21 +58,22 @@ export const Surface: React.FC<SurfaceProps> = ({
   };
 
   const borderStyle = bordered
-    ? 'border border-slate-200/80 dark:border-slate-800/80'
+    ? 'border border-border/80 dark:border-border'
     : 'border-0';
 
   return (
     <div
-      className={`transition-colors duration-150 ${variantStyles[resolvedVariant as keyof typeof variantStyles] || variantStyles.default} ${paddingStyles[padding]} ${roundedStyles[rounded]} ${borderStyle} ${className}`}
+      className={`transition-colors duration-150 overflow-hidden ${variantStyles[resolvedVariant as keyof typeof variantStyles] || variantStyles.default} ${paddingStyles[padding]} ${roundedStyles[rounded]} ${borderStyle} ${className}`}
       {...props}
     >
       {(title || subtitle) && (
-        <div className="mb-4 pb-3 border-b border-slate-100 dark:border-slate-800">
-          {title && <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100">{title}</h3>}
-          {subtitle && <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{subtitle}</p>}
+        <div className="mb-4 pb-3 border-b border-border/70 dark:border-border/80">
+          {title && <h3 className="text-base font-semibold leading-6 text-ink tracking-tight">{title}</h3>}
+          {subtitle && <p className="text-xs text-ink-faint mt-1 leading-normal">{subtitle}</p>}
         </div>
       )}
       {children}
     </div>
   );
 };
+

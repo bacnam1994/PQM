@@ -2,11 +2,30 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useAppStore } from '../../store/useAppStore';
 import { 
-  Plus, Search, FileText, ChevronDown, Trash2,
-  Calendar, Package, Layers, Beaker, ShieldCheck,
-  X, Info, Eye, LayoutGrid, List, CornerDownRight, ArrowRightLeft, Loader2, FlaskConical,
-  CheckCircle2, Clock, Copy, Filter, Activity, Thermometer, Edit2, History, GitCompare, ArrowRight, ArrowUpDown, ClipboardCheck, TrendingUp
-} from 'lucide-react';
+  DocumentTextIcon,
+  ChevronDownIcon,
+  CalendarDaysIcon,
+  CubeIcon,
+  Square3Stack3DIcon,
+  BeakerIcon,
+  ShieldCheckIcon,
+  InformationCircleIcon,
+  EyeIcon,
+  Squares2X2Icon,
+  ListBulletIcon,
+  ArrowPathIcon,
+  CheckCircleIcon,
+  ClockIcon,
+  DocumentDuplicateIcon,
+  FunnelIcon,
+  PencilSquareIcon,
+  TrashIcon,
+  ArrowRightIcon,
+  ChevronUpDownIcon,
+  ClipboardDocumentCheckIcon,
+  ArrowTrendingUpIcon,
+  ArrowsRightLeftIcon
+} from '@heroicons/react/24/outline';
 import { Link } from 'react-router-dom';
 import { TCCS, Product, Criterion, TestResultEntry, CriterionType } from '../../types';
 import { logAuditAction } from '../../services/auditService';
@@ -19,70 +38,64 @@ import { useNavigate } from 'react-router-dom';
 
 const TCCSGridItem = React.memo(({ tccs, product, isExpanded, onExpand, onView, onClone, onEdit, onDelete, handleViewHistory, isAdmin }: any) => {
   return (
-    <DSCard isExpanded={isExpanded} className={`group ${isExpanded ? 'md:col-span-2 xl:col-span-3' : 'hover:-translate-y-2 hover:shadow-[0_20px_40px_-15px_rgba(59,130,246,0.15)] dark:hover:shadow-[0_20px_40px_-15px_rgba(59,130,246,0.08)] transition-all duration-500'} relative overflow-hidden bg-gradient-to-br from-blue-50/80 via-white to-sky-50/80 dark:from-blue-950/20 dark:via-slate-800 dark:to-sky-950/20 dark:border-slate-700/50`}>
-      {/* Decorative Blob */}
-      <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-blue-400/10 to-sky-400/10 rounded-full blur-2xl -mr-10 -mt-10 transition-transform group-hover:scale-150 duration-700"></div>
-
-      <div className="p-5 flex flex-col gap-5 relative z-10 h-full">
+    <DSCard isExpanded={isExpanded} className={`group ${isExpanded ? 'md:col-span-2 xl:col-span-3' : 'hover:-translate-y-1 hover:shadow-lg transition-all duration-300'} relative overflow-hidden bg-surface border border-border`}>
+      <div className="p-5 flex flex-col gap-4 relative z-10 h-full">
         {/* Header: Product Name and Status */}
         <div className="flex items-start justify-between gap-2">
-          <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400">
-            <Package size={14} className="text-blue-500" />
+          <div className="flex items-center gap-1.5 text-xs font-semibold text-ink-muted">
+            <CubeIcon className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
             <span className="truncate max-w-[200px]" title={product?.name}>{product?.name || 'Chưa rõ sản phẩm'}</span>
           </div>
           {tccs.isActive 
-            ? <span className="px-2 py-1 rounded bg-blue-100 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400 text-[9px] font-black uppercase tracking-widest">Hiệu lực</span> 
-            : <span className="px-2 py-1 rounded bg-slate-100 dark:bg-slate-900 text-slate-500 dark:text-slate-400 text-[9px] font-black uppercase tracking-widest">Hết hiệu lực</span>}
+            ? <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-800/40">Hiệu lực</span> 
+            : <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-surface-2 text-ink-muted border border-border">Hết hiệu lực</span>}
         </div>
 
-        {/* Glass Box Highlighting Main Content */}
-        <div className="bg-gradient-to-br from-white/60 to-white/30 dark:from-slate-900/60 dark:to-slate-900/30 backdrop-blur-md border border-white/60 dark:border-slate-700/60 shadow-[0_4px_20px_-5px_rgba(59,130,246,0.1)] dark:shadow-[0_4px_20px_-5px_rgba(59,130,246,0.05)] rounded-2xl p-4 flex flex-col gap-4 mt-2 flex-grow">
+        {/* Content Box */}
+        <div className="bg-surface-2 border border-border rounded-xl p-4 flex flex-col gap-3 flex-grow">
           {/* Main Info: TCCS Code and Date */}
-          <div className="flex items-center gap-4">
-            <div className="bg-blue-50/80 dark:bg-blue-950/50 p-3.5 rounded-xl text-blue-600 dark:text-blue-400 shrink-0 border border-blue-100/50 dark:border-blue-900/30 shadow-inner">
-              <FileText size={24} />
+          <div className="flex items-center gap-3.5">
+            <div className="p-2.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 shrink-0 border border-emerald-100 dark:border-emerald-900/30">
+              <DocumentTextIcon className="w-6 h-6" />
             </div>
-            <div className="flex flex-col">
-              <h3 className="font-black text-slate-800 dark:text-slate-200 text-lg leading-tight group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">{tccs.code}</h3>
-              <div className="flex items-center gap-1.5 mt-1 text-[11px] font-bold text-slate-500 dark:text-slate-400">
-                <Calendar size={12} />
+            <div className="flex flex-col min-w-0">
+              <h3 className="font-semibold text-ink text-base leading-tight group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors truncate">{tccs.code}</h3>
+              <div className="flex items-center gap-1.5 mt-1 text-xs text-ink-muted">
+                <CalendarDaysIcon className="w-3.5 h-3.5 shrink-0" />
                 <span>Ban hành: {formatDateStandard(tccs.issueDate)}</span>
               </div>
             </div>
           </div>
 
-          {/* --- BADGES LIÊN KẾT DỮ LIỆU --- */}
-          <div className="flex flex-wrap gap-1.5 pt-2 border-t border-slate-100/60 dark:border-slate-700/40">
-            {/* Badge: Số lô áp dụng */}
+          {/* Badges */}
+          <div className="flex flex-wrap gap-1.5 pt-2 border-t border-border">
             <Link
               to={`/batches?productId=${tccs.productId}`}
               onClick={e => e.stopPropagation()}
-              className="flex items-center gap-1 px-2 py-1 rounded-lg bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400 text-[10px] font-black border border-blue-100 dark:border-blue-900/40 hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors"
+              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-surface text-ink-soft text-xs font-medium border border-border hover:border-emerald-300 dark:hover:border-emerald-700 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors"
             >
-              <Layers size={10} />
+              <Square3Stack3DIcon className="w-3.5 h-3.5" />
               {tccs.batchesCount > 0 ? `${tccs.batchesCount} lô` : 'Chưa có lô'}
             </Link>
-            {/* Badge: Số phiếu KN */}
             {tccs.testResultsCount > 0 && (
               <Link
                 to={`/test-results?productId=${tccs.productId}`}
                 onClick={e => e.stopPropagation()}
-                className="flex items-center gap-1 px-2 py-1 rounded-lg bg-cyan-50 dark:bg-cyan-950/30 text-cyan-600 dark:text-cyan-400 text-[10px] font-black border border-cyan-100 dark:border-cyan-900/40 hover:bg-cyan-100 dark:hover:bg-cyan-900/50 transition-colors"
+                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-surface text-ink-soft text-xs font-medium border border-border hover:border-sky-300 dark:hover:border-sky-700 hover:text-sky-600 dark:hover:text-sky-400 transition-colors"
               >
-                <ClipboardCheck size={10} />
+                <ClipboardDocumentCheckIcon className="w-3.5 h-3.5" />
                 {tccs.testResultsCount} phiếu KN
               </Link>
             )}
-            {/* Badge: Tỷ lệ đạt */}
             {tccs.testResultsCount > 0 && (
-              <span className={`flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-black border ${
+              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium border ${
                 tccs.passRate >= 80
-                  ? 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 border-emerald-100 dark:border-emerald-900/40'
+                  ? 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800/40'
                   : tccs.passRate >= 50
-                  ? 'bg-amber-50 dark:bg-amber-950/30 text-amber-600 dark:text-amber-400 border-amber-100 dark:border-amber-900/40'
-                  : 'bg-red-50 dark:bg-red-950/30 text-red-600 dark:text-red-400 border-red-100 dark:border-red-900/40'
+                  ? 'bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800/40'
+                  : 'bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-400 border-red-200 dark:border-red-800/40'
               }`}>
-                <TrendingUp size={10} />
+                <ArrowTrendingUpIcon className="w-3.5 h-3.5" />
                 Đạt: {tccs.passRate}%
               </span>
             )}
@@ -90,9 +103,15 @@ const TCCSGridItem = React.memo(({ tccs, product, isExpanded, onExpand, onView, 
         </div>
 
         {/* Footer: Actions */}
-        <div className="flex items-center justify-between pt-4 border-t border-slate-200/50 dark:border-slate-700/50 mt-auto">
-          <div className="relative z-10 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-            <button onClick={() => handleViewHistory(tccs.productId)} className="p-2 text-slate-400 dark:text-slate-550 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30 rounded-lg transition-colors" title="Lịch sử phiên bản"><History size={16} /></button>
+        <div className="flex items-center justify-between pt-3 border-t border-border mt-auto">
+          <div className="relative z-10 flex items-center gap-1 opacity-90 group-hover:opacity-100 transition-opacity">
+            <button 
+              onClick={() => handleViewHistory(tccs.productId)} 
+              className="p-1.5 text-ink-muted hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-surface-2 rounded-lg transition-colors" 
+              title="Lịch sử phiên bản"
+            >
+              <ClockIcon className="w-4 h-4" />
+            </button>
             <ActionButtons
               onView={() => onView(tccs)}
               onClone={isAdmin ? () => onClone(tccs) : undefined}
@@ -100,8 +119,16 @@ const TCCSGridItem = React.memo(({ tccs, product, isExpanded, onExpand, onView, 
               onDelete={isAdmin ? () => onDelete(tccs) : undefined}
             />
           </div>
-          <button onClick={() => onExpand(tccs.id)} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-bold text-[11px] transition-all ml-auto ${isExpanded ? 'bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300' : 'bg-slate-50/80 dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200/50 dark:border-slate-700'}`}>
-            {isExpanded ? 'Đóng lại' : 'Xem cấu trúc'} <ChevronDown size={14} className={`transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+          <button 
+            onClick={() => onExpand(tccs.id)} 
+            className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all ml-auto ${
+              isExpanded 
+                ? 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800' 
+                : 'bg-surface-2 text-ink-soft hover:bg-surface-3 border border-border'
+            }`}
+          >
+            {isExpanded ? 'Đóng lại' : 'Xem cấu trúc'} 
+            <ChevronDownIcon className={`w-3.5 h-3.5 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
           </button>
         </div>
       </div>
@@ -139,20 +166,20 @@ const TCCSExpandedStructure = ({ tccs }: { tccs: any }) => {
   const CriteriaTable = ({ title, criteria, color }: { title: string; criteria: any[]; color: string }) => (
     criteria.length > 0 ? (
       <div>
-        <h5 className={`text-[10px] font-black uppercase tracking-[0.2em] flex items-center gap-1.5 mb-2 ${color}`}>
-          <Activity size={12}/> {title}
+        <h5 className={`text-xs font-semibold uppercase tracking-wider flex items-center gap-1.5 mb-2 ${color}`}>
+          <BeakerIcon className="w-3.5 h-3.5" /> {title}
         </h5>
-        <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700 overflow-hidden mb-4 shadow-sm">
+        <div className="bg-surface rounded-lg border border-border overflow-hidden mb-3 shadow-xs">
           <table className="w-full text-left text-xs">
-            <thead className="bg-slate-50 dark:bg-slate-900 border-b border-slate-100 dark:border-slate-700 text-[10px] font-black text-slate-400 dark:text-slate-555 uppercase">
-              <tr><th className="px-4 py-2.5">Chỉ tiêu</th><th className="px-4 py-2.5">Mức quy định</th><th className="px-4 py-2.5 text-center">ĐVT</th></tr>
+            <thead className="bg-surface-2 border-b border-border text-[11px] font-semibold text-ink-muted uppercase">
+              <tr><th className="px-3.5 py-2">Chỉ tiêu</th><th className="px-3.5 py-2">Mức quy định</th><th className="px-3.5 py-2 text-center">ĐVT</th></tr>
             </thead>
-            <tbody className="divide-y divide-slate-50 dark:divide-slate-800/40">
+            <tbody className="divide-y divide-border">
               {criteria.map((c: any, i: number) => c ? (
-                <tr key={i} className="hover:bg-blue-50/30 dark:hover:bg-blue-950/20 transition-colors">
-                  <td className="px-4 py-2.5 font-bold text-slate-700 dark:text-slate-200">{c.name}</td>
-                  <td className="px-4 py-2.5 font-black text-blue-600 dark:text-blue-400 font-mono">{renderReq(c)}</td>
-                  <td className="px-4 py-2.5 text-center text-slate-500 dark:text-slate-400">{c.unit}</td>
+                <tr key={i} className="hover:bg-surface-2 transition-colors">
+                  <td className="px-3.5 py-2 font-medium text-ink">{c.name}</td>
+                  <td className="px-3.5 py-2 font-semibold text-emerald-600 dark:text-emerald-400 font-mono">{renderReq(c)}</td>
+                  <td className="px-3.5 py-2 text-center text-ink-muted">{c.unit}</td>
                 </tr>
               ) : null)}
             </tbody>
@@ -163,56 +190,60 @@ const TCCSExpandedStructure = ({ tccs }: { tccs: any }) => {
   );
 
   return (
-    <div className="px-6 pb-6 pt-4 border-t border-slate-100 dark:border-slate-700 animate-in slide-in-from-top-4 duration-300 space-y-2 bg-slate-50/50 dark:bg-slate-900/10">
-      <CriteriaTable title="Chỉ tiêu Lý hóa & Cảm quan" criteria={ensureArray(tccs?.mainQualityCriteria)} color="text-indigo-600" />
-      <CriteriaTable title="Giới hạn Vi sinh vật" criteria={micro} color="text-emerald-600" />
-      <CriteriaTable title="Giới hạn Kim loại nặng" criteria={metal} color="text-red-600" />
+    <div className="px-5 pb-5 pt-3 border-t border-border animate-in slide-in-from-top-4 duration-300 space-y-2 bg-surface-2/40">
+      <CriteriaTable title="Chỉ tiêu Lý hóa & Cảm quan" criteria={ensureArray(tccs?.mainQualityCriteria)} color="text-emerald-600 dark:text-emerald-400" />
+      <CriteriaTable title="Giới hạn Vi sinh vật" criteria={micro} color="text-teal-600 dark:text-teal-400" />
+      <CriteriaTable title="Giới hạn Kim loại nặng" criteria={metal} color="text-rose-600 dark:text-rose-400" />
       {ensureArray(tccs?.mainQualityCriteria).length === 0 && micro.length === 0 && metal.length === 0 && (
-        <p className="text-center text-slate-400 dark:text-slate-500 italic text-xs py-4">Chưa có chỉ tiêu nào được khai báo.</p>
+        <p className="text-center text-ink-muted italic text-xs py-3">Chưa có chỉ tiêu nào được khai báo.</p>
       )}
     </div>
   );
 };
 
 const TCCSListItem = React.memo(({ tccs, product, onView, onClone, onEdit, onDelete, isAdmin }: any) => (
-  <tr className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
-    <td className="px-4 py-3 font-black text-slate-800 dark:text-slate-200">{tccs.code}</td>
-    <td className="px-4 py-3 font-bold text-slate-600 dark:text-slate-300">{product?.name}</td>
-    <td className="px-4 py-3 text-sm text-zinc-600 dark:text-zinc-400">{formatDateStandard(tccs.issueDate)}</td>
+  <tr className="hover:bg-surface-2 transition-colors">
+    <td className="px-4 py-3 font-semibold text-ink">{tccs.code}</td>
+    <td className="px-4 py-3 font-medium text-ink-soft">{product?.name}</td>
+    <td className="px-4 py-3 text-xs text-ink-muted">{formatDateStandard(tccs.issueDate)}</td>
     <td className="px-4 py-3">
       <div className="flex flex-wrap gap-1">
         <Link
           to={`/batches?productId=${tccs.productId}`}
           onClick={e => e.stopPropagation()}
-          className="flex items-center gap-1 px-2 py-0.5 rounded bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400 text-[10px] font-black hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors border border-blue-100 dark:border-blue-900/40"
+          className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-surface text-ink-soft border border-border hover:text-emerald-600 hover:border-emerald-300 transition-colors"
         >
-          <Layers size={9} /> {tccs.batchesCount} lô
+          <Square3Stack3DIcon className="w-3 h-3" /> {tccs.batchesCount} lô
         </Link>
         {tccs.testResultsCount > 0 && (
           <Link
             to={`/test-results?productId=${tccs.productId}`}
             onClick={e => e.stopPropagation()}
-            className="flex items-center gap-1 px-2 py-0.5 rounded bg-cyan-50 dark:bg-cyan-950/30 text-cyan-600 dark:text-cyan-400 text-[10px] font-black hover:bg-cyan-100 dark:hover:bg-cyan-900/50 transition-colors border border-cyan-100 dark:border-cyan-900/40"
+            className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-surface text-ink-soft border border-border hover:text-sky-600 hover:border-sky-300 transition-colors"
           >
-            <ClipboardCheck size={9} /> {tccs.testResultsCount} KN
+            <ClipboardDocumentCheckIcon className="w-3 h-3" /> {tccs.testResultsCount} KN
           </Link>
         )}
         {tccs.testResultsCount > 0 && (
-          <span className={`flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-black border ${
-            tccs.passRate >= 80 ? 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 border-emerald-100 dark:border-emerald-900/40'
-            : tccs.passRate >= 50 ? 'bg-amber-50 dark:bg-amber-950/30 text-amber-600 dark:text-amber-400 border-amber-100 dark:border-amber-900/40'
-            : 'bg-red-50 dark:bg-red-950/30 text-red-600 dark:text-red-400 border-red-100 dark:border-red-900/40'
+          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium border ${
+            tccs.passRate >= 80 ? 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800/40'
+            : tccs.passRate >= 50 ? 'bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800/40'
+            : 'bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-400 border-red-200 dark:border-red-800/40'
           }`}>
-            <TrendingUp size={9} /> {tccs.passRate}%
+            <ArrowTrendingUpIcon className="w-3 h-3" /> {tccs.passRate}%
           </span>
         )}
       </div>
     </td>
     <td className="px-4 py-3 text-center">
-      {tccs.isActive ? <span className="bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 px-2 py-1 rounded text-[10px] font-black uppercase">Hiệu lực</span> : <span className="bg-slate-100 dark:bg-slate-900 text-slate-500 dark:text-slate-400 px-2 py-1 rounded text-[10px] font-black uppercase">Hết hiệu lực</span>}
+      {tccs.isActive ? (
+        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-800/40">Hiệu lực</span>
+      ) : (
+        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-surface-2 text-ink-muted border border-border">Hết hiệu lực</span>
+      )}
     </td>
     <td className="px-4 py-3 text-right">
-      <div className="relative z-10 flex justify-end gap-2">
+      <div className="relative z-10 flex justify-end gap-1.5">
         <ActionButtons
           onView={() => onView(tccs)}
           onClone={isAdmin ? () => onClone(tccs) : undefined}
@@ -228,7 +259,7 @@ const TCCSListItem = React.memo(({ tccs, product, onView, onClone, onEdit, onDel
 const TCCSDataList = ({ viewMode, data, products, expandedIds, onExpand, onView, onClone, onEdit, onDelete, handleViewHistory, isAdmin }: any) => {
   if (viewMode === 'grid') {
     return (
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
         {data.map((tccs: any) => (
           <TCCSGridItem 
             key={tccs.id}
@@ -249,14 +280,28 @@ const TCCSDataList = ({ viewMode, data, products, expandedIds, onExpand, onView,
   }
   return (
     <DSTable>
-      <thead className="bg-slate-50 dark:bg-zinc-900 border-b border-slate-100 dark:border-zinc-800/80">
-        <tr className="text-slate-500 dark:text-zinc-400 text-[10px] font-black uppercase tracking-widest">
-          <th className="px-4 py-3">Mã TCCS</th><th className="px-4 py-3">Sản phẩm</th><th className="px-4 py-3">Ngày ban hành</th><th className="px-4 py-3">Thống kê</th><th className="px-4 py-3 text-center">Trạng thái</th><th className="px-4 py-3 text-right">Thao tác</th>
+      <thead className="bg-surface-2 border-b border-border">
+        <tr className="text-ink-muted text-xs font-semibold uppercase tracking-wider">
+          <th className="px-4 py-3">Mã TCCS</th>
+          <th className="px-4 py-3">Sản phẩm</th>
+          <th className="px-4 py-3">Ngày ban hành</th>
+          <th className="px-4 py-3">Thống kê</th>
+          <th className="px-4 py-3 text-center">Trạng thái</th>
+          <th className="px-4 py-3 text-right">Thao tác</th>
         </tr>
       </thead>
-      <tbody className="divide-y divide-slate-50 dark:divide-zinc-850">
+      <tbody className="divide-y divide-border">
         {data.map((tccs: any) => (
-          <TCCSListItem key={tccs.id} tccs={tccs} product={products.find((p: any) => p.id === tccs.productId)} onView={onView} onClone={onClone} onEdit={onEdit} onDelete={onDelete} isAdmin={isAdmin} />
+          <TCCSListItem 
+            key={tccs.id} 
+            tccs={tccs} 
+            product={products.find((p: any) => p.id === tccs.productId)} 
+            onView={onView} 
+            onClone={onClone} 
+            onEdit={onEdit} 
+            onDelete={onDelete} 
+            isAdmin={isAdmin} 
+          />
         ))}
       </tbody>
     </DSTable>
@@ -268,14 +313,12 @@ const TCCSList: React.FC = () => {
   const products = useAppStore(s => s.products);
   const tccsList = useAppStore(s => s.tccsList);
   const batches = useAppStore(s => s.batches);
-  const productFormulas = useAppStore(s => s.productFormulas);
   const addTCCS = useAppStore(s => s.addTCCS);
   const updateTCCS = useAppStore(s => s.updateTCCS);
   const deleteTCCS = useAppStore(s => s.deleteTCCS);
   const isAdmin = useAppStore(s => s.isAdmin);
   const notify = useAppStore(s => s.notify);
   const user = useAppStore(s => s.user);
-  // Dùng useDataGraph để lấy HydratedTCCS (có batchesCount, testResultsCount, passRate)
   const { tccsList: hydratedTccsList } = useDataGraph();
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
@@ -294,7 +337,6 @@ const TCCSList: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = viewMode === 'grid' ? 12 : 15;
 
-  // Use CRUD Hook
   const crud = useCrud<TCCS>();
 
   const toggleExpand = useCallback((id: string) => {
@@ -306,7 +348,6 @@ const TCCSList: React.FC = () => {
   }, []);
 
   const handleDeleteTCCS = useCallback(async (tccs: TCCS) => {
-    // Check if the TCCS is used by any valid batch object
     const isUsed = batches.some(b => b && b.tccsId === tccs.id);
     if (isUsed) {
       notify({ type: 'WARNING', title: 'Không thể xóa', message: 'TCCS này đang được sử dụng bởi một hoặc nhiều Lô sản xuất.' });
@@ -319,11 +360,9 @@ const TCCSList: React.FC = () => {
     if (crud.selectedItem) {
       try {
         await deleteTCCS(crud.selectedItem.id);
-        // Đóng modal ngay khi xóa thành công
         crud.close();
         notify({ type: 'SUCCESS', title: 'Đã xóa', message: `Đã xóa TCCS ${crud.selectedItem!.code}` });
         
-        // Ghi log an toàn
         try {
           logAuditAction({
             action: 'DELETE',
@@ -337,12 +376,11 @@ const TCCSList: React.FC = () => {
         }
       } catch (error) {
         console.error("Failed to delete TCCS:", error);
-        // AppContext handles error notification
       }
     } else {
       crud.close();
     }
-  }, [crud.selectedItem, deleteTCCS, user]);
+  }, [crud.selectedItem, deleteTCCS, user, crud]);
 
   const handleEdit = useCallback((tccs: TCCS) => {
     navigate(`/tccs/edit/${tccs.id}`);
@@ -387,7 +425,6 @@ const TCCSList: React.FC = () => {
 
   const filteredTCCS = useMemo(() => {
     const productMap = new Map(products.map(p => [p.id, p]));
-    // Dùng hydratedTccsList để có batchesCount, testResultsCount, passRate
     const sourceList = hydratedTccsList.length > 0 ? hydratedTccsList : tccsList;
 
     return sourceList.filter(t => {
@@ -411,7 +448,6 @@ const TCCSList: React.FC = () => {
     });
   }, [tccsList, hydratedTccsList, products, searchTerm, filterProductId, filterStatus, sortConfig, filterMonth, filterYear]);
 
-
   useEffect(() => {
     setCurrentPage(1);
   }, [searchTerm, filterProductId, filterStatus, sortConfig, filterMonth, filterYear]);
@@ -422,10 +458,10 @@ const TCCSList: React.FC = () => {
   const renderComparisonRow = (label: string, val1: any, val2: any) => {
     const isDiff = val1 !== val2;
     return (
-      <tr className="border-b border-slate-100 last:border-none hover:bg-slate-50">
-        <td className="py-3 px-4 text-xs font-bold text-slate-500">{label}</td>
-        <td className="py-3 px-4 text-xs text-slate-700 font-medium">{val1 || '-'}</td>
-        <td className={`py-3 px-4 text-xs font-bold ${isDiff ? 'text-blue-600 bg-blue-50' : 'text-slate-700'}`}>
+      <tr className="border-b border-border last:border-none hover:bg-surface-2">
+        <td className="py-2.5 px-4 text-xs font-medium text-ink-muted">{label}</td>
+        <td className="py-2.5 px-4 text-xs text-ink">{val1 || '-'}</td>
+        <td className={`py-2.5 px-4 text-xs font-semibold ${isDiff ? 'text-emerald-600 bg-emerald-50/50 dark:bg-emerald-950/20' : 'text-ink'}`}>
           {val2 || '-'}
         </td>
       </tr>
@@ -444,13 +480,13 @@ const TCCSList: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500">
+    <div className="space-y-6">
       <PageHeader 
         title="Tiêu chuẩn Cơ sở (TCCS)" 
         subtitle="Quản lý định mức kỹ thuật và chỉ tiêu chất lượng sản phẩm." 
-        icon={FileText} 
+        icon={DocumentTextIcon} 
         action={
-              isAdmin && <AddButton onClick={() => navigate('/tccs/new')} label="Lập hồ sơ mới" />
+          isAdmin && <AddButton onClick={() => navigate('/tccs/new')} label="Lập hồ sơ mới" />
         }
       />
 
@@ -458,7 +494,7 @@ const TCCSList: React.FC = () => {
       <DSFilterBar>
         <DSSearchInput placeholder="Tìm theo mã TCCS hoặc tên sản phẩm..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
         
-        <DSSelect icon={Filter} value={filterStatus} onChange={(e) => setFilterStatus(e.target.value as any)} className="w-32">
+        <DSSelect icon={FunnelIcon} value={filterStatus} onChange={(e) => setFilterStatus(e.target.value as any)} className="w-36">
            <option value="ALL">Tất cả trạng thái</option>
            <option value="ACTIVE">Đang hiệu lực</option>
            <option value="INACTIVE">Hết hiệu lực</option>
@@ -466,7 +502,7 @@ const TCCSList: React.FC = () => {
 
         <DSSelect value={filterYear} onChange={(e) => setFilterYear(e.target.value)} className="w-24">
           <option value="ALL">Năm</option>
-        {Array.from(new Set(tccsList.map(t => new Date(t.issueDate).getFullYear()))).sort((a, b) => (b as number) - (a as number)).map(y => <option key={String(y)} value={String(y)}>{y}</option>)}
+          {Array.from(new Set(tccsList.map(t => new Date(t.issueDate).getFullYear()))).sort((a, b) => (b as number) - (a as number)).map(y => <option key={String(y)} value={String(y)}>{y}</option>)}
         </DSSelect>
 
         <DSSelect value={filterMonth} onChange={(e) => setFilterMonth(e.target.value)} className="w-24">
@@ -476,26 +512,26 @@ const TCCSList: React.FC = () => {
 
         <DSSelect value={filterProductId} onChange={(e) => setFilterProductId(e.target.value)} className="w-full md:w-48">
           <option value="">Tất cả sản phẩm</option>
-        {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+          {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
         </DSSelect>
 
-        <DSSelect icon={ArrowUpDown} value={`${sortConfig.key}-${sortConfig.direction}`} onChange={(e) => {
+        <DSSelect icon={ChevronUpDownIcon} value={`${sortConfig.key}-${sortConfig.direction}`} onChange={(e) => {
              const [key, direction] = e.target.value.split('-');
              setSortConfig({ key: key as any, direction: direction as any });
-           }} className="w-32">
+           }} className="w-36">
            <option value="code-asc">Mã TCCS (A-Z)</option>
            <option value="code-desc">Mã TCCS (Z-A)</option>
            <option value="issueDate-desc">Mới ban hành</option>
            <option value="issueDate-asc">Cũ nhất</option>
         </DSSelect>
 
-        <DSViewToggle viewMode={viewMode} setViewMode={setViewMode} gridIcon={LayoutGrid} listIcon={List} />
+        <DSViewToggle viewMode={viewMode} setViewMode={setViewMode} gridIcon={Squares2X2Icon} listIcon={ListBulletIcon} />
       </DSFilterBar>
 
       <TCCSDataList 
         viewMode={viewMode}
         data={paginatedTCCS}
-      products={products}
+        products={products}
         expandedIds={expandedIds}
         onExpand={toggleExpand}
         onView={handleView}
@@ -517,77 +553,80 @@ const TCCSList: React.FC = () => {
       />
 
       {/* Modal Lịch sử Phiên bản */}
-      <Modal isOpen={isHistoryModalOpen} onClose={() => setIsHistoryModalOpen(false)} title="Lịch sử Phiên bản TCCS" icon={History} color="bg-indigo-600">
-        <div className="flex justify-between items-center mb-4 px-2 bg-indigo-50 p-3 rounded-xl border border-indigo-100">
-          <p className="text-xs font-bold text-indigo-800 flex items-center gap-2"><Info size={14}/> Chọn 2 phiên bản để so sánh</p>
+      <Modal isOpen={isHistoryModalOpen} onClose={() => setIsHistoryModalOpen(false)} title="Lịch sử Phiên bản TCCS" icon={ClockIcon} color="bg-emerald-600">
+        <div className="flex justify-between items-center mb-4 p-3 bg-surface-2 rounded-xl border border-border">
+          <p className="text-xs font-medium text-ink flex items-center gap-2">
+            <InformationCircleIcon className="w-4 h-4 text-emerald-600" /> Chọn 2 phiên bản để so sánh
+          </p>
           <button 
             onClick={() => setIsCompareModalOpen(true)}
             disabled={compareSelection.length !== 2}
-            className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg text-[10px] font-black uppercase disabled:opacity-50 disabled:cursor-not-allowed hover:bg-indigo-700 transition-all shadow-md"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-xs font-medium disabled:opacity-50 disabled:cursor-not-allowed hover:bg-emerald-700 transition-all shadow-xs"
           >
-            <GitCompare size={14} /> So sánh ({compareSelection.length}/2)
+            <ArrowsRightLeftIcon className="w-4 h-4" /> So sánh ({compareSelection.length}/2)
           </button>
         </div>
-        <div className="space-y-4 max-h-[50vh] overflow-y-auto custom-scrollbar pr-2">
+        <div className="space-y-3 max-h-[50vh] overflow-y-auto custom-scrollbar pr-2">
            {historyVersions.length > 0 ? (
-             <div className="relative border-l-2 border-indigo-100 ml-3 space-y-6 py-2">
+             <div className="relative border-l-2 border-border ml-3 space-y-4 py-2">
                {historyVersions.map((ver, idx) => (
                  <div key={ver.id} className="relative pl-6">
-                    <div className={`absolute -left-[9px] top-0 w-4 h-4 rounded-full border-2 border-white ${idx === 0 ? 'bg-indigo-600' : 'bg-slate-300'}`} />
-                    <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 hover:bg-white hover:shadow-md transition-all group">
+                    <div className={`absolute -left-[9px] top-0 w-4 h-4 rounded-full border-2 border-surface ${idx === 0 ? 'bg-emerald-600' : 'bg-surface-3'}`} />
+                    <div className="bg-surface-2 p-3.5 rounded-xl border border-border hover:bg-surface hover:shadow-xs transition-all">
                        <div className="flex justify-between items-start mb-2 gap-3">
                           <input 
                             type="checkbox" 
                             checked={compareSelection.includes(ver.id)}
                             onChange={() => toggleCompareSelection(ver.id)}
-                            className="mt-1 w-4 h-4 accent-indigo-600 cursor-pointer shrink-0"
+                            className="mt-1 w-4 h-4 rounded border-border text-emerald-600 focus:ring-emerald-500 cursor-pointer shrink-0"
                           />
-                          <div>
-                             <h4 className={`font-bold text-sm ${idx === 0 ? 'text-indigo-700' : 'text-slate-700'}`}>{ver.code}</h4>
-                             <p className="text-[10px] font-bold text-zinc-400 uppercase">Ban hành: {formatDateStandard(ver.issueDate)}</p>
+                          <div className="min-w-0 flex-1">
+                             <h4 className={`font-semibold text-sm ${idx === 0 ? 'text-emerald-700 dark:text-emerald-400' : 'text-ink'}`}>{ver.code}</h4>
+                             <p className="text-xs text-ink-muted">Ban hành: {formatDateStandard(ver.issueDate)}</p>
                           </div>
-                          {idx === 0 && <span className="bg-indigo-100 text-indigo-700 text-[9px] font-black px-2 py-1 rounded uppercase">Hiện hành</span>}
+                          {idx === 0 && <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400">Hiện hành</span>}
                        </div>
-                       <button onClick={() => { setIsHistoryModalOpen(false); handleEdit(ver); }} className="w-full mt-2 py-2 bg-white border border-slate-200 rounded-lg text-[10px] font-bold text-slate-500 hover:text-indigo-600 hover:border-indigo-200 transition-all">Xem chi tiết / Chỉnh sửa</button>
+                       <button onClick={() => { setIsHistoryModalOpen(false); handleEdit(ver); }} className="w-full mt-2 py-1.5 bg-surface border border-border rounded-lg text-xs font-medium text-ink-soft hover:text-emerald-600 hover:border-emerald-300 transition-all">Xem chi tiết / Chỉnh sửa</button>
                     </div>
                  </div>
                ))}
              </div>
            ) : (
-             <p className="text-center text-slate-400 text-sm py-4">Chưa có dữ liệu lịch sử cho sản phẩm này.</p>
+             <p className="text-center text-ink-muted text-xs py-4">Chưa có dữ liệu lịch sử cho sản phẩm này.</p>
            )}
         </div>
       </Modal>
 
       {/* Modal So sánh */}
-      <Modal isOpen={isCompareModalOpen} onClose={() => setIsCompareModalOpen(false)} title="So sánh Phiên bản" icon={GitCompare} color="bg-blue-600">
+      <Modal isOpen={isCompareModalOpen} onClose={() => setIsCompareModalOpen(false)} title="So sánh Phiên bản" icon={ArrowsRightLeftIcon} color="bg-emerald-600">
         {compareVersions && (
           <div className="overflow-x-auto max-h-[70vh] custom-scrollbar">
-             <div className="grid grid-cols-2 gap-4 mb-6 sticky top-0 bg-white z-10 pb-4 border-b border-slate-100">
-                <div className="p-4 bg-slate-50 rounded-xl border border-slate-200">
-                   <p className="text-[10px] font-black text-slate-400 uppercase mb-1">Phiên bản cũ</p>
-                   <h4 className="font-bold text-slate-700 text-sm">{compareVersions[0].code}</h4>
-                   <p className="text-[10px] font-bold text-zinc-500">{formatDateStandard(compareVersions[0].issueDate)}</p>
+             <div className="grid grid-cols-2 gap-4 mb-4 sticky top-0 bg-surface z-10 pb-3 border-b border-border">
+                <div className="p-3.5 bg-surface-2 rounded-xl border border-border">
+                   <p className="text-xs font-medium text-ink-muted uppercase mb-1">Phiên bản cũ</p>
+                   <h4 className="font-semibold text-ink text-sm">{compareVersions[0].code}</h4>
+                   <p className="text-xs text-ink-muted">{formatDateStandard(compareVersions[0].issueDate)}</p>
                 </div>
-                <div className="p-4 bg-blue-50 rounded-xl border border-blue-200 relative">
-                   <div className="absolute -left-2 top-1/2 -translate-y-1/2 bg-white rounded-full p-1 border border-blue-100 text-blue-400 z-20"><ArrowRight size={14}/></div>
-                   <p className="text-[10px] font-black text-blue-400 uppercase mb-1">Phiên bản mới</p>
-                   <h4 className="font-bold text-blue-700 text-sm">{compareVersions[1].code}</h4>
-                   <p className="text-[10px] font-bold text-blue-500">{formatDateStandard(compareVersions[1].issueDate)}</p>
+                <div className="p-3.5 bg-emerald-50/50 dark:bg-emerald-950/20 rounded-xl border border-emerald-200 dark:border-emerald-800/40 relative">
+                   <div className="absolute -left-2 top-1/2 -translate-y-1/2 bg-surface rounded-full p-1 border border-border text-emerald-600 z-20">
+                     <ArrowRightIcon className="w-3.5 h-3.5" />
+                   </div>
+                   <p className="text-xs font-medium text-emerald-600 dark:text-emerald-400 uppercase mb-1">Phiên bản mới</p>
+                   <h4 className="font-semibold text-emerald-700 dark:text-emerald-300 text-sm">{compareVersions[1].code}</h4>
+                   <p className="text-xs text-emerald-600/80 dark:text-emerald-400/80">{formatDateStandard(compareVersions[1].issueDate)}</p>
                 </div>
              </div>
              
-             <table className="w-full text-left border-collapse">
+             <table className="w-full text-left border-collapse text-xs">
                <thead>
-                 <tr className="text-[10px] font-black text-slate-400 uppercase tracking-widest border-b-2 border-slate-100">
-                   <th className="py-2 px-4 w-1/3">Thông tin / Chỉ tiêu</th>
-                   <th className="py-2 px-4 w-1/3">Bản cũ</th>
-                   <th className="py-2 px-4 w-1/3">Bản mới</th>
+                 <tr className="text-xs font-semibold text-ink-muted uppercase tracking-wider border-b border-border bg-surface-2">
+                   <th className="py-2.5 px-4 w-1/3">Thông tin / Chỉ tiêu</th>
+                   <th className="py-2.5 px-4 w-1/3">Bản cũ</th>
+                   <th className="py-2.5 px-4 w-1/3">Bản mới</th>
                  </tr>
                </thead>
-               <tbody className="divide-y divide-slate-50">
-                 {/* Criteria Comparison */}
-                 <tr><td colSpan={3} className="py-3 px-4 bg-slate-50 text-[10px] font-black text-slate-400 uppercase tracking-widest mt-2">Chỉ tiêu chất lượng</td></tr>
+               <tbody className="divide-y divide-border">
+                 <tr><td colSpan={3} className="py-2 px-4 bg-surface-2/60 text-xs font-semibold text-ink-muted uppercase tracking-wider">Chỉ tiêu chất lượng</td></tr>
                  {Array.from(new Set([
                     ...(compareVersions[0].mainQualityCriteria || []).filter(c => c?.name).map(c => c.name),
                     ...(compareVersions[0].safetyCriteria || []).filter(c => c?.name).map(c => c.name),
@@ -602,8 +641,8 @@ const TCCSList: React.FC = () => {
                  })}
                </tbody>
              </table>
-             <div className="mt-6 flex justify-end">
-                <button onClick={() => setIsCompareModalOpen(false)} className="px-6 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg text-xs font-bold uppercase transition-colors">Đóng</button>
+             <div className="mt-4 flex justify-end">
+                <button onClick={() => setIsCompareModalOpen(false)} className="px-4 py-2 bg-surface-2 hover:bg-surface-3 text-ink rounded-lg text-xs font-medium transition-colors border border-border">Đóng</button>
              </div>
           </div>
         )}

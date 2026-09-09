@@ -1,5 +1,15 @@
 import React, { useState } from 'react';
-import { X, Scale, AlertTriangle, CheckCircle2, FileText, UploadCloud, Sparkles, Loader2, ExternalLink } from 'lucide-react';
+import { 
+  XMarkIcon, 
+  ScaleIcon, 
+  ExclamationTriangleIcon, 
+  CheckCircleIcon, 
+  DocumentTextIcon, 
+  ArrowUpTrayIcon, 
+  SparklesIcon, 
+  ArrowPathIcon, 
+  ArrowTopRightOnSquareIcon 
+} from '@heroicons/react/24/outline';
 import { TestResult, Batch } from '../../types';
 import { compareLabReports, LabComparisonResult, LabReportSource } from '../../services/ai/labComparisonService';
 import { geminiService } from '../../services/ai/geminiService';
@@ -120,45 +130,48 @@ export const LabComparisonModal: React.FC<LabComparisonModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/70 backdrop-blur-sm p-4 overflow-y-auto">
-      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 w-full max-w-4xl overflow-hidden my-8 animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 overflow-y-auto">
+      <div className="bg-surface rounded-2xl shadow-2xl border border-border w-full max-w-4xl overflow-hidden my-8 animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
         {/* Header */}
-        <div className="p-5 border-b border-slate-100 dark:border-slate-700 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-slate-900 dark:to-indigo-950/40 flex justify-between items-center flex-shrink-0">
+        <div className="p-5 border-b border-border bg-surface-2 flex justify-between items-center flex-shrink-0">
           <div className="flex items-center gap-3">
-            <div className="p-2.5 bg-indigo-600 text-white rounded-xl shadow-md">
-              <Scale size={20} />
+            <div className="p-2.5 bg-emerald-600 text-white rounded-xl shadow-sm">
+              <ScaleIcon className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="text-base font-black text-slate-800 dark:text-slate-100 uppercase tracking-wide flex items-center gap-2">
+              <h3 className="text-base font-black text-ink uppercase tracking-wide flex items-center gap-2">
                 AI Cross-Lab Comparison
-                <span className="text-[10px] bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 font-bold px-2 py-0.5 rounded-full">
-                  Đối chiếu Đa phiếu & Lab Bias
+                <span className="text-[10px] bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 font-bold px-2 py-0.5 rounded-full border border-emerald-500/20">
+                  Đối chiếu Đa phiếu &amp; Lab Bias
                 </span>
               </h3>
-              <p className="text-xs text-slate-500 dark:text-slate-400">
+              <p className="text-xs text-ink-muted">
                 So sánh kết quả giữa phòng Lab Nội bộ và Lab Ngoại kiểm (Quatest, CASE, Eurofins, CoA NCC).
               </p>
             </div>
           </div>
-          <button onClick={onClose} className="p-2 hover:bg-slate-200/50 dark:hover:bg-slate-700 rounded-lg text-slate-400">
-            <X size={18} />
+          <button 
+            onClick={onClose} 
+            className="p-2 hover:bg-surface-3 rounded-xl text-ink-muted hover:text-ink transition-colors"
+          >
+            <XMarkIcon className="w-5 h-5" />
           </button>
         </div>
 
         {/* Body Content */}
-        <div className="p-6 overflow-y-auto space-y-6 custom-scrollbar flex-1">
+        <div className="p-6 overflow-y-auto space-y-6 custom-scrollbar flex-1 bg-surface text-ink">
           {/* Section 1: Selector / Upload */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-50 dark:bg-slate-700/30 p-4 rounded-xl border border-slate-100 dark:border-slate-700">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-surface-2 p-4 rounded-xl border border-border">
             {/* Source 1 */}
             <div className="space-y-2">
-              <label className="text-xs font-black text-slate-700 dark:text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
-                <FileText size={14} className="text-indigo-500" />
+              <label className="text-xs font-black text-ink uppercase tracking-wider flex items-center gap-1.5">
+                <DocumentTextIcon className="w-4 h-4 text-emerald-500" />
                 Phiếu Kiểm Nghiệm 1 (Gốc / Nội bộ)
               </label>
               <select
                 value={selectedId1}
                 onChange={e => { setSelectedId1(e.target.value); setFile1(null); }}
-                className="w-full text-xs font-bold p-2.5 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500"
+                className="w-full text-xs font-bold p-2.5 rounded-xl border border-border bg-surface text-ink focus:ring-2 focus:ring-emerald-500 focus:outline-none"
               >
                 <option value="">-- Chọn phiếu có sẵn trong hệ thống --</option>
                 {availableResults.map(r => {
@@ -170,26 +183,26 @@ export const LabComparisonModal: React.FC<LabComparisonModalProps> = ({
                   );
                 })}
               </select>
-              <div className="text-center text-[10px] text-slate-400 font-bold uppercase">— hoặc tải file PDF/ảnh —</div>
+              <div className="text-center text-[10px] text-ink-muted font-bold uppercase">— hoặc tải file PDF/ảnh —</div>
               <input
                 type="file"
                 accept=".pdf,image/*"
                 onChange={e => { setFile1(e.target.files?.[0] || null); setSelectedId1(''); }}
-                className="text-xs text-slate-500 file:mr-2 file:py-1 file:px-2.5 file:rounded-md file:border-0 file:text-xs file:font-bold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
+                className="text-xs text-ink-muted file:mr-2 file:py-1 file:px-2.5 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-emerald-500/10 file:text-emerald-700 dark:file:text-emerald-300 hover:file:bg-emerald-500/20"
               />
-              {file1 && <p className="text-[11px] text-emerald-600 font-bold truncate">✓ Đã chọn file: {file1.name}</p>}
+              {file1 && <p className="text-[11px] text-emerald-600 dark:text-emerald-400 font-bold truncate">✓ Đã chọn file: {file1.name}</p>}
             </div>
 
             {/* Source 2 */}
             <div className="space-y-2">
-              <label className="text-xs font-black text-slate-700 dark:text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
-                <FileText size={14} className="text-blue-500" />
+              <label className="text-xs font-black text-ink uppercase tracking-wider flex items-center gap-1.5">
+                <DocumentTextIcon className="w-4 h-4 text-blue-500" />
                 Phiếu Kiểm Nghiệm 2 (Đối chiếu / Ngoại kiểm)
               </label>
               <select
                 value={selectedId2}
                 onChange={e => { setSelectedId2(e.target.value); setFile2(null); }}
-                className="w-full text-xs font-bold p-2.5 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-blue-500"
+                className="w-full text-xs font-bold p-2.5 rounded-xl border border-border bg-surface text-ink focus:ring-2 focus:ring-emerald-500 focus:outline-none"
               >
                 <option value="">-- Chọn phiếu có sẵn trong hệ thống --</option>
                 {availableResults.map(r => {
@@ -201,14 +214,14 @@ export const LabComparisonModal: React.FC<LabComparisonModalProps> = ({
                   );
                 })}
               </select>
-              <div className="text-center text-[10px] text-slate-400 font-bold uppercase">— hoặc tải file PDF/ảnh —</div>
+              <div className="text-center text-[10px] text-ink-muted font-bold uppercase">— hoặc tải file PDF/ảnh —</div>
               <input
                 type="file"
                 accept=".pdf,image/*"
                 onChange={e => { setFile2(e.target.files?.[0] || null); setSelectedId2(''); }}
-                className="text-xs text-slate-500 file:mr-2 file:py-1 file:px-2.5 file:rounded-md file:border-0 file:text-xs file:font-bold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                className="text-xs text-ink-muted file:mr-2 file:py-1 file:px-2.5 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-blue-500/10 file:text-blue-700 dark:file:text-blue-300 hover:file:bg-blue-500/20"
               />
-              {file2 && <p className="text-[11px] text-emerald-600 font-bold truncate">✓ Đã chọn file: {file2.name}</p>}
+              {file2 && <p className="text-[11px] text-emerald-600 dark:text-emerald-400 font-bold truncate">✓ Đã chọn file: {file2.name}</p>}
             </div>
           </div>
 
@@ -217,17 +230,17 @@ export const LabComparisonModal: React.FC<LabComparisonModalProps> = ({
             <button
               onClick={handleRunComparison}
               disabled={isComparing || isUploading}
-              className="px-6 py-2.5 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white text-xs font-black uppercase tracking-wider rounded-xl shadow-lg shadow-indigo-200 dark:shadow-none flex items-center gap-2 transition-all disabled:opacity-50"
+              className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black uppercase tracking-wider rounded-xl shadow-sm flex items-center gap-2 transition-all disabled:opacity-50"
             >
               {(isComparing || isUploading) ? (
                 <>
-                  <Loader2 size={16} className="animate-spin" />
+                  <ArrowPathIcon className="w-4 h-4 animate-spin" />
                   {uploadStep || 'Đang phân tích đối chiếu...'}
                 </>
               ) : (
                 <>
-                  <Sparkles size={16} />
-                  Tiến hành Đối chiếu & Phân tích AI
+                  <SparklesIcon className="w-4 h-4" />
+                  Tiến hành Đối chiếu &amp; Phân tích AI
                 </>
               )}
             </button>
@@ -235,30 +248,30 @@ export const LabComparisonModal: React.FC<LabComparisonModalProps> = ({
 
           {/* Section 2: Results Display */}
           {comparisonResult && (
-            <div className="space-y-6 pt-4 border-t border-slate-100 dark:border-slate-700 animate-in fade-in duration-300">
+            <div className="space-y-6 pt-4 border-t border-border animate-in fade-in duration-300">
               {/* Metrics Header */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <div className="p-3.5 bg-indigo-50/70 dark:bg-indigo-950/30 rounded-xl border border-indigo-100 dark:border-indigo-800 text-center">
-                  <p className="text-[10px] font-black uppercase text-indigo-500">Tỷ lệ Đồng thuận</p>
-                  <p className="text-xl font-black text-indigo-700 dark:text-indigo-300 mt-0.5">
+                <div className="p-3.5 bg-emerald-500/10 rounded-xl border border-emerald-500/20 text-center">
+                  <p className="text-[10px] font-black uppercase text-emerald-700 dark:text-emerald-400">Tỷ lệ Đồng thuận</p>
+                  <p className="text-xl font-black text-emerald-700 dark:text-emerald-300 mt-0.5">
                     {comparisonResult.metrics.agreementRatePercent}%
                   </p>
                 </div>
-                <div className="p-3.5 bg-blue-50/70 dark:bg-blue-950/30 rounded-xl border border-blue-100 dark:border-blue-800 text-center">
-                  <p className="text-[10px] font-black uppercase text-blue-500">Độ lệch Trung bình (%RPD)</p>
+                <div className="p-3.5 bg-blue-500/10 rounded-xl border border-blue-500/20 text-center">
+                  <p className="text-[10px] font-black uppercase text-blue-700 dark:text-blue-400">Độ lệch Trung bình (%RPD)</p>
                   <p className="text-xl font-black text-blue-700 dark:text-blue-300 mt-0.5">
                     {comparisonResult.metrics.avgRpdPercent}%
                   </p>
                 </div>
-                <div className="p-3.5 bg-amber-50/70 dark:bg-amber-950/30 rounded-xl border border-amber-100 dark:border-amber-800 text-center">
-                  <p className="text-[10px] font-black uppercase text-amber-500">Lệch Vừa (12-25%)</p>
+                <div className="p-3.5 bg-amber-500/10 rounded-xl border border-amber-500/20 text-center">
+                  <p className="text-[10px] font-black uppercase text-amber-700 dark:text-amber-400">Lệch Vừa (12-25%)</p>
                   <p className="text-xl font-black text-amber-700 dark:text-amber-300 mt-0.5">
                     {comparisonResult.metrics.minorDiffCount}
                   </p>
                 </div>
-                <div className="p-3.5 bg-red-50/70 dark:bg-red-950/30 rounded-xl border border-red-100 dark:border-red-800 text-center">
-                  <p className="text-[10px] font-black uppercase text-red-500">Lệch Nghiêm trọng (&gt;25%)</p>
-                  <p className="text-xl font-black text-red-700 dark:text-red-300 mt-0.5">
+                <div className="p-3.5 bg-rose-500/10 rounded-xl border border-rose-500/20 text-center">
+                  <p className="text-[10px] font-black uppercase text-rose-700 dark:text-rose-400">Lệch Nghiêm trọng (&gt;25%)</p>
+                  <p className="text-xl font-black text-rose-700 dark:text-rose-300 mt-0.5">
                     {comparisonResult.metrics.criticalDiffCount}
                   </p>
                 </div>
@@ -273,40 +286,40 @@ export const LabComparisonModal: React.FC<LabComparisonModalProps> = ({
                 const pct1 = totalPairs > 0 ? Math.round((bias.source1HigherCount / totalPairs) * 100) : 0;
                 const pct2 = totalPairs > 0 ? Math.round((bias.source2HigherCount / totalPairs) * 100) : 0;
                 const pctEq = totalPairs > 0 ? Math.round((bias.equalCount / totalPairs) * 100) : 0;
-                const borderColor = bias.isSystematic ? 'border-rose-200 dark:border-rose-900/50' : 'border-emerald-200 dark:border-emerald-900/50';
-                const bgColor = bias.isSystematic ? 'bg-rose-50/60 dark:bg-rose-950/25' : 'bg-emerald-50/60 dark:bg-emerald-950/25';
+                const borderColor = bias.isSystematic ? 'border-rose-500/20' : 'border-emerald-500/20';
+                const bgColor = bias.isSystematic ? 'bg-rose-500/5' : 'bg-emerald-500/5';
                 const iconBg = bias.isSystematic ? 'bg-rose-600' : 'bg-emerald-600';
                 const confidenceLabel = bias.confidence === 'HIGH' ? 'Cao' : bias.confidence === 'MEDIUM' ? 'Trung bình' : 'Sơ bộ';
-                const confidenceColor = bias.confidence === 'HIGH' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300' : bias.confidence === 'MEDIUM' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300' : 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-400';
+                const confidenceColor = bias.confidence === 'HIGH' ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300' : bias.confidence === 'MEDIUM' ? 'bg-amber-500/10 text-amber-700 dark:text-amber-300' : 'bg-surface-3 text-ink-muted';
                 return (
                   <div className={`rounded-2xl border ${borderColor} ${bgColor} overflow-hidden`}>
                     {/* Header */}
                     <div className="flex items-center justify-between px-4 py-3 border-b border-inherit">
                       <div className="flex items-center gap-2.5">
                         <div className={`p-1.5 rounded-lg text-white ${iconBg}`}>
-                          <Scale size={16} />
+                          <ScaleIcon className="w-4 h-4" />
                         </div>
                         <div>
                           <div className="flex items-center gap-2 flex-wrap">
-                            <span className="text-xs font-black uppercase tracking-wide text-slate-800 dark:text-slate-100">
+                            <span className="text-xs font-black uppercase tracking-wide text-ink">
                               {bias.isSystematic ? '⚠️ Sai số Hệ thống Phát hiện (Lab Bias)' : '✅ Cân bằng – Không có Sai số Hệ thống'}
                             </span>
                             <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${confidenceColor}`}>
                               Độ tin cậy: {confidenceLabel}
                             </span>
                             {comparisonResult.report1.detectedLabOrg && comparisonResult.report1.detectedLabOrg !== 'GENERIC' && (
-                              <span className="px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300 font-mono text-[10px]">
+                              <span className="px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 font-mono text-[10px]">
                                 {comparisonResult.report1.detectedLabOrg}
                               </span>
                             )}
-                            <span className="text-[10px] text-slate-400 font-bold">vs</span>
+                            <span className="text-[10px] text-ink-muted font-bold">vs</span>
                             {comparisonResult.report2.detectedLabOrg && comparisonResult.report2.detectedLabOrg !== 'GENERIC' && (
-                              <span className="px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 font-mono text-[10px]">
+                              <span className="px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-700 dark:text-blue-300 font-mono text-[10px]">
                                 {comparisonResult.report2.detectedLabOrg}
                               </span>
                             )}
                           </div>
-                          <p className="text-[11px] text-slate-600 dark:text-slate-300 mt-0.5 font-medium leading-relaxed">
+                          <p className="text-[11px] text-ink-soft mt-0.5 font-medium leading-relaxed">
                             {bias.assessmentSummary}
                           </p>
                         </div>
@@ -317,14 +330,14 @@ export const LabComparisonModal: React.FC<LabComparisonModalProps> = ({
                       {/* Directional Bias Bar */}
                       {totalPairs >= 2 && (
                         <div className="space-y-2">
-                          <p className="text-[10px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1">
-                            <Scale size={11} /> Phân bố Hướng Đo ({totalPairs} cặp chỉ tiêu định lượng)
+                          <p className="text-[10px] font-black uppercase tracking-wider text-ink-muted flex items-center gap-1">
+                            <ScaleIcon className="w-3 h-3" /> Phân bố Hướng Đo ({totalPairs} cặp chỉ tiêu định lượng)
                           </p>
                           {/* Bar */}
-                          <div className="relative h-5 rounded-full overflow-hidden bg-slate-200 dark:bg-slate-700 flex text-[9px] font-black">
+                          <div className="relative h-5 rounded-full overflow-hidden bg-surface-3 flex text-[9px] font-black">
                             {pct1 > 0 && (
                               <div
-                                className="h-full bg-indigo-500 flex items-center justify-center text-white transition-all duration-700"
+                                className="h-full bg-emerald-600 flex items-center justify-center text-white transition-all duration-700"
                                 style={{ width: `${pct1}%` }}
                                 title={`${lab1Name} đo cao hơn: ${bias.source1HigherCount} chỉ tiêu (${pct1}%)`}
                               >
@@ -342,7 +355,7 @@ export const LabComparisonModal: React.FC<LabComparisonModalProps> = ({
                             )}
                             {pct2 > 0 && (
                               <div
-                                className="h-full bg-blue-500 flex items-center justify-center text-white transition-all duration-700"
+                                className="h-full bg-blue-600 flex items-center justify-center text-white transition-all duration-700"
                                 style={{ width: `${pct2}%` }}
                                 title={`${lab2Name} đo cao hơn: ${bias.source2HigherCount} chỉ tiêu (${pct2}%)`}
                               >
@@ -353,20 +366,20 @@ export const LabComparisonModal: React.FC<LabComparisonModalProps> = ({
                           {/* Legend */}
                           <div className="flex items-center gap-3 text-[10px] flex-wrap">
                             <div className="flex items-center gap-1">
-                              <span className="inline-block w-2.5 h-2.5 rounded-sm bg-indigo-500"></span>
-                              <span className="font-bold text-slate-600 dark:text-slate-400">{lab1Name} cao hơn ({bias.source1HigherCount} CT)</span>
+                              <span className="inline-block w-2.5 h-2.5 rounded-sm bg-emerald-600"></span>
+                              <span className="font-bold text-ink-muted">{lab1Name} cao hơn ({bias.source1HigherCount} CT)</span>
                             </div>
                             <div className="flex items-center gap-1">
                               <span className="inline-block w-2.5 h-2.5 rounded-sm bg-slate-400"></span>
-                              <span className="font-bold text-slate-600 dark:text-slate-400">Tương đương ({bias.equalCount} CT)</span>
+                              <span className="font-bold text-ink-muted">Tương đương ({bias.equalCount} CT)</span>
                             </div>
                             <div className="flex items-center gap-1">
-                              <span className="inline-block w-2.5 h-2.5 rounded-sm bg-blue-500"></span>
-                              <span className="font-bold text-slate-600 dark:text-slate-400">{lab2Name} cao hơn ({bias.source2HigherCount} CT)</span>
+                              <span className="inline-block w-2.5 h-2.5 rounded-sm bg-blue-600"></span>
+                              <span className="font-bold text-ink-muted">{lab2Name} cao hơn ({bias.source2HigherCount} CT)</span>
                             </div>
-                            <div className="ml-auto flex items-center gap-1 font-bold text-slate-500">
+                            <div className="ml-auto flex items-center gap-1 font-bold text-ink-muted">
                               Độ lệch TB:
-                              <span className={`px-1.5 py-0.5 rounded font-mono ${Math.abs(bias.meanBiasPercent) >= 5 ? 'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300' : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300'}`}>
+                              <span className={`px-1.5 py-0.5 rounded font-mono ${Math.abs(bias.meanBiasPercent) >= 5 ? 'bg-rose-500/10 text-rose-700 dark:text-rose-300' : 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'}`}>
                                 {bias.meanBiasPercent > 0 ? `+${bias.meanBiasPercent}` : bias.meanBiasPercent}%
                               </span>
                             </div>
@@ -377,13 +390,13 @@ export const LabComparisonModal: React.FC<LabComparisonModalProps> = ({
                       {/* Potential Causes & Action Recommendations side by side */}
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         {bias.potentialCauses && bias.potentialCauses.length > 0 && (
-                          <div className="bg-white/70 dark:bg-slate-800/60 rounded-xl p-3 border border-slate-100 dark:border-slate-700/60">
-                            <p className="text-[10px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2 flex items-center gap-1">
-                              <AlertTriangle size={11} className="text-amber-500" /> Nguyên nhân tiềm ẩn
+                          <div className="bg-surface rounded-xl p-3 border border-border">
+                            <p className="text-[10px] font-black uppercase tracking-wider text-ink-muted mb-2 flex items-center gap-1">
+                              <ExclamationTriangleIcon className="w-3.5 h-3.5 text-amber-500" /> Nguyên nhân tiềm ẩn
                             </p>
                             <ul className="space-y-1.5">
                               {bias.potentialCauses.map((cause, i) => (
-                                <li key={i} className="flex items-start gap-1.5 text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed">
+                                <li key={i} className="flex items-start gap-1.5 text-[11px] text-ink-soft leading-relaxed">
                                   <span className="text-amber-500 mt-0.5 shrink-0">•</span>
                                   <span>{cause}</span>
                                 </li>
@@ -392,13 +405,13 @@ export const LabComparisonModal: React.FC<LabComparisonModalProps> = ({
                           </div>
                         )}
                         {bias.actionRecommendations && bias.actionRecommendations.length > 0 && (
-                          <div className="bg-white/70 dark:bg-slate-800/60 rounded-xl p-3 border border-slate-100 dark:border-slate-700/60">
-                            <p className="text-[10px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2 flex items-center gap-1">
-                              <CheckCircle2 size={11} className="text-emerald-500" /> Đề xuất Hành động QA
+                          <div className="bg-surface rounded-xl p-3 border border-border">
+                            <p className="text-[10px] font-black uppercase tracking-wider text-ink-muted mb-2 flex items-center gap-1">
+                              <CheckCircleIcon className="w-3.5 h-3.5 text-emerald-500" /> Đề xuất Hành động QA
                             </p>
                             <ul className="space-y-1.5">
                               {bias.actionRecommendations.map((rec, i) => (
-                                <li key={i} className="flex items-start gap-1.5 text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed">
+                                <li key={i} className="flex items-start gap-1.5 text-[11px] text-ink-soft leading-relaxed">
                                   <span className="text-emerald-500 mt-0.5 shrink-0">→</span>
                                   <span>{rec}</span>
                                 </li>
@@ -413,18 +426,18 @@ export const LabComparisonModal: React.FC<LabComparisonModalProps> = ({
               })()}
 
               {/* Side-by-side Table */}
-              <div className="border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden">
+              <div className="border border-border rounded-xl overflow-hidden bg-surface">
                 <table className="w-full text-left text-xs border-collapse">
                   <thead>
-                    <tr className="bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 uppercase font-black tracking-wider text-[10px]">
-                      <th className="p-3">Chỉ tiêu & Phương pháp</th>
+                    <tr className="bg-surface-2 text-ink-muted uppercase font-black tracking-wider text-[10px] border-b border-border">
+                      <th className="p-3">Chỉ tiêu &amp; Phương pháp</th>
                       <th className="p-3">{comparisonResult.report1.labName || 'Phiếu 1'}</th>
                       <th className="p-3">{comparisonResult.report2.labName || 'Phiếu 2'}</th>
                       <th className="p-3 text-center">Độ lệch (%RPD)</th>
                       <th className="p-3 text-right">Đánh giá</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
+                  <tbody className="divide-y divide-border">
                     {comparisonResult.entries.map((entry, idx) => {
                       const isSingle = entry.deviationLevel === 'SINGLE_SOURCE';
                       const isCritical = entry.deviationLevel === 'CRITICAL';
@@ -434,50 +447,50 @@ export const LabComparisonModal: React.FC<LabComparisonModalProps> = ({
                       return (
                         <tr
                           key={idx}
-                          className={`hover:bg-slate-50/60 dark:hover:bg-slate-700/40 transition-colors ${
-                            isCritical ? 'bg-red-50/40 dark:bg-red-950/20' : ''
+                          className={`hover:bg-surface-2 transition-colors ${
+                            isCritical ? 'bg-rose-500/5' : ''
                           }`}
                         >
-                          <td className="p-3 font-bold text-slate-800 dark:text-slate-200">
+                          <td className="p-3 font-bold text-ink">
                             <div>{entry.criteriaName}</div>
-                            {entry.limit && <span className="block text-[10px] text-slate-400 font-normal">YC: {entry.limit}</span>}
+                            {entry.limit && <span className="block text-[10px] text-ink-muted font-normal">YC: {entry.limit}</span>}
                             {(entry.source1Method || entry.source2Method) && (
-                              <span className="inline-block text-[9px] text-indigo-500 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/40 px-1.5 py-0.5 rounded mt-0.5 font-mono">
+                              <span className="inline-block text-[9px] text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded mt-0.5 font-mono">
                                 PP: {entry.source1Method || entry.source2Method}
                               </span>
                             )}
                             {entry.isCensoredDataComparison && (
-                              <span className="inline-block ml-1 text-[9px] text-cyan-600 dark:text-cyan-400 bg-cyan-50 dark:bg-cyan-950/40 px-1.5 py-0.5 rounded font-mono" title={entry.censoredDetails}>
+                              <span className="inline-block ml-1 text-[9px] text-cyan-600 dark:text-cyan-400 bg-cyan-500/10 px-1.5 py-0.5 rounded font-mono" title={entry.censoredDetails}>
                                 Ngưỡng KPH/LOD
                               </span>
                             )}
                           </td>
                           <td className="p-3 font-medium">
-                            <span className="font-bold text-slate-700 dark:text-slate-300">{entry.source1Value}</span>
-                            {entry.source1Unit && <span className="text-slate-400 ml-1">{entry.source1Unit}</span>}
+                            <span className="font-bold text-ink">{entry.source1Value}</span>
+                            {entry.source1Unit && <span className="text-ink-muted ml-1">{entry.source1Unit}</span>}
                           </td>
                           <td className="p-3 font-medium">
-                            <span className="font-bold text-slate-700 dark:text-slate-300">{entry.source2Value}</span>
-                            {entry.source2Unit && <span className="text-slate-400 ml-1">{entry.source2Unit}</span>}
+                            <span className="font-bold text-ink">{entry.source2Value}</span>
+                            {entry.source2Unit && <span className="text-ink-muted ml-1">{entry.source2Unit}</span>}
                           </td>
                           <td className="p-3 text-center font-bold">
                             {entry.rpd !== undefined ? (
                               <span className={`px-2 py-0.5 rounded-full text-[10px] ${
-                                isCritical ? 'bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-300' :
-                                isWarning ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300' :
-                                'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300'
+                                isCritical ? 'bg-rose-500/10 text-rose-700 dark:text-rose-300' :
+                                isWarning ? 'bg-amber-500/10 text-amber-700 dark:text-amber-300' :
+                                'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
                               }`}>
                                 {entry.rpd}%
                               </span>
                             ) : (
-                              <span className="text-slate-400">—</span>
+                              <span className="text-ink-muted">—</span>
                             )}
                           </td>
                           <td className="p-3 text-right font-black">
-                            {isCritical && <span className="text-red-600 text-[11px]">Lệch Lớn 🚨</span>}
+                            {isCritical && <span className="text-rose-600 text-[11px]">Lệch Lớn 🚨</span>}
                             {isWarning && <span className="text-amber-600 text-[11px]">Lệch Vừa ⚠️</span>}
                             {isGood && <span className="text-emerald-600 text-[11px]">Đồng thuận ✓</span>}
-                            {isSingle && <span className="text-slate-400 text-[10px]">Chỉ 1 bên kiểm</span>}
+                            {isSingle && <span className="text-ink-muted text-[10px]">Chỉ 1 bên kiểm</span>}
                           </td>
                         </tr>
                       );
@@ -487,28 +500,28 @@ export const LabComparisonModal: React.FC<LabComparisonModalProps> = ({
               </div>
 
               {/* AI Expert Synthesis Card */}
-              <div className="bg-gradient-to-br from-indigo-500/10 via-blue-500/5 to-purple-500/10 p-5 rounded-2xl border border-indigo-100 dark:border-indigo-800/60 space-y-3">
-                <div className="flex items-center gap-2 text-indigo-700 dark:text-indigo-300 font-black text-sm">
-                  <Sparkles size={18} />
-                  Nhận Định Chuyên Gia AI & Đánh Giá Sai Số Hệ Thống (Lab Bias)
+              <div className="bg-surface-2 p-5 rounded-2xl border border-border space-y-3">
+                <div className="flex items-center gap-2 text-emerald-700 dark:text-emerald-400 font-black text-sm">
+                  <SparklesIcon className="w-5 h-5" />
+                  Nhận Định Chuyên Gia AI &amp; Đánh Giá Sai Số Hệ Thống (Lab Bias)
                 </div>
-                <p className="text-xs text-slate-700 dark:text-slate-200 leading-relaxed font-medium">
+                <p className="text-xs text-ink-soft leading-relaxed font-medium">
                   {comparisonResult.aiAnalysis.summary}
                 </p>
-                <div className="p-3 bg-white/80 dark:bg-slate-800/80 rounded-xl border border-indigo-100/80 dark:border-indigo-900/40 text-xs space-y-1.5">
-                  <p className="font-bold text-slate-800 dark:text-slate-100 flex items-center gap-1.5">
-                    <Scale size={14} className="text-indigo-500" />
+                <div className="p-3.5 bg-surface rounded-xl border border-border text-xs space-y-1.5">
+                  <p className="font-bold text-ink flex items-center gap-1.5">
+                    <ScaleIcon className="w-4 h-4 text-emerald-500" />
                     Đánh giá Lab Bias:
                   </p>
-                  <p className="text-slate-600 dark:text-slate-300">
+                  <p className="text-ink-muted">
                     {comparisonResult.aiAnalysis.systematicBiasAssessment}
                   </p>
                 </div>
 
                 {comparisonResult.aiAnalysis.actionRecommendations.length > 0 && (
                   <div className="text-xs space-y-1">
-                    <p className="font-bold text-slate-700 dark:text-slate-300">Đề xuất hành động QA:</p>
-                    <ul className="list-disc list-inside space-y-0.5 text-slate-600 dark:text-slate-400">
+                    <p className="font-bold text-ink">Đề xuất hành động QA:</p>
+                    <ul className="list-disc list-inside space-y-0.5 text-ink-muted">
                       {comparisonResult.aiAnalysis.actionRecommendations.map((rec, i) => (
                         <li key={i}>{rec}</li>
                       ))}

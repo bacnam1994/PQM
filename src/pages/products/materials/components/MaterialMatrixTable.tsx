@@ -1,6 +1,12 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Link2, Unlink, Package, Plus, Edit2 } from 'lucide-react';
+import {
+  LinkIcon,
+  ExclamationCircleIcon,
+  CubeIcon,
+  PlusIcon,
+  PencilSquareIcon,
+} from '@heroicons/react/24/outline';
 import { DSTable } from '../../../../components';
 import { RawMaterial } from '../../../../types';
 import { AggregatedFormulaItem } from '../types';
@@ -22,80 +28,80 @@ export const MaterialMatrixTable: React.FC<MaterialMatrixTableProps> = ({
 }) => {
   return (
     <DSTable>
-      <thead className="bg-slate-50 dark:bg-zinc-900 border-b border-slate-100 dark:border-zinc-800/80">
-        <tr className="text-slate-500 dark:text-zinc-400 text-[10px] font-black uppercase tracking-widest">
-          <th className="px-4 py-3">Tên thành phần trong Công thức</th>
-          <th className="px-4 py-3">Phân loại</th>
-          <th className="px-4 py-3">Trạng thái Master Catalog</th>
-          <th className="px-4 py-3">Sản phẩm & Hàm lượng áp dụng</th>
+      <thead className="bg-surface-2 border-b border-border">
+        <tr className="text-ink-soft text-[10px] font-bold uppercase tracking-wider">
+          <th className="px-4 py-3 text-left">Tên thành phần trong Công thức</th>
+          <th className="px-4 py-3 text-left">Phân loại</th>
+          <th className="px-4 py-3 text-left">Trạng thái Master Catalog</th>
+          <th className="px-4 py-3 text-left">Sản phẩm & Hàm lượng áp dụng</th>
           <th className="px-4 py-3 text-right">Hành động</th>
         </tr>
       </thead>
-      <tbody className="divide-y divide-slate-100 dark:divide-zinc-850">
+      <tbody className="divide-y divide-border">
         {paginatedItems.map(item => {
           const isLinked = !!item.materialId && materialMap.has(item.materialId);
           const master = item.linkedMaterial;
 
           return (
-            <tr key={item.id} className="hover:bg-slate-50 dark:hover:bg-zinc-900/40 transition-colors">
-              <td className="px-4 py-3 font-bold text-slate-800 dark:text-zinc-100 text-sm">
+            <tr key={item.id} className="hover:bg-surface-2 transition-colors">
+              <td className="px-4 py-3.5 font-semibold text-ink text-sm">
                 {item.name}
               </td>
-              <td className="px-4 py-3 whitespace-nowrap">
-                <span className={`px-2.5 py-1 rounded-lg text-xs font-bold ${
+              <td className="px-4 py-3.5 whitespace-nowrap">
+                <span className={`px-2.5 py-1 rounded-md text-xs font-semibold ${
                   item.type === 'ACTIVE' 
-                    ? 'bg-rose-50 text-rose-600 border border-rose-100 dark:bg-rose-950/40 dark:text-rose-400' 
-                    : 'bg-slate-100 text-slate-600 border border-slate-200 dark:bg-zinc-800 dark:text-zinc-300'
+                    ? 'bg-rose-50 text-rose-600 border border-rose-200 dark:bg-rose-950/40 dark:text-rose-400' 
+                    : 'bg-surface-2 text-ink-soft border border-border'
                 }`}>
                   {item.type === 'ACTIVE' ? 'Hoạt chất' : 'Tá dược'}
                 </span>
               </td>
-              <td className="px-4 py-3 whitespace-nowrap">
+              <td className="px-4 py-3.5 whitespace-nowrap">
                 {isLinked && master ? (
-                  <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900/50 px-2.5 py-1 rounded-lg w-fit">
-                    <Link2 size={13} />
+                  <div className="flex items-center gap-1.5 text-xs font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900/50 px-2.5 py-1 rounded-md w-fit">
+                    <LinkIcon className="h-3.5 w-3.5" />
                     <span>{master.name}</span>
-                    {master.code && <span className="text-[10px] font-mono text-emerald-700 dark:text-emerald-300">({master.code})</span>}
+                    {master.code && <span className="text-[10px] font-mono text-emerald-800 dark:text-emerald-300">({master.code})</span>}
                   </div>
                 ) : (
-                  <div className="flex items-center gap-1.5 text-xs font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/50 px-2.5 py-1 rounded-lg w-fit">
-                    <Unlink size={13} />
+                  <div className="flex items-center gap-1.5 text-xs font-semibold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/50 px-2.5 py-1 rounded-md w-fit">
+                    <ExclamationCircleIcon className="h-3.5 w-3.5" />
                     <span>Chưa liên kết Master Catalog</span>
                   </div>
                 )}
               </td>
-              <td className="px-4 py-3">
+              <td className="px-4 py-3.5">
                 <div className="flex flex-wrap gap-1.5 items-center">
                   {item.relatedProducts.map(p => (
                     <Link
                       key={p.id}
                       to={`/products/${p.id}`}
-                      className="inline-flex items-center gap-1 bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 px-2.5 py-1 rounded-lg text-xs font-semibold text-slate-700 dark:text-zinc-200 hover:border-indigo-300 transition-colors shadow-2xs"
+                      className="inline-flex items-center gap-1 bg-surface border border-border px-2.5 py-1 rounded-md text-xs font-semibold text-ink hover:border-emerald-400 transition-colors shadow-sm"
                     >
-                      <Package size={12} className="text-indigo-500" />
+                      <CubeIcon className="h-3.5 w-3.5 text-emerald-500" />
                       <span>{p.name}</span>
-                      {p.content && <span className="text-[11px] font-mono text-slate-400">({p.content})</span>}
+                      {p.content && <span className="text-[11px] font-mono text-ink-muted">({p.content})</span>}
                     </Link>
                   ))}
                 </div>
               </td>
-              <td className="px-4 py-3 text-right whitespace-nowrap">
+              <td className="px-4 py-3.5 text-right whitespace-nowrap">
                 {!isLinked && isAdmin ? (
                   <button
                     type="button"
                     onClick={() => onOpenAdd(item.name, item.type)}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 dark:bg-indigo-950/50 hover:bg-indigo-600 hover:text-white text-indigo-600 dark:text-indigo-400 rounded-lg text-xs font-bold transition-all border border-indigo-200 dark:border-indigo-900"
+                    className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-emerald-50 dark:bg-emerald-950/40 hover:bg-emerald-600 hover:text-white text-emerald-700 dark:text-emerald-400 rounded-md text-xs font-semibold transition-all border border-emerald-200 dark:border-emerald-900/50"
                   >
-                    <Plus size={13} />
-                    <span>+ Thêm vào Master Catalog</span>
+                    <PlusIcon className="h-3.5 w-3.5" />
+                    <span>+ Thêm vào Master</span>
                   </button>
                 ) : isLinked && master && isAdmin ? (
                   <button
                     type="button"
                     onClick={() => onOpenEdit(master)}
-                    className="inline-flex items-center gap-1 px-2.5 py-1 text-slate-500 hover:text-indigo-600 dark:text-zinc-400 text-xs font-bold rounded-lg hover:bg-slate-100 dark:hover:bg-zinc-800 transition-colors"
+                    className="inline-flex items-center gap-1 px-2.5 py-1 text-ink-soft hover:text-emerald-600 text-xs font-semibold rounded-md hover:bg-surface-2 transition-colors"
                   >
-                    <Edit2 size={13} />
+                    <PencilSquareIcon className="h-3.5 w-3.5" />
                     <span>Sửa Master</span>
                   </button>
                 ) : null}

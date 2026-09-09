@@ -1,6 +1,17 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Loader2, Save, Plus, X as XIcon, Layers3, BookOpen, ShieldCheck, Hash, AlertTriangle } from 'lucide-react';
+import { 
+  ArrowLeftIcon, 
+  ArrowPathIcon, 
+  CheckIcon, 
+  PlusIcon, 
+  XMarkIcon, 
+  Square3Stack3DIcon, 
+  BookOpenIcon, 
+  ShieldCheckIcon, 
+  HashtagIcon, 
+  ExclamationTriangleIcon 
+} from '@heroicons/react/24/outline';
 import { useAppStore } from '../../store/useAppStore';
 import { DSFormInput, DSSelect } from '../../components';
 import { generateId } from '../../utils';
@@ -70,7 +81,6 @@ const MaterialFormPage = () => {
   // 2. Load dữ liệu
   useEffect(() => {
     if (id && id !== 'new') {
-      // ✅ Bug 3 Fix: chỉ lookup by exact ID — không fallback theo name để tránh nhầm nguyên liệu
       const material = rawMaterials.find(m => m.id === id);
 
       if (material) {
@@ -155,11 +165,9 @@ const MaterialFormPage = () => {
 
        if (materialToEdit) {
          await updateRawMaterial(data);
-         // audit log đã được ghi trong store (updateRawMaterial)
          notify({ type: 'SUCCESS', title: 'Đã cập nhật', message: 'Thông tin nguyên liệu đã được lưu.' });
        } else {
          await addRawMaterial(data);
-         // audit log đã được ghi trong store (addRawMaterial)
          notify({ type: 'SUCCESS', title: 'Thành công', message: 'Đã thêm nguyên liệu mới vào danh mục.' });
        }
        navigate('/materials');
@@ -171,31 +179,34 @@ const MaterialFormPage = () => {
   };
 
   return (
-    <div className="p-6 max-w-4xl mx-auto animate-in fade-in duration-500 space-y-6">
+    <div className="p-6 max-w-4xl mx-auto space-y-6">
       <datalist id="pharma-standards-list">
         {COMMON_PHARMA_STANDARDS.map(s => <option key={s} value={s} />)}
       </datalist>
 
       <div className="flex items-center gap-4">
-        <button onClick={() => navigate('/materials')} className="p-2.5 bg-white dark:bg-zinc-900 text-slate-500 hover:text-indigo-600 rounded-xl shadow-xs border border-slate-200/80 dark:border-zinc-800 transition-colors">
-          <ArrowLeft size={20} />
+        <button 
+          onClick={() => navigate('/materials')} 
+          className="p-2 bg-surface text-ink-muted hover:text-emerald-600 rounded-xl border border-border shadow-sm transition-colors"
+        >
+          <ArrowLeftIcon className="w-5 h-5" />
         </button>
         <div>
-          <h1 className="text-2xl font-black text-slate-800 dark:text-zinc-100 uppercase tracking-tight">
+          <h1 className="text-2xl font-bold text-ink tracking-tight">
             {materialToEdit ? 'Chỉnh sửa Nguyên liệu' : 'Thêm Nguyên liệu mới'}
           </h1>
-          <p className="text-xs text-slate-400 dark:text-zinc-500 font-medium">
+          <p className="text-xs text-ink-muted mt-0.5">
             Quản lý hồ sơ nguyên liệu chuẩn (Master Catalog), tiêu chuẩn Dược điển và bí danh (Aliases).
           </p>
         </div>
       </div>
 
-      <div className="bg-white dark:bg-zinc-950 rounded-2xl shadow-sm border border-slate-100 dark:border-zinc-850 p-6 md:p-8">
+      <div className="bg-surface rounded-2xl shadow-sm border border-border p-6 md:p-8">
         <form onSubmit={handleSave} className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="space-y-1">
-              <label className="text-[10px] font-black text-slate-400 dark:text-zinc-500 uppercase tracking-widest pl-2 flex items-center gap-1.5">
-                <Hash size={12} />
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-ink-muted uppercase tracking-wider flex items-center gap-1.5">
+                <HashtagIcon className="w-3.5 h-3.5 text-emerald-600" />
                 Mã nguyên liệu (Code)
               </label>
               <input
@@ -203,13 +214,13 @@ const MaterialFormPage = () => {
                 value={code}
                 onChange={e => setCode(e.target.value)}
                 placeholder="VD: NL-GINKGO-01"
-                className="w-full px-4 py-2.5 bg-slate-50 dark:bg-zinc-900 border border-slate-200/80 dark:border-zinc-800 rounded-xl font-bold text-sm outline-none focus:ring-2 focus:ring-indigo-500 text-slate-800 dark:text-zinc-200 placeholder:text-slate-400"
+                className="w-full px-4 py-2.5 bg-surface border border-border rounded-xl font-medium text-sm outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-ink placeholder:text-ink-muted transition-all"
               />
             </div>
 
-            <div className="md:col-span-2 space-y-1">
-              <label className="text-[10px] font-black text-slate-400 dark:text-zinc-500 uppercase tracking-widest pl-2 flex items-center gap-1.5">
-                <BookOpen size={12} />
+            <div className="md:col-span-2 space-y-1.5">
+              <label className="text-xs font-semibold text-ink-muted uppercase tracking-wider flex items-center gap-1.5">
+                <BookOpenIcon className="w-3.5 h-3.5 text-emerald-600" />
                 Tên nguyên liệu chuẩn (Canonical Name) *
               </label>
               <input
@@ -221,39 +232,38 @@ const MaterialFormPage = () => {
                 }}
                 placeholder="VD: Ginkgo Biloba Extract (Cao khô Bạch quả)"
                 required
-                className={`w-full px-4 py-2.5 bg-slate-50 dark:bg-zinc-900 border rounded-xl font-bold text-sm outline-none focus:ring-2 text-slate-800 dark:text-zinc-200 placeholder:text-slate-400 ${
+                className={`w-full px-4 py-2.5 bg-surface border rounded-xl font-medium text-sm outline-none focus:ring-2 text-ink placeholder:text-ink-muted transition-all ${
                   duplicateWarnings.length > 0
-                    ? 'border-amber-400 dark:border-amber-600 focus:ring-amber-400'
-                    : 'border-slate-200/80 dark:border-zinc-800 focus:ring-indigo-500'
+                    ? 'border-amber-500 focus:ring-amber-500/20'
+                    : 'border-border focus:ring-emerald-500 focus:border-emerald-500'
                 }`}
               />
-              {/* Upgrade B: Cảnh báo trùng tên real-time trong FormPage */}
               {duplicateWarnings.length > 0 && (
-                <div className="mt-2 p-3 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 rounded-xl">
-                  <div className="flex items-center gap-1.5 text-[10px] font-black uppercase text-amber-700 dark:text-amber-400 mb-2">
-                    <AlertTriangle size={12} />
+                <div className="mt-2 p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl">
+                  <div className="flex items-center gap-1.5 text-xs font-semibold uppercase text-amber-700 dark:text-amber-400 mb-2">
+                    <ExclamationTriangleIcon className="w-4 h-4" />
                     <span>Phát hiện {duplicateWarnings.length} nguyên liệu tương đồng trong Master Catalog!</span>
                   </div>
                   <div className="flex flex-wrap gap-1.5">
                     {duplicateWarnings.map(w => (
-                      <span key={w.id} className="inline-flex items-center gap-1 bg-white dark:bg-zinc-800 border border-amber-200 dark:border-amber-700 px-2.5 py-1 rounded-lg text-[11px] font-bold text-amber-800 dark:text-amber-300">
+                      <span key={w.id} className="inline-flex items-center gap-1 bg-surface border border-amber-500/30 px-2.5 py-1 rounded-lg text-xs font-medium text-amber-800 dark:text-amber-300">
                         {w.name}{w.code ? ` (${w.code})` : ''}
                       </span>
                     ))}
                   </div>
-                  <p className="text-[11px] text-amber-600 dark:text-amber-500 mt-1.5">💡 Kiểm tra kỹ trước khi lưu để tránh trùng lặp. Sử dụng AI Rà soát để gộp sau nếu cần.</p>
+                  <p className="text-xs text-amber-600 dark:text-amber-500 mt-1.5">💡 Kiểm tra kỹ trước khi lưu để tránh trùng lặp. Sử dụng AI Rà soát để gộp sau nếu cần.</p>
                 </div>
               )}
             </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="space-y-1">
-              <label className="text-[10px] font-black text-slate-400 dark:text-zinc-500 uppercase tracking-widest pl-2">Phân loại</label>
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-ink-muted uppercase tracking-wider">Phân loại</label>
               <select
                 value={category}
                 onChange={e => setCategory(e.target.value as any)}
-                className="w-full px-4 py-2.5 bg-slate-50 dark:bg-zinc-900 border border-slate-200/80 dark:border-zinc-800 rounded-xl font-bold text-sm outline-none focus:ring-2 focus:ring-indigo-500 text-slate-800 dark:text-zinc-200"
+                className="w-full px-4 py-2.5 bg-surface border border-border rounded-xl font-medium text-sm outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-ink cursor-pointer transition-all"
               >
                 <option value="ACTIVE">Hoạt chất (Active Ingredient)</option>
                 <option value="EXCIPIENT">Tá dược / Phụ liệu (Excipient)</option>
@@ -261,9 +271,9 @@ const MaterialFormPage = () => {
               </select>
             </div>
 
-            <div className="space-y-1">
-              <label className="text-[10px] font-black text-slate-400 dark:text-zinc-500 uppercase tracking-widest pl-2 flex items-center gap-1.5">
-                <ShieldCheck size={12} />
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-ink-muted uppercase tracking-wider flex items-center gap-1.5">
+                <ShieldCheckIcon className="w-3.5 h-3.5 text-emerald-600" />
                 Tiêu chuẩn áp dụng
               </label>
               <input
@@ -272,12 +282,12 @@ const MaterialFormPage = () => {
                 value={standard}
                 onChange={e => setStandard(e.target.value)}
                 placeholder="VD: DĐVN V, USP 43..."
-                className="w-full px-4 py-2.5 bg-slate-50 dark:bg-zinc-900 border border-slate-200/80 dark:border-zinc-800 rounded-xl font-bold text-sm outline-none focus:ring-2 focus:ring-indigo-500 text-slate-800 dark:text-zinc-200 placeholder:text-slate-400"
+                className="w-full px-4 py-2.5 bg-surface border border-border rounded-xl font-medium text-sm outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-ink placeholder:text-ink-muted transition-all"
               />
             </div>
 
-            <div className="space-y-1">
-              <label className="text-[10px] font-black text-slate-400 dark:text-zinc-500 uppercase tracking-widest pl-2">Mã số CAS (Tùy chọn)</label>
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-ink-muted uppercase tracking-wider">Mã số CAS (Tùy chọn)</label>
               <input
                 type="text"
                 value={casNumber}
@@ -293,13 +303,13 @@ const MaterialFormPage = () => {
                   }
                 }}
                 placeholder="VD: 90045-36-6"
-                className={`w-full px-4 py-2.5 bg-slate-50 dark:bg-zinc-900 border rounded-xl font-bold text-sm outline-none focus:ring-2 text-slate-800 dark:text-zinc-200 placeholder:text-slate-400 font-mono ${
-                  casError ? 'border-rose-400 dark:border-rose-600 focus:ring-rose-400' : 'border-slate-200/80 dark:border-zinc-800 focus:ring-indigo-500'
+                className={`w-full px-4 py-2.5 bg-surface border rounded-xl font-medium text-sm outline-none focus:ring-2 text-ink placeholder:text-ink-muted font-mono transition-all ${
+                  casError ? 'border-rose-500 focus:ring-rose-500/20' : 'border-border focus:ring-emerald-500 focus:border-emerald-500'
                 }`}
               />
               {casError && (
-                <p className="text-[11px] text-rose-500 font-bold pl-2 flex items-center gap-1 mt-0.5">
-                  <AlertTriangle size={11} /> {casError}
+                <p className="text-xs text-rose-500 font-medium pl-1 flex items-center gap-1 mt-1">
+                  <ExclamationTriangleIcon className="w-3.5 h-3.5" /> {casError}
                 </p>
               )}
             </div>
@@ -307,16 +317,16 @@ const MaterialFormPage = () => {
 
           {/* Aliases Tag Input */}
           <div className="space-y-2">
-            <label className="text-[10px] font-black text-slate-400 dark:text-zinc-500 uppercase tracking-widest pl-2 flex items-center gap-2">
-              <Layers3 size={13} className="text-indigo-500" />
+            <label className="text-xs font-semibold text-ink-muted uppercase tracking-wider flex items-center gap-2">
+              <Square3Stack3DIcon className="w-4 h-4 text-emerald-600" />
               Các tên gọi khác & Bí danh (Aliases)
             </label>
-            <div className="p-2.5 bg-slate-50 dark:bg-zinc-900/60 rounded-xl border border-slate-200/80 dark:border-zinc-800 flex flex-wrap gap-2 min-h-[50px] items-center focus-within:ring-2 focus-within:ring-indigo-500 transition-all">
+            <div className="p-2.5 bg-surface-2 rounded-xl border border-border flex flex-wrap gap-2 min-h-[50px] items-center focus-within:ring-2 focus-within:ring-emerald-500 focus-within:border-emerald-500 transition-all">
               {aliases.map((alias, i) => (
-                <div key={i} className="flex items-center gap-1.5 bg-white dark:bg-zinc-800 border border-indigo-100 dark:border-indigo-900/60 text-indigo-700 dark:text-indigo-400 text-xs font-bold px-2.5 py-1 rounded-lg shadow-xs animate-in zoom-in duration-200">
+                <div key={i} className="flex items-center gap-1.5 bg-surface border border-emerald-500/20 text-emerald-700 dark:text-emerald-400 text-xs font-medium px-2.5 py-1 rounded-lg shadow-xs">
                   {alias}
-                  <button type="button" onClick={() => removeAlias(i)} className="text-indigo-300 hover:text-rose-500 transition-colors">
-                    <XIcon size={14} />
+                  <button type="button" onClick={() => removeAlias(i)} className="text-ink-muted hover:text-rose-500 transition-colors">
+                    <XMarkIcon className="w-3.5 h-3.5" />
                   </button>
                 </div>
               ))}
@@ -328,48 +338,48 @@ const MaterialFormPage = () => {
                   onKeyDown={handleAliasKeyDown}
                   onPaste={handlePaste}
                   placeholder="Gõ tên khác rồi nhấn Enter hoặc dán danh sách..."
-                  className="flex-1 bg-transparent outline-none text-xs p-1 placeholder:text-slate-400 font-medium text-slate-800 dark:text-zinc-200"
+                  className="flex-1 bg-transparent outline-none text-xs p-1 placeholder:text-ink-muted font-medium text-ink"
                 />
                 <button 
                   type="button" 
                   onClick={handleAddAlias}
                   disabled={!aliasInput.trim()}
-                  className="ml-2 p-1.5 bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 rounded-lg hover:bg-indigo-600 hover:text-white transition-colors disabled:opacity-0 disabled:pointer-events-none"
+                  className="ml-2 p-1.5 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-lg hover:bg-emerald-600 hover:text-white transition-colors disabled:opacity-0 disabled:pointer-events-none"
                 >
-                  <Plus size={15} />
+                  <PlusIcon className="w-4 h-4" />
                 </button>
               </div>
             </div>
-            <p className="text-[11px] text-slate-400 dark:text-zinc-500 pl-2">
+            <p className="text-xs text-ink-muted pl-1">
               💡 Gợi ý: Hỗ trợ tự động ánh xạ khi nhập phiếu kiểm nghiệm hoặc công thức có tên viết tắt.
             </p>
           </div>
 
-          <div className="space-y-1">
-            <label className="text-[10px] font-black text-slate-400 dark:text-zinc-500 uppercase tracking-widest pl-2">Mô tả & Nguồn gốc xuất xứ</label>
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold text-ink-muted uppercase tracking-wider">Mô tả & Nguồn gốc xuất xứ</label>
             <textarea
               value={description}
               onChange={e => setDescription(e.target.value)}
               placeholder="Ghi chú về nguồn gốc, quy cách bảo quản, nhà sản xuất, đặc tính kỹ thuật..."
               rows={3}
-              className="w-full px-4 py-2.5 bg-slate-50 dark:bg-zinc-900 border border-slate-200/80 dark:border-zinc-800 rounded-xl font-medium text-sm outline-none focus:ring-2 focus:ring-indigo-500 text-slate-800 dark:text-zinc-200 placeholder:text-slate-400 resize-none"
+              className="w-full px-4 py-2.5 bg-surface border border-border rounded-xl font-medium text-sm outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-ink placeholder:text-ink-muted resize-none transition-all"
             />
           </div>
 
-          <div className="flex justify-end gap-3 pt-6 border-t border-slate-100 dark:border-zinc-850">
+          <div className="flex items-center justify-end gap-3 pt-6 border-t border-border">
             <button
               type="button"
               onClick={() => navigate('/materials')}
-              className="px-6 py-2.5 text-slate-500 dark:text-zinc-400 font-bold uppercase text-xs hover:bg-slate-100 dark:hover:bg-zinc-900 rounded-xl transition-colors"
+              className="px-5 py-2.5 text-ink-muted hover:text-ink font-semibold uppercase text-xs tracking-wider hover:bg-surface-2 rounded-xl transition-colors"
             >
               Hủy
             </button>
             <button
               type="submit"
               disabled={isSubmitting}
-              className="px-8 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold uppercase text-xs flex items-center gap-2 transition-all shadow-md shadow-indigo-600/20 disabled:opacity-50"
+              className="px-8 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-semibold uppercase text-xs tracking-wider flex items-center gap-2 transition-all shadow-sm disabled:opacity-50"
             >
-              {isSubmitting ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />}
+              {isSubmitting ? <ArrowPathIcon className="w-4 h-4 animate-spin" /> : <CheckIcon className="w-4 h-4" />}
               {materialToEdit ? 'Cập nhật Nguyên liệu' : 'Lưu Nguyên liệu'}
             </button>
           </div>

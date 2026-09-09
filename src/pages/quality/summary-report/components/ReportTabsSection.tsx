@@ -1,5 +1,9 @@
 import React from 'react';
-import { TrendingUp, Activity, AlertCircle } from 'lucide-react';
+import { 
+  ArrowTrendingUpIcon, 
+  ChartBarIcon, 
+  ExclamationTriangleIcon 
+} from '@heroicons/react/24/outline';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid,
   Tooltip, Legend, ResponsiveContainer, ReferenceLine,
@@ -22,7 +26,7 @@ interface ReportTabsSectionProps {
   isDark: boolean;
 }
 
-const LINE_COLORS = ['#6366f1', '#ec4899', '#10b981', '#f59e0b', '#3b82f6', '#8b5cf6', '#14b8a6'];
+const LINE_COLORS = ['#10b981', '#6366f1', '#ec4899', '#f59e0b', '#3b82f6', '#8b5cf6', '#14b8a6'];
 
 export const ReportTabsSection: React.FC<ReportTabsSectionProps> = ({
   activeTab,
@@ -41,55 +45,55 @@ export const ReportTabsSection: React.FC<ReportTabsSectionProps> = ({
   return (
     <DSCard className="p-5 space-y-4">
       {/* Tabs */}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 dark:border-zinc-800 pb-3">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-3">
         <div className="flex items-center gap-2">
           <button
             type="button"
             onClick={() => setActiveTab('trend')}
-            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
               activeTab === 'trend'
-                ? 'bg-indigo-600 text-white shadow-sm'
-                : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-zinc-800'
+                ? 'bg-emerald-600 text-white shadow-sm'
+                : 'text-ink-muted hover:bg-surface-2 hover:text-ink'
             }`}
           >
-            <TrendingUp size={14} />
+            <ArrowTrendingUpIcon className="w-4 h-4" />
             <span>Xu hướng (% công bố)</span>
           </button>
 
           <button
             type="button"
             onClick={() => setActiveTab('spc')}
-            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
               activeTab === 'spc'
-                ? 'bg-indigo-600 text-white shadow-sm'
-                : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-zinc-800'
+                ? 'bg-emerald-600 text-white shadow-sm'
+                : 'text-ink-muted hover:bg-surface-2 hover:text-ink'
             }`}
           >
-            <Activity size={14} />
+            <ChartBarIcon className="w-4 h-4" />
             <span>Kiểm soát SPC (X̄/3σ)</span>
           </button>
 
           <button
             type="button"
             onClick={() => setActiveTab('fail')}
-            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
               activeTab === 'fail'
                 ? 'bg-rose-600 text-white shadow-sm'
-                : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-zinc-800'
+                : 'text-ink-muted hover:bg-surface-2 hover:text-ink'
             }`}
           >
-            <AlertCircle size={14} />
+            <ExclamationTriangleIcon className="w-4 h-4" />
             <span>Chỉ tiêu không đạt ({failCriteriaSummary.length})</span>
           </button>
         </div>
 
         {activeTab === 'spc' && mainCriteria.length > 0 && (
           <div className="flex items-center gap-1.5 text-xs">
-            <span className="text-slate-400 font-bold">Chỉ tiêu SPC:</span>
+            <span className="text-ink-muted font-medium">Chỉ tiêu SPC:</span>
             <select
               value={spcCriteriaName}
               onChange={e => setSpcCriteriaName(e.target.value)}
-              className="px-2.5 py-1 bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-lg font-bold text-xs outline-none focus:ring-1 focus:ring-indigo-500 text-slate-800 dark:text-zinc-200"
+              className="px-2.5 py-1.5 bg-surface border border-border rounded-xl font-bold text-xs outline-none focus:ring-2 focus:ring-emerald-500 text-ink cursor-pointer"
             >
               {mainCriteria.map(c => (
                 <option key={c.name} value={c.name}>{c.name}</option>
@@ -136,9 +140,9 @@ export const ReportTabsSection: React.FC<ReportTabsSectionProps> = ({
       {activeTab === 'spc' && (
         <div className="space-y-2">
           {currentSpcStat && (
-            <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500 dark:text-zinc-400 pb-1 font-mono">
-              <span>X̄ = <strong className="text-indigo-600 dark:text-indigo-400">{currentSpcStat.mean.toFixed(3)}</strong></span>
-              <span>σ = <strong>{currentSpcStat.stdDev.toFixed(3)}</strong></span>
+            <div className="flex flex-wrap items-center gap-3 text-xs text-ink-muted pb-1 font-mono">
+              <span>X̄ = <strong className="text-emerald-600 dark:text-emerald-400">{currentSpcStat.mean.toFixed(3)}</strong></span>
+              <span>σ = <strong className="text-ink">{currentSpcStat.stdDev.toFixed(3)}</strong></span>
               <span>UCL = <strong className="text-rose-500">{currentSpcStat.ucl.toFixed(3)}</strong></span>
               <span>LCL = <strong className="text-rose-500">{currentSpcStat.lcl.toFixed(3)}</strong></span>
               <span>Cpk = <strong className="text-emerald-600">{currentSpcStat.cpk !== null ? currentSpcStat.cpk.toFixed(2) : '---'}</strong></span>
@@ -146,7 +150,7 @@ export const ReportTabsSection: React.FC<ReportTabsSectionProps> = ({
           )}
           <div className="h-80 w-full">
             {spcChartData.length === 0 ? (
-              <div className="flex items-center justify-center h-full text-slate-400 text-xs italic">
+              <div className="flex items-center justify-center h-full text-ink-muted text-xs italic">
                 Chưa có dữ liệu định lượng cho chỉ tiêu này
               </div>
             ) : (

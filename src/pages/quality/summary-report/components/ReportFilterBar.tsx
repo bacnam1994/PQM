@@ -1,5 +1,12 @@
 import React from 'react';
-import { Search, X, Calendar, Download, Sparkles, Loader2 } from 'lucide-react';
+import { 
+  MagnifyingGlassIcon, 
+  XMarkIcon, 
+  CalendarIcon, 
+  ArrowDownTrayIcon, 
+  SparklesIcon, 
+  ArrowPathIcon 
+} from '@heroicons/react/24/outline';
 import { DSFilterBar } from '../../../../components';
 import { Product } from '../../../../types';
 
@@ -41,7 +48,7 @@ export const ReportFilterBar: React.FC<ReportFilterBarProps> = ({
       {/* Product Search & Dropdown */}
       <div className="relative flex-1 min-w-[280px]">
         <div className="relative">
-          <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+          <MagnifyingGlassIcon className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-muted" />
           <input
             type="text"
             value={productSearch}
@@ -52,7 +59,7 @@ export const ReportFilterBar: React.FC<ReportFilterBarProps> = ({
             onFocus={() => setShowProductDropdown(true)}
             onBlur={handleInputBlur}
             placeholder="Tìm theo mã hoặc tên sản phẩm..."
-            className="w-full pl-9 pr-8 py-2 bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500 text-slate-800 dark:text-zinc-200"
+            className="w-full pl-9 pr-8 py-2.5 bg-surface border border-border rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-emerald-500 text-ink placeholder-ink-muted"
           />
           {productSearch && (
             <button
@@ -61,15 +68,15 @@ export const ReportFilterBar: React.FC<ReportFilterBarProps> = ({
                 setProductSearch('');
                 setSelectedProductId('');
               }}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 text-slate-400 hover:text-slate-600 dark:hover:text-zinc-200 rounded-full cursor-pointer"
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-ink-muted hover:text-ink rounded-lg cursor-pointer"
             >
-              <X size={14} />
+              <XMarkIcon className="w-4 h-4" />
             </button>
           )}
         </div>
 
         {showProductDropdown && filteredProducts.length > 0 && (
-          <div className="absolute z-50 left-0 right-0 mt-1.5 bg-white dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 rounded-xl shadow-xl max-h-60 overflow-y-auto divide-y divide-slate-100 dark:divide-zinc-900">
+          <div className="absolute z-50 left-0 right-0 mt-1.5 bg-surface border border-border rounded-xl shadow-xl max-h-60 overflow-y-auto divide-y divide-border">
             {filteredProducts.map(p => (
               <div
                 key={p.id}
@@ -78,15 +85,15 @@ export const ReportFilterBar: React.FC<ReportFilterBarProps> = ({
                   setProductSearch(`${p.code} - ${p.name}`);
                   setShowProductDropdown(false);
                 }}
-                className={`p-2.5 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 cursor-pointer text-xs flex items-center justify-between transition-colors ${
-                  selectedProductId === p.id ? 'bg-indigo-50/80 dark:bg-indigo-950/60 font-black text-indigo-600' : 'text-slate-700 dark:text-zinc-300'
+                className={`p-2.5 hover:bg-surface-2 cursor-pointer text-xs flex items-center justify-between transition-colors ${
+                  selectedProductId === p.id ? 'bg-emerald-500/10 font-black text-emerald-700 dark:text-emerald-300' : 'text-ink'
                 }`}
               >
                 <div>
-                  <span className="font-mono font-bold mr-2 text-indigo-500">[{p.code}]</span>
+                  <span className="font-mono font-bold mr-2 text-emerald-600 dark:text-emerald-400">[{p.code}]</span>
                   <span>{p.name}</span>
                 </div>
-                {p.group && <span className="text-[10px] text-slate-400 dark:text-zinc-500">{p.group}</span>}
+                {p.group && <span className="text-[10px] text-ink-muted">{p.group}</span>}
               </div>
             ))}
           </div>
@@ -95,25 +102,35 @@ export const ReportFilterBar: React.FC<ReportFilterBarProps> = ({
 
       {/* Date Range Inputs */}
       <div className="flex items-center gap-2">
-        <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-zinc-900 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-zinc-800 text-xs">
-          <Calendar size={14} className="text-slate-400" />
+        <div className="flex items-center gap-1.5 bg-surface px-3 py-1.5 rounded-xl border border-border text-xs">
+          <CalendarIcon className="w-4 h-4 text-ink-muted" />
           <input
             type="date"
             value={dateRange.from}
             onChange={e => setDateRange(prev => ({ ...prev, from: e.target.value }))}
-            className="bg-transparent border-none outline-none text-slate-700 dark:text-zinc-300 font-medium"
+            className="bg-transparent border-none text-xs text-ink outline-none cursor-pointer"
           />
-          <span className="text-slate-400 font-bold">—</span>
+          <span className="text-ink-muted font-bold">→</span>
           <input
             type="date"
             value={dateRange.to}
             onChange={e => setDateRange(prev => ({ ...prev, to: e.target.value }))}
-            className="bg-transparent border-none outline-none text-slate-700 dark:text-zinc-300 font-medium"
+            className="bg-transparent border-none text-xs text-ink outline-none cursor-pointer"
           />
         </div>
+        {(dateRange.from || dateRange.to) && (
+          <button
+            type="button"
+            onClick={() => setDateRange({ from: '', to: '' })}
+            className="p-2 text-ink-muted hover:text-ink bg-surface border border-border hover:bg-surface-2 rounded-xl transition-colors text-xs"
+            title="Xóa lọc ngày"
+          >
+            <XMarkIcon className="w-4 h-4" />
+          </button>
+        )}
       </div>
 
-      {/* Action buttons */}
+      {/* Actions */}
       <div className="flex items-center gap-2 ml-auto">
         {reportDataLength > 0 && (
           <>
@@ -121,18 +138,21 @@ export const ReportFilterBar: React.FC<ReportFilterBarProps> = ({
               type="button"
               onClick={() => handleGeneratePQR(true)}
               disabled={isGeneratingNarrative}
-              className="flex items-center gap-1.5 px-3.5 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-xl text-xs font-bold shadow-md shadow-purple-500/20 transition-all disabled:opacity-50 cursor-pointer"
+              className="flex items-center gap-1.5 px-3.5 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-xl text-xs font-bold shadow-md shadow-emerald-500/20 transition-all cursor-pointer disabled:opacity-50"
             >
-              {isGeneratingNarrative ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
-              <span>AI Nhận xét PQR</span>
+              {isGeneratingNarrative ? (
+                <ArrowPathIcon className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <SparklesIcon className="w-3.5 h-3.5 text-amber-300" />
+              )}
+              <span>{isGeneratingNarrative ? 'Đang phân tích...' : 'AI Nhận định PQR'}</span>
             </button>
-
             <button
               type="button"
               onClick={handleExportExcel}
-              className="flex items-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-md shadow-emerald-500/20 transition-all cursor-pointer"
+              className="flex items-center gap-1.5 px-3.5 py-2 bg-surface hover:bg-surface-2 text-ink border border-border rounded-xl text-xs font-bold transition-all cursor-pointer"
             >
-              <Download size={14} />
+              <ArrowDownTrayIcon className="w-3.5 h-3.5 text-ink-muted" />
               <span>Xuất Excel</span>
             </button>
           </>

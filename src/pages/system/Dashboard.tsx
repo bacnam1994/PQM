@@ -1,18 +1,27 @@
 import React, { useMemo, useEffect, useState } from 'react';
 import { useAppStore } from '../../store/useAppStore';
 import { 
-  Package, Layers, ClipboardCheck, FileText, 
-  Activity, ArrowRight, Clock, ShieldAlert, Brain, Sparkles
-} from 'lucide-react';
+  CubeIcon, 
+  Square3Stack3DIcon, 
+  ClipboardDocumentCheckIcon, 
+  DocumentTextIcon, 
+  ArrowTrendingUpIcon, 
+  ArrowRightIcon, 
+  ClockIcon, 
+  ShieldExclamationIcon, 
+  SparklesIcon,
+  CheckCircleIcon,
+  ExclamationTriangleIcon,
+  CheckBadgeIcon
+} from '@heroicons/react/24/outline';
 import { Link, useNavigate } from 'react-router-dom';
-import { DSCard } from '../../components';
-import { Surface, StatusBadge } from '../../components/ui';
-import { BATCH_STATUS, PRODUCT_STATUS, TEST_RESULT_STATUS, formatDateStandard } from '../../utils';
+import { Surface } from '../../components/ui';
+import { BATCH_STATUS, PRODUCT_STATUS, TEST_RESULT_STATUS } from '../../utils';
 import { useShallow } from 'zustand/react/shallow';
 import { useQualityAlerts } from '../../hooks/useQualityAlerts';
 import { QAQCActionQueue } from '../../components/features/QAQCActionQueue';
 
-// Gauge Chart Component — SVG Inline Needle Gauge (no external CSS dependency)
+// Gauge Chart Component — SVG Inline Needle Gauge
 const GaugeChart: React.FC<{ passRate: number }> = ({ passRate }) => {
   // -90° = 0%, +90° = 100%
   const needleRotation = -90 + (passRate / 100) * 180;
@@ -20,13 +29,13 @@ const GaugeChart: React.FC<{ passRate: number }> = ({ passRate }) => {
   return (
     <div className="flex flex-col items-center justify-center gap-2">
       {/* SVG Gauge Arc */}
-      <div className="relative w-48 h-24 overflow-hidden">
-        <svg className="w-48 h-48 transform -rotate-180" viewBox="0 0 100 100">
+      <div className="relative w-44 h-22 overflow-hidden">
+        <svg className="w-44 h-44 transform -rotate-180" viewBox="0 0 100 100">
           {/* Vùng đỏ: 0-50% */}
-          <circle cx="50" cy="50" r="40" fill="none" stroke="#d6494a" strokeWidth="8"
+          <circle cx="50" cy="50" r="40" fill="none" stroke="#ef4444" strokeWidth="8"
             strokeDasharray="62.8 126" strokeDashoffset="-62.8" />
           {/* Vùng vàng: 50-75% */}
-          <circle cx="50" cy="50" r="40" fill="none" stroke="#e0972a" strokeWidth="8"
+          <circle cx="50" cy="50" r="40" fill="none" stroke="#f59e0b" strokeWidth="8"
             strokeDasharray="31.4 126" strokeDashoffset="-94.2" />
           {/* Vùng xanh: 75-100% */}
           <circle cx="50" cy="50" r="40" fill="none" stroke="#10b981" strokeWidth="8"
@@ -34,21 +43,20 @@ const GaugeChart: React.FC<{ passRate: number }> = ({ passRate }) => {
         </svg>
         {/* Kim đo xoay động theo passRate */}
         <div
-          className="absolute bottom-0 left-1/2 w-1 h-16 bg-white origin-bottom rounded-full shadow-lg transition-transform duration-1000 ease-out"
+          className="absolute bottom-0 left-1/2 w-1 h-14 bg-ink origin-bottom rounded-full shadow-lg transition-transform duration-1000 ease-out"
           style={{ transform: `translateX(-50%) rotate(${needleRotation}deg)` }}
         />
         {/* Trụ kim trung tâm */}
-        <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-4 h-4 rounded-full bg-white shadow border-4 border-slate-700 dark:border-slate-900" />
+        <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-3.5 h-3.5 rounded-full bg-surface shadow border-2 border-ink" />
       </div>
       {/* Nhãn giá trị */}
       <div className="text-center -mt-1">
-        <span className="text-2xl font-black tracking-tight tabular-nums text-slate-800 dark:text-slate-100">{passRate}%</span>
-        <span className="text-[10px] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider block">Tỷ lệ đạt chỉ tiêu</span>
+        <span className="text-2xl font-black tracking-tight tabular-nums text-ink">{passRate}%</span>
+        <span className="text-[10px] text-ink-muted font-bold uppercase tracking-wider block">Tỷ lệ đạt chuẩn</span>
       </div>
     </div>
   );
 };
-
 
 const Dashboard: React.FC = () => {
   const navigate = useNavigate();
@@ -158,7 +166,7 @@ const Dashboard: React.FC = () => {
     return 'Chào buổi tối';
   }, []);
 
-  const userName = user?.displayName || user?.email?.split('@')[0] || 'Ngọc';
+  const userName = user?.displayName || user?.email?.split('@')[0] || 'Quản lý';
 
   // Trigger global assistant prompt injection
   const triggerAIChat = (prompt: string) => {
@@ -166,308 +174,306 @@ const Dashboard: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500">
+    <div className="space-y-6 animate-in fade-in duration-300">
       
       {/* ================= HERO BANNER ================= */}
-      <Surface variant="flat" padding="lg" className="hero !border-slate-200/80 dark:!border-slate-800">
-        <div className="hero-left">
-          <div className="hero-eyebrow">
-            <Sparkles className="animate-pulse" />
+      <div className="p-6 rounded-2xl bg-surface border border-border shadow-sm flex flex-col md:flex-row items-center justify-between gap-6 relative overflow-hidden">
+        <div className="space-y-4 max-w-xl z-10">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20">
+            <SparklesIcon className="w-3.5 h-3.5 animate-pulse" />
             Tổng quan chất lượng · Hôm nay
           </div>
-          <div className="hero-greet">{greeting}, {userName} 👋</div>
-          <div className="hero-desc">
-            {stats.totalBatches} lô đang được theo dõi trong hệ thống. {alerts.length} chỉ tiêu chất lượng cần chú ý.
+          <div>
+            <h1 className="text-2xl font-black tracking-tight text-ink">
+              {greeting}, {userName} 👋
+            </h1>
+            <p className="text-xs text-ink-muted mt-1 leading-relaxed">
+              <strong className="text-ink">{stats.totalBatches}</strong> lô đang được theo dõi trong hệ thống. <strong className="text-amber-600 dark:text-amber-400">{alerts.length}</strong> chỉ tiêu chất lượng cần chú ý thẩm định.
+            </p>
           </div>
-          <div className="hero-stats">
-            <div className="hero-stat">
-              <span className="dot" style={{ background: 'var(--mint-500)' }}></span>
-              <b>{stats.releasedBatches}</b>
-              <span>Lô đã duyệt</span>
+
+          <div className="flex items-center gap-6 pt-1">
+            <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+              <span className="text-sm font-bold text-ink">{stats.releasedBatches}</span>
+              <span className="text-xs text-ink-muted">Đã duyệt</span>
             </div>
-            <div className="hero-stat">
-              <span className="dot" style={{ background: 'var(--amber-500)' }}></span>
-              <b>{stats.testingBatches}</b>
-              <span>Đang chờ kiểm</span>
+            <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-amber-500"></span>
+              <span className="text-sm font-bold text-ink">{stats.testingBatches}</span>
+              <span className="text-xs text-ink-muted">Chờ kiểm</span>
             </div>
-            <div className="hero-stat">
-              <span className="dot" style={{ background: 'var(--red-500)' }}></span>
-              <b>{alerts.length}</b>
-              <span>Cảnh báo</span>
+            <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-rose-500"></span>
+              <span className="text-sm font-bold text-ink">{alerts.length}</span>
+              <span className="text-xs text-ink-muted">Cảnh báo</span>
             </div>
           </div>
-          <Link to="/reports/quality-summary" className="hero-cta">
-            <FileText size={15} /> Xem báo cáo tổng hợp
-          </Link>
+
+          <div>
+            <Link 
+              to="/reports/quality-summary" 
+              className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-sm transition-all"
+            >
+              <DocumentTextIcon className="w-4 h-4" /> 
+              Xem báo cáo tổng hợp chất lượng
+            </Link>
+          </div>
         </div>
         
-        <div className="hero-right">
+        <div className="p-4 bg-surface-2 border border-border rounded-2xl shadow-inner z-10 shrink-0">
           <GaugeChart passRate={passRate} />
         </div>
-      </Surface>
+      </div>
 
       {/* ================= QA/QC ACTION WORKBENCH QUEUE ================= */}
       <QAQCActionQueue />
 
-      {/* ================= KPI CARDS ================= */}
-      <div className="kpi-row">
-        <div className="kpi-card" style={{ '--accent': 'var(--green-500)' } as React.CSSProperties}>
-          <div className="kpi-top">
-            <div className="kpi-icon" style={{ background: 'rgba(0,117,58,.1)', color: 'var(--green-600)' }}>
-              <Layers />
+      {/* ================= KPI STATS CARDS ================= */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Card 1 */}
+        <div className="bg-surface p-5 rounded-2xl border border-border shadow-sm hover:border-emerald-500/40 transition-all flex flex-col justify-between">
+          <div className="flex items-center justify-between mb-2">
+            <div className="p-2.5 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+              <Square3Stack3DIcon className="w-5 h-5" />
             </div>
-            <div className="kpi-trend trend-up">
-              <Sparkles size={10} /> Live
-            </div>
+            <span className="inline-flex items-center gap-1 text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-700 dark:text-emerald-300">
+              <SparklesIcon className="w-3 h-3" /> Live
+            </span>
           </div>
-          <div className="kpi-value">{stats.totalBatches}</div>
-          <div className="kpi-label">Lô đang theo dõi trong tháng</div>
-          <div className="spark">
-            <i style={{ height: '35%' }}></i>
-            <i style={{ height: '55%' }}></i>
-            <i style={{ height: '40%' }}></i>
-            <i style={{ height: '70%' }}></i>
-            <i style={{ height: '60%' }}></i>
-            <i style={{ height: '90%' }}></i>
-            <i style={{ height: '100%' }}></i>
+          <div>
+            <div className="text-2xl font-black text-ink tracking-tight tabular-nums">{stats.totalBatches}</div>
+            <div className="text-xs font-bold text-ink-muted uppercase tracking-wider mt-0.5">Lô theo dõi trong tháng</div>
           </div>
         </div>
 
-        <div className="kpi-card" style={{ '--accent': 'var(--mint-500)' } as React.CSSProperties}>
-          <div className="kpi-top">
-            <div className="kpi-icon" style={{ background: 'rgba(16,185,129,.12)', color: 'var(--mint-500)' }}>
-              <ClipboardCheck />
+        {/* Card 2 */}
+        <div className="bg-surface p-5 rounded-2xl border border-border shadow-sm hover:border-emerald-500/40 transition-all flex flex-col justify-between">
+          <div className="flex items-center justify-between mb-2">
+            <div className="p-2.5 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+              <ClipboardDocumentCheckIcon className="w-5 h-5" />
             </div>
-            <div className="kpi-trend trend-up">
-              <Activity size={10} /> {passRate >= 90 ? 'Tốt' : 'Khá'}
-            </div>
+            <span className="inline-flex items-center gap-1 text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-700 dark:text-emerald-300">
+              <ArrowTrendingUpIcon className="w-3 h-3" /> {passRate >= 90 ? 'Đạt chuẩn' : 'Khá'}
+            </span>
           </div>
-          <div className="kpi-value">{passRate}%</div>
-          <div className="kpi-label">Tỷ lệ đạt chỉ tiêu kiểm nghiệm</div>
-          <div className="spark">
-            <i style={{ height: '70%' }}></i>
-            <i style={{ height: '75%' }}></i>
-            <i style={{ height: '68%' }}></i>
-            <i style={{ height: '80%' }}></i>
-            <i style={{ height: '85%' }}></i>
-            <i style={{ height: '90%' }}></i>
-            <i style={{ height: '96%' }}></i>
+          <div>
+            <div className="text-2xl font-black text-ink tracking-tight tabular-nums">{passRate}%</div>
+            <div className="text-xs font-bold text-ink-muted uppercase tracking-wider mt-0.5">Tỷ lệ đạt chỉ tiêu kiểm nghiệm</div>
           </div>
         </div>
 
-        <div className="kpi-card" style={{ '--accent': 'var(--amber-500)' } as React.CSSProperties}>
-          <div className="kpi-top">
-            <div className="kpi-icon" style={{ background: 'rgba(224,151,42,.13)', color: 'var(--amber-500)' }}>
-              <Clock />
+        {/* Card 3 */}
+        <div className="bg-surface p-5 rounded-2xl border border-border shadow-sm hover:border-amber-500/40 transition-all flex flex-col justify-between">
+          <div className="flex items-center justify-between mb-2">
+            <div className="p-2.5 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400">
+              <ClockIcon className="w-5 h-5" />
             </div>
-            <div className="kpi-trend trend-up">
-              <Clock size={10} /> Quy trình
-            </div>
+            <span className="inline-flex items-center gap-1 text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-700 dark:text-amber-300">
+              Quy trình
+            </span>
           </div>
-          <div className="kpi-value">{stats.testingBatches}</div>
-          <div className="kpi-label">Lô đang kiểm nghiệm tại Lab</div>
-          <div className="spark">
-            <i style={{ height: '90%' }}></i>
-            <i style={{ height: '70%' }}></i>
-            <i style={{ height: '60%' }}></i>
-            <i style={{ height: '50%' }}></i>
-            <i style={{ height: '45%' }}></i>
-            <i style={{ height: '35%' }}></i>
-            <i style={{ height: '30%' }}></i>
+          <div>
+            <div className="text-2xl font-black text-ink tracking-tight tabular-nums">{stats.testingBatches}</div>
+            <div className="text-xs font-bold text-ink-muted uppercase tracking-wider mt-0.5">Lô đang kiểm nghiệm tại Lab</div>
           </div>
         </div>
 
-        <div className="kpi-card" style={{ '--accent': 'var(--red-500)' } as React.CSSProperties}>
-          <div className="kpi-top">
-            <div className="kpi-icon" style={{ background: 'rgba(214,73,74,.12)', color: 'var(--red-500)' }}>
-              <ShieldAlert />
+        {/* Card 4 */}
+        <div className="bg-surface p-5 rounded-2xl border border-border shadow-sm hover:border-rose-500/40 transition-all flex flex-col justify-between">
+          <div className="flex items-center justify-between mb-2">
+            <div className="p-2.5 rounded-xl bg-rose-500/10 text-rose-600 dark:text-rose-400">
+              <ShieldExclamationIcon className="w-5 h-5" />
             </div>
-            <div className="kpi-trend trend-down">
-              <ShieldAlert size={10} /> Cần xử lý
-            </div>
+            <span className="inline-flex items-center gap-1 text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-700 dark:text-rose-300">
+              Cần xử lý
+            </span>
           </div>
-          <div className="kpi-value">{alerts.length}</div>
-          <div className="kpi-label">Cảnh báo chất lượng phát hiện</div>
-          <div className="spark">
-            <i style={{ height: '20%' }}></i>
-            <i style={{ height: '30%' }}></i>
-            <i style={{ height: '25%' }}></i>
-            <i style={{ height: '40%' }}></i>
-            <i style={{ height: '35%' }}></i>
-            <i style={{ height: '55%' }}></i>
-            <i style={{ height: '65%' }}></i>
+          <div>
+            <div className="text-2xl font-black text-ink tracking-tight tabular-nums">{alerts.length}</div>
+            <div className="text-xs font-bold text-ink-muted uppercase tracking-wider mt-0.5">Cảnh báo chất lượng phát hiện</div>
           </div>
         </div>
       </div>
 
       {/* ================= SIGNATURE PIPELINE ================= */}
-      <Surface variant="flat" padding="lg" className="pipeline-card !border-slate-200/80 dark:!border-slate-800">
-        <div className="pipeline-head">
+      <div className="p-6 rounded-2xl bg-surface border border-border shadow-sm space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-border">
           <div>
-            <h2 className="text-zinc-900 dark:text-zinc-50 font-bold">Chuỗi xử lý lô — Từ nguyên liệu đến xuất kho</h2>
-            <p>Số lượng lô thực tế phân bổ tại mỗi công đoạn</p>
+            <h2 className="text-base font-bold text-ink">Chuỗi xử lý lô — Từ nguyên liệu đến xuất kho</h2>
+            <p className="text-xs text-ink-muted mt-0.5">Số lượng lô thực tế phân bổ tại mỗi công đoạn GMP</p>
           </div>
-          <Link to="/batches" className="btn-ghost text-zinc-700 dark:text-zinc-300">
-            <Layers size={14} /> Xem chi tiết lô
+          <Link 
+            to="/batches" 
+            className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-600 dark:text-emerald-400 hover:underline"
+          >
+            <Square3Stack3DIcon className="w-4 h-4" /> Xem chi tiết danh sách lô &rarr;
           </Link>
         </div>
         
-        <div className="pipeline-track">
-          {/* Stage 1: Nguyên liệu */}
-          <div className="pl-stage">
-            <div className={`pl-connector ${pipelineStages.pending > 0 ? 'filled' : ''}`}></div>
-            <div className="pl-node">
-              <div className="pl-circle" style={{ borderColor: 'var(--green-500)', color: 'var(--green-600)' }}>
-                <Package size={22} />
-              </div>
-              <div className="pl-count">{pipelineStages.pending}</div>
-              <div className="pl-name">Nguyên liệu</div>
-              <div className="pl-sub">chờ cấp phép</div>
+        {/* Pipeline Nodes */}
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
+          {/* Stage 1 */}
+          <div className="p-4 rounded-xl bg-surface-2 border border-border text-center flex flex-col items-center">
+            <div className="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center mb-2">
+              <CubeIcon className="w-5 h-5" />
             </div>
+            <div className="text-xl font-black text-ink tabular-nums">{pipelineStages.pending}</div>
+            <div className="text-xs font-bold text-ink mt-1">Nguyên liệu</div>
+            <div className="text-[10px] text-ink-muted">Chờ cấp phép</div>
           </div>
 
-          {/* Stage 2: Sản xuất */}
-          <div className="pl-stage">
-            <div className={`pl-connector ${pipelineStages.production > 0 ? 'filled' : ''}`}></div>
-            <div className="pl-node">
-              <div className="pl-circle" style={{ borderColor: 'var(--green-500)', color: 'var(--green-600)' }}>
-                <Activity size={22} />
-              </div>
-              <div className="pl-count">{pipelineStages.production}</div>
-              <div className="pl-name">Sản xuất</div>
-              <div className="pl-sub">đang pha chế</div>
+          {/* Stage 2 */}
+          <div className="p-4 rounded-xl bg-surface-2 border border-border text-center flex flex-col items-center">
+            <div className="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center mb-2">
+              <ArrowTrendingUpIcon className="w-5 h-5" />
             </div>
+            <div className="text-xl font-black text-ink tabular-nums">{pipelineStages.production}</div>
+            <div className="text-xs font-bold text-ink mt-1">Sản xuất</div>
+            <div className="text-[10px] text-ink-muted">Đang pha chế</div>
           </div>
 
-          {/* Stage 3: Kiểm nghiệm */}
-          <div className="pl-stage">
-            <div className={`pl-connector ${pipelineStages.testing > 0 ? 'partial' : ''}`}></div>
-            <div className="pl-node">
-              <div className="pl-circle" style={{ borderColor: 'var(--amber-500)', color: 'var(--amber-500)' }}>
-                <ClipboardCheck size={22} />
-              </div>
-              <div className="pl-count">{pipelineStages.testing}</div>
-              <div className="pl-name">Kiểm nghiệm</div>
-              <div className="pl-sub">phòng Lab QC</div>
+          {/* Stage 3 */}
+          <div className="p-4 rounded-xl bg-surface-2 border border-border text-center flex flex-col items-center">
+            <div className="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center mb-2">
+              <ClipboardDocumentCheckIcon className="w-5 h-5" />
             </div>
+            <div className="text-xl font-black text-ink tabular-nums">{pipelineStages.testing}</div>
+            <div className="text-xs font-bold text-ink mt-1">Kiểm nghiệm</div>
+            <div className="text-[10px] text-ink-muted">Phòng Lab QC</div>
           </div>
 
-          {/* Stage 4: Phê duyệt */}
-          <div className="pl-stage">
-            <div className={`pl-connector ${pipelineStages.review > 0 ? 'filled' : ''}`}></div>
-            <div className="pl-node">
-              <div className="pl-circle">
-                <FileText size={22} />
-              </div>
-              <div className="pl-count">{pipelineStages.review}</div>
-              <div className="pl-name">Phê duyệt</div>
-              <div className="pl-sub">chờ QA thẩm định</div>
+          {/* Stage 4 */}
+          <div className="p-4 rounded-xl bg-surface-2 border border-border text-center flex flex-col items-center">
+            <div className="w-10 h-10 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center mb-2">
+              <DocumentTextIcon className="w-5 h-5" />
             </div>
+            <div className="text-xl font-black text-ink tabular-nums">{pipelineStages.review}</div>
+            <div className="text-xs font-bold text-ink mt-1">Phê duyệt</div>
+            <div className="text-[10px] text-ink-muted">Chờ QA duyệt</div>
           </div>
 
-          {/* Stage 5: Xuất kho */}
-          <div className="pl-stage">
-            <div className="pl-node">
-              <div className="pl-circle" style={{ borderColor: 'var(--mint-500)', color: 'var(--mint-500)' }}>
-                <Layers size={22} />
-              </div>
-              <div className="pl-count">{pipelineStages.exported}</div>
-              <div className="pl-name">Xuất kho</div>
-              <div className="pl-sub">đạt chuẩn phát hành</div>
+          {/* Stage 5 */}
+          <div className="p-4 rounded-xl bg-surface-2 border border-border text-center flex flex-col items-center col-span-2 sm:col-span-1">
+            <div className="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center mb-2">
+              <CheckBadgeIcon className="w-5 h-5" />
             </div>
+            <div className="text-xl font-black text-ink tabular-nums">{pipelineStages.exported}</div>
+            <div className="text-xs font-bold text-ink mt-1">Xuất kho</div>
+            <div className="text-[10px] text-ink-muted">Đạt chuẩn phát hành</div>
           </div>
         </div>
-      </Surface>
+      </div>
 
       {/* ================= TWO COLUMN GRID ================= */}
-      <div className="grid-2">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
-        {/* Left Col: Batches List */}
-        <Surface variant="flat" padding="md" className="card !border-slate-200/80 dark:!border-slate-800">
-          <div className="card-head">
-            <h3 className="font-bold">Lô hàng gần đây</h3>
-            <Link to="/batches" className="link">Xem tất cả &rarr;</Link>
+        {/* Left Col: Batches List (2 cols wide) */}
+        <div className="lg:col-span-2 p-5 rounded-2xl bg-surface border border-border shadow-sm space-y-4">
+          <div className="flex items-center justify-between pb-3 border-b border-border">
+            <h3 className="font-bold text-ink text-sm">Lô hàng gần đây</h3>
+            <Link to="/batches" className="text-xs font-bold text-emerald-600 dark:text-emerald-400 hover:underline">
+              Xem tất cả &rarr;
+            </Link>
           </div>
           
-          <div className="tabs">
-            <span 
+          <div className="flex items-center gap-1.5">
+            <button 
               onClick={() => setActiveTab('all')} 
-              className={`tab ${activeTab === 'all' ? 'active' : ''}`}
+              className={`px-3 py-1 text-xs font-bold rounded-lg transition-all border ${
+                activeTab === 'all' 
+                  ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm' 
+                  : 'bg-surface-2 text-ink-muted hover:text-ink border-border'
+              }`}
             >
               Tất cả
-            </span>
-            <span 
+            </button>
+            <button 
               onClick={() => setActiveTab('testing')} 
-              className={`tab ${activeTab === 'testing' ? 'active' : ''}`}
+              className={`px-3 py-1 text-xs font-bold rounded-lg transition-all border ${
+                activeTab === 'testing' 
+                  ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm' 
+                  : 'bg-surface-2 text-ink-muted hover:text-ink border-border'
+              }`}
             >
               Đang kiểm
-            </span>
-            <span 
+            </button>
+            <button 
               onClick={() => setActiveTab('rejected')} 
-              className={`tab ${activeTab === 'rejected' ? 'active' : ''}`}
+              className={`px-3 py-1 text-xs font-bold rounded-lg transition-all border ${
+                activeTab === 'rejected' 
+                  ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm' 
+                  : 'bg-surface-2 text-ink-muted hover:text-ink border-border'
+              }`}
             >
               Không đạt
-            </span>
+            </button>
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full text-left">
+            <table className="w-full text-left text-xs">
               <thead>
-                <tr>
-                  <th className="px-5 py-3 border-b border-zinc-200/50 dark:border-zinc-800 text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Số lô</th>
-                  <th className="px-5 py-3 border-b border-zinc-200/50 dark:border-zinc-800 text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Sản phẩm</th>
-                  <th className="px-5 py-3 border-b border-zinc-200/50 dark:border-zinc-800 text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Hạn dùng</th>
-                  <th className="px-5 py-3 border-b border-zinc-200/50 dark:border-zinc-800 text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Tiến độ</th>
-                  <th className="px-5 py-3 border-b border-zinc-200/50 dark:border-zinc-800 text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Trạng thái</th>
+                <tr className="border-b border-border text-[10px] font-black uppercase text-ink-muted tracking-wider">
+                  <th className="py-2.5 pr-4">Số lô</th>
+                  <th className="py-2.5 px-4">Sản phẩm</th>
+                  <th className="py-2.5 px-4">Hạn dùng</th>
+                  <th className="py-2.5 px-4">Trạng thái</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y divide-border">
                 {filteredBatches.map((b) => {
                   const product = products.find(p => p.id === b.productId);
-                  let progress = 0;
-                  let chipClass = 'chip-review';
-                  let statusText = 'Chờ duyệt';
+                  let statusBadge = (
+                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-surface-3 text-ink-muted">
+                      Chờ duyệt
+                    </span>
+                  );
                   
                   if (b.status === BATCH_STATUS.RELEASED) {
-                    progress = 100;
-                    chipClass = 'chip-pass';
-                    statusText = 'Đạt';
+                    statusBadge = (
+                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20">
+                        Đạt chuẩn
+                      </span>
+                    );
                   } else if (b.status === BATCH_STATUS.TESTING) {
-                    progress = 65;
-                    chipClass = 'chip-testing';
-                    statusText = 'Đang kiểm';
+                    statusBadge = (
+                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/20">
+                        Đang kiểm
+                      </span>
+                    );
                   } else if (b.status === BATCH_STATUS.REJECTED) {
-                    progress = 40;
-                    chipClass = 'chip-fail';
-                    statusText = 'Không đạt';
+                    statusBadge = (
+                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-500/10 text-rose-700 dark:text-rose-300 border border-rose-500/20">
+                        Không đạt
+                      </span>
+                    );
                   }
 
                   return (
-                    <tr key={b.id} onClick={() => navigate(`/batches/${b.id}`)} className="cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-900/60 transition-colors">
-                      <td className="px-5 py-3 border-b border-zinc-200/50 dark:border-zinc-800 font-mono text-[12px] font-bold text-zinc-500 dark:text-zinc-400">
+                    <tr 
+                      key={b.id} 
+                      onClick={() => navigate(`/batches/${b.id}`)} 
+                      className="cursor-pointer hover:bg-surface-2 transition-colors"
+                    >
+                      <td className="py-3 pr-4 font-mono font-bold text-ink">
                         {b.batchNo}
                       </td>
-                      <td className="px-5 py-3 border-b border-zinc-200/50 dark:border-zinc-800">
-                        <div className="prod-name">{product?.name || 'Sản phẩm không rõ'}</div>
-                        <div className="prod-sub font-mono">{product?.code || '---'}</div>
+                      <td className="py-3 px-4">
+                        <div className="font-bold text-ink">{product?.name || 'Sản phẩm không rõ'}</div>
+                        <div className="text-[10px] font-mono text-ink-muted">{product?.code || '---'}</div>
                       </td>
-                      <td className="px-5 py-3 border-b border-zinc-200/50 dark:border-zinc-800 font-medium text-zinc-650 dark:text-zinc-400">
+                      <td className="py-3 px-4 text-ink-soft">
                         {b.expDate ? b.expDate.split('-').reverse().slice(0, 2).join('/') : '---'}
                       </td>
-                      <td className="px-5 py-3 border-b border-zinc-200/50 dark:border-zinc-800">
-                        <div className="progress-mini">
-                          <span style={{ width: `${progress}%`, background: b.status === BATCH_STATUS.REJECTED ? 'var(--red-500)' : b.status === BATCH_STATUS.TESTING ? 'var(--amber-500)' : 'var(--green-500)' }}></span>
-                        </div>
-                      </td>
-                      <td className="px-5 py-3 border-b border-zinc-200/50 dark:border-zinc-800">
-                        <span className={`chip ${chipClass}`}>{statusText}</span>
+                      <td className="py-3 px-4">
+                        {statusBadge}
                       </td>
                     </tr>
                   );
                 })}
                 {filteredBatches.length === 0 && (
                   <tr>
-                    <td colSpan={5} className="px-5 py-8 text-center text-zinc-400 font-medium text-xs">
+                    <td colSpan={4} className="py-8 text-center text-ink-muted font-medium text-xs">
                       Không tìm thấy lô hàng nào phù hợp.
                     </td>
                   </tr>
@@ -475,32 +481,35 @@ const Dashboard: React.FC = () => {
               </tbody>
             </table>
           </div>
-        </Surface>
+        </div>
 
-        {/* Right Col: Alerts & AI Card */}
+        {/* Right Col: Alerts & AI Card (1 col wide) */}
         <div className="space-y-4">
           
           {/* Quality Alerts */}
-          <Surface variant="flat" padding="md" className="card !border-slate-200/80 dark:!border-slate-800">
-            <div className="card-head">
-              <h3 className="font-bold">Cảnh báo chất lượng</h3>
-              <Link to="/alerts" className="link">Tất cả</Link>
+          <div className="p-5 rounded-2xl bg-surface border border-border shadow-sm space-y-3">
+            <div className="flex items-center justify-between pb-3 border-b border-border">
+              <h3 className="font-bold text-ink text-sm">Cảnh báo chất lượng</h3>
+              <Link to="/alerts" className="text-xs font-bold text-emerald-600 dark:text-emerald-400 hover:underline">
+                Tất cả &rarr;
+              </Link>
             </div>
             
-            <div className="divide-y divide-zinc-200/50 dark:divide-zinc-800/80">
+            <div className="divide-y divide-border">
               {alerts.slice(0, 4).map((anomaly, idx) => {
-                let severityClass = 'sev-low';
-                if (anomaly.severity === 'HIGH') severityClass = 'sev-high';
-                else if (anomaly.severity === 'MEDIUM') severityClass = 'sev-mid';
-
+                const isHigh = anomaly.severity === 'HIGH';
                 return (
-                  <div key={idx} className="alert-item">
-                    <div className={`alert-dot ${severityClass}`}>
-                      {anomaly.severity === 'HIGH' ? <ShieldAlert size={15} /> : <Clock size={15} />}
+                  <div key={idx} className="py-2.5 flex items-start gap-2.5">
+                    <div className={`p-1 rounded-lg shrink-0 mt-0.5 ${
+                      isHigh 
+                        ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400' 
+                        : 'bg-amber-500/10 text-amber-600 dark:text-amber-400'
+                    }`}>
+                      {isHigh ? <ShieldExclamationIcon className="w-4 h-4" /> : <ClockIcon className="w-4 h-4" />}
                     </div>
-                    <div>
-                      <div className="alert-title">{anomaly.title}</div>
-                      <div className="alert-meta">
+                    <div className="min-w-0">
+                      <div className="text-xs font-bold text-ink truncate">{anomaly.title}</div>
+                      <div className="text-[11px] text-ink-muted truncate mt-0.5">
                         {anomaly.detail} {anomaly.batchNo ? `· Lô: ${anomaly.batchNo}` : ''}
                       </div>
                     </div>
@@ -508,35 +517,39 @@ const Dashboard: React.FC = () => {
                 );
               })}
               {alerts.length === 0 && (
-                <div className="p-8 text-center text-zinc-400 font-medium text-xs">
+                <div className="py-6 text-center text-ink-muted font-medium text-xs">
                   Không có cảnh báo chất lượng cần xử lý.
                 </div>
               )}
             </div>
-          </Surface>
+          </div>
 
           {/* AI Quick Prompt Widget */}
-          <div className="ai-card">
-            <div className="ai-head">
-              <Brain size={18} />
-              <b>Trợ lý AI</b>
+          <div className="p-5 rounded-2xl bg-gradient-to-br from-emerald-500/10 via-surface to-surface-2 border border-border shadow-sm space-y-3">
+            <div className="flex items-center gap-2 text-ink font-bold text-sm">
+              <SparklesIcon className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+              <span>Trợ lý AI Phân tích</span>
             </div>
-            <p>Hỏi trợ lý về tình trạng lô, phân tích nguyên nhân gốc (5 Why) hoặc trích xuất dữ liệu kết quả phiếu kiểm nghiệm.</p>
+            <p className="text-xs text-ink-muted leading-relaxed">
+              Hỏi trợ lý về tình trạng lô, phân tích nguyên nhân gốc (5 Why) hoặc trích xuất dữ liệu kết quả phiếu kiểm nghiệm.
+            </p>
             
-            <div 
-              onClick={() => triggerAIChat('Tổng quan tình trạng tất cả lô hàng hiện tại')}
-              className="ai-prompt"
-            >
-              <Sparkles size={13} />
-              <span>Tổng quan tình trạng tất cả lô hàng hiện tại</span>
-            </div>
+            <div className="space-y-2 pt-1">
+              <button 
+                onClick={() => triggerAIChat('Tổng quan tình trạng tất cả lô hàng hiện tại')}
+                className="w-full text-left p-2.5 bg-surface hover:bg-surface-3 border border-border rounded-xl text-xs text-ink font-medium transition-colors flex items-center gap-2 shadow-xs"
+              >
+                <SparklesIcon className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                <span className="truncate">Tổng quan tình trạng tất cả lô hàng hiện tại</span>
+              </button>
 
-            <div 
-              onClick={() => triggerAIChat('Xuất báo cáo chất lượng tháng này ra Excel')}
-              className="ai-prompt"
-            >
-              <Sparkles size={13} />
-              <span>Xuất báo cáo chất lượng tháng này ra Excel</span>
+              <button 
+                onClick={() => triggerAIChat('Xuất báo cáo chất lượng tháng này ra Excel')}
+                className="w-full text-left p-2.5 bg-surface hover:bg-surface-3 border border-border rounded-xl text-xs text-ink font-medium transition-colors flex items-center gap-2 shadow-xs"
+              >
+                <SparklesIcon className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                <span className="truncate">Xuất báo cáo chất lượng tháng này ra Excel</span>
+              </button>
             </div>
           </div>
         </div>

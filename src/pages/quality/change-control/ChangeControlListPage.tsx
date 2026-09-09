@@ -5,10 +5,16 @@
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { 
-  GitPullRequest, Plus, Search, Filter, ShieldCheck, 
-  AlertTriangle, CheckCircle2, Clock, ArrowRight, RefreshCw, 
-  Layers, Package, AlertOctagon, Activity, FileText, Calendar, User
-} from 'lucide-react';
+  ArrowsRightLeftIcon, 
+  PlusIcon, 
+  MagnifyingGlassIcon, 
+  ArrowPathIcon, 
+  ArrowRightIcon,
+  ShieldExclamationIcon,
+  CheckCircleIcon,
+  ClockIcon,
+  ExclamationTriangleIcon
+} from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 import { useAppStore } from '../../../store/useAppStore';
 import { useShallow } from 'zustand/react/shallow';
@@ -169,14 +175,14 @@ export const ChangeControlListPage: React.FC = () => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="p-2.5 bg-indigo-100 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 rounded-xl border border-indigo-200 dark:border-indigo-900/50">
-            <GitPullRequest size={24} />
+          <div className="p-2.5 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-xl border border-emerald-500/20">
+            <ArrowsRightLeftIcon className="h-6 w-6" />
           </div>
           <div>
-            <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-50">
+            <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-ink">
               Quản lý Thay đổi Chuẩn GMP (Change Control)
             </h1>
-            <p className="text-xs sm:text-sm text-slate-500">
+            <p className="text-xs sm:text-sm text-ink-muted">
               Kiểm soát các thay đổi về công thức, quy trình, tiêu chuẩn, thiết bị và nhà cung cấp (ICH Q10 / PIC/S)
             </p>
           </div>
@@ -186,17 +192,17 @@ export const ChangeControlListPage: React.FC = () => {
           <button
             onClick={loadData}
             disabled={loading}
-            className="p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+            className="p-2.5 rounded-xl border border-border bg-surface text-ink-soft hover:bg-surface-2 transition-colors"
             title="Tải lại dữ liệu"
           >
-            <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
+            <ArrowPathIcon className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
           </button>
 
           <button
             onClick={() => setShowCreateModal(true)}
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs uppercase tracking-wider shadow-sm transition-all"
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs uppercase tracking-wider shadow-sm transition-all"
           >
-            <Plus size={16} />
+            <PlusIcon className="h-4 w-4 stroke-[2.5]" />
             <span>Tạo Yêu cầu Thay đổi</span>
           </button>
         </div>
@@ -204,9 +210,9 @@ export const ChangeControlListPage: React.FC = () => {
 
       {/* KPI Metrics */}
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-        <div className="p-3.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm">
-          <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Tổng yêu cầu</span>
-          <p className="text-2xl font-black text-slate-800 dark:text-slate-100 mt-1">{total}</p>
+        <div className="p-3.5 rounded-2xl bg-surface border border-border shadow-sm">
+          <span className="text-[10px] font-black uppercase text-ink-muted tracking-wider">Tổng yêu cầu</span>
+          <p className="text-2xl font-black text-ink mt-1">{total}</p>
         </div>
         <div className="p-3.5 rounded-2xl bg-amber-50/60 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800/50 shadow-sm">
           <span className="text-[10px] font-black uppercase text-amber-700 dark:text-amber-400 tracking-wider">Đánh giá tác động</span>
@@ -227,15 +233,15 @@ export const ChangeControlListPage: React.FC = () => {
       </div>
 
       {/* Search & Filter Toolbar */}
-      <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-wrap items-center justify-between gap-3">
+      <div className="bg-surface p-4 rounded-2xl border border-border shadow-sm flex flex-wrap items-center justify-between gap-3">
         <div className="relative flex-1 min-w-[260px]">
-          <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+          <MagnifyingGlassIcon className="h-4 w-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-muted" />
           <input
             type="text"
             placeholder="Tìm theo mã CR, tiêu đề thay đổi hoặc sản phẩm..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold outline-none focus:border-indigo-500 transition-colors"
+            className="w-full pl-10 pr-4 py-2 bg-surface-2 border border-border rounded-xl text-xs font-bold text-ink placeholder:text-ink-muted outline-none focus:border-emerald-500 transition-colors"
           />
         </div>
 
@@ -243,7 +249,7 @@ export const ChangeControlListPage: React.FC = () => {
           <select
             value={categoryFilter}
             onChange={(e) => setCategoryFilter(e.target.value)}
-            className="px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold outline-none text-slate-700 dark:text-slate-200"
+            className="px-3 py-2 bg-surface-2 border border-border rounded-xl text-xs font-bold outline-none text-ink"
           >
             <option value="ALL">Tất cả phân loại</option>
             <option value="FORMULA">Công thức (Formula)</option>
@@ -258,7 +264,7 @@ export const ChangeControlListPage: React.FC = () => {
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold outline-none text-slate-700 dark:text-slate-200"
+            className="px-3 py-2 bg-surface-2 border border-border rounded-xl text-xs font-bold outline-none text-ink"
           >
             <option value="ALL">Tất cả trạng thái</option>
             <option value="DRAFT">Bản nháp</option>
@@ -271,11 +277,11 @@ export const ChangeControlListPage: React.FC = () => {
       </div>
 
       {/* Change Requests Table */}
-      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+      <div className="bg-surface rounded-2xl border border-border shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse text-xs">
             <thead>
-              <tr className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 text-slate-500 uppercase tracking-wider font-black">
+              <tr className="bg-surface-2 border-b border-border text-ink-muted uppercase tracking-wider font-black">
                 <th className="p-4 w-36">Mã CR</th>
                 <th className="p-4 min-w-[260px]">Tiêu đề Thay đổi</th>
                 <th className="p-4 w-40">Phân loại</th>
@@ -286,10 +292,10 @@ export const ChangeControlListPage: React.FC = () => {
                 <th className="p-4 w-20 text-center">Chi tiết</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
+            <tbody className="divide-y divide-border">
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="p-12 text-center text-slate-400 font-medium">
+                  <td colSpan={8} className="p-12 text-center text-ink-muted font-medium">
                     Chưa có Yêu cầu Thay đổi nào phù hợp.
                   </td>
                 </tr>
@@ -297,31 +303,31 @@ export const ChangeControlListPage: React.FC = () => {
                 filtered.map(cr => {
                   const rpn = cr.riskAssessment?.rpn;
                   const rpnColor = rpn 
-                    ? rpn >= 60 ? 'text-rose-600 bg-rose-50 border-rose-200' 
-                    : rpn >= 25 ? 'text-amber-600 bg-amber-50 border-amber-200' 
-                    : 'text-emerald-600 bg-emerald-50 border-emerald-200'
-                    : 'text-slate-400 bg-slate-50 border-slate-200';
+                    ? rpn >= 60 ? 'text-rose-600 bg-rose-500/10 border-rose-500/30' 
+                    : rpn >= 25 ? 'text-amber-600 bg-amber-500/10 border-amber-500/30' 
+                    : 'text-emerald-600 bg-emerald-500/10 border-emerald-500/30'
+                    : 'text-ink-muted bg-surface-2 border-border';
 
                   return (
                     <tr 
                       key={cr.id}
                       onClick={() => setSelectedCR(cr)}
-                      className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors cursor-pointer"
+                      className="hover:bg-surface-2 transition-colors cursor-pointer"
                     >
-                      <td className="p-4 font-mono font-bold text-indigo-600 dark:text-indigo-400">
+                      <td className="p-4 font-mono font-bold text-emerald-600 dark:text-emerald-400">
                         {cr.crNo}
                       </td>
                       <td className="p-4">
-                        <p className="font-bold text-slate-800 dark:text-slate-100">{cr.title}</p>
+                        <p className="font-bold text-ink">{cr.title}</p>
                         {cr.productName && (
-                          <span className="text-[11px] text-slate-400">Sản phẩm: {cr.productName}</span>
+                          <span className="text-[11px] text-ink-muted">Sản phẩm: {cr.productName}</span>
                         )}
                       </td>
                       <td className="p-4">
-                        <span className="font-medium text-slate-600 dark:text-slate-300">{cr.category}</span>
+                        <span className="font-medium text-ink-soft">{cr.category}</span>
                       </td>
                       <td className="p-4">
-                        <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase border border-slate-200 text-slate-600">
+                        <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase border border-border text-ink-soft">
                           {cr.changeType}
                         </span>
                       </td>
@@ -331,19 +337,19 @@ export const ChangeControlListPage: React.FC = () => {
                             RPN: {rpn}
                           </span>
                         ) : (
-                          <span className="text-slate-400 text-[11px]">Chưa tính</span>
+                          <span className="text-ink-muted text-[11px]">Chưa tính</span>
                         )}
                       </td>
-                      <td className="p-4 font-mono text-slate-600 dark:text-slate-400">
+                      <td className="p-4 font-mono text-ink-soft">
                         {formatDateStandard(cr.targetImplementationDate)}
                       </td>
                       <td className="p-4 text-center">
-                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-surface-2 text-ink-soft border border-border">
                           {cr.status}
                         </span>
                       </td>
                       <td className="p-4 text-center">
-                        <ArrowRight size={14} className="text-slate-400 mx-auto" />
+                        <ArrowRightIcon className="h-3.5 w-3.5 text-ink-muted mx-auto" />
                       </td>
                     </tr>
                   );
@@ -371,12 +377,12 @@ export const ChangeControlListPage: React.FC = () => {
         isOpen={showCreateModal}
         onClose={() => setShowCreateModal(false)}
         title="Khởi tạo Yêu cầu Thay đổi GMP (Change Request)"
-        icon={Plus}
-        color="bg-indigo-600"
+        icon={PlusIcon}
+        color="bg-emerald-600"
       >
         <form onSubmit={handleCreateSubmit} className="space-y-4 text-xs">
           <div>
-            <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">
+            <label className="font-bold text-ink block mb-1">
               Tiêu đề Yêu cầu Thay đổi <span className="text-rose-500">*</span>:
             </label>
             <input
@@ -384,18 +390,18 @@ export const ChangeControlListPage: React.FC = () => {
               placeholder="VD: Thay đổi thông số nhiệt độ ép vỉ màng nhôm..."
               value={newForm.title}
               onChange={(e) => setNewForm(f => ({ ...f, title: e.target.value }))}
-              className="w-full p-2.5 bg-slate-50 dark:bg-slate-800 border rounded-xl font-medium outline-none"
+              className="w-full p-2.5 bg-surface-2 border border-border rounded-xl font-medium text-ink outline-none focus:border-emerald-500 transition-colors"
               required
             />
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Phân loại:</label>
+              <label className="font-bold text-ink block mb-1">Phân loại:</label>
               <select
                 value={newForm.category}
                 onChange={(e) => setNewForm(f => ({ ...f, category: e.target.value as ChangeCategory }))}
-                className="w-full p-2.5 bg-slate-50 dark:bg-slate-800 border rounded-xl font-bold"
+                className="w-full p-2.5 bg-surface-2 border border-border rounded-xl font-bold text-ink"
               >
                 <option value="MANUFACTURING_PROCESS">Quy trình sản xuất</option>
                 <option value="FORMULA">Công thức sản phẩm</option>
@@ -408,11 +414,11 @@ export const ChangeControlListPage: React.FC = () => {
             </div>
 
             <div>
-              <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Mức độ thay đổi:</label>
+              <label className="font-bold text-ink block mb-1">Mức độ thay đổi:</label>
               <select
                 value={newForm.changeType}
                 onChange={(e) => setNewForm(f => ({ ...f, changeType: e.target.value as ChangeType }))}
-                className="w-full p-2.5 bg-slate-50 dark:bg-slate-800 border rounded-xl font-bold"
+                className="w-full p-2.5 bg-surface-2 border border-border rounded-xl font-bold text-ink"
               >
                 <option value="MINOR">Nhẹ (Minor)</option>
                 <option value="MAJOR">Đáng kể (Major)</option>
@@ -423,11 +429,11 @@ export const ChangeControlListPage: React.FC = () => {
           </div>
 
           <div>
-            <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Sản phẩm liên đới (tùy chọn):</label>
+            <label className="font-bold text-ink block mb-1">Sản phẩm liên đới (tùy chọn):</label>
             <select
               value={newForm.productId}
               onChange={(e) => setNewForm(f => ({ ...f, productId: e.target.value }))}
-              className="w-full p-2.5 bg-slate-50 dark:bg-slate-800 border rounded-xl font-medium"
+              className="w-full p-2.5 bg-surface-2 border border-border rounded-xl font-medium text-ink"
             >
               <option value="">-- Không gắn sản phẩm cụ thể --</option>
               {products.map(p => (
@@ -437,7 +443,7 @@ export const ChangeControlListPage: React.FC = () => {
           </div>
 
           <div>
-            <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">
+            <label className="font-bold text-ink block mb-1">
               Lý do và tính cần thiết (Justification) <span className="text-rose-500">*</span>:
             </label>
             <textarea
@@ -445,13 +451,13 @@ export const ChangeControlListPage: React.FC = () => {
               placeholder="Tại sao cần thực hiện thay đổi này..."
               value={newForm.justification}
               onChange={(e) => setNewForm(f => ({ ...f, justification: e.target.value }))}
-              className="w-full p-2.5 bg-slate-50 dark:bg-slate-800 border rounded-xl font-medium outline-none"
+              className="w-full p-2.5 bg-surface-2 border border-border rounded-xl font-medium text-ink outline-none focus:border-emerald-500 transition-colors"
               required
             />
           </div>
 
           <div>
-            <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">
+            <label className="font-bold text-ink block mb-1">
               Nội dung và phạm vi thay đổi cụ thể (Description) <span className="text-rose-500">*</span>:
             </label>
             <textarea
@@ -459,35 +465,35 @@ export const ChangeControlListPage: React.FC = () => {
               placeholder="Mô tả chi tiết những gì sẽ thay đổi, thông số cũ vs mới..."
               value={newForm.description}
               onChange={(e) => setNewForm(f => ({ ...f, description: e.target.value }))}
-              className="w-full p-2.5 bg-slate-50 dark:bg-slate-800 border rounded-xl font-medium outline-none"
+              className="w-full p-2.5 bg-surface-2 border border-border rounded-xl font-medium text-ink outline-none focus:border-emerald-500 transition-colors"
               required
             />
           </div>
 
           <div>
-            <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">
+            <label className="font-bold text-ink block mb-1">
               Hạn dự kiến hoàn thành triển khai:
             </label>
             <input
               type="date"
               value={newForm.targetImplementationDate}
               onChange={(e) => setNewForm(f => ({ ...f, targetImplementationDate: e.target.value }))}
-              className="w-full p-2.5 bg-slate-50 dark:bg-slate-800 border rounded-xl font-medium outline-none"
+              className="w-full p-2.5 bg-surface-2 border border-border rounded-xl font-medium text-ink outline-none focus:border-emerald-500 transition-colors"
               required
             />
           </div>
 
-          <div className="flex justify-end gap-2 pt-2 border-t">
+          <div className="flex justify-end gap-2 pt-3 border-t border-border">
             <button
               type="button"
               onClick={() => setShowCreateModal(false)}
-              className="px-4 py-2 text-slate-500 font-bold uppercase text-xs hover:bg-slate-50 rounded-xl"
+              className="px-4 py-2 text-ink-muted hover:text-ink font-bold uppercase text-xs hover:bg-surface-2 rounded-xl transition-colors"
             >
               Hủy
             </button>
             <button
               type="submit"
-              className="px-6 py-2 bg-indigo-600 text-white font-bold uppercase text-xs rounded-xl shadow-md"
+              className="px-6 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold uppercase text-xs rounded-xl shadow-sm transition-all"
             >
               Lưu Change Request
             </button>

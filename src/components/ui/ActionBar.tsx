@@ -10,8 +10,8 @@ export interface ActionBarProps {
 }
 
 /**
- * ActionBar - Thanh tác vụ cố định đáy trang (Sticky Action Bar)
- * Giữ các nút hành động cốt lõi (Hủy, Lưu nháp, Ký số, Tiếp tục) luôn trong tầm tay người dùng.
+ * ActionBar - Tailwind UI Sticky Action Toolbar
+ * Thanh tác vụ cố định đáy trang hỗ trợ Dark mode với bg-surface/95 và border-border.
  */
 export const ActionBar: React.FC<ActionBarProps> = ({
   left,
@@ -26,7 +26,7 @@ export const ActionBar: React.FC<ActionBarProps> = ({
 
   return (
     <div
-      className={`sticky bottom-0 z-30 -mx-4 -mb-6 sm:-mx-6 sm:-mb-8 px-4 sm:px-6 py-3.5 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border-t border-slate-200/80 dark:border-slate-800/80 shadow-[0_-4px_12px_rgba(0,0,0,0.03)] flex flex-wrap items-center justify-between gap-3 ${className}`}
+      className={`sticky bottom-0 z-30 -mx-4 -mb-6 sm:-mx-6 sm:-mb-8 px-4 sm:px-6 py-3.5 bg-surface/95 backdrop-blur-md border-t border-border shadow-[0_-4px_16px_rgba(0,0,0,0.04)] flex flex-wrap items-center justify-between gap-3 transition-colors ${className}`}
     >
       {children ? (
         children
@@ -44,3 +44,4 @@ export const ActionBar: React.FC<ActionBarProps> = ({
     </div>
   );
 };
+

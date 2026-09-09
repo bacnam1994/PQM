@@ -1,5 +1,12 @@
 import React from 'react';
-import { Filter, ShieldCheck, Layers, Package, LayoutGrid, List } from 'lucide-react';
+import {
+  FunnelIcon,
+  ShieldCheckIcon,
+  Square3Stack3DIcon,
+  CubeIcon,
+  Squares2X2Icon,
+  ListBulletIcon,
+} from '@heroicons/react/24/outline';
 import { DSFilterBar, DSSearchInput, DSSelect, DSViewToggle } from '../../../../components';
 import { Product } from '../../../../types';
 import { MaterialCategoryFilter, MaterialTab, MaterialUsageFilter } from '../types';
@@ -46,7 +53,7 @@ export const MaterialFilterSection: React.FC<MaterialFilterSectionProps> = ({
       />
 
       <DSSelect 
-        icon={Filter} 
+        icon={FunnelIcon} 
         value={filterCategory} 
         onChange={(e) => setFilterCategory(e.target.value as any)} 
         className="w-36"
@@ -60,7 +67,7 @@ export const MaterialFilterSection: React.FC<MaterialFilterSectionProps> = ({
       {activeTab === 'CATALOG' ? (
         <>
           <DSSelect 
-            icon={ShieldCheck} 
+            icon={ShieldCheckIcon} 
             value={filterStandard} 
             onChange={(e) => setFilterStandard(e.target.value)} 
             className="w-44 truncate"
@@ -74,7 +81,7 @@ export const MaterialFilterSection: React.FC<MaterialFilterSectionProps> = ({
           </DSSelect>
 
           <DSSelect 
-            icon={Layers} 
+            icon={Square3Stack3DIcon} 
             value={filterUsage} 
             onChange={(e) => setFilterUsage(e.target.value as any)} 
             className="w-40"
@@ -86,7 +93,7 @@ export const MaterialFilterSection: React.FC<MaterialFilterSectionProps> = ({
         </>
       ) : (
         <DSSelect 
-          icon={Package} 
+          icon={CubeIcon} 
           value={filterProductId} 
           onChange={(e) => setFilterProductId(e.target.value)} 
           className="w-48 truncate"
@@ -99,7 +106,7 @@ export const MaterialFilterSection: React.FC<MaterialFilterSectionProps> = ({
       )}
 
       {activeTab !== 'CONSISTENCY' && (
-        <DSViewToggle viewMode={viewMode} setViewMode={setViewMode} gridIcon={LayoutGrid} listIcon={List} />
+        <DSViewToggle viewMode={viewMode} setViewMode={setViewMode} gridIcon={Squares2X2Icon} listIcon={ListBulletIcon} />
       )}
     </DSFilterBar>
   );

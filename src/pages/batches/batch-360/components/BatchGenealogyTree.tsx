@@ -1,9 +1,17 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { 
-  GitBranch, CheckCircle2, AlertTriangle, XCircle, Info, 
-  ChevronRight, ChevronDown, ExternalLink, ShieldCheck, ShieldAlert 
-} from 'lucide-react';
+  ShareIcon, 
+  CheckCircleIcon, 
+  ExclamationTriangleIcon, 
+  XCircleIcon, 
+  InformationCircleIcon, 
+  ChevronRightIcon, 
+  ChevronDownIcon, 
+  ArrowTopRightOnSquareIcon, 
+  ShieldCheckIcon, 
+  ShieldExclamationIcon 
+} from '@heroicons/react/24/outline';
 import { 
   GenealogyNode, 
   GenealogyNodeStatus, 
@@ -16,34 +24,34 @@ interface BatchGenealogyTreeProps {
 
 const statusColorMap: Record<GenealogyNodeStatus, { border: string; bg: string; text: string; icon: React.ReactNode }> = {
   OK: {
-    border: 'border-emerald-500/40 dark:border-emerald-500/30',
-    bg: 'bg-emerald-50/60 dark:bg-emerald-950/20',
+    border: 'border-emerald-500/30',
+    bg: 'bg-emerald-500/5',
     text: 'text-emerald-700 dark:text-emerald-300',
-    icon: <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+    icon: <CheckCircleIcon className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
   },
   WARNING: {
-    border: 'border-amber-500/40 dark:border-amber-500/30',
-    bg: 'bg-amber-50/60 dark:bg-amber-950/20',
+    border: 'border-amber-500/30',
+    bg: 'bg-amber-500/5',
     text: 'text-amber-700 dark:text-amber-300',
-    icon: <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+    icon: <ExclamationTriangleIcon className="w-4 h-4 text-amber-600 dark:text-amber-400" />
   },
   FAIL: {
-    border: 'border-rose-500/40 dark:border-rose-500/30',
-    bg: 'bg-rose-50/60 dark:bg-rose-950/20',
+    border: 'border-rose-500/30',
+    bg: 'bg-rose-500/5',
     text: 'text-rose-700 dark:text-rose-300',
-    icon: <XCircle className="w-4 h-4 text-rose-600 dark:text-rose-400" />
+    icon: <XCircleIcon className="w-4 h-4 text-rose-600 dark:text-rose-400" />
   },
   PENDING: {
-    border: 'border-slate-300 dark:border-slate-700',
-    bg: 'bg-slate-50 dark:bg-slate-900/40',
-    text: 'text-slate-700 dark:text-slate-300',
-    icon: <Info className="w-4 h-4 text-slate-500" />
+    border: 'border-border',
+    bg: 'bg-surface-2/60',
+    text: 'text-ink-soft',
+    icon: <InformationCircleIcon className="w-4 h-4 text-ink-muted" />
   },
   INFO: {
-    border: 'border-blue-500/40 dark:border-blue-500/30',
-    bg: 'bg-blue-50/60 dark:bg-blue-950/20',
+    border: 'border-blue-500/30',
+    bg: 'bg-blue-500/5',
     text: 'text-blue-700 dark:text-blue-300',
-    icon: <Info className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+    icon: <InformationCircleIcon className="w-4 h-4 text-blue-600 dark:text-blue-400" />
   }
 };
 
@@ -55,26 +63,26 @@ const TreeNodeItem: React.FC<{ node: GenealogyNode; depth?: number }> = ({ node,
   return (
     <div className="flex flex-col">
       <div 
-        className={`flex items-start gap-3 p-3.5 rounded-xl border transition-all ${statusCfg.border} ${statusCfg.bg} hover:shadow-md`}
+        className={`flex items-start gap-3 p-3.5 rounded-xl border transition-all ${statusCfg.border} ${statusCfg.bg} hover:shadow-sm`}
         style={{ marginLeft: `${Math.min(depth * 24, 96)}px` }}
       >
         {hasChildren ? (
           <button
             onClick={() => setIsExpanded(!isExpanded)}
-            className="p-1 hover:bg-slate-200 dark:hover:bg-slate-800 rounded text-slate-500 transition-colors mt-0.5"
+            className="p-1 hover:bg-surface-3 rounded text-ink-muted transition-colors mt-0.5"
             title={isExpanded ? 'Thu gọn nhánh' : 'Mở rộng nhánh'}
           >
-            {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+            {isExpanded ? <ChevronDownIcon className="w-4 h-4" /> : <ChevronRightIcon className="w-4 h-4" />}
           </button>
         ) : (
           <div className="w-6 h-6 flex items-center justify-center mt-0.5">
-            <span className="w-2 h-2 rounded-full bg-slate-400 dark:bg-slate-600" />
+            <span className="w-2 h-2 rounded-full bg-ink-muted opacity-40" />
           </div>
         )}
 
         <div className="flex-1 min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <div className="flex items-center gap-1.5 font-semibold text-slate-900 dark:text-slate-100">
+            <div className="flex items-center gap-1.5 font-semibold text-ink">
               {statusCfg.icon}
               <span>{node.label}</span>
             </div>
@@ -82,9 +90,9 @@ const TreeNodeItem: React.FC<{ node: GenealogyNode; depth?: number }> = ({ node,
               <span
                 key={idx}
                 className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${
-                  badge.color === 'green' ? 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300' :
-                  badge.color === 'red' ? 'bg-rose-100 dark:bg-rose-950/60 text-rose-800 dark:text-rose-300' :
-                  'bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300'
+                  badge.color === 'green' ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20' :
+                  badge.color === 'red' ? 'bg-rose-500/10 text-rose-700 dark:text-rose-300 border border-rose-500/20' :
+                  'bg-surface-3 text-ink-soft border border-border'
                 }`}
               >
                 {badge.text}
@@ -93,17 +101,17 @@ const TreeNodeItem: React.FC<{ node: GenealogyNode; depth?: number }> = ({ node,
           </div>
 
           {node.sublabel && (
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+            <p className="text-xs text-ink-muted mt-0.5">
               {node.sublabel}
             </p>
           )}
 
           {node.details && Object.keys(node.details).length > 0 && (
-            <div className="mt-2.5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 pt-2 border-t border-slate-200/60 dark:border-slate-800/60 text-xs">
+            <div className="mt-2.5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 pt-2 border-t border-border/60 text-xs">
               {Object.entries(node.details).map(([k, v]) => v !== undefined && (
-                <div key={k} className="flex items-center justify-between gap-2 px-2 py-1 bg-white/70 dark:bg-slate-900/60 rounded border border-slate-200/50 dark:border-slate-800/50">
-                  <span className="text-slate-500 dark:text-slate-400">{k}:</span>
-                  <span className="font-medium text-slate-800 dark:text-slate-200 truncate">{String(v)}</span>
+                <div key={k} className="flex items-center justify-between gap-2 px-2 py-1 bg-surface/80 rounded border border-border">
+                  <span className="text-ink-muted">{k}:</span>
+                  <span className="font-medium text-ink truncate">{String(v)}</span>
                 </div>
               ))}
             </div>
@@ -113,10 +121,10 @@ const TreeNodeItem: React.FC<{ node: GenealogyNode; depth?: number }> = ({ node,
         {node.navigationPath && (
           <Link
             to={node.navigationPath}
-            className="p-1.5 text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-950/40 rounded-lg transition-colors"
+            className="p-1.5 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10 rounded-lg transition-colors"
             title="Xem chi tiết thực thể này"
           >
-            <ExternalLink className="w-4 h-4" />
+            <ArrowTopRightOnSquareIcon className="w-4 h-4" />
           </Link>
         )}
       </div>
@@ -148,52 +156,52 @@ export const BatchGenealogyTree: React.FC<BatchGenealogyTreeProps> = ({ report }
     <div className="space-y-6">
       {/* Thẻ chỉ số truy xuất nguồn gốc */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="p-4 bg-white dark:bg-slate-800/90 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm flex items-center justify-between">
+        <div className="p-4 bg-surface rounded-xl border border-border shadow-sm flex items-center justify-between">
           <div>
-            <p className="text-xs font-medium text-slate-500 dark:text-slate-400">Chỉ số truy vết nguồn gốc (Traceability Score)</p>
+            <p className="text-xs font-medium text-ink-muted">Chỉ số truy vết nguồn gốc (Traceability Score)</p>
             <div className="flex items-baseline gap-2 mt-1">
               <span className={`text-3xl font-bold ${scoreColor}`}>{score}</span>
-              <span className="text-sm font-semibold text-slate-400">/ 100</span>
+              <span className="text-sm font-semibold text-ink-muted">/ 100</span>
             </div>
-            <div className="w-48 h-2 bg-slate-100 dark:bg-slate-700 rounded-full mt-2 overflow-hidden">
+            <div className="w-48 h-2 bg-surface-3 rounded-full mt-2 overflow-hidden">
               <div className={`h-full ${scoreBg} transition-all duration-500`} style={{ width: `${score}%` }} />
             </div>
           </div>
-          <div className="p-3 bg-blue-50 dark:bg-blue-950/40 rounded-xl">
-            <GitBranch className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+          <div className="p-3 bg-emerald-500/10 rounded-xl">
+            <ShareIcon className="w-6 h-6 text-emerald-600 dark:text-emerald-400" />
           </div>
         </div>
 
-        <div className="p-4 bg-white dark:bg-slate-800/90 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm flex items-center justify-between">
+        <div className="p-4 bg-surface rounded-xl border border-border shadow-sm flex items-center justify-between">
           <div>
-            <p className="text-xs font-medium text-slate-500 dark:text-slate-400">Mức độ rủi ro chuỗi cung ứng</p>
+            <p className="text-xs font-medium text-ink-muted">Mức độ rủi ro chuỗi cung ứng</p>
             <div className="flex items-center gap-2 mt-1.5">
               {report.overallRisk === 'LOW' ? (
-                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300">
-                  <ShieldCheck className="w-3.5 h-3.5" /> THẤP (An toàn)
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20">
+                  <ShieldCheckIcon className="w-3.5 h-3.5" /> THẤP (An toàn)
                 </span>
               ) : report.overallRisk === 'MEDIUM' ? (
-                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300">
-                  <AlertTriangle className="w-3.5 h-3.5" /> TRUNG BÌNH
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/20">
+                  <ExclamationTriangleIcon className="w-3.5 h-3.5" /> TRUNG BÌNH
                 </span>
               ) : (
-                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-rose-100 dark:bg-rose-950/60 text-rose-800 dark:text-rose-300">
-                  <ShieldAlert className="w-3.5 h-3.5" /> CAO (Cần rà soát)
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-rose-500/10 text-rose-700 dark:text-rose-300 border border-rose-500/20">
+                  <ShieldExclamationIcon className="w-3.5 h-3.5" /> CAO (Cần rà soát)
                 </span>
               )}
             </div>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">
+            <p className="text-xs text-ink-muted mt-2">
               {report.riskReasons.length > 0 ? `${report.riskReasons.length} cảnh báo rủi ro` : 'Không có rủi ro đáng kể'}
             </p>
           </div>
-          <div className="p-3 bg-indigo-50 dark:bg-indigo-950/40 rounded-xl">
-            <ShieldCheck className="w-6 h-6 text-indigo-600 dark:text-indigo-400" />
+          <div className="p-3 bg-blue-500/10 rounded-xl">
+            <ShieldCheckIcon className="w-6 h-6 text-blue-600 dark:text-blue-400" />
           </div>
         </div>
 
-        <div className="p-4 bg-white dark:bg-slate-800/90 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
-          <p className="text-xs font-medium text-slate-500 dark:text-slate-400">Tóm lược cây phả hệ</p>
-          <p className="text-xs text-slate-700 dark:text-slate-300 mt-1.5 line-clamp-3 leading-relaxed">
+        <div className="p-4 bg-surface rounded-xl border border-border shadow-sm">
+          <p className="text-xs font-medium text-ink-muted">Tóm lược cây phả hệ</p>
+          <p className="text-xs text-ink-soft mt-1.5 line-clamp-3 leading-relaxed">
             {report.summary || 'Cây gia phả ghi nhận đầy đủ liên kết sản xuất và kiểm nghiệm.'}
           </p>
         </div>
@@ -201,9 +209,9 @@ export const BatchGenealogyTree: React.FC<BatchGenealogyTreeProps> = ({ report }
 
       {/* Cảnh báo đứt gãy liên kết nếu có */}
       {report.missingLinks && report.missingLinks.length > 0 && (
-        <div className="p-4 bg-amber-50 dark:bg-amber-950/20 border border-amber-300/80 dark:border-amber-700/60 rounded-xl">
+        <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-xl">
           <div className="flex items-center gap-2 text-amber-800 dark:text-amber-200 font-semibold text-sm">
-            <AlertTriangle className="w-4 h-4 text-amber-600" />
+            <ExclamationTriangleIcon className="w-4 h-4 text-amber-600" />
             <span>Phát hiện liên kết truy vết chưa đầy đủ ({report.missingLinks.length}):</span>
           </div>
           <ul className="mt-2 space-y-1 text-xs text-amber-700 dark:text-amber-300 pl-6 list-disc">
@@ -215,13 +223,13 @@ export const BatchGenealogyTree: React.FC<BatchGenealogyTreeProps> = ({ report }
       )}
 
       {/* Cây phả hệ phân cấp */}
-      <div className="bg-white dark:bg-slate-800/90 rounded-xl border border-slate-200 dark:border-slate-700 p-5 shadow-sm">
-        <div className="flex items-center justify-between pb-4 border-b border-slate-200 dark:border-slate-700 mb-4">
-          <div className="flex items-center gap-2 font-semibold text-slate-800 dark:text-slate-200">
-            <GitBranch className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+      <div className="bg-surface rounded-xl border border-border p-5 shadow-sm">
+        <div className="flex items-center justify-between pb-4 border-b border-border mb-4">
+          <div className="flex items-center gap-2 font-semibold text-ink">
+            <ShareIcon className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
             <span>Cây Phả hệ Truy vết (Genealogy Hierarchy)</span>
           </div>
-          <span className="text-xs text-slate-500 dark:text-slate-400">
+          <span className="text-xs text-ink-muted">
             Click vào biểu tượng mũi tên để thu gọn / mở rộng từng nhánh
           </span>
         </div>

@@ -1,5 +1,5 @@
 import React from 'react';
-import { History, Beaker, ShieldCheck, AlertCircle } from 'lucide-react';
+import { ClockIcon, BeakerIcon, ShieldCheckIcon, ExclamationCircleIcon } from '@heroicons/react/24/outline';
 import { CriteriaInputGroup } from '../../../../components';
 import { formatDateStandard } from '../../../../utils';
 import { TCCS } from '../../../../types';
@@ -28,9 +28,9 @@ export const TccsCriteriaSection: React.FC<TccsCriteriaSectionProps> = ({
   if (!activeTCCS) {
     if (batchId) {
       return (
-        <div className="p-8 text-center bg-indigo-50/30 rounded-2xl border-4 border-dashed border-indigo-100">
-          <AlertCircle size={48} className="mx-auto text-indigo-200 mb-4" />
-          <p className="text-sm font-black text-indigo-800 uppercase">Không tìm thấy hồ sơ TCCS hiệu lực!</p>
+        <div className="p-8 text-center bg-surface-2 rounded-2xl border-2 border-dashed border-border">
+          <ExclamationCircleIcon className="w-12 h-12 mx-auto text-ink-muted/50 mb-3" />
+          <p className="text-sm font-semibold text-ink uppercase">Không tìm thấy hồ sơ TCCS hiệu lực!</p>
         </div>
       );
     }
@@ -55,18 +55,18 @@ export const TccsCriteriaSection: React.FC<TccsCriteriaSectionProps> = ({
   });
 
   return (
-    <div className="space-y-6 animate-in fade-in">
-      <div className="flex flex-col gap-2 bg-slate-50 p-4 rounded-xl border border-slate-100">
+    <div className="space-y-6">
+      <div className="flex flex-col gap-2 bg-surface-2 p-4 rounded-xl border border-border">
         <div className="flex justify-between items-center">
-          <h4 className="text-xs font-black text-indigo-600 uppercase tracking-[0.3em] flex items-center gap-2">
-            <History size={20} /> TIÊU CHUẨN ÁP DỤNG
+          <h4 className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider flex items-center gap-2">
+            <ClockIcon className="w-4 h-4" /> TIÊU CHUẨN ÁP DỤNG
           </h4>
         </div>
-        <div className="flex items-center gap-3 mt-2">
+        <div className="flex items-center gap-3 mt-1">
           <select
             value={activeTCCS.id}
             onChange={(e) => setManualTccsId(e.target.value)}
-            className="flex-1 bg-white border border-slate-200 text-slate-700 text-sm font-bold rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-indigo-500"
+            className="flex-1 bg-surface border border-border text-ink text-sm font-medium rounded-xl px-3 py-2.5 outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all cursor-pointer"
           >
             {availableTCCSList.map(t => (
               <option key={t.id} value={t.id}>
@@ -80,8 +80,8 @@ export const TccsCriteriaSection: React.FC<TccsCriteriaSectionProps> = ({
       <CriteriaInputGroup
         title="Lý hóa & Cảm quan"
         criteria={activeTCCS.mainQualityCriteria || []}
-        icon={<Beaker size={16} />}
-        colorClass="text-indigo-600"
+        icon={<BeakerIcon className="w-4 h-4" />}
+        colorClass="text-emerald-600 dark:text-emerald-400"
         activeTCCS={activeTCCS}
         testResultsMap={testResultsMap}
         setMapValue={setMapValue}
@@ -93,8 +93,8 @@ export const TccsCriteriaSection: React.FC<TccsCriteriaSectionProps> = ({
         <CriteriaInputGroup
           title="Giới hạn Vi sinh vật"
           criteria={micro}
-          icon={<ShieldCheck size={16} />}
-          colorClass="text-emerald-600"
+          icon={<ShieldCheckIcon className="w-4 h-4" />}
+          colorClass="text-emerald-600 dark:text-emerald-400"
           activeTCCS={activeTCCS}
           testResultsMap={testResultsMap}
           setMapValue={setMapValue}
@@ -105,10 +105,10 @@ export const TccsCriteriaSection: React.FC<TccsCriteriaSectionProps> = ({
 
       {metal.length > 0 && (
         <CriteriaInputGroup
-          title="Giới hạn Kim loại nặng"
+          title="Kim loại nặng & Độc tố"
           criteria={metal}
-          icon={<ShieldCheck size={16} />}
-          colorClass="text-red-600"
+          icon={<ShieldCheckIcon className="w-4 h-4" />}
+          colorClass="text-amber-600 dark:text-amber-400"
           activeTCCS={activeTCCS}
           testResultsMap={testResultsMap}
           setMapValue={setMapValue}

@@ -1,5 +1,5 @@
 import React from 'react';
-import { CheckCircle2, AlertTriangle, XCircle } from 'lucide-react';
+import { CheckCircleIcon, ExclamationTriangleIcon, XCircleIcon } from '@heroicons/react/24/outline';
 import { DSCard } from '../../../../components';
 import { formatDateStandard } from '../../../../utils';
 
@@ -15,36 +15,36 @@ export const BatchHistoryTable: React.FC<BatchHistoryTableProps> = ({
   enrichedData
 }) => {
   return (
-    <DSCard className="overflow-hidden p-0">
-      <div className="px-5 py-3 border-b border-slate-100 dark:border-zinc-800">
-        <h4 className="font-black text-slate-700 dark:text-zinc-200 text-sm">Dữ liệu chi tiết ({chartDataLength} lô)</h4>
+    <DSCard className="overflow-hidden p-0 border border-border">
+      <div className="px-5 py-3.5 border-b border-border bg-surface-2">
+        <h4 className="font-bold text-ink text-sm">Dữ liệu chi tiết ({chartDataLength} lô)</h4>
       </div>
       <div className="overflow-x-auto">
         <table className="w-full text-xs">
           <thead>
-            <tr className="bg-slate-50 dark:bg-zinc-900/50">
+            <tr className="bg-surface-2 border-b border-border">
               {['#', 'Số lô', 'Ngày SX', `Giá trị đo (${selectedCriteria?.unit || 'Số'})`, 'Tỉ lệ % công bố', 'Trạng thái SPC'].map(h => (
-                <th key={h} className="px-4 py-2.5 text-left font-bold text-slate-500 dark:text-zinc-400 whitespace-nowrap">{h}</th>
+                <th key={h} className="px-4 py-3 text-left font-semibold text-ink-muted whitespace-nowrap text-[11px] uppercase tracking-wider">{h}</th>
               ))}
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-50 dark:divide-zinc-900">
+          <tbody className="divide-y divide-border">
             {enrichedData.map(d => (
               <tr key={d.batchNo}
-                className={`hover:bg-slate-50 dark:hover:bg-zinc-900/30 transition-colors ${d.isOOS ? 'bg-red-50/60 dark:bg-red-900/10' : d.isOOC ? 'bg-orange-50/60 dark:bg-orange-900/10' : ''}`}>
-                <td className="px-4 py-2 text-slate-400 dark:text-zinc-600 font-mono">{d.index}</td>
-                <td className="px-4 py-2 font-bold text-slate-700 dark:text-zinc-200">{d.batchNo}</td>
-                <td className="px-4 py-2 text-slate-500 dark:text-zinc-400 font-mono">{d.mfgDate ? formatDateStandard(d.mfgDate) : '---'}</td>
-                <td className="px-4 py-2 font-mono font-bold text-slate-800 dark:text-zinc-100">{d.value.toFixed(4)}</td>
-                <td className="px-4 py-2 font-mono font-black text-indigo-600 dark:text-indigo-400">
+                className={`hover:bg-surface-2 transition-colors ${d.isOOS ? 'bg-rose-500/10' : d.isOOC ? 'bg-amber-500/10' : ''}`}>
+                <td className="px-4 py-2.5 text-ink-muted font-mono">{d.index}</td>
+                <td className="px-4 py-2.5 font-bold text-ink">{d.batchNo}</td>
+                <td className="px-4 py-2.5 text-ink-muted font-mono">{d.mfgDate ? formatDateStandard(d.mfgDate) : '---'}</td>
+                <td className="px-4 py-2.5 font-mono font-bold text-ink">{d.value.toFixed(4)}</td>
+                <td className="px-4 py-2.5 font-mono font-black text-emerald-600 dark:text-emerald-400">
                   {d.percent !== null ? `${d.percent.toFixed(1)}%` : '---'}
                 </td>
-                <td className="px-4 py-2">
+                <td className="px-4 py-2.5">
                   {d.isOOS
-                    ? <span className="inline-flex items-center gap-1 text-red-600 dark:text-red-400 font-bold"><XCircle size={12} /> Ngoài spec</span>
+                    ? <span className="inline-flex items-center gap-1.5 text-rose-600 dark:text-rose-400 font-bold"><XCircleIcon className="w-4 h-4" /> Ngoài spec</span>
                     : d.isOOC
-                    ? <span className="inline-flex items-center gap-1 text-orange-600 dark:text-orange-400 font-bold"><AlertTriangle size={12} /> Ngoài KS (3σ)</span>
-                    : <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-bold"><CheckCircle2 size={12} /> Trong tầm kiểm soát</span>}
+                    ? <span className="inline-flex items-center gap-1.5 text-amber-600 dark:text-amber-400 font-bold"><ExclamationTriangleIcon className="w-4 h-4" /> Ngoài KS (3σ)</span>
+                    : <span className="inline-flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-bold"><CheckCircleIcon className="w-4 h-4" /> Trong tầm kiểm soát</span>}
                 </td>
               </tr>
             ))}

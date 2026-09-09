@@ -5,9 +5,15 @@
 
 import React, { useState, useMemo } from 'react';
 import { 
-  CheckCircle2, Clock, AlertTriangle, Filter, Search, 
-  User, Calendar, ArrowRight, ShieldCheck, CheckSquare, Square
-} from 'lucide-react';
+  CheckCircleIcon, 
+  ClockIcon, 
+  ExclamationTriangleIcon, 
+  MagnifyingGlassIcon, 
+  UserIcon, 
+  CalendarIcon, 
+  ArrowRightIcon 
+} from '@heroicons/react/24/outline';
+import { CheckIcon } from '@heroicons/react/20/solid';
 import { QualityDeviation, CAPAActionItem } from '../../../types/deviation';
 import { formatDateStandard } from '../../../utils';
 
@@ -85,50 +91,50 @@ export const CAPATrackerView: React.FC<CAPATrackerViewProps> = ({
   }, [allItems, statusFilter, typeFilter, searchQuery, nowStr]);
 
   const typeConfig: Record<string, { label: string; badge: string }> = {
-    CORRECTIVE: { label: 'Khắc phục', badge: 'bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300 border-rose-200' },
-    PREVENTIVE: { label: 'Phòng ngừa', badge: 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300 border-indigo-200' },
-    IMMEDIATE: { label: 'Tức thời', badge: 'bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300 border-amber-200' }
+    CORRECTIVE: { label: 'Khắc phục', badge: 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20' },
+    PREVENTIVE: { label: 'Phòng ngừa', badge: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20' },
+    IMMEDIATE: { label: 'Tức thời', badge: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20' }
   };
 
   return (
     <div className="space-y-4">
       {/* Thanh công cụ tìm kiếm và lọc */}
-      <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-wrap items-center justify-between gap-3">
+      <div className="bg-surface p-4 rounded-2xl border border-border shadow-sm flex flex-wrap items-center justify-between gap-3">
         <div className="relative flex-1 min-w-[240px]">
-          <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+          <MagnifyingGlassIcon className="h-4 w-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-muted" />
           <input
             type="text"
             placeholder="Tìm theo nội dung CAPA, người phụ trách, mã sai lệch..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold outline-none focus:border-indigo-500 transition-colors"
+            className="w-full pl-10 pr-4 py-2 bg-surface-2 border border-border rounded-xl text-xs font-bold text-ink placeholder:text-ink-muted outline-none focus:border-emerald-500 transition-colors"
           />
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
           {/* Status Filter */}
-          <div className="flex items-center bg-slate-100 dark:bg-slate-800 p-1 rounded-xl text-xs font-bold">
+          <div className="flex items-center bg-surface-2 border border-border p-1 rounded-xl text-xs font-bold">
             <button
               onClick={() => setStatusFilter('ALL')}
-              className={`px-3 py-1.5 rounded-lg transition-all ${statusFilter === 'ALL' ? 'bg-white dark:bg-slate-700 shadow-sm text-indigo-600 dark:text-indigo-300' : 'text-slate-500'}`}
+              className={`px-3 py-1.5 rounded-lg transition-all ${statusFilter === 'ALL' ? 'bg-surface shadow-sm text-emerald-600 dark:text-emerald-400 font-bold' : 'text-ink-muted hover:text-ink'}`}
             >
               Tất cả ({allItems.length})
             </button>
             <button
               onClick={() => setStatusFilter('PENDING')}
-              className={`px-3 py-1.5 rounded-lg transition-all ${statusFilter === 'PENDING' ? 'bg-white dark:bg-slate-700 shadow-sm text-blue-600 dark:text-blue-300' : 'text-slate-500'}`}
+              className={`px-3 py-1.5 rounded-lg transition-all ${statusFilter === 'PENDING' ? 'bg-surface shadow-sm text-blue-600 dark:text-blue-400 font-bold' : 'text-ink-muted hover:text-ink'}`}
             >
               Đang thực hiện
             </button>
             <button
               onClick={() => setStatusFilter('OVERDUE')}
-              className={`px-3 py-1.5 rounded-lg transition-all ${statusFilter === 'OVERDUE' ? 'bg-white dark:bg-slate-700 shadow-sm text-rose-600 dark:text-rose-300' : 'text-slate-500'}`}
+              className={`px-3 py-1.5 rounded-lg transition-all ${statusFilter === 'OVERDUE' ? 'bg-surface shadow-sm text-rose-600 dark:text-rose-400 font-bold' : 'text-ink-muted hover:text-ink'}`}
             >
               Quá hạn
             </button>
             <button
               onClick={() => setStatusFilter('COMPLETED')}
-              className={`px-3 py-1.5 rounded-lg transition-all ${statusFilter === 'COMPLETED' ? 'bg-white dark:bg-slate-700 shadow-sm text-emerald-600 dark:text-emerald-300' : 'text-slate-500'}`}
+              className={`px-3 py-1.5 rounded-lg transition-all ${statusFilter === 'COMPLETED' ? 'bg-surface shadow-sm text-emerald-600 dark:text-emerald-400 font-bold' : 'text-ink-muted hover:text-ink'}`}
             >
               Đã hoàn thành
             </button>
@@ -138,7 +144,7 @@ export const CAPATrackerView: React.FC<CAPATrackerViewProps> = ({
           <select
             value={typeFilter}
             onChange={(e) => setTypeFilter(e.target.value)}
-            className="px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold outline-none text-slate-700 dark:text-slate-200"
+            className="px-3 py-2 bg-surface-2 border border-border rounded-xl text-xs font-bold outline-none text-ink"
           >
             <option value="ALL">Tất cả loại hành động</option>
             <option value="CORRECTIVE">Khắc phục (Corrective)</option>
@@ -149,11 +155,11 @@ export const CAPATrackerView: React.FC<CAPATrackerViewProps> = ({
       </div>
 
       {/* Danh sách CAPA Items */}
-      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+      <div className="bg-surface rounded-2xl border border-border shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse text-xs">
             <thead>
-              <tr className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 text-slate-500 uppercase tracking-wider font-black">
+              <tr className="bg-surface-2 border-b border-border text-ink-muted uppercase tracking-wider font-black">
                 <th className="p-4 w-12 text-center">Xác nhận</th>
                 <th className="p-4 min-w-[280px]">Nội dung Hành động CAPA</th>
                 <th className="p-4 w-32">Phân loại</th>
@@ -163,10 +169,10 @@ export const CAPATrackerView: React.FC<CAPATrackerViewProps> = ({
                 <th className="p-4 w-32 text-center">Trạng thái</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
+            <tbody className="divide-y divide-border">
               {filteredItems.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="p-12 text-center text-slate-400 font-medium">
+                  <td colSpan={7} className="p-12 text-center text-ink-muted font-medium">
                     Không có hành động CAPA nào phù hợp với bộ lọc.
                   </td>
                 </tr>
@@ -179,8 +185,8 @@ export const CAPATrackerView: React.FC<CAPATrackerViewProps> = ({
                   return (
                     <tr 
                       key={item.id}
-                      className={`hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors ${
-                        isOverdue ? 'bg-rose-50/20 dark:bg-rose-950/10' : ''
+                      className={`hover:bg-surface-2 transition-colors ${
+                        isOverdue ? 'bg-rose-500/5' : ''
                       }`}
                     >
                       <td className="p-4 text-center">
@@ -188,23 +194,23 @@ export const CAPATrackerView: React.FC<CAPATrackerViewProps> = ({
                           type="button"
                           disabled={isCompleted}
                           onClick={() => onCompleteItem(item.deviationId, item.id)}
-                          className={`p-1 rounded-lg transition-all ${
+                          className={`h-5 w-5 mx-auto rounded flex items-center justify-center border transition-all ${
                             isCompleted 
-                              ? 'text-emerald-500 cursor-default' 
-                              : 'text-slate-300 hover:text-emerald-600 hover:bg-emerald-50'
+                              ? 'bg-emerald-600 border-emerald-600 text-white cursor-default' 
+                              : 'border-border text-transparent hover:border-emerald-600'
                           }`}
                           title={isCompleted ? 'Đã hoàn thành' : 'Đánh dấu hoàn thành CAPA'}
                         >
-                          {isCompleted ? <CheckSquare size={18} /> : <Square size={18} />}
+                          <CheckIcon className="h-3.5 w-3.5 stroke-[3]" />
                         </button>
                       </td>
 
                       <td className="p-4">
-                        <p className={`font-bold text-slate-800 dark:text-slate-100 ${isCompleted ? 'line-through text-slate-400 dark:text-slate-500' : ''}`}>
+                        <p className={`font-bold text-ink ${isCompleted ? 'line-through text-ink-muted' : ''}`}>
                           {item.action}
                         </p>
                         {item.verificationMethod && (
-                          <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5">
+                          <p className="text-[11px] text-ink-muted mt-0.5">
                             Phương pháp thẩm tra: {item.verificationMethod}
                           </p>
                         )}
@@ -212,7 +218,7 @@ export const CAPATrackerView: React.FC<CAPATrackerViewProps> = ({
 
                       <td className="p-4">
                         <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black border uppercase tracking-wider ${
-                          typeConfig[item.type]?.badge || 'bg-slate-100 text-slate-600 border-slate-200'
+                          typeConfig[item.type]?.badge || 'bg-surface-2 text-ink-soft border-border'
                         }`}>
                           {typeConfig[item.type]?.label || item.type}
                         </span>
@@ -225,34 +231,34 @@ export const CAPATrackerView: React.FC<CAPATrackerViewProps> = ({
                             onClick={() => onSelectDeviation(parentDeviation)}
                             className="text-left group"
                           >
-                            <span className="font-bold text-indigo-600 dark:text-indigo-400 group-hover:underline flex items-center gap-1">
+                            <span className="font-bold text-emerald-600 dark:text-emerald-400 group-hover:underline flex items-center gap-1">
                               {item.deviationNo}
-                              <ArrowRight size={10} className="group-hover:translate-x-0.5 transition-transform" />
+                              <ArrowRightIcon className="h-3 w-3 group-hover:translate-x-0.5 transition-transform" />
                             </span>
-                            <span className="text-[11px] text-slate-500 block truncate max-w-[200px]">
+                            <span className="text-[11px] text-ink-muted block truncate max-w-[200px]">
                               {item.deviationTitle}
                             </span>
                             {item.batchNo && (
-                              <span className="text-[10px] font-bold text-slate-400">Lô: {item.batchNo}</span>
+                              <span className="text-[10px] font-bold text-ink-muted">Lô: {item.batchNo}</span>
                             )}
                           </button>
                         ) : (
-                          <span className="text-slate-400">{item.deviationNo}</span>
+                          <span className="text-ink-muted">{item.deviationNo}</span>
                         )}
                       </td>
 
                       <td className="p-4">
-                        <div className="flex items-center gap-1.5 text-slate-700 dark:text-slate-300 font-medium">
-                          <User size={13} className="text-slate-400" />
+                        <div className="flex items-center gap-1.5 text-ink font-medium">
+                          <UserIcon className="h-3.5 w-3.5 text-ink-muted" />
                           <span>{item.responsible}</span>
                         </div>
                       </td>
 
                       <td className="p-4">
                         <div className="flex items-center gap-1.5">
-                          <Calendar size={13} className={isOverdue ? 'text-rose-500' : 'text-slate-400'} />
+                          <CalendarIcon className={`h-3.5 w-3.5 ${isOverdue ? 'text-rose-500' : 'text-ink-muted'}`} />
                           <span className={`font-mono font-medium ${
-                            isOverdue ? 'font-bold text-rose-600 dark:text-rose-400' : 'text-slate-700 dark:text-slate-300'
+                            isOverdue ? 'font-bold text-rose-600 dark:text-rose-400' : 'text-ink'
                           }`}>
                             {item.deadline ? formatDateStandard(item.deadline) : '—'}
                           </span>
@@ -261,16 +267,16 @@ export const CAPATrackerView: React.FC<CAPATrackerViewProps> = ({
 
                       <td className="p-4 text-center">
                         {isCompleted ? (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200">
-                            <CheckCircle2 size={11} /> Đã hoàn tất
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                            <CheckCircleIcon className="h-3 w-3" /> Đã hoàn tất
                           </span>
                         ) : isOverdue ? (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border border-rose-200">
-                            <AlertTriangle size={11} /> Quá hạn
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20">
+                            <ExclamationTriangleIcon className="h-3 w-3" /> Quá hạn
                           </span>
                         ) : (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200">
-                            <Clock size={11} /> Đang tiến hành
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">
+                            <ClockIcon className="h-3 w-3" /> Đang tiến hành
                           </span>
                         )}
                       </td>

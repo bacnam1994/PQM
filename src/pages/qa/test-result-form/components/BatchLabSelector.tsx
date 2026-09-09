@@ -1,5 +1,14 @@
 import React from 'react';
-import { Search, CheckCircle2, Package, Hash, Calendar, Clock, AlertCircle, Printer } from 'lucide-react';
+import { 
+  MagnifyingGlassIcon, 
+  CheckCircleIcon, 
+  CubeIcon, 
+  HashtagIcon, 
+  CalendarIcon, 
+  ClockIcon, 
+  ExclamationCircleIcon, 
+  PrinterIcon 
+} from '@heroicons/react/24/outline';
 import { DSFormInput, DSDateInput } from '../../../../components';
 import { formatDateStandard, TEST_RESULT_STATUS, getAppUrl } from '../../../../utils';
 import { HydratedBatch } from '../../../../hooks/useDataGraph';
@@ -51,11 +60,11 @@ export const BatchLabSelector: React.FC<BatchLabSelectorProps> = ({
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="space-y-2">
-          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-2">
+          <label className="text-xs font-semibold text-ink-muted uppercase tracking-wider">
             Chọn Lô hàng cần test *
           </label>
           <div className="relative">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+            <MagnifyingGlassIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-muted w-5 h-5" />
             <input
               type="text"
               value={batchSearch}
@@ -68,12 +77,12 @@ export const BatchLabSelector: React.FC<BatchLabSelectorProps> = ({
               onBlur={() => setTimeout(() => setShowBatchDropdown(false), 200)}
               placeholder="Tìm kiếm Lô hàng (Số lô hoặc Tên SP)..."
               disabled={isEditMode}
-              className="w-full pl-10 pr-4 py-3 bg-slate-50 border-none rounded-xl font-bold outline-none shadow-inner text-sm focus:ring-2 focus:ring-indigo-500"
+              className="w-full pl-10 pr-10 py-2.5 bg-surface border border-border rounded-xl font-medium text-ink placeholder:text-ink-muted outline-none text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 disabled:opacity-60 transition-all"
             />
-            {batchId && <CheckCircle2 className="absolute right-4 top-1/2 -translate-y-1/2 text-indigo-600" size={16} />}
+            {batchId && <CheckCircleIcon className="absolute right-3.5 top-1/2 -translate-y-1/2 text-emerald-600 w-5 h-5" />}
 
             {showBatchDropdown && (
-              <div className="absolute z-20 w-full mt-2 bg-white rounded-xl shadow-2xl border border-slate-100 max-h-60 overflow-y-auto">
+              <div className="absolute z-20 w-full mt-2 bg-surface rounded-xl shadow-xl border border-border max-h-60 overflow-y-auto divide-y divide-border">
                 {availableBatchesForDropdown.map(b => (
                   <div
                     key={b.id}
@@ -82,12 +91,12 @@ export const BatchLabSelector: React.FC<BatchLabSelectorProps> = ({
                       setBatchSearch(`${b.batchNo} - ${b.product?.name}`);
                       setShowBatchDropdown(false);
                     }}
-                    className={`px-4 py-3 hover:bg-indigo-50 cursor-pointer border-b border-slate-50 last:border-none transition-colors ${
-                      batchId === b.id ? 'bg-indigo-50' : ''
+                    className={`px-4 py-3 hover:bg-surface-2 cursor-pointer transition-colors ${
+                      batchId === b.id ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' : ''
                     }`}
                   >
-                    <p className="text-sm font-bold text-slate-700 uppercase">Lô: {b.batchNo}</p>
-                    <p className="text-[10px] font-medium text-slate-500">{b.product?.name}</p>
+                    <p className="text-sm font-semibold text-ink uppercase">Lô: {b.batchNo}</p>
+                    <p className="text-xs text-ink-muted">{b.product?.name}</p>
                   </div>
                 ))}
               </div>
@@ -95,8 +104,8 @@ export const BatchLabSelector: React.FC<BatchLabSelectorProps> = ({
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
-          <div className="col-span-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="sm:col-span-2">
             <DSFormInput
               label="Tên đơn vị kiểm nghiệm *"
               name="labName"
@@ -107,7 +116,7 @@ export const BatchLabSelector: React.FC<BatchLabSelectorProps> = ({
               placeholder="VD: Phòng QC, CASE..."
             />
           </div>
-          <div className="col-span-2">
+          <div className="sm:col-span-2">
             <DSDateInput
               label="Ngày xuất phiếu *"
               name="testDate"
@@ -120,56 +129,56 @@ export const BatchLabSelector: React.FC<BatchLabSelectorProps> = ({
       </div>
 
       {batchId && selectedBatch && (
-        <div className="space-y-3 animate-in fade-in">
-          <div className="bg-indigo-50/50 p-3 rounded-xl border border-indigo-100 flex flex-wrap gap-4 text-xs">
-            <div className="flex items-center gap-1">
-              <Package size={14} className="text-indigo-400" />
-              <span className="font-bold text-slate-700">{selectedBatch.product?.name}</span>
+        <div className="space-y-3">
+          <div className="bg-surface-2 p-3.5 rounded-xl border border-border flex flex-wrap gap-4 text-xs">
+            <div className="flex items-center gap-1.5">
+              <CubeIcon className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+              <span className="font-semibold text-ink">{selectedBatch.product?.name}</span>
             </div>
-            <div className="flex items-center gap-1">
-              <Hash size={14} className="text-indigo-400" />
-              <span className="font-bold text-indigo-700">{selectedBatch.batchNo}</span>
+            <div className="flex items-center gap-1.5">
+              <HashtagIcon className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+              <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">{selectedBatch.batchNo}</span>
             </div>
-            <div className="flex items-center gap-1">
-              <Calendar size={14} className="text-indigo-400" />
-              <span className="font-bold text-slate-700">
+            <div className="flex items-center gap-1.5">
+              <CalendarIcon className="w-4 h-4 text-ink-muted" />
+              <span className="text-ink-soft">
                 SX: {selectedBatch.mfgDate ? formatDateStandard(selectedBatch.mfgDate) : '---'}
               </span>
             </div>
-            <div className="flex items-center gap-1">
-              <Clock size={14} className="text-indigo-400" />
-              <span className="font-bold text-slate-700">
+            <div className="flex items-center gap-1.5">
+              <ClockIcon className="w-4 h-4 text-ink-muted" />
+              <span className="text-ink-soft">
                 HD: {selectedBatch.expDate ? formatDateStandard(selectedBatch.expDate) : '---'}
               </span>
             </div>
           </div>
 
           {existingResultsForBatch.length > 0 && (
-            <div className="bg-amber-50 p-3 rounded-xl border border-amber-100 animate-in fade-in">
+            <div className="bg-amber-500/10 p-3.5 rounded-xl border border-amber-500/20">
               <div className="flex justify-between items-center mb-2">
-                <p className="text-[10px] font-black text-amber-600 uppercase tracking-widest flex items-center gap-2">
-                  <AlertCircle size={12} /> Lô này đã có {existingResultsForBatch.length} phiếu kết quả:
+                <p className="text-xs font-semibold text-amber-700 dark:text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
+                  <ExclamationCircleIcon className="w-4 h-4" /> Lô này đã có {existingResultsForBatch.length} phiếu kết quả:
                 </p>
                 <button
                   type="button"
                   onClick={() => window.open(getAppUrl(`/test-results/coa/${batchId}`), '_blank')}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-[10px] font-black uppercase hover:bg-indigo-700 transition-colors shadow-md shadow-indigo-100"
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-xs font-semibold uppercase tracking-wider hover:bg-emerald-700 transition-colors shadow-sm"
                 >
-                  <Printer size={12} /> Xem CoA Tổng hợp
+                  <PrinterIcon className="w-3.5 h-3.5" /> Xem CoA Tổng hợp
                 </button>
               </div>
-              <div className="space-y-1">
+              <div className="space-y-1.5">
                 {existingResultsForBatch.map((r: any) => (
-                  <div key={r.id} className="flex justify-between items-center text-xs bg-white p-2 rounded border border-amber-100/50">
-                    <span className="font-bold text-slate-600">
-                      {r.labName} <span className="font-normal text-slate-400">({formatDateStandard(r.testDate)})</span>
+                  <div key={r.id} className="flex justify-between items-center text-xs bg-surface p-2.5 rounded-lg border border-border">
+                    <span className="font-medium text-ink">
+                      {r.labName} <span className="text-ink-muted font-normal">({formatDateStandard(r.testDate)})</span>
                     </span>
                     <div className="flex items-center gap-2">
                       <span
-                        className={`text-[9px] font-black px-1.5 py-0.5 rounded ${
+                        className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
                           r.overallStatus === TEST_RESULT_STATUS.PASS
-                            ? 'bg-emerald-100 text-emerald-700'
-                            : 'bg-red-100 text-red-700'
+                            ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20'
+                            : 'bg-rose-500/10 text-rose-700 dark:text-rose-400 border border-rose-500/20'
                         }`}
                       >
                         {r.overallStatus}
@@ -177,7 +186,7 @@ export const BatchLabSelector: React.FC<BatchLabSelectorProps> = ({
                       <button
                         type="button"
                         onClick={() => switchToEditMode(r)}
-                        className="text-[9px] font-bold text-blue-600 hover:underline"
+                        className="text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline"
                       >
                         Sửa phiếu này
                       </button>
@@ -185,7 +194,7 @@ export const BatchLabSelector: React.FC<BatchLabSelectorProps> = ({
                   </div>
                 ))}
               </div>
-              <p className="text-[10px] text-amber-600/70 italic mt-2 text-center">
+              <p className="text-xs text-amber-700/80 dark:text-amber-400/80 italic mt-2 text-center">
                 Bạn đang tạo phiếu kết quả <b>MỚI</b> (ví dụ: gửi mẫu thêm cho đơn vị khác).
               </p>
             </div>

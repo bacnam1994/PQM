@@ -1,6 +1,17 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Loader2, Plus, X, Search, CheckCircle2, Link2, Unlink, Sparkles, Box, Check, ChevronDown } from 'lucide-react';
+import {
+  ArrowLeftIcon,
+  ArrowPathIcon,
+  PlusIcon,
+  XMarkIcon,
+  MagnifyingGlassIcon,
+  CheckCircleIcon,
+  LinkIcon,
+  CubeIcon,
+  CheckIcon,
+  ChevronDownIcon
+} from '@heroicons/react/24/outline';
 import { useAppStore } from '../../store/useAppStore';
 import { generateId, normalizeSearch, autoFormatInput, parseNumberFromText } from '../../utils';
 import { ProductFormula, FormulaIngredient, RawMaterial } from '../../types';
@@ -214,46 +225,76 @@ const ProductFormulaFormPage = () => {
   };
 
   return (
-    <div className="p-6 max-w-6xl mx-auto animate-in fade-in duration-500 space-y-6">
-      <div className="flex items-center gap-4">
-        <button onClick={() => navigate('/product-formulas')} className="p-2 bg-white text-slate-500 hover:text-indigo-600 rounded-xl shadow-sm">
-          <ArrowLeft size={20} />
+    <div className="p-6 max-w-6xl mx-auto space-y-6">
+      <div className="flex items-center gap-3">
+        <button
+          type="button"
+          onClick={() => navigate('/product-formulas')}
+          className="p-2 bg-surface hover:bg-surface-2 text-ink-muted hover:text-ink rounded-lg border border-border transition-colors"
+          title="Quay lại danh sách"
+        >
+          <ArrowLeftIcon className="h-5 w-5" />
         </button>
         <div>
-          <h1 className="text-2xl font-black text-slate-800 uppercase tracking-tight">
+          <h1 className="text-xl font-bold text-ink flex items-center gap-2">
+            <CubeIcon className="h-6 w-6 text-emerald-600 dark:text-emerald-400" />
             {id ? 'Chỉnh sửa Công thức' : 'Tạo Công thức mới'}
           </h1>
-          <p className="text-xs text-slate-400 font-medium">Liên kết trực tiếp với Danh mục Nguyên liệu chuẩn và Tiêu chuẩn cơ sở (TCCS).</p>
+          <p className="text-xs text-ink-muted mt-0.5">
+            Liên kết trực tiếp với Danh mục Nguyên liệu chuẩn và Tiêu chuẩn cơ sở (TCCS).
+          </p>
         </div>
       </div>
 
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
+      <div className="bg-surface rounded-xl shadow-sm border border-border p-6">
         {(!id || formulaToEdit) && (
-          <form onSubmit={handleSave} className="space-y-8">
-            <datalist id="formula-unit-suggestions">{COMMON_CRITERIA_UNITS.map(unit => <option key={unit} value={unit} />)}</datalist>
+          <form onSubmit={handleSave} className="space-y-6">
+            <datalist id="formula-unit-suggestions">
+              {COMMON_CRITERIA_UNITS.map(unit => <option key={unit} value={unit} />)}
+            </datalist>
             <SpecialCharToolbar />
             
             {/* Product Selection */}
             <div className="relative">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-2 mb-1 block">Sản phẩm áp dụng *</label>
-              <Search className="absolute left-4 top-1/2 text-slate-400" size={16} />
-              <input 
-                type="text" value={productSearch}
-                onChange={(e) => { setProductSearch(e.target.value); setShowProductDropdown(true); if (!e.target.value) setSelectedProductId(''); }}
-                onFocus={() => setShowProductDropdown(true)}
-                onBlur={() => setTimeout(() => setShowProductDropdown(false), 250)}
-                placeholder="Tìm kiếm mã hoặc tên sản phẩm..."
-                className="w-full pl-10 pr-10 py-3 bg-white border border-slate-200 rounded-xl font-bold outline-none shadow-sm text-sm focus:ring-2 focus:ring-indigo-500"
-                disabled={!!id}
-              />
-              {selectedProductId && <CheckCircle2 className="absolute right-4 top-1/2 text-emerald-600" size={16} />}
+              <label className="text-xs font-semibold text-ink-muted uppercase tracking-wider mb-1.5 block">
+                Sản phẩm áp dụng *
+              </label>
+              <div className="relative">
+                <MagnifyingGlassIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-muted h-4 w-4" />
+                <input 
+                  type="text" 
+                  value={productSearch}
+                  onChange={(e) => { 
+                    setProductSearch(e.target.value); 
+                    setShowProductDropdown(true); 
+                    if (!e.target.value) setSelectedProductId(''); 
+                  }}
+                  onFocus={() => setShowProductDropdown(true)}
+                  onBlur={() => setTimeout(() => setShowProductDropdown(false), 250)}
+                  placeholder="Tìm kiếm mã hoặc tên sản phẩm..."
+                  className="w-full pl-10 pr-10 py-2.5 bg-surface-2 border border-border rounded-lg font-medium text-sm text-ink outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 shadow-inner"
+                  disabled={!!id}
+                />
+                {selectedProductId && (
+                  <CheckCircleIcon className="absolute right-3.5 top-1/2 -translate-y-1/2 text-emerald-600 dark:text-emerald-400 h-5 w-5" />
+                )}
+              </div>
+
               {showProductDropdown && !id && (
-                <div className="absolute z-30 w-full mt-2 bg-white rounded-xl shadow-2xl border border-slate-100 max-h-60 overflow-y-auto">
+                <div className="absolute z-30 w-full mt-1.5 bg-surface rounded-xl shadow-xl border border-border max-h-60 overflow-y-auto">
                   {products.filter(p => !productSearch || normalizeSearch(p.name).includes(normalizeSearch(productSearch)) || normalizeSearch(p.code).includes(normalizeSearch(productSearch))).map(p => (
-                    <div key={p.id} onMouseDown={(e) => e.preventDefault()} onClick={() => { setSelectedProductId(p.id); setProductSearch(`${p.code} - ${p.name}`); setShowProductDropdown(false); }}
-                      className={`px-4 py-3 hover:bg-indigo-50 cursor-pointer border-b border-slate-50 last:border-none transition-colors ${selectedProductId === p.id ? 'bg-indigo-50' : ''}`}>
-                      <p className="text-sm font-bold text-slate-700">{p.name}</p>
-                      <p className="text-[10px] font-black text-slate-400 uppercase">{p.code}</p>
+                    <div 
+                      key={p.id} 
+                      onMouseDown={(e) => e.preventDefault()} 
+                      onClick={() => { 
+                        setSelectedProductId(p.id); 
+                        setProductSearch(`${p.code} - ${p.name}`); 
+                        setShowProductDropdown(false); 
+                      }}
+                      className={`px-4 py-3 hover:bg-surface-2 cursor-pointer border-b border-border last:border-none transition-colors ${selectedProductId === p.id ? 'bg-surface-2' : ''}`}
+                    >
+                      <p className="text-sm font-semibold text-ink">{p.name}</p>
+                      <p className="text-[10px] font-mono font-medium text-ink-muted uppercase">{p.code}</p>
                     </div>
                   ))}
                 </div>
@@ -261,30 +302,34 @@ const ProductFormulaFormPage = () => {
             </div>
 
             {/* Ingredients (Hoạt chất) */}
-            <div>
-              <div className="flex justify-between items-center mb-3">
+            <div className="space-y-3 pt-4 border-t border-border">
+              <div className="flex justify-between items-center">
                 <div className="flex items-center gap-2">
-                  <h4 className="text-sm font-black text-slate-700 uppercase tracking-widest">Thành phần Hoạt chất</h4>
-                  <span className="text-[10px] bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded-full font-bold">
+                  <h4 className="text-xs font-bold text-ink uppercase tracking-wider">Thành phần Hoạt chất</h4>
+                  <span className="text-[10px] bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 px-2 py-0.5 rounded-full font-semibold border border-emerald-200 dark:border-emerald-800/50">
                     {ingredients.length} hoạt chất
                   </span>
                 </div>
-                <button type="button" onClick={() => setIngredients([...ingredients, { id: generateId('ing'), name: '', declaredContent: 0, unit: 'mg/viên' }])} className="px-3 py-1.5 bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-100 transition-colors text-xs font-bold flex items-center gap-1.5">
-                  <Plus size={14}/> Thêm hoạt chất
+                <button 
+                  type="button" 
+                  onClick={() => setIngredients([...ingredients, { id: generateId('ing'), name: '', declaredContent: 0, unit: 'mg/viên' }])} 
+                  className="px-3 py-1.5 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 rounded-lg hover:bg-emerald-100 dark:hover:bg-emerald-950/50 transition-colors text-xs font-semibold flex items-center gap-1.5 border border-emerald-200 dark:border-emerald-800/40"
+                >
+                  <PlusIcon className="h-4 w-4" /> Thêm hoạt chất
                 </button>
               </div>
 
               {ingredients.length > 0 && (
-                <div className="grid grid-cols-12 gap-2 px-1 mb-1">
-                  <span className="col-span-5 text-[9px] font-black text-slate-400 uppercase tracking-widest pl-1">Tên hoạt chất & Kho nguyên liệu</span>
-                  <span className="col-span-2 text-[9px] font-black text-slate-400 uppercase tracking-widest text-right pr-1">Hàm lượng</span>
-                  <span className="col-span-2 text-[9px] font-black text-slate-400 uppercase tracking-widest text-center">ĐVT</span>
-                  <span className="col-span-2 text-[9px] font-black text-slate-400 uppercase tracking-widest text-right pr-1">HL Nguyên tố</span>
+                <div className="grid grid-cols-12 gap-2 px-1 text-[10px] font-semibold text-ink-muted uppercase tracking-wider">
+                  <span className="col-span-5 pl-1">Tên hoạt chất & Kho nguyên liệu</span>
+                  <span className="col-span-2 text-right pr-1">Hàm lượng</span>
+                  <span className="col-span-2 text-center">ĐVT</span>
+                  <span className="col-span-2 text-right pr-1">HL Nguyên tố</span>
                   <span className="col-span-1"></span>
                 </div>
               )}
 
-              <div className="space-y-2.5">
+              <div className="space-y-2">
                 {ingredients.map((ing, index) => {
                   const linkedMaterial = ing.materialId ? materialMap.get(ing.materialId) : undefined;
                   const matchingMaterials = rawMaterials.filter(m => 
@@ -293,7 +338,7 @@ const ProductFormulaFormPage = () => {
                   );
 
                   return (
-                    <div key={ing.id} className="grid grid-cols-12 gap-2 items-center bg-slate-50/70 p-2 rounded-xl border border-slate-200/60 hover:border-indigo-200 transition-all relative">
+                    <div key={ing.id} className="grid grid-cols-12 gap-2 items-center bg-surface-2 p-2 rounded-xl border border-border hover:border-border transition-all relative">
                       <div className="col-span-5 relative">
                         <div className="relative flex items-center">
                           <input 
@@ -305,23 +350,23 @@ const ProductFormulaFormPage = () => {
                             }} 
                             onFocus={() => setActiveMaterialDropdown({ type: 'ingredient', index })}
                             onBlur={() => setTimeout(() => setActiveMaterialDropdown(null), 250)}
-                            className={`w-full pl-3 pr-8 py-2 bg-white border shadow-sm rounded-lg text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-400 ${linkedMaterial ? 'border-emerald-200 text-slate-800' : 'border-slate-200'}`} 
+                            className={`w-full pl-3 pr-8 py-2 bg-surface border rounded-lg text-xs font-medium text-ink outline-none focus:ring-2 focus:ring-emerald-500 ${linkedMaterial ? 'border-emerald-300 dark:border-emerald-700' : 'border-border'}`} 
                           />
                           {linkedMaterial ? (
-                            <span title={`Đã liên kết: ${linkedMaterial.name} (${linkedMaterial.code || 'RM'})`} className="absolute right-2 text-emerald-600 flex items-center gap-0.5 text-[10px] font-bold">
-                              <Link2 size={13} />
+                            <span title={`Đã liên kết: ${linkedMaterial.name} (${linkedMaterial.code || 'RM'})`} className="absolute right-2 text-emerald-600 dark:text-emerald-400 flex items-center gap-0.5">
+                              <LinkIcon className="h-3.5 w-3.5" />
                             </span>
                           ) : (
-                            <span title="Chưa liên kết kho nguyên liệu" className="absolute right-2 text-slate-300">
-                              <Unlink size={13} />
+                            <span title="Chưa liên kết kho nguyên liệu" className="absolute right-2 text-ink-muted opacity-40">
+                              <LinkIcon className="h-3.5 w-3.5" />
                             </span>
                           )}
                         </div>
 
                         {/* Dropdown gợi ý từ Kho nguyên liệu */}
                         {activeMaterialDropdown?.type === 'ingredient' && activeMaterialDropdown.index === index && (matchingMaterials.length > 0 || ing.name.trim()) && (
-                          <div className="absolute z-40 w-full mt-1 bg-white rounded-xl shadow-xl border border-slate-200 max-h-56 overflow-y-auto">
-                            <div className="p-1.5 bg-slate-50 border-b border-slate-100 text-[9px] font-black text-slate-400 uppercase tracking-wider">
+                          <div className="absolute z-40 w-full mt-1 bg-surface rounded-xl shadow-xl border border-border max-h-56 overflow-y-auto">
+                            <div className="p-1.5 bg-surface-2 border-b border-border text-[9px] font-semibold text-ink-muted uppercase tracking-wider">
                               Gợi ý từ Danh mục Nguyên liệu ({matchingMaterials.length})
                             </div>
                             {matchingMaterials.map(m => (
@@ -329,15 +374,15 @@ const ProductFormulaFormPage = () => {
                                 key={m.id} 
                                 onMouseDown={(e) => e.preventDefault()}
                                 onClick={() => handleSelectMaterialForIngredient(index, m)}
-                                className="p-2 hover:bg-indigo-50 cursor-pointer border-b border-slate-50 last:border-none flex items-center justify-between text-xs transition-colors"
+                                className="p-2 hover:bg-surface-2 cursor-pointer border-b border-border last:border-none flex items-center justify-between text-xs transition-colors"
                               >
                                 <div>
-                                  <span className="font-bold text-slate-700">{m.name}</span>
+                                  <span className="font-semibold text-ink">{m.name}</span>
                                   {m.aliases && m.aliases.length > 0 && (
-                                    <span className="text-[10px] text-slate-400 ml-1.5">({m.aliases.join(', ')})</span>
+                                    <span className="text-[10px] text-ink-muted ml-1.5">({m.aliases.join(', ')})</span>
                                   )}
                                 </div>
-                                <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${m.category === 'ACTIVE' ? 'bg-indigo-50 text-indigo-600' : 'bg-slate-100 text-slate-500'}`}>
+                                <span className={`text-[9px] font-medium px-1.5 py-0.5 rounded ${m.category === 'ACTIVE' ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400' : 'bg-surface-3 text-ink-muted'}`}>
                                   {m.category === 'ACTIVE' ? 'Hoạt chất' : 'Tá dược'}
                                 </span>
                               </div>
@@ -346,9 +391,9 @@ const ProductFormulaFormPage = () => {
                               <div
                                 onMouseDown={(e) => e.preventDefault()}
                                 onClick={() => handleQuickCreateMaterialForIngredient(index, ing.name)}
-                                className="p-2.5 bg-indigo-50/80 hover:bg-indigo-100 text-indigo-700 font-bold text-xs cursor-pointer flex items-center gap-1.5 border-t border-indigo-100 transition-colors"
+                                className="p-2.5 bg-emerald-50/80 dark:bg-emerald-950/30 hover:bg-emerald-100 dark:hover:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400 font-semibold text-xs cursor-pointer flex items-center gap-1.5 border-t border-emerald-200 dark:border-emerald-800/40 transition-colors"
                               >
-                                <Plus size={13} />
+                                <PlusIcon className="h-3.5 w-3.5" />
                                 <span>+ Thêm nhanh "{ing.name}" vào Danh mục chuẩn</span>
                               </div>
                             )}
@@ -356,10 +401,33 @@ const ProductFormulaFormPage = () => {
                         )}
                       </div>
 
-                      <input placeholder="0" value={ing.declaredContent} onChange={e => handleIngredientChange(index, 'declaredContent', e.target.value)} className="col-span-2 px-3 py-2 bg-white border border-slate-200 shadow-sm rounded-lg text-xs font-bold outline-none text-right focus:ring-2 focus:ring-indigo-400" />
-                      <input placeholder="ĐVT" value={ing.unit} onChange={e => handleIngredientChange(index, 'unit', e.target.value)} className="col-span-2 px-3 py-2 bg-white border border-slate-200 shadow-sm rounded-lg text-xs font-bold outline-none text-center focus:ring-2 focus:ring-indigo-400" list="formula-unit-suggestions" />
-                      <input placeholder="(Tùy chọn)" value={ing.elementalContent || ''} onChange={e => handleIngredientChange(index, 'elementalContent', e.target.value)} className="col-span-2 px-3 py-2 bg-white border border-slate-200 shadow-sm rounded-lg text-xs font-bold outline-none text-right focus:ring-2 focus:ring-indigo-400" />
-                      <button type="button" onClick={() => setIngredients(ingredients.filter((_, i) => i !== index))} className="col-span-1 p-2 text-slate-300 hover:text-red-500 transition-colors flex justify-center"><X size={16}/></button>
+                      <input 
+                        placeholder="0" 
+                        value={ing.declaredContent} 
+                        onChange={e => handleIngredientChange(index, 'declaredContent', e.target.value)} 
+                        className="col-span-2 px-3 py-2 bg-surface border border-border rounded-lg text-xs font-medium text-ink outline-none text-right focus:ring-2 focus:ring-emerald-500" 
+                      />
+                      <input 
+                        placeholder="ĐVT" 
+                        value={ing.unit} 
+                        onChange={e => handleIngredientChange(index, 'unit', e.target.value)} 
+                        className="col-span-2 px-3 py-2 bg-surface border border-border rounded-lg text-xs font-medium text-ink outline-none text-center focus:ring-2 focus:ring-emerald-500" 
+                        list="formula-unit-suggestions" 
+                      />
+                      <input 
+                        placeholder="(Tùy chọn)" 
+                        value={ing.elementalContent || ''} 
+                        onChange={e => handleIngredientChange(index, 'elementalContent', e.target.value)} 
+                        className="col-span-2 px-3 py-2 bg-surface border border-border rounded-lg text-xs font-medium text-ink outline-none text-right focus:ring-2 focus:ring-emerald-500" 
+                      />
+                      <button 
+                        type="button" 
+                        onClick={() => setIngredients(ingredients.filter((_, i) => i !== index))} 
+                        className="col-span-1 p-2 text-ink-muted hover:text-red-500 transition-colors flex justify-center"
+                        title="Xóa hoạt chất"
+                      >
+                        <XMarkIcon className="h-4 w-4" />
+                      </button>
                     </div>
                   );
                 })}
@@ -367,29 +435,33 @@ const ProductFormulaFormPage = () => {
             </div>
 
             {/* Excipients (Tá dược) */}
-            <div>
-              <div className="flex justify-between items-center mb-3">
+            <div className="space-y-3 pt-4 border-t border-border">
+              <div className="flex justify-between items-center">
                 <div className="flex items-center gap-2">
-                  <h4 className="text-sm font-black text-slate-700 uppercase tracking-widest">Thành phần Tá dược</h4>
-                  <span className="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full font-bold">
+                  <h4 className="text-xs font-bold text-ink uppercase tracking-wider">Thành phần Tá dược</h4>
+                  <span className="text-[10px] bg-surface-2 text-ink-muted px-2 py-0.5 rounded-full font-semibold border border-border">
                     {excipients.length} tá dược
                   </span>
                 </div>
-                <button type="button" onClick={() => setExcipients([...excipients, { id: generateId('exc'), name: '', declaredContent: 0, unit: 'mg/viên' }])} className="px-3 py-1.5 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200 transition-colors text-xs font-bold flex items-center gap-1.5">
-                  <Plus size={14}/> Thêm tá dược
+                <button 
+                  type="button" 
+                  onClick={() => setExcipients([...excipients, { id: generateId('exc'), name: '', declaredContent: 0, unit: 'mg/viên' }])} 
+                  className="px-3 py-1.5 bg-surface-2 hover:bg-surface-3 text-ink rounded-lg transition-colors text-xs font-semibold flex items-center gap-1.5 border border-border"
+                >
+                  <PlusIcon className="h-4 w-4" /> Thêm tá dược
                 </button>
               </div>
 
               {excipients.length > 0 && (
-                <div className="grid grid-cols-12 gap-2 px-1 mb-1">
-                  <span className="col-span-7 text-[9px] font-black text-slate-400 uppercase tracking-widest pl-1">Tên tá dược & Kho nguyên liệu</span>
-                  <span className="col-span-2 text-[9px] font-black text-slate-400 uppercase tracking-widest text-right pr-1">Hàm lượng</span>
-                  <span className="col-span-2 text-[9px] font-black text-slate-400 uppercase tracking-widest text-center">ĐVT</span>
+                <div className="grid grid-cols-12 gap-2 px-1 text-[10px] font-semibold text-ink-muted uppercase tracking-wider">
+                  <span className="col-span-7 pl-1">Tên tá dược & Kho nguyên liệu</span>
+                  <span className="col-span-2 text-right pr-1">Hàm lượng</span>
+                  <span className="col-span-2 text-center">ĐVT</span>
                   <span className="col-span-1"></span>
                 </div>
               )}
 
-              <div className="space-y-2.5">
+              <div className="space-y-2">
                 {excipients.map((exc, index) => {
                   const linkedMaterial = exc.materialId ? materialMap.get(exc.materialId) : undefined;
                   const matchingMaterials = rawMaterials.filter(m => 
@@ -398,7 +470,7 @@ const ProductFormulaFormPage = () => {
                   );
 
                   return (
-                    <div key={exc.id} className="grid grid-cols-12 gap-2 items-center bg-slate-50/70 p-2 rounded-xl border border-slate-200/60 hover:border-slate-300 transition-all relative">
+                    <div key={exc.id} className="grid grid-cols-12 gap-2 items-center bg-surface-2 p-2 rounded-xl border border-border hover:border-border transition-all relative">
                       <div className="col-span-7 relative">
                         <div className="relative flex items-center">
                           <input 
@@ -410,23 +482,23 @@ const ProductFormulaFormPage = () => {
                             }} 
                             onFocus={() => setActiveMaterialDropdown({ type: 'excipient', index })}
                             onBlur={() => setTimeout(() => setActiveMaterialDropdown(null), 250)}
-                            className={`w-full pl-3 pr-8 py-2 bg-white border shadow-sm rounded-lg text-xs font-bold outline-none focus:ring-2 focus:ring-slate-400 ${linkedMaterial ? 'border-emerald-200 text-slate-800' : 'border-slate-200'}`} 
+                            className={`w-full pl-3 pr-8 py-2 bg-surface border rounded-lg text-xs font-medium text-ink outline-none focus:ring-2 focus:ring-emerald-500 ${linkedMaterial ? 'border-emerald-300 dark:border-emerald-700' : 'border-border'}`} 
                           />
                           {linkedMaterial ? (
-                            <span title={`Đã liên kết: ${linkedMaterial.name}`} className="absolute right-2 text-emerald-600 flex items-center gap-0.5 text-[10px] font-bold">
-                              <Link2 size={13} />
+                            <span title={`Đã liên kết: ${linkedMaterial.name}`} className="absolute right-2 text-emerald-600 dark:text-emerald-400 flex items-center gap-0.5">
+                              <LinkIcon className="h-3.5 w-3.5" />
                             </span>
                           ) : (
-                            <span title="Chưa liên kết kho nguyên liệu" className="absolute right-2 text-slate-300">
-                              <Unlink size={13} />
+                            <span title="Chưa liên kết kho nguyên liệu" className="absolute right-2 text-ink-muted opacity-40">
+                              <LinkIcon className="h-3.5 w-3.5" />
                             </span>
                           )}
                         </div>
 
                         {/* Dropdown gợi ý từ Kho nguyên liệu */}
                         {activeMaterialDropdown?.type === 'excipient' && activeMaterialDropdown.index === index && (matchingMaterials.length > 0 || exc.name.trim()) && (
-                          <div className="absolute z-40 w-full mt-1 bg-white rounded-xl shadow-xl border border-slate-200 max-h-56 overflow-y-auto">
-                            <div className="p-1.5 bg-slate-50 border-b border-slate-100 text-[9px] font-black text-slate-400 uppercase tracking-wider">
+                          <div className="absolute z-40 w-full mt-1 bg-surface rounded-xl shadow-xl border border-border max-h-56 overflow-y-auto">
+                            <div className="p-1.5 bg-surface-2 border-b border-border text-[9px] font-semibold text-ink-muted uppercase tracking-wider">
                               Gợi ý từ Danh mục Nguyên liệu ({matchingMaterials.length})
                             </div>
                             {matchingMaterials.map(m => (
@@ -434,15 +506,15 @@ const ProductFormulaFormPage = () => {
                                 key={m.id} 
                                 onMouseDown={(e) => e.preventDefault()}
                                 onClick={() => handleSelectMaterialForExcipient(index, m)}
-                                className="p-2 hover:bg-indigo-50 cursor-pointer border-b border-slate-50 last:border-none flex items-center justify-between text-xs transition-colors"
+                                className="p-2 hover:bg-surface-2 cursor-pointer border-b border-border last:border-none flex items-center justify-between text-xs transition-colors"
                               >
                                 <div>
-                                  <span className="font-bold text-slate-700">{m.name}</span>
+                                  <span className="font-semibold text-ink">{m.name}</span>
                                   {m.aliases && m.aliases.length > 0 && (
-                                    <span className="text-[10px] text-slate-400 ml-1.5">({m.aliases.join(', ')})</span>
+                                    <span className="text-[10px] text-ink-muted ml-1.5">({m.aliases.join(', ')})</span>
                                   )}
                                 </div>
-                                <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${m.category === 'ACTIVE' ? 'bg-indigo-50 text-indigo-600' : 'bg-slate-100 text-slate-500'}`}>
+                                <span className={`text-[9px] font-medium px-1.5 py-0.5 rounded ${m.category === 'ACTIVE' ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400' : 'bg-surface-3 text-ink-muted'}`}>
                                   {m.category === 'ACTIVE' ? 'Hoạt chất' : 'Tá dược'}
                                 </span>
                               </div>
@@ -451,9 +523,9 @@ const ProductFormulaFormPage = () => {
                               <div
                                 onMouseDown={(e) => e.preventDefault()}
                                 onClick={() => handleQuickCreateMaterialForExcipient(index, exc.name)}
-                                className="p-2.5 bg-indigo-50/80 hover:bg-indigo-100 text-indigo-700 font-bold text-xs cursor-pointer flex items-center gap-1.5 border-t border-indigo-100 transition-colors"
+                                className="p-2.5 bg-emerald-50/80 dark:bg-emerald-950/30 hover:bg-emerald-100 dark:hover:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400 font-semibold text-xs cursor-pointer flex items-center gap-1.5 border-t border-emerald-200 dark:border-emerald-800/40 transition-colors"
                               >
-                                <Plus size={13} />
+                                <PlusIcon className="h-3.5 w-3.5" />
                                 <span>+ Thêm nhanh "{exc.name}" vào Danh mục chuẩn</span>
                               </div>
                             )}
@@ -461,9 +533,27 @@ const ProductFormulaFormPage = () => {
                         )}
                       </div>
 
-                      <input placeholder="0" value={exc.declaredContent} onChange={e => handleExcipientChange(index, 'declaredContent', e.target.value)} className="col-span-2 px-3 py-2 bg-white border border-slate-200 shadow-sm rounded-lg text-xs font-bold outline-none text-right focus:ring-2 focus:ring-slate-400" />
-                      <input placeholder="ĐVT" value={exc.unit} onChange={e => handleExcipientChange(index, 'unit', e.target.value)} className="col-span-2 px-3 py-2 bg-white border border-slate-200 shadow-sm rounded-lg text-xs font-bold outline-none text-center focus:ring-2 focus:ring-slate-400" list="formula-unit-suggestions" />
-                      <button type="button" onClick={() => setExcipients(excipients.filter((_, i) => i !== index))} className="col-span-1 p-2 text-slate-300 hover:text-red-500 transition-colors flex justify-center"><X size={16}/></button>
+                      <input 
+                        placeholder="0" 
+                        value={exc.declaredContent} 
+                        onChange={e => handleExcipientChange(index, 'declaredContent', e.target.value)} 
+                        className="col-span-2 px-3 py-2 bg-surface border border-border rounded-lg text-xs font-medium text-ink outline-none text-right focus:ring-2 focus:ring-emerald-500" 
+                      />
+                      <input 
+                        placeholder="ĐVT" 
+                        value={exc.unit} 
+                        onChange={e => handleExcipientChange(index, 'unit', e.target.value)} 
+                        className="col-span-2 px-3 py-2 bg-surface border border-border rounded-lg text-xs font-medium text-ink outline-none text-center focus:ring-2 focus:ring-emerald-500" 
+                        list="formula-unit-suggestions" 
+                      />
+                      <button 
+                        type="button" 
+                        onClick={() => setExcipients(excipients.filter((_, i) => i !== index))} 
+                        className="col-span-1 p-2 text-ink-muted hover:text-red-500 transition-colors flex justify-center"
+                        title="Xóa tá dược"
+                      >
+                        <XMarkIcon className="h-4 w-4" />
+                      </button>
                     </div>
                   );
                 })}
@@ -471,10 +561,10 @@ const ProductFormulaFormPage = () => {
             </div>
 
             {/* Sensory & Other Info */}
-            <div className="grid grid-cols-2 gap-6 pt-6 border-t border-slate-100">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-6 border-t border-border">
               <div>
-                <h4 className="text-sm font-bold text-slate-600 mb-2">Thông tin Cảm quan</h4>
-                <div className="space-y-2">
+                <h4 className="text-xs font-bold text-ink uppercase tracking-wider mb-3">Thông tin Cảm quan</h4>
+                <div className="space-y-3">
                   <DSFormInput label="Dạng bào chế" name="dosageForm" defaultValue={formulaToEdit?.sensory?.dosageForm} placeholder="VD: Viên nang, dung dịch..." />
                   <DSFormInput label="Màu sắc" name="color" defaultValue={formulaToEdit?.sensory?.color} />
                   <DSFormInput label="Mùi vị" name="smellTaste" defaultValue={formulaToEdit?.sensory?.smellTaste} />
@@ -482,8 +572,8 @@ const ProductFormulaFormPage = () => {
                 </div>
               </div>
               <div>
-                <h4 className="text-sm font-bold text-slate-600 mb-2">Thông tin khác</h4>
-                <div className="space-y-2">
+                <h4 className="text-xs font-bold text-ink uppercase tracking-wider mb-3">Thông tin khác</h4>
+                <div className="space-y-3">
                   <DSFormInput label="Quy cách đóng gói" name="packaging" defaultValue={formulaToEdit?.packaging} />
                   <DSFormInput label="Điều kiện bảo quản" name="storage" defaultValue={formulaToEdit?.storage} />
                   <DSFormInput label="Hạn dùng" name="shelfLife" defaultValue={formulaToEdit?.shelfLife} />
@@ -492,10 +582,24 @@ const ProductFormulaFormPage = () => {
             </div>
 
             {/* Actions */}
-            <div className="flex justify-end gap-3 pt-6 border-t border-slate-100 mt-6">
-              <button type="button" onClick={() => navigate('/product-formulas')} className="px-6 py-3 text-slate-400 font-black uppercase text-xs tracking-widest hover:bg-slate-50 rounded-xl">Hủy</button>
-              <button type="submit" disabled={isSubmitting} className="px-10 py-3 bg-indigo-600 text-white rounded-xl font-black uppercase text-xs flex items-center gap-2 hover:bg-indigo-700 transition-all shadow-md shadow-indigo-200">
-                {isSubmitting && <Loader2 size={14} className="animate-spin" />}
+            <div className="flex justify-end gap-3 pt-6 border-t border-border">
+              <button 
+                type="button" 
+                onClick={() => navigate('/product-formulas')} 
+                className="px-4 py-2 text-ink-muted font-semibold text-xs hover:bg-surface-2 rounded-lg border border-border transition-colors"
+              >
+                Hủy
+              </button>
+              <button 
+                type="submit" 
+                disabled={isSubmitting} 
+                className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs rounded-lg shadow-sm transition-all flex items-center gap-1.5 disabled:opacity-50"
+              >
+                {isSubmitting ? (
+                  <ArrowPathIcon className="h-4 w-4 animate-spin" />
+                ) : (
+                  <CheckIcon className="h-4 w-4" />
+                )}
                 {id ? 'Cập nhật Công thức' : 'Lưu Công thức'}
               </button>
             </div>

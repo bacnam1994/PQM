@@ -3,7 +3,12 @@ import { useParams, useNavigate } from 'react-router-dom';
 import CoAReport from '../../components/features/CoAReport';
 import { useDataGraph, HydratedTestResult, HydratedBatch } from '../../hooks/useDataGraph';
 import { useAppStore } from '../../store/useAppStore';
-import { ArrowLeft, Printer, Loader2, AlertTriangle } from 'lucide-react';
+import { 
+  ArrowLeftIcon, 
+  PrinterIcon, 
+  ArrowPathIcon, 
+  ExclamationTriangleIcon 
+} from '@heroicons/react/24/outline';
 import { fetchTestResultsByBatchId, fetchTestResultById } from '../../services/testResultService';
 import { calculateOverallStatus, ensureArray } from '../../utils';
 import { TestResult, TestResultEntry, TCCS } from '../../types';
@@ -303,11 +308,11 @@ const CoAReportPage = () => {
   if (notFound) {
     return (
       <div className="min-h-[80vh] flex items-center justify-center">
-        <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-100 flex flex-col items-center gap-3 text-center">
-          <AlertTriangle size={36} className="text-amber-500" />
-          <p className="font-black text-slate-700 text-lg">Không tìm thấy phiếu</p>
-          <p className="text-sm text-slate-400">Phiếu kết quả này không tồn tại hoặc đã bị xóa.</p>
-          <button onClick={() => navigate('/test-results')} className="mt-2 px-5 py-2 bg-indigo-600 text-white rounded-lg font-bold text-sm hover:bg-indigo-700 transition-all">
+        <div className="bg-surface p-8 rounded-2xl shadow-sm border border-border flex flex-col items-center gap-3 text-center">
+          <ExclamationTriangleIcon className="w-10 h-10 text-amber-500" />
+          <p className="font-black text-ink text-lg">Không tìm thấy phiếu</p>
+          <p className="text-sm text-ink-muted">Phiếu kết quả này không tồn tại hoặc đã bị xóa.</p>
+          <button onClick={() => navigate('/test-results')} className="mt-2 px-5 py-2 bg-emerald-600 text-white rounded-xl font-bold text-sm hover:bg-emerald-700 transition-all shadow-sm">
             Quay lại danh sách
           </button>
         </div>
@@ -318,8 +323,8 @@ const CoAReportPage = () => {
   if (loading || !result) {
     return (
       <div className="min-h-[80vh] flex items-center justify-center">
-        <div className="bg-white p-8 rounded-2xl shadow-sm text-slate-500 font-bold border border-slate-100 flex items-center gap-3">
-          <Loader2 className="animate-spin" /> Đang thiết lập bản in CoA...
+        <div className="bg-surface p-8 rounded-2xl shadow-sm text-ink-muted font-bold border border-border flex items-center gap-3">
+          <ArrowPathIcon className="w-5 h-5 animate-spin text-emerald-600" /> Đang thiết lập bản in CoA...
         </div>
       </div>
     );
@@ -338,14 +343,14 @@ const CoAReportPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-200 dark:bg-slate-950 py-8 transition-colors duration-300 print:bg-white print:py-0">
+    <div className="min-h-screen bg-surface-3 py-8 transition-colors duration-300 print:bg-white print:py-0">
       {/* Thanh công cụ (Sẽ tự động ẩn đi khi nhấn In) */}
-      <div className="coa-page-toolbar max-w-[21cm] mx-auto mb-4 flex justify-between items-center print:hidden bg-white dark:bg-slate-800 p-4 rounded-xl shadow-sm border border-slate-100 dark:border-slate-700">
-         <button onClick={handleBack} className="flex items-center gap-2 text-slate-600 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 font-bold transition-all">
-            <ArrowLeft size={18} /> Đóng / Quay lại
+      <div className="coa-page-toolbar max-w-[21cm] mx-auto mb-4 flex justify-between items-center print:hidden bg-surface p-4 rounded-xl shadow-sm border border-border">
+         <button onClick={handleBack} className="flex items-center gap-2 text-ink-soft hover:text-emerald-600 dark:hover:text-emerald-400 font-bold transition-all text-sm">
+            <ArrowLeftIcon className="w-4 h-4" /> Đóng / Quay lại
          </button>
-         <button onClick={() => window.print()} className="flex items-center gap-2 px-6 py-2.5 bg-indigo-600 text-white rounded-lg font-bold shadow-lg shadow-indigo-200 hover:bg-indigo-700 transition-all">
-            <Printer size={18} /> In CoA
+         <button onClick={() => window.print()} className="flex items-center gap-2 px-6 py-2.5 bg-emerald-600 text-white rounded-xl font-bold shadow-sm hover:bg-emerald-700 transition-all text-sm">
+            <PrinterIcon className="w-4 h-4" /> In CoA
          </button>
       </div>
 

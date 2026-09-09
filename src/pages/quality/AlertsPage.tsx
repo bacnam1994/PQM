@@ -7,19 +7,19 @@
 
 import React, { useState, useMemo } from 'react';
 import { 
-  ShieldAlert, 
-  TrendingUp, 
-  Clock, 
-  PackageX, 
-  AlertTriangle,
-  RefreshCw,
-  Activity,
-  CheckCircle2,
-  Brain,
-  Zap,
-  ChevronDown,
-  ChevronRight
-} from 'lucide-react';
+  ShieldExclamationIcon, 
+  ArrowTrendingUpIcon, 
+  ClockIcon, 
+  ArchiveBoxXMarkIcon, 
+  ExclamationTriangleIcon,
+  ArrowPathIcon,
+  ChartBarIcon,
+  CheckCircleIcon,
+  SparklesIcon,
+  BoltIcon,
+  ChevronDownIcon,
+  ChevronRightIcon
+} from '@heroicons/react/24/outline';
 import { useQualityAlerts } from '../../hooks/useQualityAlerts';
 import { useAppStore } from '../../store/useAppStore';
 import { runSmartAlertAnalysis, SmartAlert, getCachedSmartAlerts, saveSmartAlertsCache } from '../../services/ai/smartAlertService';
@@ -28,26 +28,26 @@ import type { QualityAnomaly } from '../../services/reportService';
 const SEVERITY_CONFIG = {
   HIGH: {
     label: 'Cao',
-    bg: 'bg-red-50/80 dark:bg-red-950/30',
-    border: 'border-red-200 dark:border-red-900/60',
-    badge: 'bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-300',
-    icon: <AlertTriangle size={18} className="text-red-500 dark:text-red-400 shrink-0 mt-0.5" />,
-    dot: 'bg-red-500',
+    bg: 'bg-rose-500/10',
+    border: 'border-rose-500/20',
+    badge: 'bg-rose-500/20 text-rose-700 dark:text-rose-300',
+    icon: <ExclamationTriangleIcon className="w-5 h-5 text-rose-500 shrink-0 mt-0.5" />,
+    dot: 'bg-rose-500',
   },
   MEDIUM: {
     label: 'Trung bình',
-    bg: 'bg-amber-50/80 dark:bg-amber-950/30',
-    border: 'border-amber-200 dark:border-amber-900/60',
-    badge: 'bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300',
-    icon: <AlertTriangle size={18} className="text-amber-500 dark:text-amber-400 shrink-0 mt-0.5" />,
+    bg: 'bg-amber-500/10',
+    border: 'border-amber-500/20',
+    badge: 'bg-amber-500/20 text-amber-700 dark:text-amber-300',
+    icon: <ExclamationTriangleIcon className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />,
     dot: 'bg-amber-500',
   },
   LOW: {
     label: 'Thấp',
-    bg: 'bg-blue-50/80 dark:bg-blue-950/30',
-    border: 'border-blue-200 dark:border-blue-900/60',
-    badge: 'bg-blue-100 text-blue-600 dark:bg-blue-900/50 dark:text-blue-300',
-    icon: <Clock size={18} className="text-blue-500 dark:text-blue-400 shrink-0 mt-0.5" />,
+    bg: 'bg-blue-500/10',
+    border: 'border-blue-500/20',
+    badge: 'bg-blue-500/20 text-blue-700 dark:text-blue-300',
+    icon: <ClockIcon className="w-5 h-5 text-blue-500 shrink-0 mt-0.5" />,
     dot: 'bg-blue-400',
   },
 };
@@ -55,38 +55,38 @@ const SEVERITY_CONFIG = {
 const TYPE_CONFIG: Record<string, { label: string; icon: React.ReactNode; desc: string }> = {
   DRIFT: {
     label: 'Xu hướng trôi (OOT)',
-    icon: <TrendingUp size={14} />,
+    icon: <ArrowTrendingUpIcon className="w-3.5 h-3.5" />,
     desc: 'Chỉ tiêu có xu hướng thay đổi liên tục qua nhiều lần kiểm.',
   },
   OOT_NEAR_LIMIT: {
     label: 'Cận biên giới hạn (OOT)',
-    icon: <AlertTriangle size={14} className="text-amber-500" />,
+    icon: <ExclamationTriangleIcon className="w-3.5 h-3.5 text-amber-500" />,
     desc: 'Chỉ tiêu tiệm cận sát biên dung sai tối đa/tối thiểu của TCCS.',
   },
   OOT_SIGMA_SHIFT: {
     label: 'Lệch thống kê >2σ (OOT)',
-    icon: <Activity size={14} className="text-purple-500" />,
+    icon: <ChartBarIcon className="w-3.5 h-3.5 text-purple-500" />,
     desc: 'Giá trị lô lệch đáng kể so với trung bình lịch sử của sản phẩm.',
   },
   EXPIRY: {
     label: 'Sắp hết hạn',
-    icon: <Clock size={14} />,
+    icon: <ClockIcon className="w-3.5 h-3.5" />,
     desc: 'Lô sản phẩm sẽ hết hạn trong thời gian tới.',
   },
   HIGH_FAIL_RATE: {
     label: 'Tỷ lệ thất bại cao',
-    icon: <PackageX size={14} />,
+    icon: <ArchiveBoxXMarkIcon className="w-3.5 h-3.5" />,
     desc: 'Sản phẩm có nhiều phiếu kiểm không đạt.',
   },
   MISSING_DATA: {
     label: 'Thiếu dữ liệu',
-    icon: <ShieldAlert size={14} />,
+    icon: <ShieldExclamationIcon className="w-3.5 h-3.5" />,
     desc: 'Dữ liệu kiểm nghiệm bị thiếu hoặc không đầy đủ.',
   },
 };
 
 const renderMarkdown = (text: string) => {
-  return text.replace(/\*\*(.+?)\*\*/g, '<strong class="font-bold text-slate-900 dark:text-slate-100">$1</strong>');
+  return text.replace(/\*\*(.+?)\*\*/g, '<strong class="font-bold text-ink">$1</strong>');
 };
 
 type FilterType = 'ALL' | 'HIGH' | 'MEDIUM' | 'LOW';
@@ -109,49 +109,49 @@ const AlertsPage: React.FC = () => {
   const filteredAlerts = filter === 'ALL' ? alerts : alerts.filter(a => a.severity === filter);
 
   return (
-    <div className="max-w-4xl mx-auto py-8 px-4 sm:px-6 space-y-6">
+    <div className="max-w-4xl mx-auto py-8 px-4 sm:px-6 space-y-6 animate-in fade-in duration-300">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-black text-slate-900 dark:text-slate-100 tracking-tight flex items-center gap-2.5">
-            <div className="p-2 rounded-xl bg-rose-50 dark:bg-rose-950/50 text-rose-500 dark:text-rose-400">
-              <ShieldAlert size={24} />
+          <h1 className="text-2xl font-black text-ink tracking-tight flex items-center gap-2.5">
+            <div className="p-2 rounded-xl bg-rose-500/10 text-rose-600 dark:text-rose-400">
+              <ShieldExclamationIcon className="w-6 h-6" />
             </div>
             Cảnh báo Chất lượng
           </h1>
-          <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">
+          <p className="text-ink-muted text-sm mt-1">
             Giám sát rủi ro tự động — phân tích xu hướng trôi, lô cận date và phiếu không đạt theo thời gian thực
           </p>
         </div>
-        <span className="text-[11px] font-semibold text-slate-400 dark:text-slate-500 flex items-center gap-1.5 self-start sm:self-auto px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800">
-          <RefreshCw size={12} className="animate-spin text-primary-500" /> Cập nhật tự động
+        <span className="text-[11px] font-semibold text-ink-muted flex items-center gap-1.5 self-start sm:self-auto px-3 py-1.5 rounded-xl bg-surface border border-border">
+          <ArrowPathIcon className="w-3.5 h-3.5 animate-spin text-emerald-500" /> Cập nhật tự động
         </span>
       </div>
 
       {/* Summary cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <button
           onClick={() => setFilter(filter === 'HIGH' ? 'ALL' : 'HIGH')}
-          className={`rounded-2xl border-2 p-4 text-left transition-all cursor-pointer shadow-xs ${
+          className={`rounded-2xl border-2 p-5 text-left transition-all cursor-pointer shadow-xs ${
             filter === 'HIGH' 
-              ? 'border-red-500 bg-red-50 dark:bg-red-950/40' 
-              : 'border-red-100 dark:border-red-900/40 bg-white dark:bg-slate-900 hover:border-red-300 dark:hover:border-red-700'
+              ? 'border-rose-500 bg-rose-500/10' 
+              : 'border-border bg-surface hover:border-rose-500/40'
           }`}
         >
           <div className="flex items-center gap-2 mb-1">
-            <span className="w-2.5 h-2.5 rounded-full bg-red-500 inline-block shadow-xs"></span>
-            <span className="text-xs font-bold text-red-600 dark:text-red-400 uppercase tracking-wider">Mức Cao</span>
+            <span className="w-2.5 h-2.5 rounded-full bg-rose-500 inline-block shadow-xs"></span>
+            <span className="text-xs font-bold text-rose-600 dark:text-rose-400 uppercase tracking-wider">Mức Cao</span>
           </div>
-          <p className="text-3xl font-black text-red-600 dark:text-red-400">{highCount}</p>
-          <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-1">bất thường nghiêm trọng</p>
+          <p className="text-3xl font-black text-rose-600 dark:text-rose-400">{highCount}</p>
+          <p className="text-[11px] text-ink-muted mt-1">bất thường nghiêm trọng</p>
         </button>
 
         <button
           onClick={() => setFilter(filter === 'MEDIUM' ? 'ALL' : 'MEDIUM')}
-          className={`rounded-2xl border-2 p-4 text-left transition-all cursor-pointer shadow-xs ${
+          className={`rounded-2xl border-2 p-5 text-left transition-all cursor-pointer shadow-xs ${
             filter === 'MEDIUM' 
-              ? 'border-amber-500 bg-amber-50 dark:bg-amber-950/40' 
-              : 'border-amber-100 dark:border-amber-900/40 bg-white dark:bg-slate-900 hover:border-amber-300 dark:hover:border-amber-700'
+              ? 'border-amber-500 bg-amber-500/10' 
+              : 'border-border bg-surface hover:border-amber-500/40'
           }`}
         >
           <div className="flex items-center gap-2 mb-1">
@@ -159,15 +159,15 @@ const AlertsPage: React.FC = () => {
             <span className="text-xs font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wider">Trung bình</span>
           </div>
           <p className="text-3xl font-black text-amber-600 dark:text-amber-400">{mediumCount}</p>
-          <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-1">cần theo dõi & xử lý</p>
+          <p className="text-[11px] text-ink-muted mt-1">cần theo dõi &amp; xử lý</p>
         </button>
 
         <button
           onClick={() => setFilter(filter === 'LOW' ? 'ALL' : 'LOW')}
-          className={`rounded-2xl border-2 p-4 text-left transition-all cursor-pointer shadow-xs ${
+          className={`rounded-2xl border-2 p-5 text-left transition-all cursor-pointer shadow-xs ${
             filter === 'LOW' 
-              ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/40' 
-              : 'border-blue-100 dark:border-blue-900/40 bg-white dark:bg-slate-900 hover:border-blue-300 dark:hover:border-blue-700'
+              ? 'border-blue-500 bg-blue-500/10' 
+              : 'border-border bg-surface hover:border-blue-500/40'
           }`}
         >
           <div className="flex items-center gap-2 mb-1">
@@ -175,37 +175,37 @@ const AlertsPage: React.FC = () => {
             <span className="text-xs font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider">Thấp</span>
           </div>
           <p className="text-3xl font-black text-blue-600 dark:text-blue-400">{lowCount}</p>
-          <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-1">thông tin cần lưu ý</p>
+          <p className="text-[11px] text-ink-muted mt-1">thông tin cần lưu ý</p>
         </button>
       </div>
 
       {/* === SMART AI ALERTS === */}
       {smartReport.totalAlerts > 0 && (
-        <div className="border border-violet-200 dark:border-violet-800/50 rounded-2xl overflow-hidden shadow-sm">
+        <div className="border border-border rounded-2xl overflow-hidden shadow-sm bg-surface">
           <button
             onClick={() => setSmartExpanded(e => !e)}
-            className="w-full flex items-center justify-between px-5 py-4 bg-gradient-to-r from-violet-50 to-indigo-50 dark:from-violet-950/40 dark:to-indigo-950/40 hover:from-violet-100 dark:hover:from-violet-900/40 transition-colors"
+            className="w-full flex items-center justify-between px-5 py-4 bg-surface-2 hover:bg-surface-3 transition-colors border-b border-border"
           >
             <div className="flex items-center gap-3">
-              <div className="p-1.5 rounded-lg bg-violet-100 dark:bg-violet-900/50">
-                <Brain size={16} className="text-violet-600 dark:text-violet-400" />
+              <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                <SparklesIcon className="w-5 h-5" />
               </div>
               <div className="text-left">
-                <p className="font-black text-violet-800 dark:text-violet-200 text-sm flex items-center gap-2">
+                <p className="font-black text-ink text-sm flex items-center gap-2">
                   AI Proactive Smart Alerts
                   {smartReport.highCount > 0 && (
-                    <span className="text-[10px] font-black bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300 px-2 py-0.5 rounded-full">
+                    <span className="text-[10px] font-black bg-rose-500/10 text-rose-700 dark:text-rose-300 border border-rose-500/20 px-2 py-0.5 rounded-full">
                       {smartReport.highCount} URGENT
                     </span>
                   )}
                 </p>
-                <p className="text-xs text-violet-600 dark:text-violet-400">{smartReport.summary}</p>
+                <p className="text-xs text-ink-muted">{smartReport.summary}</p>
               </div>
             </div>
-            {smartExpanded ? <ChevronDown size={16} className="text-violet-400" /> : <ChevronRight size={16} className="text-violet-400" />}
+            {smartExpanded ? <ChevronDownIcon className="w-4 h-4 text-ink-muted" /> : <ChevronRightIcon className="w-4 h-4 text-ink-muted" />}
           </button>
           {smartExpanded && (
-            <div className="divide-y divide-violet-100 dark:divide-violet-900/30 bg-white dark:bg-slate-900/50">
+            <div className="divide-y divide-border">
               {smartReport.alerts.map((alert) => (
                 <SmartAlertCard key={alert.id} alert={alert} />
               ))}
@@ -216,10 +216,10 @@ const AlertsPage: React.FC = () => {
 
       {/* Alert list */}
       {!hasAlerts ? (
-        <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-12 text-center shadow-xs">
-          <CheckCircle2 size={48} className="mx-auto text-emerald-500 dark:text-emerald-400 mb-3" />
-          <p className="font-black text-slate-800 dark:text-slate-100 text-lg">Không có cảnh báo nào</p>
-          <p className="text-slate-400 dark:text-slate-500 text-sm mt-1">
+        <div className="bg-surface border border-border rounded-2xl p-12 text-center shadow-xs">
+          <CheckCircleIcon className="w-12 h-12 mx-auto text-emerald-500 mb-3" />
+          <p className="font-black text-ink text-lg">Không có cảnh báo nào</p>
+          <p className="text-ink-muted text-sm mt-1">
             Hệ thống không phát hiện bất thường hay lô cận date trong dữ liệu hiện tại.
           </p>
         </div>
@@ -227,17 +227,17 @@ const AlertsPage: React.FC = () => {
         <div className="space-y-3">
           {filter !== 'ALL' && (
             <div className="flex items-center gap-2 px-1">
-              <span className="text-xs text-slate-500 dark:text-slate-400">Đang lọc theo mức:</span>
+              <span className="text-xs text-ink-muted">Đang lọc theo mức:</span>
               <button
                 onClick={() => setFilter('ALL')}
-                className="text-xs font-bold text-primary-600 dark:text-primary-400 hover:underline cursor-pointer"
+                className="text-xs font-bold text-emerald-600 dark:text-emerald-400 hover:underline cursor-pointer"
               >
                 Xem tất cả ({totalCount})
               </button>
             </div>
           )}
           {filteredAlerts.length === 0 ? (
-            <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-8 text-center text-slate-400 dark:text-slate-500 text-sm shadow-xs">
+            <div className="bg-surface border border-border rounded-2xl p-8 text-center text-ink-muted text-sm shadow-xs">
               Không có cảnh báo nào ở mức này.
             </div>
           ) : (
@@ -263,29 +263,29 @@ const AlertCard: React.FC<{ alert: QualityAnomaly }> = ({ alert }) => {
           <span className={`inline-flex items-center gap-1 text-[10px] font-black uppercase tracking-widest px-2.5 py-0.5 rounded-full ${sev.badge}`}>
             {sev.label}
           </span>
-          <span className="inline-flex items-center gap-1 text-[10px] font-bold text-slate-600 dark:text-slate-300 bg-white/90 dark:bg-slate-800 px-2.5 py-0.5 rounded-full border border-slate-200/80 dark:border-slate-700 shadow-2xs">
+          <span className="inline-flex items-center gap-1 text-[10px] font-bold text-ink bg-surface px-2.5 py-0.5 rounded-full border border-border shadow-2xs">
             {type.icon} {type.label}
           </span>
           {alert.productName && (
-            <span className="text-[11px] font-medium text-slate-600 dark:text-slate-300 bg-slate-100/80 dark:bg-slate-800/80 px-2 py-0.5 rounded-md truncate max-w-[200px]" title={alert.productName}>
+            <span className="text-[11px] font-medium text-ink-muted bg-surface-2 px-2 py-0.5 rounded-md truncate max-w-[200px]" title={alert.productName}>
               📦 {alert.productName}
             </span>
           )}
           {alert.batchNo && (
-            <span className="text-[11px] font-mono font-medium text-slate-600 dark:text-slate-300 bg-slate-100/80 dark:bg-slate-800/80 px-2 py-0.5 rounded-md">
+            <span className="text-[11px] font-mono font-medium text-ink-muted bg-surface-2 px-2 py-0.5 rounded-md">
               🏷️ Lô {alert.batchNo}
             </span>
           )}
         </div>
-        <p className="text-sm font-bold text-slate-900 dark:text-slate-100 leading-snug">{alert.title}</p>
+        <p className="text-sm font-bold text-ink leading-snug">{alert.title}</p>
         <p
-          className="text-xs text-slate-600 dark:text-slate-300 mt-1 leading-relaxed"
+          className="text-xs text-ink-soft mt-1 leading-relaxed"
           dangerouslySetInnerHTML={{ __html: renderMarkdown(alert.detail) }}
         />
         {alert.recommendation && (
-          <div className="mt-2.5 p-2.5 rounded-xl bg-white/60 dark:bg-slate-800/80 border border-slate-200/60 dark:border-slate-700/60 flex items-start gap-2 text-xs">
-            <span className="text-[10px] font-black uppercase text-cyan-600 dark:text-cyan-400 shrink-0 mt-0.5">Khuyến nghị AI:</span>
-            <span className="text-slate-700 dark:text-slate-300 font-medium">{alert.recommendation}</span>
+          <div className="mt-2.5 p-2.5 rounded-xl bg-surface border border-border flex items-start gap-2 text-xs">
+            <span className="text-[10px] font-black uppercase text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5">Khuyến nghị AI:</span>
+            <span className="text-ink-soft font-medium">{alert.recommendation}</span>
           </div>
         )}
       </div>
@@ -298,47 +298,47 @@ export default AlertsPage;
 const SmartAlertCard: React.FC<{ alert: SmartAlert }> = ({ alert }) => {
   const [expanded, setExpanded] = useState(alert.severity === 'HIGH');
   const sevStyle = {
-    HIGH: 'border-red-200 dark:border-red-800/50 bg-red-50/50 dark:bg-red-950/20',
-    MEDIUM: 'border-amber-200 dark:border-amber-800/50 bg-amber-50/50 dark:bg-amber-950/20',
-    LOW: 'border-blue-200 dark:border-blue-800/50 bg-blue-50/50 dark:bg-blue-950/20',
+    HIGH: 'border-rose-500/20 bg-rose-500/5',
+    MEDIUM: 'border-amber-500/20 bg-amber-500/5',
+    LOW: 'border-blue-500/20 bg-blue-500/5',
   }[alert.severity];
-  const sevDot = { HIGH: 'bg-red-500', MEDIUM: 'bg-amber-500', LOW: 'bg-blue-400' }[alert.severity];
+  const sevDot = { HIGH: 'bg-rose-500', MEDIUM: 'bg-amber-500', LOW: 'bg-blue-400' }[alert.severity];
 
   return (
-    <div className={`border-l-4 ${alert.severity === 'HIGH' ? 'border-l-red-500' : alert.severity === 'MEDIUM' ? 'border-l-amber-500' : 'border-l-blue-400'} ${sevStyle} p-4`}>
+    <div className={`border-l-4 ${alert.severity === 'HIGH' ? 'border-l-rose-500' : alert.severity === 'MEDIUM' ? 'border-l-amber-500' : 'border-l-blue-400'} ${sevStyle} p-4`}>
       <div className="flex items-start gap-3">
         <div className={`w-2 h-2 rounded-full shrink-0 mt-2 ${sevDot}`}></div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between gap-2 mb-1">
-            <p className="font-bold text-sm text-slate-800 dark:text-slate-100">{alert.title}</p>
-            <button onClick={() => setExpanded(e => !e)} className="text-slate-400 shrink-0">
-              {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+            <p className="font-bold text-sm text-ink">{alert.title}</p>
+            <button onClick={() => setExpanded(e => !e)} className="text-ink-muted hover:text-ink shrink-0">
+              {expanded ? <ChevronDownIcon className="w-4 h-4" /> : <ChevronRightIcon className="w-4 h-4" />}
             </button>
           </div>
-          <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">{alert.description}</p>
+          <p className="text-xs text-ink-muted leading-relaxed">{alert.description}</p>
           {expanded && (
             <div className="mt-3 space-y-2">
               {/* Evidence */}
               {alert.evidence.length > 0 && (
-                <div className="bg-white/70 dark:bg-slate-800/50 rounded-lg p-3">
-                  <p className="text-[10px] font-black text-slate-400 uppercase mb-1.5">Bằng chứng</p>
+                <div className="bg-surface rounded-xl p-3 border border-border">
+                  <p className="text-[10px] font-black text-ink-muted uppercase mb-1.5">Bằng chứng</p>
                   <ul className="space-y-0.5">
                     {alert.evidence.map((e, i) => (
-                      <li key={i} className="text-xs text-slate-600 dark:text-slate-400 flex items-start gap-1.5">
-                        <span className="text-slate-400 shrink-0">•</span>{e}
+                      <li key={i} className="text-xs text-ink-muted flex items-start gap-1.5">
+                        <span className="text-ink-muted shrink-0">•</span>{e}
                       </li>
                     ))}
                   </ul>
                 </div>
               )}
               {/* Recommendation */}
-              <div className="flex items-start gap-2 p-2.5 rounded-lg bg-violet-50 dark:bg-violet-900/20 border border-violet-100 dark:border-violet-800/40">
-                <Zap size={12} className="text-violet-500 shrink-0 mt-0.5" />
-                <p className="text-xs text-violet-700 dark:text-violet-300 font-medium">{alert.recommendation}</p>
+              <div className="flex items-start gap-2 p-2.5 rounded-xl bg-surface-2 border border-border">
+                <BoltIcon className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
+                <p className="text-xs text-ink-soft font-medium">{alert.recommendation}</p>
               </div>
               {alert.actionSuggestion && (
                 <div className="text-xs text-rose-600 dark:text-rose-400 font-bold flex items-center gap-1.5">
-                  <AlertTriangle size={12} /> {alert.actionSuggestion}
+                  <ExclamationTriangleIcon className="w-4 h-4" /> {alert.actionSuggestion}
                 </div>
               )}
             </div>

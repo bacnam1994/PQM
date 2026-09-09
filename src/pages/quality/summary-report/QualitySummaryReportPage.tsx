@@ -1,7 +1,10 @@
 import React from 'react';
-import { FileText, Download, Dna, Package, BarChart2 } from 'lucide-react';
-import { PageHeader, DSCard } from '../../../components';
-import { Surface } from '../../../components/ui';
+import { 
+  DocumentChartBarIcon, 
+  CubeIcon, 
+  ChartBarIcon 
+} from '@heroicons/react/24/outline';
+import { PageHeader } from '../../../components';
 import { useQualitySummaryReportState } from './hooks/useQualitySummaryReportState';
 import { ReportFilterBar } from './components/ReportFilterBar';
 import { ReportKpiBanner } from './components/ReportKpiBanner';
@@ -17,7 +20,7 @@ export const QualitySummaryReportPage: React.FC = () => {
       <PageHeader
         title="Báo cáo Tổng hợp Chất lượng"
         subtitle="Product Quality Review (PQR / APR) — Tổng kết xu hướng, năng lực quy trình SPC và nhận xét chất lượng định kỳ"
-        icon={FileText}
+        icon={DocumentChartBarIcon}
       />
 
       {/* Filter Bar */}
@@ -41,28 +44,28 @@ export const QualitySummaryReportPage: React.FC = () => {
       {/* Loading state */}
       {state.loading && (
         <div className="flex justify-center py-16">
-          <div className="animate-spin w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full" />
+          <div className="animate-spin w-8 h-8 border-2 border-emerald-500 border-t-transparent rounded-full" />
         </div>
       )}
 
       {/* Empty selection state */}
       {!state.loading && !state.selectedProductId && (
-        <Surface variant="flat" padding="lg" className="text-center py-12">
-          <BarChart2 size={44} className="text-slate-300 dark:text-zinc-700 mx-auto mb-3" />
-          <p className="text-slate-700 dark:text-zinc-300 font-bold text-base">Chọn một sản phẩm để tạo Báo cáo Tổng hợp Chất lượng PQR</p>
-          <p className="text-slate-400 dark:text-zinc-500 text-xs mt-1.5 max-w-md mx-auto leading-relaxed">
+        <div className="bg-surface border border-border rounded-2xl text-center py-12 px-6 shadow-sm">
+          <ChartBarIcon className="w-12 h-12 text-ink-muted mx-auto mb-3" />
+          <p className="text-ink font-bold text-base">Chọn một sản phẩm để tạo Báo cáo Tổng hợp Chất lượng PQR</p>
+          <p className="text-ink-muted text-xs mt-1.5 max-w-md mx-auto leading-relaxed">
             Hệ thống sẽ tính toán toàn diện các chỉ số năng lực quy trình (Cp, Cpk, Mean, Std Dev, CV%), phát hiện lô vượt tiêu chuẩn và hỗ trợ AI sinh văn bản nhận xét tự động theo chuẩn GMP.
           </p>
-        </Surface>
+        </div>
       )}
 
       {/* When product selected but no data */}
       {!state.loading && state.selectedProductId && state.reportData.length === 0 && (
-        <Surface variant="flat" padding="lg" className="text-center py-12">
-          <Package size={40} className="text-slate-300 dark:text-zinc-700 mx-auto mb-3" />
-          <p className="text-slate-700 dark:text-zinc-300 font-bold">Chưa tìm thấy dữ liệu kiểm nghiệm cho sản phẩm trong khoảng thời gian đã chọn</p>
-          <p className="text-slate-400 dark:text-zinc-500 text-xs mt-1">Hãy thử xóa khoảng ngày lọc hoặc kiểm tra lại danh sách lô sản xuất.</p>
-        </Surface>
+        <div className="bg-surface border border-border rounded-2xl text-center py-12 px-6 shadow-sm">
+          <CubeIcon className="w-12 h-12 text-ink-muted mx-auto mb-3" />
+          <p className="text-ink font-bold">Chưa tìm thấy dữ liệu kiểm nghiệm cho sản phẩm trong khoảng thời gian đã chọn</p>
+          <p className="text-ink-muted text-xs mt-1">Hãy thử xóa khoảng ngày lọc hoặc kiểm tra lại danh sách lô sản xuất.</p>
+        </div>
       )}
 
       {/* Main Report View */}

@@ -1,12 +1,46 @@
-import React, { useState } from 'react';
+import React, { useState, Fragment } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { 
-  LayoutDashboard, Package, FileText, ClipboardCheck, Settings, 
-  Menu, X, Leaf, Cloud, CloudOff, RefreshCw, Layers,
-  LogOut, User as UserIcon, FlaskConical, Users, Activity,
-  ChevronDown, Search, Moon, Sun, ShieldAlert, TrendingUp, Link2, History, Bell, GitPullRequest
-} from 'lucide-react';
+import {
+  Dialog,
+  DialogPanel,
+  Transition,
+  TransitionChild,
+  Menu,
+  MenuButton,
+  MenuItem,
+  MenuItems
+} from '@headlessui/react';
+import {
+  Squares2X2Icon,
+  CubeIcon,
+  CircleStackIcon,
+  AdjustmentsHorizontalIcon,
+  DocumentTextIcon,
+  BeakerIcon,
+  Square3Stack3DIcon,
+  ClipboardDocumentCheckIcon,
+  ExclamationTriangleIcon,
+  ArrowPathRoundedSquareIcon,
+  BellIcon,
+  DocumentChartBarIcon,
+  ChartBarIcon,
+  UsersIcon,
+  ShieldCheckIcon,
+  LinkIcon,
+  Cog6ToothIcon,
+  SparklesIcon,
+  ArrowRightOnRectangleIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  Bars3Icon,
+  XMarkIcon,
+  MagnifyingGlassIcon,
+  SunIcon,
+  MoonIcon,
+  UserCircleIcon
+} from '@heroicons/react/24/outline';
 import { useAppStore } from '../../store/useAppStore';
+import { useUIStore } from '../../store/useUIStore';
 import { useShallow } from 'zustand/react/shallow';
 import { AIAssistantChat } from '../features/AIAssistantChat';
 import { useQualityAlerts } from '../../hooks/useQualityAlerts';
@@ -16,7 +50,7 @@ import { GlobalCommandPalette } from './GlobalCommandPalette';
 interface NavItemChild {
   name: string;
   path: string;
-  icon: React.ComponentType<{ size?: number; className?: string }>;
+  icon: React.ComponentType<{ className?: string }>;
   adminOnly?: boolean;
   isAlerts?: boolean;
 }
@@ -24,63 +58,61 @@ interface NavItemChild {
 interface NavGroup {
   name: string;
   path?: string;
-  icon: React.ComponentType<{ size?: number; className?: string }>;
+  icon: React.ComponentType<{ className?: string }>;
   children?: NavItemChild[];
 }
 
-// Tối ưu 1: Đưa cấu hình Menu tĩnh ra ngoài Component
-// Tránh việc mảng bị khởi tạo lại liên tục mỗi khi chuyển trang hoặc gõ tìm kiếm
 const navItems: NavGroup[] = [
-  { name: 'Dashboard', path: '/', icon: LayoutDashboard },
+  { name: 'Bảng điều khiển', path: '/', icon: Squares2X2Icon },
   { 
     name: 'Danh mục', 
-    icon: Package,
+    icon: CubeIcon,
     children: [
-      { name: 'Sản phẩm', path: '/products', icon: Package },
-      { name: 'Nguyên liệu', path: '/materials', icon: Layers },
-      { name: 'Chỉ tiêu', path: '/criteria', icon: Activity },
+      { name: 'Sản phẩm', path: '/products', icon: CubeIcon },
+      { name: 'Nguyên liệu', path: '/materials', icon: CircleStackIcon },
+      { name: 'Chỉ tiêu', path: '/criteria', icon: AdjustmentsHorizontalIcon },
     ]
   },
   { 
     name: 'Hồ sơ', 
-    icon: FileText,
+    icon: DocumentTextIcon,
     children: [
-      { name: 'Hồ sơ TCCS', path: '/tccs', icon: FileText },
-      { name: 'Công thức sản phẩm', path: '/product-formulas', icon: FlaskConical },
+      { name: 'Hồ sơ TCCS', path: '/tccs', icon: DocumentTextIcon },
+      { name: 'Công thức sản phẩm', path: '/product-formulas', icon: BeakerIcon },
     ]
   },
   { 
     name: 'Nghiệp vụ', 
-    icon: Layers,
+    icon: Square3Stack3DIcon,
     children: [
-      { name: 'Quản lý Lô', path: '/batches', icon: Layers },
-      { name: 'Kiểm soát Lab', path: '/test-results', icon: ClipboardCheck },
-      { name: 'Quản lý Sai lệch (CAPA)', path: '/deviations', icon: ShieldAlert },
-      { name: 'Quản lý Thay đổi (Change Control)', path: '/change-control', icon: GitPullRequest },
-      { name: 'Cảnh báo chất lượng', path: '/alerts', icon: Bell, isAlerts: true },
-      { name: 'Báo cáo tổng hợp', path: '/reports/quality-summary', icon: FileText },
-      { name: 'Phân tích xu hướng', path: '/reports/trend-analysis', icon: TrendingUp },
+      { name: 'Quản lý Lô', path: '/batches', icon: Square3Stack3DIcon },
+      { name: 'Kiểm soát Lab', path: '/test-results', icon: ClipboardDocumentCheckIcon },
+      { name: 'Quản lý Sai lệch (CAPA)', path: '/deviations', icon: ExclamationTriangleIcon },
+      { name: 'Quản lý Thay đổi (CR)', path: '/change-control', icon: ArrowPathRoundedSquareIcon },
+      { name: 'Cảnh báo chất lượng', path: '/alerts', icon: BellIcon, isAlerts: true },
+      { name: 'Báo cáo tổng hợp', path: '/reports/quality-summary', icon: DocumentChartBarIcon },
+      { name: 'Phân tích xu hướng', path: '/reports/trend-analysis', icon: ChartBarIcon },
     ]
   },
   { 
     name: 'Hệ thống', 
-    icon: Settings,
+    icon: Cog6ToothIcon,
     children: [
-      { name: 'Người dùng', path: '/users', icon: Users, adminOnly: true },
-      { name: 'Nhật ký kiểm toán', path: '/audit-logs', icon: History, adminOnly: true },
-      { name: 'Liên kết chỉ tiêu', path: '/criteria-aliases', icon: Link2, adminOnly: true },
-      { name: 'Cấu hình', path: '/settings', icon: Settings },
+      { name: 'Người dùng', path: '/users', icon: UsersIcon, adminOnly: true },
+      { name: 'Nhật ký kiểm toán', path: '/audit-logs', icon: ShieldCheckIcon, adminOnly: true },
+      { name: 'Liên kết chỉ tiêu', path: '/criteria-aliases', icon: LinkIcon, adminOnly: true },
+      { name: 'Cấu hình', path: '/settings', icon: Cog6ToothIcon },
     ]
   }
 ];
 
 const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [isCollapsed, setIsCollapsed] = useState(false);
+  const isCollapsed = useUIStore(state => state.sidebarCollapsed);
+  const toggleSidebar = useUIStore(state => state.toggleSidebar);
   const [isMobileMenuOpen, setMobileMenuOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
-  const lastSync = useAppStore(state => state.lastSync);
-  const syncStatus = useAppStore(state => state.syncStatus);
+  
   const user = useAppStore(state => state.user);
   const role = useAppStore(state => state.role);
   const logout = useAppStore(state => state.logout);
@@ -130,9 +162,6 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     }
   };
 
-  const toggleSidebar = () => setIsCollapsed(!isCollapsed);
-
-  // Helper to resolve title & subtitle for the topbar based on active route
   const getPageHeaderInfo = (pathname: string) => {
     if (pathname === '/') return { title: 'Bảng điều khiển', subtitle: 'Tổng quan hoạt động nghiệp vụ QMS V-Biotech' };
     if (pathname.startsWith('/products')) return { title: 'Danh mục Sản phẩm', subtitle: 'Quản lý sản phẩm lưu hành và TCCS áp dụng' };
@@ -142,7 +171,8 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     if (pathname.startsWith('/product-formulas')) return { title: 'Công thức Sản phẩm', subtitle: 'Định mức nguyên liệu và công thức chế phẩm' };
     if (pathname.startsWith('/batches')) return { title: 'Quản lý Lô', subtitle: 'Theo dõi trạng thái, hồ sơ và kiểm nghiệm lô sản xuất' };
     if (pathname.startsWith('/test-results')) return { title: 'Kiểm soát Lab', subtitle: 'Nhập kết quả kiểm nghiệm và phát hành CoA' };
-    if (pathname.startsWith('/deviations')) return { title: 'Quản lý Sai lệch & CAPA', subtitle: 'Theo dõi sự cố OOS, điều tra nguyên nhân gốc rễ và kiểm soát hành động khắc phục (GMP-WHO / 21 CFR Part 211)' };
+    if (pathname.startsWith('/deviations')) return { title: 'Quản lý Sai lệch & CAPA', subtitle: 'Theo dõi sự cố OOS, điều tra nguyên nhân gốc rễ và kiểm soát hành động khắc phục' };
+    if (pathname.startsWith('/change-control')) return { title: 'Quản lý Thay đổi (CR)', subtitle: 'Đánh giá rủi ro FMEA và kiểm soát thay đổi chuẩn GMP' };
     if (pathname.startsWith('/reports')) return { title: 'Báo cáo tổng hợp', subtitle: 'Thống kê chất lượng và báo cáo định kỳ' };
     if (pathname.startsWith('/users')) return { title: 'Người dùng', subtitle: 'Quản lý tài khoản và phân quyền thành viên' };
     if (pathname.startsWith('/settings')) return { title: 'Cấu hình', subtitle: 'Thông tin hệ thống và tùy chọn kết nối API AI' };
@@ -156,216 +186,429 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const headerInfo = getPageHeaderInfo(location.pathname);
   const { totalCount: alertCount, hasAlerts } = useQualityAlerts(30);
 
-  // Format current date dynamically
   const getFormattedDate = () => {
     const days = ['Chủ Nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy'];
     const now = new Date();
     const dayName = days[now.getDay()];
     const dateStr = now.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
-    return `${dayName}, ${dateStr} · Cập nhật theo thời gian thực`;
+    return `${dayName}, ${dateStr} · Realtime`;
   };
 
-  return (
-    <div className="shell min-h-screen bg-transparent">
-      {/* Mobile Menu Backdrop */}
-      {isMobileMenuOpen && (
-        <div 
-          className="fixed inset-0 z-40 bg-black/20 dark:bg-black/40 backdrop-blur-xs transition-opacity xl:hidden"
-          onClick={() => setMobileMenuOpen(false)}
-        />
-      )}
+  const renderNavLinks = (onItemClick?: () => void) => (
+    <div className="space-y-6">
+      {/* Dashboard Item */}
+      <div>
+        <Link
+          to="/"
+          onClick={onItemClick}
+          className={`group flex items-center gap-x-3 rounded-xl px-3 py-2 text-xs font-semibold transition-all ${
+            location.pathname === '/'
+              ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 ring-1 ring-inset ring-emerald-600/20 shadow-xs'
+              : 'text-ink-soft hover:bg-surface-2 hover:text-ink'
+          }`}
+          title="Bảng điều khiển"
+        >
+          <Squares2X2Icon className={`w-5 h-5 shrink-0 ${location.pathname === '/' ? 'text-emerald-600 dark:text-emerald-400' : 'text-ink-faint group-hover:text-ink'}`} />
+          {!isCollapsed && <span className="truncate">Bảng điều khiển</span>}
+        </Link>
+      </div>
 
-      {/* ============ SIDEBAR ============ */}
-      <aside className={`sidebar ${isCollapsed ? 'collapsed' : ''} ${isMobileMenuOpen ? 'mobile-open' : ''} transition-all duration-300`} id="sidebar">
-        <div className="sb-brand">
-          <div className="sb-logo">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 2v6.5L4.5 17a2 2 0 0 0 1.8 3h11.4a2 2 0 0 0 1.8-3L15 8.5V2"/><path d="M9 2h6"/><path d="M7.5 14h9"/></svg>
+      {/* Nav Groups */}
+      {navItems.slice(1).map((group, idx) => {
+        const visibleChildren = (group.children || []).filter(child => !child.adminOnly || role === 'ADMIN');
+        if (visibleChildren.length === 0) return null;
+
+        return (
+          <div key={idx} className="space-y-1">
+            {!isCollapsed ? (
+              <div className="px-3 text-[10px] font-bold uppercase tracking-wider text-ink-faint">
+                {group.name}
+              </div>
+            ) : (
+              <div className="w-6 mx-auto my-2 border-t border-border/60" />
+            )}
+
+            {visibleChildren.map((child) => {
+              const isActive = location.pathname === child.path || (child.path !== '/' && location.pathname.startsWith(child.path));
+              const IconComp = child.icon;
+
+              return (
+                <Link
+                  key={child.path}
+                  to={child.path}
+                  onClick={onItemClick}
+                  className={`group flex items-center gap-x-3 rounded-xl px-3 py-2 text-xs font-semibold transition-all ${
+                    isActive
+                      ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 ring-1 ring-inset ring-emerald-600/20 shadow-xs'
+                      : 'text-ink-soft hover:bg-surface-2 hover:text-ink'
+                  }`}
+                  title={child.name}
+                >
+                  <IconComp className={`w-5 h-5 shrink-0 ${isActive ? 'text-emerald-600 dark:text-emerald-400' : 'text-ink-faint group-hover:text-ink'}`} />
+                  {!isCollapsed && (
+                    <span className="flex-1 truncate">{child.name}</span>
+                  )}
+                  {child.isAlerts && hasAlerts && (
+                    <span className="px-1.5 py-0.5 text-[10px] font-bold rounded-full bg-rose-500 text-white shrink-0 shadow-xs animate-pulse">
+                      {alertCount}
+                    </span>
+                  )}
+                </Link>
+              );
+            })}
           </div>
-          <div className="sb-word">
-            <div className="name">V-Biotech</div>
-            <div className="tag">QMS Platform</div>
+        );
+      })}
+
+      {/* Tools / Actions */}
+      <div className="space-y-1 pt-2 border-t border-border/70">
+        {!isCollapsed && (
+          <div className="px-3 text-[10px] font-bold uppercase tracking-wider text-ink-faint">
+            Công cụ
           </div>
+        )}
+        <button
+          type="button"
+          onClick={() => {
+            onItemClick && onItemClick();
+            window.dispatchEvent(new CustomEvent('trigger-ai-chat', { detail: { prompt: 'Tổng quan tình trạng tất cả lô hàng hiện tại' } }));
+          }}
+          className="w-full group flex items-center gap-x-3 rounded-xl px-3 py-2 text-xs font-semibold text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 transition-all text-left"
+          title="Trợ lý AI"
+        >
+          <SparklesIcon className="w-5 h-5 shrink-0 text-emerald-600 dark:text-emerald-400 group-hover:scale-110 transition-transform" />
+          {!isCollapsed && <span className="truncate">Trợ lý AI Copilot</span>}
+        </button>
+
+        <button
+          type="button"
+          onClick={handleLogout}
+          className="w-full group flex items-center gap-x-3 rounded-xl px-3 py-2 text-xs font-semibold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-all text-left"
+          title="Đăng xuất"
+        >
+          <ArrowRightOnRectangleIcon className="w-5 h-5 shrink-0 text-rose-500 group-hover:translate-x-0.5 transition-transform" />
+          {!isCollapsed && <span className="truncate">Đăng xuất</span>}
+        </button>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="min-h-screen bg-transparent flex">
+      {/* ============ MOBILE SIDEBAR (Slide-over Dialog) ============ */}
+      <Transition show={isMobileMenuOpen} as={Fragment}>
+        <Dialog as="div" className="relative z-50 xl:hidden" onClose={setMobileMenuOpen}>
+          <TransitionChild
+            as={Fragment}
+            enter="transition-opacity ease-linear duration-300"
+            enterFrom="opacity-0"
+            enterTo="opacity-100"
+            leave="transition-opacity ease-linear duration-300"
+            leaveFrom="opacity-100"
+            leaveTo="opacity-0"
+          >
+            <div className="fixed inset-0 bg-black/40 dark:bg-black/60 backdrop-blur-xs" />
+          </TransitionChild>
+
+          <div className="fixed inset-0 flex">
+            <TransitionChild
+              as={Fragment}
+              enter="transition ease-in-out duration-300 transform"
+              enterFrom="-translate-x-full"
+              enterTo="translate-x-0"
+              leave="transition ease-in-out duration-300 transform"
+              leaveFrom="translate-x-0"
+              leaveTo="-translate-x-full"
+            >
+              <DialogPanel className="relative mr-16 flex w-full max-w-xs flex-1">
+                <div className="flex grow flex-col gap-y-5 overflow-y-auto bg-surface px-6 pb-6 ring-1 ring-border shadow-2xl">
+                  {/* Brand & Close Button */}
+                  <div className="flex h-16 shrink-0 items-center justify-between border-b border-border/80">
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-xl bg-emerald-600 text-white flex items-center justify-center shadow-xs">
+                        <CubeIcon className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <div className="text-sm font-bold tracking-tight text-ink">V-Biotech</div>
+                        <div className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 uppercase tracking-widest">QMS Platform</div>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setMobileMenuOpen(false)}
+                      className="p-1.5 rounded-lg text-ink-faint hover:text-ink hover:bg-surface-2 transition-colors"
+                      aria-label="Đóng menu"
+                    >
+                      <XMarkIcon className="w-5 h-5" />
+                    </button>
+                  </div>
+
+                  {/* Nav links */}
+                  <nav className="flex flex-1 flex-col">
+                    {renderNavLinks(() => setMobileMenuOpen(false))}
+                  </nav>
+                </div>
+              </DialogPanel>
+            </TransitionChild>
+          </div>
+        </Dialog>
+      </Transition>
+
+      {/* ============ DESKTOP SIDEBAR ============ */}
+      <aside
+        className={`hidden xl:flex flex-col shrink-0 border-r border-border bg-surface transition-all duration-300 sticky top-0 h-screen z-30 ${
+          isCollapsed ? 'w-20' : 'w-64'
+        }`}
+      >
+        {/* Brand Header */}
+        <div className="flex h-16 shrink-0 items-center justify-between px-5 border-b border-border/80">
+          <Link to="/" className="flex items-center gap-3 overflow-hidden">
+            <div className="w-9 h-9 rounded-xl bg-emerald-600 text-white flex items-center justify-center shadow-xs shrink-0">
+              <CubeIcon className="w-5 h-5" />
+            </div>
+            {!isCollapsed && (
+              <div className="min-w-0">
+                <div className="text-sm font-bold tracking-tight text-ink truncate">V-Biotech</div>
+                <div className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 uppercase tracking-widest truncate">QMS Platform</div>
+              </div>
+            )}
+          </Link>
         </div>
 
-        <nav className="sb-nav">
-          <div className="sb-group-label">Tổng quan</div>
-          <Link to="/" className={`sb-item ${location.pathname === '/' ? 'active' : ''}`} onClick={() => setMobileMenuOpen(false)}>
-            <LayoutDashboard size={18} />
-            <span className="label">Bảng điều khiển</span>
-          </Link>
+        {/* Sidebar Nav */}
+        <div className="flex-1 overflow-y-auto px-3 py-4 custom-scrollbar">
+          {renderNavLinks()}
+        </div>
 
-          {navItems.slice(1).map((group, idx) => {
-            const visibleChildren = (group.children || []).filter(child => !child.adminOnly || role === 'ADMIN');
-            if (visibleChildren.length === 0) return null;
-            return (
-              <React.Fragment key={idx}>
-                <div className="sb-group-label">{group.name}</div>
-                {visibleChildren.map((child) => {
-                  const isActive = location.pathname === child.path || (child.path !== '/' && location.pathname.startsWith(child.path));
-                  return (
-                    <Link key={child.path} to={child.path} className={`sb-item ${isActive ? 'active' : ''}`} onClick={() => setMobileMenuOpen(false)}>
-                      <child.icon size={18} />
-                      <span className="label flex-1">{child.name}</span>
-                      {child.isAlerts && hasAlerts && (
-                        <span className="px-1.5 py-0.2 text-[10px] font-black rounded-full bg-rose-500 text-white ml-auto shadow-xs animate-pulse">
-                          {alertCount}
-                        </span>
-                      )}
-                    </Link>
-                  );
-                })}
-              </React.Fragment>
-            );
-          })}
-
-          <div className="sb-group-label">Hệ thống</div>
-          <button 
+        {/* Sidebar Footer / Toggle */}
+        <div className="p-3 border-t border-border/80 shrink-0">
+          <button
             type="button"
-            onClick={() => {
-              setMobileMenuOpen(false);
-              window.dispatchEvent(new CustomEvent('trigger-ai-chat', { detail: { prompt: 'Tổng quan tình trạng tất cả lô hàng hiện tại' } }));
-            }}
-            className="sb-item w-full text-left bg-transparent border-none outline-none"
+            onClick={toggleSidebar}
+            className={`w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-ink-faint hover:text-ink hover:bg-surface-2 transition-colors ${
+              isCollapsed ? 'justify-center' : ''
+            }`}
+            title={isCollapsed ? 'Mở rộng menu' : 'Thu gọn menu'}
           >
-            <Activity size={18} />
-            <span className="label">Trợ lý AI</span>
-          </button>
-          
-          <button 
-            type="button"
-            onClick={handleLogout}
-            className="sb-item w-full text-left bg-transparent border-none outline-none text-red-500 hover:bg-red-50/10"
-          >
-            <LogOut size={18} />
-            <span className="label text-red-500">Đăng xuất</span>
-          </button>
-        </nav>
-
-        <div className="sb-foot">
-          <button className="sb-collapse-btn" onClick={toggleSidebar}>
-            <ChevronDown className="-rotate-90" size={16} />
-            <span className="label">Thu gọn</span>
+            {isCollapsed ? (
+              <ChevronRightIcon className="w-4 h-4" />
+            ) : (
+              <>
+                <ChevronLeftIcon className="w-4 h-4" />
+                <span>Thu gọn</span>
+              </>
+            )}
           </button>
         </div>
       </aside>
 
-      {/* ============ MAIN ============ */}
-      <div className="main flex flex-col flex-1 min-w-0">
-        <header className="topbar">
-          <div className="tb-left">
-            <div>
-              <div className="tb-title">{headerInfo.title}</div>
-              <div className="tb-sub">{getFormattedDate()}</div>
+      {/* ============ MAIN CONTENT WRAPPER ============ */}
+      <div className="flex flex-col flex-1 min-w-0">
+        {/* Topbar */}
+        <header className="sticky top-0 z-20 flex h-16 items-center justify-between gap-x-4 border-b border-border bg-surface/90 px-4 sm:px-6 lg:px-8 backdrop-blur-md transition-colors">
+          <div className="flex items-center gap-3 min-w-0">
+            {/* Mobile menu toggle */}
+            <button
+              type="button"
+              onClick={() => setMobileMenuOpen(true)}
+              className="xl:hidden p-2 rounded-xl text-ink-faint hover:text-ink hover:bg-surface-2 transition-colors -ml-1.5"
+              aria-label="Mở menu"
+            >
+              <Bars3Icon className="w-6 h-6" />
+            </button>
+
+            <div className="min-w-0">
+              <h2 className="text-base sm:text-lg font-bold tracking-tight text-ink truncate">
+                {headerInfo.title}
+              </h2>
+              <p className="text-[11px] text-ink-faint truncate hidden sm:block">
+                {getFormattedDate()}
+              </p>
             </div>
           </div>
-          
-          <div className="tb-right">
+
+          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
             {role !== 'GUEST' && (
               <>
+                {/* Desktop Global Search Trigger */}
                 <button
                   type="button"
                   onClick={() => window.dispatchEvent(new CustomEvent('pqm:toggle-command-palette'))}
-                  className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-900/60 hover:bg-slate-100 dark:hover:bg-slate-800/80 text-xs font-medium text-slate-500 dark:text-slate-400 transition-all cursor-pointer shadow-xs"
-                  title="Mở tìm kiếm nhanh (Ctrl+K)"
+                  className="hidden md:flex items-center gap-2.5 px-3 py-1.5 rounded-xl border border-border/80 bg-surface-2/60 hover:bg-surface-2 text-xs font-medium text-ink-faint hover:text-ink transition-all shadow-2xs"
+                  title="Tìm kiếm nhanh toàn hệ thống (Ctrl+K)"
                 >
-                  <Search size={14} className="text-primary-600 dark:text-primary-400" />
-                  <span>Tìm kiếm nhanh</span>
-                  <kbd className="px-1.5 py-0.5 text-[10px] font-bold bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-slate-400 dark:text-slate-500 shadow-2xs">Ctrl K</kbd>
+                  <MagnifyingGlassIcon className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                  <span>Tìm kiếm nhanh...</span>
+                  <kbd className="px-1.5 py-0.5 text-[10px] font-mono bg-surface border border-border rounded text-ink-faint shadow-2xs">Ctrl K</kbd>
                 </button>
 
-                <div className="search-box relative group md:hidden">
-                  <Search className="text-zinc-400 group-focus-within:text-zinc-900 dark:group-focus-within:text-zinc-100 transition-colors" size={15} />
-                  <form onSubmit={handleSearch} className="w-full">
-                    <input 
-                      ref={searchInputRef}
-                      type="text" 
-                      value={searchTerm}
-                      onChange={(e) => {
-                        setSearchTerm(e.target.value);
-                        setShowDropdown(true);
-                      }}
-                      onFocus={() => setShowDropdown(true)}
-                      onBlur={() => setTimeout(() => setShowDropdown(false), 200)}
-                      placeholder="Tìm kiếm…" 
-                      className="w-full bg-transparent border-none outline-none text-xs text-zinc-800 dark:text-zinc-100 placeholder:text-zinc-400 focus:ring-0 focus:outline-none"
-                    />
-                  </form>
-                {/* Search Dropdown */}
-                {showDropdown && searchResults && (
-                  <div className="absolute top-full right-0 mt-2 w-72 bg-white dark:bg-zinc-950 rounded-xl shadow-lg border border-zinc-200/50 dark:border-zinc-800/80 overflow-hidden z-50 animate-in fade-in slide-in-from-top-2 duration-150 p-1">
-                    <div className="max-h-[60vh] overflow-y-auto custom-scrollbar space-y-1.5 p-1">
+                {/* Mobile Search Dropdown Trigger */}
+                <div className="relative md:hidden">
+                  <div className="flex items-center bg-surface-2 rounded-xl px-2 py-1 border border-border">
+                    <MagnifyingGlassIcon className="w-4 h-4 text-ink-faint mr-1.5" />
+                    <form onSubmit={handleSearch}>
+                      <input
+                        ref={searchInputRef}
+                        type="text"
+                        value={searchTerm}
+                        onChange={(e) => {
+                          setSearchTerm(e.target.value);
+                          setShowDropdown(true);
+                        }}
+                        onFocus={() => setShowDropdown(true)}
+                        onBlur={() => setTimeout(() => setShowDropdown(false), 200)}
+                        placeholder="Tìm kiếm…"
+                        className="w-24 sm:w-32 bg-transparent text-xs text-ink outline-none"
+                      />
+                    </form>
+                  </div>
+
+                  {showDropdown && searchResults && (
+                    <div className="absolute top-full right-0 mt-2 w-72 bg-surface rounded-2xl shadow-xl border border-border overflow-hidden z-50 p-2 text-xs">
                       {searchResults.products.length > 0 && (
-                        <div>
-                          <div className="px-2.5 py-1 text-[9px] font-semibold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider flex items-center gap-1.5"><Package size={11}/> Sản phẩm</div>
+                        <div className="mb-2">
+                          <div className="text-[10px] font-semibold text-ink-faint uppercase tracking-wider px-2 py-1">Sản phẩm</div>
                           {searchResults.products.map(p => (
-                            <button key={p.id} type="button" onClick={() => { navigate(`/products/${p.id}`); setSearchTerm(''); setShowDropdown(false); }} className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-900 transition-colors flex flex-col">
-                              <span className="text-xs font-semibold text-zinc-800 dark:text-zinc-200">{p.name}</span>
-                              <span className="text-[10px] text-zinc-400 font-medium">{p.code}</span>
+                            <button
+                              key={p.id}
+                              type="button"
+                              onClick={() => { navigate(`/products/${p.id}`); setSearchTerm(''); setShowDropdown(false); }}
+                              className="w-full text-left px-2 py-1.5 rounded-lg hover:bg-surface-2 transition-colors flex flex-col"
+                            >
+                              <span className="font-semibold text-ink">{p.name}</span>
+                              <span className="text-[10px] text-ink-faint">{p.code}</span>
                             </button>
                           ))}
                         </div>
                       )}
                       {searchResults.batches.length > 0 && (
-                        <div>
-                          <div className="px-2.5 py-1 text-[9px] font-semibold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider flex items-center gap-1.5"><Layers size={11}/> Lô hàng</div>
+                        <div className="mb-2">
+                          <div className="text-[10px] font-semibold text-ink-faint uppercase tracking-wider px-2 py-1">Lô hàng</div>
                           {searchResults.batches.map(b => (
-                            <button key={b.id} type="button" onClick={() => { navigate(`/batches/${b.id}`); setSearchTerm(''); setShowDropdown(false); }} className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-900 transition-colors flex flex-col">
-                              <span className="text-xs font-semibold text-zinc-800 dark:text-zinc-200">Lô: {b.batchNo}</span>
-                              <span className="text-[10px] text-zinc-400 font-medium">NSX: {b.mfgDate || '---'}</span>
+                            <button
+                              key={b.id}
+                              type="button"
+                              onClick={() => { navigate(`/batches/${b.id}`); setSearchTerm(''); setShowDropdown(false); }}
+                              className="w-full text-left px-2 py-1.5 rounded-lg hover:bg-surface-2 transition-colors flex flex-col"
+                            >
+                              <span className="font-semibold text-ink">Lô: {b.batchNo}</span>
+                              <span className="text-[10px] text-ink-faint">NSX: {b.mfgDate || '---'}</span>
                             </button>
                           ))}
                         </div>
                       )}
-                      {searchResults.materials.length > 0 && (
-                        <div>
-                          <div className="px-2.5 py-1 text-[9px] font-semibold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider flex items-center gap-1.5"><Layers size={11}/> Nguyên liệu</div>
-                          {searchResults.materials.map(m => (
-                            <button key={m.id} type="button" onClick={() => { navigate(`/materials/catalog`); setSearchTerm(''); setShowDropdown(false); }} className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-900 transition-colors flex flex-col">
-                              <span className="text-xs font-semibold text-zinc-800 dark:text-zinc-200">{m.name}</span>
-                              <span className="text-[10px] text-zinc-400 font-medium">{m.code || m.id}</span>
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                      {searchResults.products.length === 0 && searchResults.batches.length === 0 && searchResults.tccs.length === 0 && searchResults.materials.length === 0 && (
-                        <div className="p-3 text-center text-xs font-medium text-zinc-400">Không tìm thấy kết quả</div>
-                      )}
-                    </div>
-                    <div className="p-1 border-t border-zinc-100 dark:border-zinc-900">
-                      <button type="button" onClick={(e) => { handleSearch(e); }} className="w-full py-1.5 text-xs font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-50/50 dark:bg-emerald-955/20 hover:bg-emerald-100/50 dark:hover:bg-emerald-955/45 rounded-lg transition-colors text-center">
+                      <button
+                        type="button"
+                        onClick={handleSearch}
+                        className="w-full py-1.5 text-center text-xs font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 rounded-lg hover:bg-emerald-100 transition-colors mt-1"
+                      >
                         Xem tất cả kết quả &rarr;
                       </button>
                     </div>
-                  </div>
-                )}
-              </div>
-            </>
-          )}
+                  )}
+                </div>
+              </>
+            )}
 
-          <button onClick={toggleTheme} className="icon-btn" title="Chế độ tối/sáng">
-              {theme === 'dark' ? <Sun size={17} /> : <Moon size={17} />}
+            {/* Dark / Light Mode Toggle */}
+            <button
+              type="button"
+              onClick={toggleTheme}
+              className="p-2 rounded-xl text-ink-faint hover:text-ink hover:bg-surface-2 border border-border transition-colors shadow-2xs"
+              title={theme === 'dark' ? 'Chuyển sang chế độ sáng' : 'Chuyển sang chế độ tối'}
+              aria-label="Chuyển chế độ sáng/tối"
+            >
+              {theme === 'dark' ? <SunIcon className="w-4 h-4" /> : <MoonIcon className="w-4 h-4" />}
             </button>
 
+            {/* Quality Alerts Notification */}
             {role !== 'GUEST' && <QualityAlertBadge />}
 
-            <div className="flex items-center gap-2 pl-2 border-l border-zinc-200 dark:border-zinc-800">
-              <Link to="/account" className="avatar overflow-hidden">
+            {/* User Profile Dropdown Menu (Tailwind UI Menu) */}
+            <Menu as="div" className="relative ml-1">
+              <MenuButton
+                className="flex items-center gap-2 rounded-full p-0.5 ring-2 ring-transparent hover:ring-emerald-500/50 transition-all focus:outline-none"
+                aria-label="Menu tài khoản"
+              >
                 {user?.photoURL ? (
-                  <img src={user.photoURL} alt="Avatar" className="w-full h-full object-cover" />
+                  <img src={user.photoURL} alt="Avatar" className="w-8 h-8 rounded-full object-cover shadow-2xs ring-1 ring-border" />
                 ) : (
-                  <span className="font-bold">{user?.email ? user.email.slice(0, 2).toUpperCase() : 'US'}</span>
+                  <div className="w-8 h-8 rounded-full bg-emerald-600 text-white flex items-center justify-center font-bold text-xs shadow-2xs">
+                    {user?.email ? user.email.slice(0, 2).toUpperCase() : 'US'}
+                  </div>
                 )}
-              </Link>
-            </div>
+              </MenuButton>
 
-            <button onClick={() => setMobileMenuOpen(!isMobileMenuOpen)} className="xl:hidden icon-btn" title="Menu">
-              <Menu size={17} />
-            </button>
+              <Transition
+                as={Fragment}
+                enter="transition ease-out duration-100"
+                enterFrom="transform opacity-0 scale-95"
+                enterTo="transform opacity-100 scale-100"
+                leave="transition ease-in duration-75"
+                leaveFrom="transform opacity-100 scale-100"
+                leaveTo="transform opacity-0 scale-95"
+              >
+                <MenuItems className="absolute right-0 z-50 mt-2 w-56 origin-top-right rounded-2xl bg-surface p-1.5 shadow-xl ring-1 ring-border focus:outline-none text-xs">
+                  <div className="px-3 py-2 border-b border-border/80 mb-1">
+                    <div className="font-semibold text-ink truncate">{user?.displayName || user?.email || 'Người dùng'}</div>
+                    <div className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold uppercase tracking-wider mt-0.5">{role}</div>
+                  </div>
+
+                  <MenuItem>
+                    {({ active }) => (
+                      <Link
+                        to="/account"
+                        className={`flex items-center gap-2 px-3 py-2 rounded-xl transition-colors ${
+                          active ? 'bg-surface-2 text-ink' : 'text-ink-soft'
+                        }`}
+                      >
+                        <UserCircleIcon className="w-4 h-4 text-ink-faint" />
+                        <span>Hồ sơ cá nhân</span>
+                      </Link>
+                    )}
+                  </MenuItem>
+
+                  <MenuItem>
+                    {({ active }) => (
+                      <Link
+                        to="/settings"
+                        className={`flex items-center gap-2 px-3 py-2 rounded-xl transition-colors ${
+                          active ? 'bg-surface-2 text-ink' : 'text-ink-soft'
+                        }`}
+                      >
+                        <Cog6ToothIcon className="w-4 h-4 text-ink-faint" />
+                        <span>Cài đặt hệ thống</span>
+                      </Link>
+                    )}
+                  </MenuItem>
+
+                  <div className="my-1 border-t border-border/80" />
+
+                  <MenuItem>
+                    {({ active }) => (
+                      <button
+                        type="button"
+                        onClick={handleLogout}
+                        className={`w-full flex items-center gap-2 px-3 py-2 rounded-xl transition-colors text-rose-600 dark:text-rose-400 ${
+                          active ? 'bg-rose-50 dark:bg-rose-950/40' : ''
+                        }`}
+                      >
+                        <ArrowRightOnRectangleIcon className="w-4 h-4" />
+                        <span>Đăng xuất</span>
+                      </button>
+                    )}
+                  </MenuItem>
+                </MenuItems>
+              </Transition>
+            </Menu>
           </div>
         </header>
 
-        <main className="content flex-1 overflow-y-auto">
-          {children}
+        {/* Main Content Area */}
+        <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
+          <div className="mx-auto max-w-7xl">
+            {children}
+          </div>
         </main>
       </div>
 
@@ -379,7 +622,6 @@ export default Layout;
 
 /**
  * QualityAlertBadge — Hiển thị nút cảnh báo chất lượng trên thanh header.
- * Tách thành component riêng để tránh re-render Layout không cần thiết.
  */
 const QualityAlertBadge: React.FC = () => {
   const location = useLocation();
@@ -390,16 +632,20 @@ const QualityAlertBadge: React.FC = () => {
     <Link
       to="/alerts"
       title={hasAlerts ? `${totalCount} cảnh báo chất lượng (${highCount} mức cao)` : 'Không có cảnh báo chất lượng'}
-      className={`icon-btn relative ${
-        isActive ? 'border-rose-500 text-rose-600 dark:text-rose-400 bg-rose-50/50 dark:bg-rose-950/30' : ''
+      className={`p-2 rounded-xl relative border transition-colors shadow-2xs ${
+        isActive 
+          ? 'border-rose-500 text-rose-600 dark:text-rose-400 bg-rose-50/50 dark:bg-rose-950/30' 
+          : 'border-border text-ink-faint hover:text-ink hover:bg-surface-2'
       }`}
+      aria-label="Xem cảnh báo chất lượng"
     >
-      <ShieldAlert size={17} className={hasAlerts && highCount > 0 ? 'text-rose-500 animate-bounce' : ''} />
+      <BellIcon className={`w-4 h-4 ${hasAlerts && highCount > 0 ? 'text-rose-500 animate-bounce' : ''}`} />
       {hasAlerts && (
-        <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 text-[10px] font-black rounded-full bg-rose-500 text-white flex items-center justify-center shadow-xs border-2 border-white dark:border-slate-900">
+        <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 text-[10px] font-bold rounded-full bg-rose-500 text-white flex items-center justify-center shadow-xs border-2 border-surface">
           {totalCount > 99 ? '99+' : totalCount}
         </span>
       )}
     </Link>
   );
 };
+

@@ -1,5 +1,5 @@
-import React, { Component, ErrorInfo, ReactNode } from 'react';
-import { AlertTriangle, RefreshCcw } from 'lucide-react';
+import { Component, ErrorInfo, ReactNode } from 'react';
+import { ExclamationTriangleIcon, ArrowPathIcon } from '@heroicons/react/24/outline';
 
 interface Props {
   children?: ReactNode;
@@ -17,15 +17,11 @@ class ErrorBoundary extends Component<Props, State> {
   };
 
   public static getDerivedStateFromError(error: Error): State {
-    // Cập nhật state để render UI thay thế
     return { hasError: true, error };
   }
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    // Bạn có thể log lỗi này lên các dịch vụ như Sentry, Firebase Crashlytics ở đây
     console.error('Đã bắt được lỗi trong ErrorBoundary:', error, errorInfo);
-    
-    // Xóa spinner loader để hiển thị giao diện báo lỗi nếu bị crash khi tải trang
     const loader = document.getElementById('app-loader');
     if (loader) loader.remove();
   }
@@ -33,20 +29,21 @@ class ErrorBoundary extends Component<Props, State> {
   public render() {
     if (this.state.hasError) {
       return (
-        <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4 font-sans">
-          <div className="bg-white p-8 rounded-3xl shadow-2xl max-w-md w-full text-center border border-red-100">
-            <div className="w-20 h-20 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto mb-6">
-              <AlertTriangle size={40} />
+        <div className="min-h-screen flex items-center justify-center bg-surface-2 p-4 font-sans">
+          <div className="bg-surface p-8 rounded-3xl shadow-xl max-w-md w-full text-center border border-rose-200/80 dark:border-rose-950/60">
+            <div className="w-16 h-16 bg-rose-50 text-rose-600 dark:bg-rose-950/60 dark:text-rose-400 rounded-2xl flex items-center justify-center mx-auto mb-5 ring-1 ring-inset ring-rose-600/20">
+              <ExclamationTriangleIcon className="w-8 h-8" />
             </div>
-            <h1 className="text-xl font-black text-slate-800 uppercase tracking-tight mb-2">Đã xảy ra sự cố</h1>
-            <p className="text-sm font-medium text-slate-500 mb-8 line-clamp-3">
+            <h1 className="text-lg font-bold text-ink uppercase tracking-tight mb-2">Đã xảy ra sự cố</h1>
+            <p className="text-xs sm:text-sm font-medium text-ink-faint mb-6 line-clamp-3 leading-relaxed">
               {this.state.error?.message || 'Có lỗi không xác định xảy ra trong quá trình hiển thị giao diện. Vui lòng tải lại trang để tiếp tục.'}
             </p>
             <button
+              type="button"
               onClick={() => window.location.reload()}
-              className="w-full py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-black uppercase text-xs tracking-widest flex items-center justify-center gap-2 transition-all shadow-lg shadow-indigo-100"
+              className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-semibold text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-all shadow-xs"
             >
-              <RefreshCcw size={16} />
+              <ArrowPathIcon className="w-4 h-4" />
               Tải lại trang
             </button>
           </div>
@@ -58,4 +55,4 @@ class ErrorBoundary extends Component<Props, State> {
   }
 }
 
-export default ErrorBoundary;
+export default ErrorBoundary;

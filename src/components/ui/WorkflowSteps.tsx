@@ -1,5 +1,5 @@
 import React from 'react';
-import { Check } from 'lucide-react';
+import { CheckIcon } from '@heroicons/react/20/solid';
 
 export interface WorkflowStep {
   id: string;
@@ -21,8 +21,8 @@ export interface WorkflowStepsProps {
 }
 
 /**
- * WorkflowSteps - Thanh tiến trình quy trình nghiệp vụ chuẩn ISO/GMP
- * Biến form nhập liệu dài thành luồng công việc rõ ràng theo từng chặng.
+ * WorkflowSteps - Tailwind UI Progress Steps
+ * Thanh tiến trình quy trình nghiệp vụ chuẩn ISO/GMP với màu emerald và token hệ thống.
  */
 export const WorkflowSteps: React.FC<WorkflowStepsProps> = ({
   steps,
@@ -50,8 +50,8 @@ export const WorkflowSteps: React.FC<WorkflowStepsProps> = ({
               {index > 0 && (
                 <div className={`h-0.5 w-6 sm:w-10 transition-colors ${
                   stepStatus === 'completed' || stepStatus === 'current'
-                    ? 'bg-blue-600 dark:bg-blue-500'
-                    : 'bg-slate-200 dark:bg-slate-700'
+                    ? 'bg-emerald-600 dark:bg-emerald-500'
+                    : 'bg-border'
                 }`} />
               )}
 
@@ -61,20 +61,20 @@ export const WorkflowSteps: React.FC<WorkflowStepsProps> = ({
                 onClick={() => onStepClick && onStepClick(step.id)}
                 className={`flex items-center gap-2.5 px-3 py-1.5 rounded-xl border text-left transition-all ${
                   stepStatus === 'current'
-                    ? 'border-blue-600 dark:border-blue-500 bg-blue-50/60 dark:bg-blue-950/40 text-blue-900 dark:text-blue-100 shadow-xs'
+                    ? 'border-emerald-600 bg-emerald-50/60 dark:bg-emerald-950/40 text-emerald-900 dark:text-emerald-100 shadow-xs ring-1 ring-inset ring-emerald-600/30'
                     : stepStatus === 'completed'
-                    ? 'border-emerald-200 dark:border-emerald-800/60 bg-emerald-50/40 dark:bg-emerald-950/20 text-emerald-900 dark:text-emerald-200 hover:border-emerald-300'
-                    : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-400 dark:text-slate-500 opacity-60 cursor-not-allowed'
+                    ? 'border-emerald-200 dark:border-emerald-800/60 bg-surface text-ink hover:bg-surface-2'
+                    : 'border-border bg-surface text-ink-faint opacity-70 cursor-not-allowed'
                 }`}
               >
                 <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[11px] font-bold shrink-0 ${
                   stepStatus === 'completed'
                     ? 'bg-emerald-600 text-white'
                     : stepStatus === 'current'
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-slate-200 dark:bg-slate-800 text-slate-500'
+                    ? 'bg-emerald-600 text-white'
+                    : 'bg-surface-3 text-ink-faint border border-border'
                 }`}>
-                  {stepStatus === 'completed' ? <Check className="w-3 h-3" /> : index + 1}
+                  {stepStatus === 'completed' ? <CheckIcon className="w-3.5 h-3.5" /> : index + 1}
                 </div>
 
                 <div className="flex flex-col">
@@ -82,7 +82,7 @@ export const WorkflowSteps: React.FC<WorkflowStepsProps> = ({
                     {stepTitle}
                   </span>
                   {stepSubtitle && (
-                    <span className="text-[10px] text-slate-400 dark:text-slate-500 truncate">
+                    <span className="text-[10px] text-ink-faint truncate max-w-[140px]">
                       {stepSubtitle}
                     </span>
                   )}
@@ -95,3 +95,4 @@ export const WorkflowSteps: React.FC<WorkflowStepsProps> = ({
     </div>
   );
 };
+

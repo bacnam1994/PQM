@@ -3,7 +3,7 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid,
   Tooltip, Legend, ResponsiveContainer, ReferenceLine, Brush
 } from 'recharts';
-import { AlertTriangle } from 'lucide-react';
+import { ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 import { DSCard } from '../../../../components';
 import { TrendTooltip } from './TrendTooltip';
 
@@ -33,21 +33,21 @@ export const ControlChartSection: React.FC<ControlChartSectionProps> = ({
       <DSCard className="p-5">
         <div className="flex items-start justify-between mb-4">
           <div>
-            <h3 className="font-black text-slate-800 dark:text-zinc-100 text-base">
-              Biểu đồ kiểm soát — <span className="text-indigo-600 dark:text-indigo-400">{selectedCriteriaName}</span>
+            <h3 className="font-bold text-ink text-base">
+              Biểu đồ kiểm soát — <span className="text-emerald-600 dark:text-emerald-400">{selectedCriteriaName}</span>
               {selectedCriteria?.unit ? ` (${selectedCriteria.unit})` : ''}
             </h3>
-            <p className="text-xs text-slate-400 dark:text-zinc-500 mt-0.5 font-mono">
+            <p className="text-xs text-ink-muted mt-0.5 font-mono">
               UCL={spcStats.ucl.toFixed(4)} | X̄={spcStats.mean.toFixed(4)} | LCL={spcStats.lcl.toFixed(4)}
               {spcStats.usl !== undefined ? ` | USL=${spcStats.usl}` : ''}
               {spcStats.lsl !== undefined ? ` | LSL=${spcStats.lsl}` : ''}
             </p>
           </div>
-          <div className="flex flex-wrap gap-3 text-[10px] font-medium text-slate-400 dark:text-zinc-500">
-            <span className="flex items-center gap-1"><span className="w-4 h-0.5 bg-indigo-500 inline-block" /> Giá trị đo</span>
-            <span className="flex items-center gap-1"><span className="w-4 h-px bg-red-400 inline-block border-t border-dashed border-red-400" /> UCL/LCL</span>
+          <div className="flex flex-wrap gap-3 text-[11px] font-medium text-ink-muted">
+            <span className="flex items-center gap-1.5"><span className="w-3.5 h-1 bg-emerald-500 rounded-full inline-block" /> Giá trị đo</span>
+            <span className="flex items-center gap-1.5"><span className="w-3.5 h-0.5 bg-rose-400 inline-block border-t border-dashed border-rose-400" /> UCL/LCL</span>
             {(spcStats.usl !== undefined || spcStats.lsl !== undefined) && (
-              <span className="flex items-center gap-1"><span className="w-4 h-0.5 bg-orange-400 inline-block" /> USL/LSL</span>
+              <span className="flex items-center gap-1.5"><span className="w-3.5 h-1 bg-amber-400 rounded-full inline-block" /> USL/LSL</span>
             )}
           </div>
         </div>
@@ -63,7 +63,7 @@ export const ControlChartSection: React.FC<ControlChartSectionProps> = ({
               <ReferenceLine y={spcStats.ucl} stroke="#f87171" strokeDasharray="5 3" strokeWidth={1.5} label={{ value: 'UCL', position: 'insideTopRight', fontSize: 10, fill: '#f87171' }} />
             )}
             {!isNaN(spcStats.mean) && (
-              <ReferenceLine y={spcStats.mean} stroke="#818cf8" strokeDasharray="4 2" strokeWidth={1} label={{ value: 'X̄', position: 'insideTopRight', fontSize: 10, fill: '#818cf8' }} />
+              <ReferenceLine y={spcStats.mean} stroke="#10b981" strokeDasharray="4 2" strokeWidth={1} label={{ value: 'X̄', position: 'insideTopRight', fontSize: 10, fill: '#10b981' }} />
             )}
             {!isNaN(spcStats.lcl) && (
               <ReferenceLine y={spcStats.lcl} stroke="#f87171" strokeDasharray="5 3" strokeWidth={1.5} label={{ value: 'LCL', position: 'insideBottomRight', fontSize: 10, fill: '#f87171' }} />
@@ -76,10 +76,10 @@ export const ControlChartSection: React.FC<ControlChartSectionProps> = ({
             )}
             <Line
               type="monotone" dataKey="value" name={selectedCriteriaName}
-              stroke="#6366f1" strokeWidth={2}
+              stroke="#10b981" strokeWidth={2}
               dot={(props: any) => {
                 const d = props.payload;
-                const fill = d.isOOS ? '#ef4444' : d.isOOC ? '#f97316' : '#6366f1';
+                const fill = d.isOOS ? '#ef4444' : d.isOOC ? '#f97316' : '#10b981';
                 return <circle key={`dot-${d.batchNo}`} cx={props.cx} cy={props.cy} r={d.isOOC || d.isOOS ? 6 : 4} fill={fill} stroke="#fff" strokeWidth={1.5} />;
               }}
               activeDot={{ r: 7 }}
@@ -91,16 +91,16 @@ export const ControlChartSection: React.FC<ControlChartSectionProps> = ({
 
       {/* Out-of-control alert */}
       {spcStats.outOfControl.length > 0 && (
-        <DSCard className="p-4 border-l-4 border-orange-400">
+        <DSCard className="p-4 border-l-4 border-l-amber-500 bg-amber-500/5">
           <div className="flex items-center gap-2 mb-2.5">
-            <AlertTriangle size={18} className="text-orange-500 flex-shrink-0" />
-            <h4 className="font-black text-slate-800 dark:text-zinc-100 text-sm">
+            <ExclamationTriangleIcon className="w-5 h-5 text-amber-500 shrink-0" />
+            <h4 className="font-bold text-ink text-sm">
               {spcStats.outOfControl.length} điểm ngoài giới hạn kiểm soát (3σ)
             </h4>
           </div>
           <div className="flex flex-wrap gap-2">
             {spcStats.outOfControl.map((d: any) => (
-              <span key={d.batchNo} className="inline-flex items-center gap-1 px-2.5 py-1 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-full text-xs font-bold text-orange-700 dark:text-orange-400">
+              <span key={d.batchNo} className="inline-flex items-center gap-1 px-2.5 py-1 bg-amber-500/10 border border-amber-500/20 rounded-full text-xs font-bold text-amber-700 dark:text-amber-400">
                 {d.batchNo} <span className="font-normal opacity-70">({d.value.toFixed(3)})</span>
               </span>
             ))}

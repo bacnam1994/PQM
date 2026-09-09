@@ -1,5 +1,11 @@
 import React from 'react';
-import { Sparkles, Loader2, CheckCircle2, Layers3, ArrowRight } from 'lucide-react';
+import {
+  SparklesIcon,
+  ArrowPathIcon,
+  CheckCircleIcon,
+  Square3Stack3DIcon,
+  ArrowRightIcon,
+} from '@heroicons/react/24/outline';
 import { Modal } from '../../../../components';
 import { DuplicateGroup, HarmonizationReport } from '../../../../services/ai/materialHarmonizerService';
 
@@ -27,45 +33,45 @@ export const MaterialHarmonizerModal: React.FC<MaterialHarmonizerModalProps> = (
       isOpen={isOpen}
       onClose={onClose}
       title="AI Rà soát & Chuẩn hóa Danh mục Nguyên liệu"
-      icon={Sparkles}
+      icon={SparklesIcon}
     >
-      <div className="space-y-6">
+      <div className="space-y-5">
         {isAnalyzingHarmonization ? (
           <div className="py-12 flex flex-col items-center justify-center gap-3 text-center">
-            <Loader2 size={32} className="animate-spin text-indigo-600" />
-            <p className="text-sm font-bold text-slate-700 dark:text-zinc-300">AI đang quét và phân tích độ tương đồng ngữ nghĩa...</p>
-            <p className="text-xs text-slate-400">Đang đối chiếu tên chuẩn, bí danh và công thức sản phẩm</p>
+            <ArrowPathIcon className="h-8 w-8 animate-spin text-emerald-600" />
+            <p className="text-sm font-bold text-ink">AI đang quét và phân tích độ tương đồng ngữ nghĩa...</p>
+            <p className="text-xs text-ink-muted">Đang đối chiếu tên chuẩn, bí danh và công thức sản phẩm</p>
           </div>
         ) : harmonizationReport ? (
           <>
             {/* Summary Stats */}
             <div className="grid grid-cols-3 gap-3">
-              <div className="bg-indigo-50/60 dark:bg-indigo-950/40 p-3.5 rounded-xl border border-indigo-100 dark:border-indigo-900/50">
-                <div className="text-[10px] font-black uppercase text-indigo-600 dark:text-indigo-400">Tổng Nguyên liệu</div>
-                <div className="text-lg font-black text-slate-800 dark:text-zinc-100 mt-0.5">{harmonizationReport.totalMaterials}</div>
+              <div className="bg-surface-2 p-3.5 rounded-xl border border-border">
+                <div className="text-[10px] font-bold uppercase text-ink-muted">Tổng Nguyên liệu</div>
+                <div className="text-lg font-bold text-ink mt-0.5">{harmonizationReport.totalMaterials}</div>
               </div>
 
-              <div className="bg-purple-50/60 dark:bg-purple-950/40 p-3.5 rounded-xl border border-purple-100 dark:border-purple-900/50">
-                <div className="text-[10px] font-black uppercase text-purple-600 dark:text-purple-400">Cặp có nguy cơ trùng</div>
-                <div className="text-lg font-black text-slate-800 dark:text-zinc-100 mt-0.5">{harmonizationReport.duplicateGroups.length} nhóm</div>
+              <div className="bg-amber-50 dark:bg-amber-950/40 p-3.5 rounded-xl border border-amber-200 dark:border-amber-900/50">
+                <div className="text-[10px] font-bold uppercase text-amber-700 dark:text-amber-400">Cặp có nguy cơ trùng</div>
+                <div className="text-lg font-bold text-amber-900 dark:text-amber-200 mt-0.5">{harmonizationReport.duplicateGroups.length} nhóm</div>
               </div>
 
-              <div className="bg-emerald-50/60 dark:bg-emerald-950/40 p-3.5 rounded-xl border border-emerald-100 dark:border-emerald-900/50">
-                <div className="text-[10px] font-black uppercase text-emerald-600 dark:text-emerald-400">Điểm sạch dữ liệu</div>
-                <div className="text-lg font-black text-slate-800 dark:text-zinc-100 mt-0.5">{harmonizationReport.healthScore}/100</div>
+              <div className="bg-emerald-50 dark:bg-emerald-950/40 p-3.5 rounded-xl border border-emerald-200 dark:border-emerald-900/50">
+                <div className="text-[10px] font-bold uppercase text-emerald-700 dark:text-emerald-400">Điểm sạch dữ liệu</div>
+                <div className="text-lg font-bold text-emerald-900 dark:text-emerald-200 mt-0.5">{harmonizationReport.healthScore}/100</div>
               </div>
             </div>
 
             {/* Duplicate Groups List */}
             <div className="space-y-4 max-h-[50vh] overflow-y-auto pr-1">
-              <h4 className="text-xs font-black uppercase tracking-wider text-slate-400 dark:text-zinc-500 flex items-center gap-1.5">
-                <Layers3 size={13} />
+              <h4 className="text-xs font-bold uppercase tracking-wider text-ink-muted flex items-center gap-1.5">
+                <Square3Stack3DIcon className="h-3.5 w-3.5" />
                 <span>Danh sách Nhóm nguyên liệu cần Gộp ({harmonizationReport.duplicateGroups.length})</span>
               </h4>
 
               {harmonizationReport.duplicateGroups.length === 0 ? (
-                <div className="p-8 text-center bg-emerald-50/40 dark:bg-emerald-950/20 rounded-xl border border-emerald-100 dark:border-emerald-900/40">
-                  <CheckCircle2 size={32} className="mx-auto text-emerald-500 mb-2" />
+                <div className="p-8 text-center bg-emerald-50/40 dark:bg-emerald-950/20 rounded-xl border border-emerald-200 dark:border-emerald-900/40">
+                  <CheckCircleIcon className="h-8 w-8 mx-auto text-emerald-500 mb-2" />
                   <p className="text-emerald-700 dark:text-emerald-300 font-bold text-sm">Tuyệt vời! Không phát hiện nguyên liệu nào bị trùng lặp trong danh mục.</p>
                 </div>
               ) : (
@@ -73,16 +79,16 @@ export const MaterialHarmonizerModal: React.FC<MaterialHarmonizerModalProps> = (
                   const isMerging = executingMergeGroupId === group.id;
 
                   return (
-                    <div key={group.id} className="p-4 bg-slate-50 dark:bg-zinc-900 rounded-xl border border-slate-200/80 dark:border-zinc-800 space-y-3">
+                    <div key={group.id} className="p-4 bg-surface-2 rounded-xl border border-border space-y-3">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                          <span className="px-2 py-0.5 bg-purple-100 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 rounded text-[10px] font-black">
+                          <span className="px-2 py-0.5 bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 rounded text-[10px] font-bold">
                             Độ tương đồng: {group.similarityScore}%
                           </span>
-                          <span className="text-xs text-slate-400 italic">({group.reason})</span>
+                          <span className="text-xs text-ink-muted italic">({group.reason})</span>
                         </div>
                         {group.affectedFormulasCount > 0 && (
-                          <span className="text-[11px] font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/40 px-2 py-0.5 rounded">
+                          <span className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 px-2 py-0.5 rounded">
                             {group.affectedFormulasCount} công thức liên quan
                           </span>
                         )}
@@ -91,26 +97,26 @@ export const MaterialHarmonizerModal: React.FC<MaterialHarmonizerModalProps> = (
                       {/* Visual Merge Representation */}
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3 items-center">
                         <div className="p-3 bg-emerald-50/60 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-900/60 rounded-xl">
-                          <div className="text-[10px] font-black uppercase text-emerald-700 dark:text-emerald-400 flex items-center gap-1 mb-1">
-                            <CheckCircle2 size={12} />
+                          <div className="text-[10px] font-bold uppercase text-emerald-700 dark:text-emerald-400 flex items-center gap-1 mb-1">
+                            <CheckCircleIcon className="h-3.5 w-3.5" />
                             <span>Giữ làm Tên Chuẩn (Primary)</span>
                           </div>
-                          <div className="font-bold text-sm text-slate-800 dark:text-zinc-100">{group.primaryMaterial.name}</div>
+                          <div className="font-bold text-sm text-ink">{group.primaryMaterial.name}</div>
                           {group.primaryMaterial.code && (
-                            <div className="text-[10px] font-mono text-slate-400">Mã: {group.primaryMaterial.code}</div>
+                            <div className="text-[10px] font-mono text-ink-muted">Mã: {group.primaryMaterial.code}</div>
                           )}
                         </div>
 
                         <div className="p-3 bg-rose-50/60 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900/60 rounded-xl">
-                          <div className="text-[10px] font-black uppercase text-rose-700 dark:text-rose-400 flex items-center gap-1 mb-1">
-                            <ArrowRight size={12} />
+                          <div className="text-[10px] font-bold uppercase text-rose-700 dark:text-rose-400 flex items-center gap-1 mb-1">
+                            <ArrowRightIcon className="h-3.5 w-3.5" />
                             <span>Gộp & Chuyển thành Aliases</span>
                           </div>
                           <div className="space-y-1">
                             {group.duplicateMaterials.map(d => (
-                              <div key={d.id} className="text-xs font-semibold text-slate-700 dark:text-zinc-300 flex items-center justify-between">
+                              <div key={d.id} className="text-xs font-semibold text-ink flex items-center justify-between">
                                 <span>{d.name}</span>
-                                {d.code && <span className="text-[10px] font-mono text-slate-400">({d.code})</span>}
+                                {d.code && <span className="text-[10px] font-mono text-ink-muted">({d.code})</span>}
                               </div>
                             ))}
                           </div>
@@ -122,9 +128,9 @@ export const MaterialHarmonizerModal: React.FC<MaterialHarmonizerModalProps> = (
                           type="button"
                           disabled={isMerging}
                           onClick={() => handleExecuteMerge(group)}
-                          className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-xs transition-all disabled:opacity-50 cursor-pointer"
+                          className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all disabled:opacity-50 cursor-pointer"
                         >
-                          {isMerging ? <Loader2 size={13} className="animate-spin" /> : <Sparkles size={13} />}
+                          {isMerging ? <ArrowPathIcon className="h-3.5 w-3.5 animate-spin" /> : <SparklesIcon className="h-3.5 w-3.5" />}
                           <span>Thực hiện Gộp vào "{group.primaryMaterial.name}"</span>
                         </button>
                       </div>
@@ -136,11 +142,11 @@ export const MaterialHarmonizerModal: React.FC<MaterialHarmonizerModalProps> = (
           </>
         ) : null}
 
-        <div className="flex justify-end pt-4 border-t border-slate-100 dark:border-zinc-850">
+        <div className="flex justify-end pt-3 border-t border-border">
           <button
             type="button"
             onClick={onClose}
-            className="px-5 py-2 bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-300 font-bold uppercase text-xs rounded-xl hover:bg-slate-200 transition-colors cursor-pointer"
+            className="px-4 py-2 bg-surface-2 text-ink-soft hover:text-ink font-semibold text-xs rounded-lg hover:bg-surface-3 transition-colors cursor-pointer border border-border"
           >
             Đóng
           </button>

@@ -1,7 +1,7 @@
 import React, { useMemo, useEffect, useState } from 'react';
 import { useAppStore } from '../../store/useAppStore';
 import { TestResultEntry, TestResult, Criterion, FormulaIngredient } from '../../types';
-import { CheckCircle2, XCircle, Loader2 } from 'lucide-react';
+import { CheckCircleIcon, XCircleIcon, ArrowPathIcon } from '@heroicons/react/24/outline';
 import { ensureArray, formatScientific, getFromCache, parseNumberFromText, formatDateStandard, getActiveLocale } from '../../utils';
 import { ref, query, orderByChild, equalTo, get } from 'firebase/database';
 import { db } from '../../firebase';
@@ -250,14 +250,14 @@ const BatchCriteriaHistory: React.FC<BatchCriteriaHistoryProps> = ({ batchId }) 
 
   if (isLoading) {
     return (
-      <div className="p-10 text-center flex flex-col items-center justify-center space-y-3 text-slate-500 bg-slate-50/50 rounded-lg border border-slate-200">
-        <Loader2 className="animate-spin text-indigo-500" size={28} />
+      <div className="p-10 text-center flex flex-col items-center justify-center space-y-3 text-ink-muted bg-surface-2 rounded-xl border border-border">
+        <ArrowPathIcon className="w-7 h-7 animate-spin text-emerald-600 dark:text-emerald-400" />
         <span className="text-sm font-medium">Đang tải chi tiết lịch sử kiểm nghiệm...</span>
       </div>
     );
   }
 
-  if (!tccs) return <div className="p-4 text-center text-slate-500 italic">Chưa xác định được TCCS cho lô này.</div>;
+  if (!tccs) return <div className="p-4 text-center text-ink-muted italic">Chưa xác định được TCCS cho lô này.</div>;
 
   // Helper hiển thị yêu cầu kỹ thuật
   const renderRequirement = (c: any) => {
@@ -274,60 +274,60 @@ const BatchCriteriaHistory: React.FC<BatchCriteriaHistoryProps> = ({ batchId }) 
     const displayUnit = tccsUnit || entry.unit || '';
     const pct = getContentPercent(entry.criteriaName, entry.value);
     return (
-      <div key={idx} className="flex items-center gap-3 text-xs bg-white border border-slate-100 p-2 rounded shadow-sm mb-1 last:mb-0">
-          <div className={`shrink-0 ${entry.isPass ? 'text-emerald-500' : 'text-red-500'}`} title={entry.isPass ? 'Đạt' : 'Không đạt'}>
-              {entry.isPass ? <CheckCircle2 size={14} /> : <XCircle size={14} />}
+      <div key={idx} className="flex items-center gap-3 text-xs bg-surface border border-border p-2.5 rounded-lg shadow-sm mb-1 last:mb-0">
+          <div className={`shrink-0 ${entry.isPass ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-500'}`} title={entry.isPass ? 'Đạt' : 'Không đạt'}>
+              {entry.isPass ? <CheckCircleIcon className="w-4 h-4" /> : <XCircleIcon className="w-4 h-4" />}
           </div>
           <div className="w-28 flex flex-col items-end">
               <div className="flex items-baseline gap-1">
-                <span className="font-black text-slate-800">{formatScientific(entry.value)}</span>
-                <span className="text-[10px] text-slate-500 font-medium truncate max-w-[40px]" title={displayUnit}>{displayUnit}</span>
+                <span className="font-bold text-ink">{formatScientific(entry.value)}</span>
+                <span className="text-[10px] text-ink-muted font-medium truncate max-w-[40px]" title={displayUnit}>{displayUnit}</span>
               </div>
-              {pct && <span className="text-[10px] text-indigo-500 font-semibold">({pct})</span>}
+              {pct && <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold">({pct})</span>}
           </div>
-          <div className="flex-1 text-slate-500 text-[10px] flex items-center gap-1.5">
-              <span className="font-bold text-indigo-600 truncate max-w-[120px]" title={entry.labName}>{entry.labName}</span>
-              <span className="text-slate-300">•</span>
+          <div className="flex-1 text-ink-muted text-[10px] flex items-center gap-1.5">
+              <span className="font-bold text-emerald-700 dark:text-emerald-300 truncate max-w-[120px]" title={entry.labName}>{entry.labName}</span>
+              <span className="text-ink-muted/40">•</span>
               <span>{formatDateStandard(entry.testDate)}</span>
           </div>
           {/* Hiển thị giới hạn nếu là chỉ tiêu Extra có limit riêng */}
-          {(entry as any).limit && <div className="text-[9px] text-slate-400 hidden sm:block">(GH: {(entry as any).limit})</div>}
+          {(entry as any).limit && <div className="text-[9px] text-ink-muted hidden sm:block">(GH: {(entry as any).limit})</div>}
       </div>
     );
   };
 
   return (
     <div className="space-y-4 font-sans animate-in fade-in">
-      <div className="bg-slate-50 px-3 py-2 rounded border border-slate-200 flex justify-between items-center">
-        <span className="text-xs font-bold text-slate-500 uppercase">TCCS Áp dụng:</span>
-        <span className="text-sm font-black text-indigo-700">{tccs.code}</span>
+      <div className="bg-surface-2 px-3.5 py-2.5 rounded-xl border border-border flex justify-between items-center">
+        <span className="text-xs font-bold text-ink-muted uppercase">TCCS Áp dụng:</span>
+        <span className="text-sm font-black text-emerald-600 dark:text-emerald-400">{tccs.code}</span>
       </div>
 
-      <div className="overflow-hidden border border-slate-200 rounded-lg">
+      <div className="overflow-hidden border border-border rounded-xl bg-surface">
         <table className="w-full text-xs">
-          <thead className="bg-slate-100 text-slate-500 font-bold uppercase border-b border-slate-200">
+          <thead className="bg-surface-2 text-ink-muted font-bold uppercase border-b border-border">
             <tr>
-              <th className="py-2 px-4 text-left w-[35%]">Chỉ tiêu / Yêu cầu</th>
-              <th className="py-2 px-4 text-left">Lịch sử kiểm nghiệm (Mới nhất → Cũ nhất)</th>
+              <th className="py-2.5 px-4 text-left w-[35%]">Chỉ tiêu / Yêu cầu</th>
+              <th className="py-2.5 px-4 text-left">Lịch sử kiểm nghiệm (Mới nhất → Cũ nhất)</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100">
+          <tbody className="divide-y divide-border">
             {historyData.map(({ criterion, history }, idx) => (
-              <tr key={idx} className="hover:bg-slate-50">
-                <td className="py-2 px-4 align-top">
-                  <p className="font-bold text-slate-700">{criterion.name}</p>
-                  <p className="text-[10px] text-slate-500 mt-0.5">{renderRequirement(criterion)}</p>
+              <tr key={idx} className="hover:bg-surface-2/50 transition-colors">
+                <td className="py-2.5 px-4 align-top">
+                  <p className="font-bold text-ink">{criterion.name}</p>
+                  <p className="text-[10px] text-ink-muted mt-0.5">{renderRequirement(criterion)}</p>
                   {history.length === 0 && (
-                      <span className="inline-block mt-1 px-2 py-0.5 bg-slate-100 text-slate-400 rounded text-[9px] font-bold">Chưa kiểm</span>
+                      <span className="inline-block mt-1 px-2 py-0.5 bg-surface-2 text-ink-muted rounded text-[9px] font-bold">Chưa kiểm</span>
                   )}
                 </td>
-                <td className="py-2 px-4 bg-slate-50/30">
+                <td className="py-2.5 px-4 bg-surface-2/20">
                   {history.length > 0 ? (
                     <div className="py-1">
                       {history.map((entry, hIdx) => renderHistoryRow(entry, hIdx, criterion.unit))}
                     </div>
                   ) : (
-                    <div className="py-2 text-center text-slate-300 italic">-</div>
+                    <div className="py-2 text-center text-ink-muted/40 italic">-</div>
                   )}
                 </td>
               </tr>
@@ -335,18 +335,18 @@ const BatchCriteriaHistory: React.FC<BatchCriteriaHistoryProps> = ({ batchId }) 
             
             {extraData.length > 0 && (
                  <tr>
-                    <td colSpan={2} className="py-2 px-4 bg-slate-100 font-black text-slate-500 text-[10px] uppercase tracking-widest border-t border-slate-200">
+                    <td colSpan={2} className="py-2.5 px-4 bg-surface-2 font-black text-ink-muted text-[10px] uppercase tracking-widest border-t border-border">
                         Chỉ tiêu bổ sung (Ngoài TCCS)
                     </td>
                  </tr>
             )}
 
             {extraData.map(({ name, history }, idx) => (
-               <tr key={`extra-${idx}`} className="hover:bg-slate-50">
-                <td className="py-2 px-4 align-top">
-                  <p className="font-bold text-slate-700">{name}</p>
+               <tr key={`extra-${idx}`} className="hover:bg-surface-2/50 transition-colors">
+                <td className="py-2.5 px-4 align-top">
+                  <p className="font-bold text-ink">{name}</p>
                 </td>
-                <td className="py-2 px-4 bg-slate-50/30">
+                <td className="py-2.5 px-4 bg-surface-2/20">
                     <div className="py-1">
                       {history.map((entry, hIdx) => renderHistoryRow(entry, hIdx, entry.unit))}
                     </div>
