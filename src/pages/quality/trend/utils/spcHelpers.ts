@@ -37,16 +37,13 @@ export const highlightMatch = (text: string, query: string): React.ReactNode => 
   );
 };
 
-export const calcMean = (vals: number[]): number => {
-  const valid = vals.filter(v => typeof v === 'number' && !isNaN(v));
-  return valid.length === 0 ? 0 : valid.reduce((a, b) => a + b, 0) / valid.length;
-};
-
-export const calcStdDev = (vals: number[], mean: number): number => {
-  const valid = vals.filter(v => typeof v === 'number' && !isNaN(v));
-  if (valid.length < 2) return 0;
-  return Math.sqrt(valid.reduce((acc, v) => acc + Math.pow(v - mean, 2), 0) / (valid.length - 1));
-};
+export { 
+  calcMean, 
+  calcStdDev, 
+  calcWithinStdDev, 
+  calcProcessCapability, 
+  detectNelsonRules 
+} from '../../../../utils/spcEngine';
 
 export const calcCpk = (mean: number, std: number, usl?: number, lsl?: number): number | null => {
   if (std === 0 || isNaN(std) || isNaN(mean) || (usl === undefined && lsl === undefined)) return null;

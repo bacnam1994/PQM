@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { ArrowLeft, Loader2, FlaskConical, ClipboardCheck, Layers, Printer, CheckCircle2, X, AlertTriangle, ShieldAlert, Sparkles, GitBranch, FileWarning, FileText, ShieldCheck } from 'lucide-react';
+import { ArrowLeft, Loader2, FlaskConical, ClipboardCheck, Layers, Printer, CheckCircle2, X, AlertTriangle, ShieldAlert, Sparkles, GitBranch, FileWarning, FileText, ShieldCheck, Activity } from 'lucide-react';
 import { useDataGraph } from '../../hooks/useDataGraph';
 import { useAppStore } from '../../store/useAppStore';
 import { formatDateStandard, ensureArray, parseNumberFromText } from '../../utils';
@@ -291,6 +291,13 @@ const BatchDetailPage = () => {
               <ShieldCheck size={16} /> Phê Duyệt Xuất Xưởng (QA)
             </button>
           ) : null}
+          <button
+            type="button"
+            onClick={() => navigate(`/batches/360/${batch.id}`)}
+            className="flex items-center gap-2 px-4 py-3 bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/60 rounded-xl font-black shadow-sm border border-blue-200 dark:border-blue-800 transition-all uppercase text-xs w-fit"
+          >
+            <Activity size={16} /> Hồ sơ 360°
+          </button>
           <button
             type="button"
             onClick={() => setIsGenealogyOpen(true)}

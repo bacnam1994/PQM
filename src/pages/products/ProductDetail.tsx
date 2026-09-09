@@ -367,6 +367,16 @@ const ProductDetail: React.FC = () => {
             <h1 className="text-2xl font-extrabold text-slate-800 dark:text-slate-100">{product.name}</h1>
           </div>
         </div>
+
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => navigate(`/products/360/${product.id}`)}
+            className="flex items-center gap-2 px-4 py-2.5 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 rounded-xl font-bold border border-indigo-200 dark:border-indigo-800 transition-all text-xs shadow-sm"
+          >
+            <Activity size={16} /> Hồ sơ Product 360°
+          </button>
+        </div>
       </div>
 
       <div className="flex border-b border-slate-200 scrollbar-hide overflow-x-auto">

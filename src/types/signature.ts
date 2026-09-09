@@ -6,6 +6,7 @@
 import { Role } from './permissions';
 
 export type SignatureDocumentType = 
+  | 'BATCH'
   | 'BATCH_RELEASE'
   | 'BATCH_REJECT'
   | 'TEST_RESULT_APPROVAL'
@@ -15,6 +16,7 @@ export type SignatureDocumentType =
   | 'CHANGE_CONTROL';
 
 export const SIGNATURE_MEANINGS: Record<SignatureDocumentType, string> = {
+  BATCH: 'Tôi xác nhận thẩm định và phê duyệt hồ sơ Lô sản xuất.',
   BATCH_RELEASE: 'Tôi xác nhận và phê duyệt xuất xưởng Lô sản xuất này theo đúng tiêu chuẩn chất lượng và hồ sơ lô.',
   BATCH_REJECT: 'Tôi xác nhận từ chối và loại bỏ Lô sản xuất này do không đạt tiêu chuẩn chất lượng quy định.',
   TEST_RESULT_APPROVAL: 'Tôi xác nhận đã soát xét và phê duyệt kết quả phân tích kiểm nghiệm này theo đúng phương pháp thử nghiệm.',

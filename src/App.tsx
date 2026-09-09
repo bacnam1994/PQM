@@ -66,6 +66,8 @@ const AuditLogPage = lazyWithRetry(() => import('./pages/system/AuditLogPage'));
 const CoAVerifyPage = lazyWithRetry(() => import('./pages/public/CoAVerifyPage'));
 const DeviationListPage = lazyWithRetry(() => import('./pages/qa/DeviationListPage'));
 const ChangeControlListPage = lazyWithRetry(() => import('./pages/quality/change-control/ChangeControlListPage'));
+const Batch360Page = lazyWithRetry(() => import('./pages/batches/batch-360/Batch360Page').then(m => ({ default: m.Batch360Page })));
+const Product360Page = lazyWithRetry(() => import('./pages/products/product-360/Product360Page').then(m => ({ default: m.Product360Page })));
 
 const LoadingFallback = () => (
   <div className="flex items-center justify-center h-screen w-full bg-transparent transition-colors duration-300">
@@ -174,6 +176,7 @@ const AppRoutes: React.FC = () => {
           <Route path="/products/new" element={<AdminRoute><ProductFormPage /></AdminRoute>} />
           <Route path="/products/edit/:id" element={<AdminRoute><ProductFormPage /></AdminRoute>} />
           <Route path="/products/:id" element={<ProductDetail />} />
+          <Route path="/products/360/:id" element={<Product360Page />} />
           <Route path="/tccs" element={<TCCSList />} />
           <Route path="/tccs/new" element={<AdminRoute><TCCSFormPage /></AdminRoute>} />
           <Route path="/tccs/edit/:id" element={<AdminRoute><TCCSFormPage /></AdminRoute>} />
@@ -194,6 +197,7 @@ const AppRoutes: React.FC = () => {
           <Route path="/batches/new" element={<BatchFormPage />} />
           <Route path="/batches/edit/:id" element={<AdminRoute><BatchFormPage /></AdminRoute>} />
           <Route path="/batches/:id" element={<BatchDetailPage />} />
+          <Route path="/batches/360/:id" element={<Batch360Page />} />
           <Route path="/test-results" element={<TestResultList />} />
           {/* USER được tạo phiếu KN mới, chỉ ADMIN mới sửa */}
           <Route path="/test-results/new" element={<TestResultFormPage />} />

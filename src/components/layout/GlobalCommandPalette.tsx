@@ -2,20 +2,40 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Search, Package, Layers, FileText, Activity, TrendingUp, AlertTriangle, 
-  Settings, Users, ArrowRight, CornerDownLeft, Sparkles, X, ShieldAlert
+  Settings, Users, ArrowRight, CornerDownLeft, Sparkles, X, ShieldAlert,
+  FlaskConical, GitPullRequest, Zap
 } from 'lucide-react';
 import { useAppStore } from '../../store/useAppStore';
 import { useShallow } from 'zustand/react/shallow';
+import { 
+  searchUniversal, 
+  UniversalSearchResult, 
+  SearchResultCategory 
+} from '../../services/core/universalSearchIndex';
 
-interface PaletteItem {
-  id: string;
-  category: 'Trang' | 'Sản phẩm' | 'Lô sản xuất' | 'TCCS' | 'Phiếu kiểm nghiệm';
-  title: string;
-  subtitle?: string;
-  icon: React.ElementType;
-  path: string;
-  badge?: string;
-}
+const categoryIconMap: Record<SearchResultCategory, React.ElementType> = {
+  PRODUCT: Package,
+  BATCH: Layers,
+  TCCS: FileText,
+  TEST_RESULT: Activity,
+  MATERIAL: FlaskConical,
+  DEVIATION: AlertTriangle,
+  CHANGE_CONTROL: GitPullRequest,
+  ACTION: Zap,
+  PAGE: ArrowRight
+};
+
+const categoryLabelMap: Record<SearchResultCategory, string> = {
+  PRODUCT: 'Sản phẩm',
+  BATCH: 'Lô sản xuất',
+  TCCS: 'Tiêu chuẩn (TCCS)',
+  TEST_RESULT: 'Phiếu kiểm nghiệm',
+  MATERIAL: 'Nguyên vật liệu',
+  DEVIATION: 'Sai lệch (Deviation)',
+  CHANGE_CONTROL: 'Yêu cầu Thay đổi (CR)',
+  ACTION: 'Tác vụ nhanh',
+  PAGE: 'Trang hệ thống'
+};
 
 export const GlobalCommandPalette: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -25,29 +45,41 @@ export const GlobalCommandPalette: React.FC = () => {
   const listRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
 
-  const { products, batches, tccsList, testResults, role } = useAppStore(
+  const { products, batches, tccsList, testResults, rawMaterials, role } = useAppStore(
     useShallow(s => ({
       products: s.products,
       batches: s.batches,
       tccsList: s.tccsList,
       testResults: s.testResults,
+      rawMaterials: s.rawMaterials,
       role: s.role,
     }))
   );
 
-  // Lắng nghe sự kiện toggle mở/đóng palette từ CustomEvent
+  // Lắng nghe sự kiện toggle mở/đóng palette từ CustomEvent hoặc Ctrl+K
   useEffect(() => {
     const handleToggle = () => setIsOpen(prev => !prev);
     const handleClose = () => setIsOpen(false);
 
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setIsOpen(prev => !prev);
+      } else if (e.key === 'Escape' && isOpen) {
+        setIsOpen(false);
+      }
+    };
+
     window.addEventListener('pqm:toggle-command-palette', handleToggle);
     window.addEventListener('pqm:close-modals', handleClose);
+    window.addEventListener('keydown', handleGlobalKeyDown);
 
     return () => {
       window.removeEventListener('pqm:toggle-command-palette', handleToggle);
       window.removeEventListener('pqm:close-modals', handleClose);
+      window.removeEventListener('keydown', handleGlobalKeyDown);
     };
-  }, []);
+  }, [isOpen]);
 
   // Tự động focus vào input khi mở
   useEffect(() => {
@@ -58,109 +90,19 @@ export const GlobalCommandPalette: React.FC = () => {
     }
   }, [isOpen]);
 
-  // Danh mục điều hướng trang mặc định
-  const staticNavigationItems: PaletteItem[] = useMemo(() => {
-    const items: PaletteItem[] = [
-      { id: 'nav-dash', category: 'Trang', title: 'Bảng điều khiển (Dashboard)', subtitle: 'Tổng quan chỉ số và thống kê', icon: Activity, path: '/' },
-      { id: 'nav-prod', category: 'Trang', title: 'Danh sách Sản phẩm', subtitle: 'Quản lý danh mục sản phẩm', icon: Package, path: '/products' },
-      { id: 'nav-batch', category: 'Trang', title: 'Quản lý Lô sản xuất', subtitle: 'Theo dõi tiến độ và trạng thái lô', icon: Layers, path: '/batches' },
-      { id: 'nav-tccs', category: 'Trang', title: 'Hồ sơ Tiêu chuẩn Cơ sở (TCCS)', subtitle: 'Tra cứu tiêu chuẩn kỹ thuật', icon: FileText, path: '/tccs' },
-      { id: 'nav-test', category: 'Trang', title: 'Phiếu kiểm nghiệm', subtitle: 'Danh sách kết quả kiểm nghiệm Lab', icon: Activity, path: '/test-results' },
-      { id: 'nav-trend', category: 'Trang', title: 'Phân tích Xu hướng Chất lượng', subtitle: 'Biểu đồ biến động và trôi chỉ tiêu', icon: TrendingUp, path: '/reports/trend-analysis' },
-      { id: 'nav-alerts', category: 'Trang', title: 'Cảnh báo Bất thường', subtitle: 'Cảnh báo hạn dùng, drift, fail rate', icon: AlertTriangle, path: '/alerts' },
-      { id: 'nav-settings', category: 'Trang', title: 'Cài đặt Hệ thống', subtitle: 'Tùy chỉnh giao diện và tài khoản', icon: Settings, path: '/settings' },
-    ];
-
-    if (role === 'ADMIN') {
-      items.push(
-        { id: 'nav-users', category: 'Trang', title: 'Quản lý Người dùng & Phân quyền', subtitle: 'Duyệt thành viên và cấp quyền Admin', icon: Users, path: '/users', badge: 'Admin' },
-        { id: 'nav-alias', category: 'Trang', title: 'Quản lý Alias Chỉ tiêu TCCS', subtitle: 'Cấu hình tương thích ngược tên chỉ tiêu', icon: Sparkles, path: '/criteria-aliases', badge: 'Admin' }
-      );
-    }
-    return items;
-  }, [role]);
-
-  // Tìm kiếm dữ liệu động trên toàn bộ hệ thống
-  const searchResults = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase();
-    if (!q) {
-      return staticNavigationItems;
-    }
-
-    const results: PaletteItem[] = [];
-
-    // 1. Lọc trang tĩnh
-    staticNavigationItems.forEach(item => {
-      if (item.title.toLowerCase().includes(q) || item.subtitle?.toLowerCase().includes(q)) {
-        results.push(item);
-      }
-    });
-
-    // 2. Tìm Sản phẩm
-    products.forEach(p => {
-      if (p.name.toLowerCase().includes(q) || p.code.toLowerCase().includes(q) || p.registrationNo?.toLowerCase().includes(q)) {
-        results.push({
-          id: `p-${p.id}`,
-          category: 'Sản phẩm',
-          title: p.name,
-          subtitle: `Mã: ${p.code} | SĐK: ${p.registrationNo || '---'}`,
-          icon: Package,
-          path: `/products/${p.id}`,
-        });
-      }
-    });
-
-    // 3. Tìm Lô sản xuất
-    batches.forEach(b => {
-      if (b.batchNo.toLowerCase().includes(q)) {
-        const prod = products.find(p => p.id === b.productId);
-        results.push({
-          id: `b-${b.id}`,
-          category: 'Lô sản xuất',
-          title: `Lô ${b.batchNo}`,
-          subtitle: `SP: ${prod?.name || b.productId} | Trạng thái: ${b.status}`,
-          icon: Layers,
-          path: `/batches/${b.id}`,
-          badge: b.status,
-        });
-      }
-    });
-
-    // 4. Tìm TCCS
-    tccsList.forEach(t => {
-      if (t.code.toLowerCase().includes(q)) {
-        const prod = products.find(p => p.id === t.productId);
-        results.push({
-          id: `t-${t.id}`,
-          category: 'TCCS',
-          title: `TCCS: ${t.code}`,
-          subtitle: `Áp dụng cho: ${prod?.name || t.productId}`,
-          icon: FileText,
-          path: `/tccs/detail/${t.id}`,
-        });
-      }
-    });
-
-    // 5. Tìm Phiếu kiểm nghiệm
-    testResults.forEach(tr => {
-      if (tr.id.toLowerCase().includes(q) || tr.labName?.toLowerCase().includes(q)) {
-        results.push({
-          id: `tr-${tr.id}`,
-          category: 'Phiếu kiểm nghiệm',
-          title: `Phiếu KN: ...${tr.id.slice(-6)}`,
-          subtitle: `Lab: ${tr.labName || 'Nội bộ'} | Ngày: ${tr.testDate} | Kết quả: ${tr.overallStatus}`,
-          icon: Activity,
-          path: `/test-results/coa/${tr.batchId}`,
-          badge: tr.overallStatus,
-        });
-      }
-    });
-
-    return results.slice(0, 15); // Giới hạn 15 kết quả hàng đầu
-  }, [searchQuery, staticNavigationItems, products, batches, tccsList, testResults]);
+  // Tìm kiếm dữ liệu đa phân hệ bằng universalSearchIndex
+  const searchResults: UniversalSearchResult[] = useMemo(() => {
+    return searchUniversal(searchQuery, {
+      products,
+      batches,
+      tccsList,
+      testResults,
+      rawMaterials
+    }, 18);
+  }, [searchQuery, products, batches, tccsList, testResults, rawMaterials]);
 
   // Điều hướng và đóng modal
-  const handleSelect = (item: PaletteItem) => {
+  const handleSelect = (item: UniversalSearchResult) => {
     setIsOpen(false);
     navigate(item.path);
   };
@@ -198,7 +140,7 @@ export const GlobalCommandPalette: React.FC = () => {
             value={searchQuery}
             onChange={e => { setSearchQuery(e.target.value); setSelectedIndex(0); }}
             onKeyDown={handleKeyDown}
-            placeholder="Tìm nhanh Sản phẩm, Lô, TCCS, Phiếu KN, Chức năng... (Ctrl+K)"
+            placeholder="Tìm nhanh Sản phẩm, Số lô, TCCS, Hoạt chất, CAS, Sai lệch... (Ctrl+K)"
             className="w-full bg-transparent text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 text-base outline-none font-medium"
           />
           <button 
@@ -218,79 +160,86 @@ export const GlobalCommandPalette: React.FC = () => {
             </div>
           ) : (
             searchResults.map((item, index) => {
+              const Icon = categoryIconMap[item.category] || ArrowRight;
               const isSelected = index === selectedIndex;
-              const Icon = item.icon;
+              const categoryLabel = categoryLabelMap[item.category] || item.category;
 
               return (
                 <div
                   key={item.id}
                   onClick={() => handleSelect(item)}
                   onMouseEnter={() => setSelectedIndex(index)}
-                  className={`flex items-center justify-between px-3.5 py-2.5 rounded-xl cursor-pointer transition-all duration-150 ${
+                  className={`flex items-center justify-between px-3.5 py-2.5 rounded-xl cursor-pointer transition-all ${
                     isSelected 
-                      ? 'bg-primary-50 dark:bg-primary-950/40 text-primary-900 dark:text-primary-100 shadow-sm' 
-                      : 'text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/60'
+                      ? 'bg-blue-50/80 dark:bg-blue-950/40 text-blue-900 dark:text-blue-100 border border-blue-200/60 dark:border-blue-800/60' 
+                      : 'hover:bg-slate-50 dark:hover:bg-slate-800/50 text-slate-700 dark:text-slate-300 border border-transparent'
                   }`}
                 >
-                  <div className="flex items-center gap-3 min-w-0">
+                  <div className="flex items-center gap-3 min-w-0 flex-1">
                     <div className={`p-2 rounded-lg shrink-0 ${
                       isSelected 
-                        ? 'bg-primary-100 dark:bg-primary-900/60 text-primary-600 dark:text-primary-400' 
+                        ? 'bg-blue-600 text-white shadow-sm' 
                         : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'
                     }`}>
-                      <Icon size={18} />
+                      <Icon size={16} />
                     </div>
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-semibold truncate">{item.title}</span>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-semibold text-sm truncate text-slate-900 dark:text-slate-100">
+                          {item.title}
+                        </span>
+                        <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700">
+                          {categoryLabel}
+                        </span>
                         {item.badge && (
-                          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md ${
-                            item.badge === 'PASS' || item.badge === 'RELEASED'
-                              ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300'
-                              : item.badge === 'FAIL' || item.badge === 'REJECTED'
-                              ? 'bg-red-100 text-red-700 dark:bg-red-950/50 dark:text-red-300'
-                              : 'bg-primary-100 text-primary-700 dark:bg-primary-950/50 dark:text-primary-300'
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                            item.badgeColor === 'green' ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300' :
+                            item.badgeColor === 'red' ? 'bg-rose-100 dark:bg-rose-950 text-rose-800 dark:text-rose-300' :
+                            item.badgeColor === 'amber' ? 'bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300' :
+                            item.badgeColor === 'purple' ? 'bg-purple-100 dark:bg-purple-950 text-purple-800 dark:text-purple-300' :
+                            'bg-blue-100 dark:bg-blue-950 text-blue-800 dark:text-blue-300'
                           }`}>
                             {item.badge}
                           </span>
                         )}
                       </div>
                       {item.subtitle && (
-                        <p className="text-xs text-slate-400 dark:text-slate-500 truncate mt-0.5">
-                          <span className="font-medium text-slate-500 dark:text-slate-400">[{item.category}]</span> {item.subtitle}
+                        <p className="text-xs text-slate-500 dark:text-slate-400 truncate mt-0.5">
+                          {item.subtitle}
                         </p>
                       )}
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2 pl-2">
-                    {isSelected ? (
-                      <span className="flex items-center gap-1 text-[11px] font-medium text-primary-600 dark:text-primary-400 bg-primary-100/60 dark:bg-primary-900/40 px-2 py-1 rounded-md">
-                        Chọn <CornerDownLeft size={12} />
-                      </span>
-                    ) : (
-                      <ArrowRight size={14} className="text-slate-300 dark:text-slate-600 opacity-0 group-hover:opacity-100" />
-                    )}
-                  </div>
+                  {isSelected && (
+                    <div className="flex items-center gap-1 text-blue-600 dark:text-blue-400 text-xs font-semibold pl-2 shrink-0">
+                      <span>Mở</span>
+                      <CornerDownLeft size={13} />
+                    </div>
+                  )}
                 </div>
               );
             })
           )}
         </div>
 
-        {/* Footer shortcuts helper */}
-        <div className="px-4 py-2.5 bg-slate-50 dark:bg-slate-950/50 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-[11px] text-slate-400 dark:text-slate-500 font-medium">
+        {/* Footer phím tắt */}
+        <div className="px-4 py-2.5 bg-slate-50 dark:bg-slate-950/60 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
           <div className="flex items-center gap-3">
-            <span><kbd className="px-1.5 py-0.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded shadow-xs text-slate-600 dark:text-slate-300">↑</kbd> <kbd className="px-1.5 py-0.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded shadow-xs text-slate-600 dark:text-slate-300">↓</kbd> Di chuyển</span>
-            <span><kbd className="px-1.5 py-0.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded shadow-xs text-slate-600 dark:text-slate-300">Enter</kbd> Chọn</span>
-            <span><kbd className="px-1.5 py-0.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded shadow-xs text-slate-600 dark:text-slate-300">Esc</kbd> Đóng</span>
+            <span className="flex items-center gap-1">
+              <kbd className="px-1.5 py-0.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded shadow-xs text-[10px]">↑</kbd>
+              <kbd className="px-1.5 py-0.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded shadow-xs text-[10px]">↓</kbd> Di chuyển
+            </span>
+            <span className="flex items-center gap-1">
+              <kbd className="px-1.5 py-0.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded shadow-xs text-[10px]">Enter</kbd> Chọn
+            </span>
+            <span className="flex items-center gap-1">
+              <kbd className="px-1.5 py-0.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded shadow-xs text-[10px]">Esc</kbd> Đóng
+            </span>
           </div>
-          <span className="flex items-center gap-1 text-primary-600 dark:text-primary-400">
-            <Sparkles size={12} /> PQM Pro Search
-          </span>
+          <span className="font-semibold text-blue-600 dark:text-blue-400">PQM Universal 2.0</span>
         </div>
       </div>
     </div>
   );
 };
-export default GlobalCommandPalette;
