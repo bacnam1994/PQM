@@ -55,9 +55,10 @@ function getSortOrder(relPath) {
   }
   if (norm === 'src/main.tsx') return '02_core_main';
   if (norm === 'src/App.tsx') return '03_core_app';
-  if (norm === 'src/types.ts') return '04_core_types';
+  if (norm === 'src/types.ts' || norm.startsWith('src/types/')) return '04_core_types_' + norm;
   if (norm === 'src/index.css') return '05_core_css';
   if (norm.startsWith('src/store/')) return '10_store_' + norm;
+  if (norm.startsWith('src/repositories/')) return '15_repos_' + norm;
   if (norm.startsWith('src/services/ai/')) return '20_services_ai_' + norm;
   if (norm.startsWith('src/services/')) return '25_services_' + norm;
   if (norm.startsWith('src/hooks/')) return '30_hooks_' + norm;
