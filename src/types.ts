@@ -243,3 +243,4 @@ export * from './types/signature';
 
 export * from './types/permissions';
 export * from './types/deviation';
+export * from './types/approvalWorkflow';

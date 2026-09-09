@@ -15,3 +15,4 @@ export * from './test-results/useTestResultList';
 export * from './useTestResultPrint';
 export * from './useCookieConsent';
 export * from './usePaginatedQuery';
+export * from './useQAQCActionQueue';

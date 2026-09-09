@@ -9,6 +9,7 @@ import { DSCard } from '../../components';
 import { BATCH_STATUS, PRODUCT_STATUS, TEST_RESULT_STATUS, formatDateStandard } from '../../utils';
 import { useShallow } from 'zustand/react/shallow';
 import { useQualityAlerts } from '../../hooks/useQualityAlerts';
+import { QAQCActionQueue } from '../../components/features/QAQCActionQueue';
 
 // Gauge Chart Component with Conic Gradient & Needle Rotation
 const GaugeChart: React.FC<{ passRate: number }> = ({ passRate }) => {
@@ -190,6 +191,9 @@ const Dashboard: React.FC = () => {
           <GaugeChart passRate={passRate} />
         </div>
       </div>
+
+      {/* ================= QA/QC ACTION WORKBENCH QUEUE ================= */}
+      <QAQCActionQueue />
 
       {/* ================= KPI CARDS ================= */}
       <div className="kpi-row">
