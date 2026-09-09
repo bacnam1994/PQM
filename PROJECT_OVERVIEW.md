@@ -189,13 +189,204 @@ H? th?ng AI d?a tr�n Google Gemini v?i 5 c?p d? v� 4 ph�n h? th�ng minh 
 # 1. Kh?i ch?y m�i tru?ng ph�t tri?n (Local Dev)
 npm run dev
 
+# ?? T?NG QUAN TON DI?N H? TH?NG PQM (PRODUCT QUALITY MANAGEMENT)
+> **Phiên bản tài liệu:** 3.0.0-final  
+> **Cập nhật lần cuối:** 2026-09-09  
+> **D? n:** H? th?ng Qu?n l Ch?t lu?ng S?n ph?m & Ki?m nghi?m (PQM)
+
+---
+
+## ?? 0. QUY T?C C?T LI DNH CHO AI ASSISTANT (B?T BU?C TUN TH?)
+1. **Qut file ny d?u tin**: M?i khi b?t d?u m?t phin lm vi?c, AI ph?i n?m ton b? ki?n trc, m hnh d? li?u, phn h? ch?c nang v lu?ng tri?n khai trong file ny.
+2. **T? d?ng c?p nh?t**: M?i khi c b?t k? thay d?i no trong d? n (thm component, s?a logic, thm route, d?i schema d? li?u, thm AI tool, v.v.), AI **B?T BU?C** ph?i c?p nh?t l?i file ny ngay sau khi hon thnh nhi?m v? d? ph?n nh tr?ng thi m?i nh?t c?a ?ng d?ng.
+3. **Nh?t k thay d?i (Changelog)**: Ghi l?i tm t?t n?i dung v?a c?p nh?t ? ph?n cu?i ti li?u km ngy thng.
+
+---
+
+## 1. GI?I THI?U V M?C TIU D? N
+**PQM (Product Quality Management)** l h? th?ng qu?n l ch?t lu?ng chuyn su dnh cho ngnh s?n xu?t y t? / du?c ph?m / cng ngh? sinh h?c (V-Biotech). 
+
+### M?c tiu chnh:
+- Qu?n l ton di?n vng d?i s?n ph?m: t? H? so s?n ph?m, Tiu chu?n co s? (TCCS), Cng th?c d?nh lu?ng, Nguyn li?u, L s?n xu?t d?n Phi?u ki?m nghi?m (Test Results).
+- T? d?ng ha dnh gi ?t/Khng ?t theo tiu chu?n k? thu?t (d?nh lu?ng ho?t ch?t, ch? tiu an ton, vi sinh, c?m quan).
+- Xu?t phi?u phn tch thnh ph?m (Certificate of Analysis - CoA) chu?n ha c m QR xc th?c.
+- Phn tch xu hu?ng ch?t lu?ng (Trend Analysis), c?nh bo s?m cc b?t thu?ng (Quality Alerts).
+- **H? th?ng Ki?m sot & Hn g?n Ton v?n D? li?u (Data Consistency & Auto-Healing Engine)**: T? d?ng r sot 6 nhm ton v?n lin k?t th?c th? (b?n ghi m? ci, sai l?ch lin k?t cho, b?t nh?t qun logic, m?t lin k?t nguyn li?u, l?ch cng th?c - TCCS, trng m) v cung c?p co ch? Auto-Heal 1-click.
+- **Unified Entity Relationship Graph (`useDataGraph.ts`)**: M?ng lu?i lin k?t 2 chi?u hon ch?nh cho ton b? 7 th?c th? d? li?u trong h? th?ng.
+- Tch h?p **AI Thng minh da c?p d? (Gemini 2.5/2.0)**: T? d?ng qut OCR k?t qu? ki?m nghi?m t? PDF nhi?u trang (Canvas Rasterizer & Smart Chunking) / ?nh, t? h?c kh?p n?i ch? tiu (Semantic Mapping & Self-Learning), v h? tr? truy v?n thng minh.
+- **H? th?ng phm t?t & Command Palette (`Ctrl+K`)**: Tm ki?m t?c th v di?u hu?ng siu t?c trn ton b? h? th?ng.
+
+---
+
+## 2. KI?N TRC CNG NGH? & MI TRU?NG TRI?N KHAI
+
+### 2.1. Tech Stack
+- **Frontend Core**: React 19, TypeScript (~5.8), Vite (v6), TailwindCSS v3.
+- **State Management**: Zustand (tch bi?t `useAppStore` cho d? li?u nghi?p v? & `useUIStore` cho giao di?n/preferences).
+- **Graph & Consistency Layer**: `useDataGraph` (Full 2-Way Hydration Graph) & `dataConsistencyService` (Audit & Auto-Heal).
+- **Backend / BaaS**: Firebase Realtime Database (RTDB), Firebase Authentication, Firebase Storage.
+- **Tr tu? nhn t?o (AI)**: Google Generative AI SDK (`@google/generative-ai` - Gemini 2.5 Flash/Pro, Gemini 2.0 Flash).
+- **X? l PDF client-side**: `pdfjs-dist` (Render PDF nhi?u trang sang ?nh JPEG t?i uu dung lu?ng).
+- **Tr?c quan ha & Bo co**: Recharts (Bi?u d? xu hu?ng, phn b?), QRCode React, SheetJS/XLSX (Xu?t Excel).
+- **Ki?m th?**: Vitest (Unit Test - 339 tests passed 100% across 51 test suites), Playwright (E2E Test - 6 tests passed 100% across 4 test suites).
+- **CI/CD T? d?ng ha**: GitHub Actions Pipeline 3 cng do?n (`.github/workflows/ci-cd.yml`): Unit Test (Vitest) -> E2E Test (Playwright) -> Build & Deploy Firebase Hosting.
+
+### 2.2. Ki?n trc Tri?n khai (Deployment Rules)
+- **Mi tru?ng S?n xu?t**: Firebase Hosting (`https://v-biotech.web.app`) | Project ID: `v-biotech`.
+- **C?u hnh Base URL**: 
+  - Khi build Firebase: `base = '/'` (ph?c v? t? root).
+  - Khi ch?y local: `base = './'`.
+- **GitHub**: Ch? dng d? **sao luu m ngu?n**. Khng d?ng GitHub Pages.
+- **Quy trnh Deploy chu?n**:
+  ```bash
+  npm run build
+  npx firebase deploy --only hosting
+  # Ho?c dng script: npm run deploy
+  ```
+
+---
+
+## 3. M HNH D? LI?U & SCHEMA (DATA ARCHITECTURE)
+
+D? li?u du?c luu tr? trn Firebase Realtime Database v?i c?u trc JSON t?i uu v d? th? lin k?t ch?t ch?:
+
+```mermaid
+erDiagram
+    Product ||--o{ TCCS : "has versions (productId, isActive)"
+    Product ||--o{ ProductFormula : "1-to-1 formula (productId)"
+    Product ||--o{ Batch : "manufactures (productId)"
+    Batch ||--o{ TestResult : "tested by (batchId)"
+    Batch ||--o{ TCCS : "bound standard (tccsId)"
+    RawMaterial ||--o{ ProductFormula : "materialId linkage"
+    TCCS ||--o{ CriteriaAlias : "aliases history (tccsId)"
+    TCCS ||--o{ ProductFormula : "criteria alignment"
+```
+
+### 3.1. Chi ti?t cc Th?c th? (Entities):
+1. **Product (`products/`)**:
+   - `id`, `code`, `name`, `group`, `registrationNo`, `registrationDate`, `registrant`, `status` (`ACTIVE` | `DISCONTINUED` | `RECALLED`), `description`, `imageUrl`.
+2. **TCCS - Tiu chu?n co s? (`tccsList/`)**:
+   - `id`, `productId`, `code`, `issueDate`, `isActive`, `packaging`, `storage`, `shelfLife`, `standardRefs`.
+   - `mainQualityCriteria`: Danh sch ch? tiu ch?t lu?ng chnh (Tn, on v?, Min, Max, Ki?u `NUMBER`/`TEXT`, `declaredContent`, `calculationBasis`).
+   - `safetyCriteria`: Danh sch ch? tiu an ton (vi sinh, kim lo?i n?ng...).
+   - `alternateRules`: Quy t?c ki?m tra b? sung / ki?m tra l?i khi khng d?t (`FAIL_RETRY`, `CONDITIONAL_CHECK`).
+3. **ProductFormula - Cng th?c s?n ph?m (`productFormulas/`)**:
+   - `id`, `productId`, `ingredients` (Hm lu?ng cng b?, hm lu?ng nguyn t?, lin k?t `materialId`), `excipients` (T du?c), `sensory`, `packaging`, `storage`, `shelfLife`.
+4. **RawMaterial - Danh m?c nguyn li?u (`rawMaterials/`)**:
+   - `id`, `code` (m qu?n l nguyn li?u n?i b?: `NL-GINKGO-01`...), `name` (tn g?c/chu?n qu?c t?), `aliases` (cc tn g?i khc, tn thuong m?i, tn vi?t t?t), `category` (`ACTIVE` | `EXCIPIENT` | `OTHER`), `standard` (tiu chu?n p d?ng: DVN V, USP, Ph.Eur, BP, TCCS-NSX...), `casNumber` (m d?nh danh ha ch?t qu?c t? CAS), `description`.
+5. **Batch - L s?n xu?t (`batches/`)**:
+   - `id`, `productId`, `tccsId`, `batchNo`, `mfgDate`, `expDate`, `theoreticalYield`, `actualYield`, `yieldUnit`, `packaging`, `status` (`PENDING` | `TESTING` | `RELEASED` | `REJECTED`), `rejectReason`, `progressPercent`.
+6. **TestResult - Phi?u ki?m nghi?m (`testResults/`)**:
+   - `id`, `batchId`, `labName`, `testDate`, `overallStatus` (`PASS` | `FAIL`), `notes`, `attachments` (file dnh km Drive/Firebase).
+   - `results`: M?ng cc `TestResultEntry` { `criteriaName`, `value`, `isPass`, `isExtra`, `unit`, `limit` }.
+   - *Luu *: Tru?ng `batch` l Virtual Join trn UI, khng luu th?a vo RTDB.
+7. **CriteriaAlias - nh x? tn ch? tiu (`criteriaAliases/`)**:
+   - ?m b?o tuong thch ngu?c khi TCCS d?i tn ch? tiu m cc phi?u ki?m nghi?m cu v?n d?i chi?u chnh xc.
+8. **AILearnedMapping (`aiLearnedMappings/`)**:
+   - H?c my t? ngu?i dng: Ghi nh? cc c?p tn ch? tiu vi?t t?t/OCR -> Tn chu?n h? th?ng (`originalName` ? `systemName`, `frequency`).
+9. **QualityAnomaly / Alerts**:
+   - C?nh bo tri d?t ch?t lu?ng (`DRIFT`), s?p h?t h?n (`EXPIRY`), t? l? l?i cao (`HIGH_FAIL_RATE`), thi?u d? li?u (`MISSING_DATA`).
+
+---
+
+## 4. PHN QUY?N & XC TH?C (AUTH & ROLES)
+
+H? th?ng qu?n l ngu?i dng v?i 3 vai tr chnh qua Firebase Auth & RTDB (`users/`):
+- **`ADMIN`**: Ton quy?n qu?n tr? h? th?ng, thm/s?a/xa s?n ph?m, TCCS, cng th?c, duy?t ngu?i dng, qu?n l Criteria Alias, c?u hnh AI.
+- **`USER`**: Nhn vin ki?m nghi?m / QA / QC: Xem d? li?u, t?o v duy?t phi?u ki?m nghi?m, t?o l s?n xu?t, xem bo co & CoA.
+- **`GUEST`**: Ti kho?n m?i dang k chua du?c duy?t, ch? c quy?n truy c?p trang `/welcome`.
+
+---
+
+## 5. C?U TRC PHN H? V ROUTING
+
+H? th?ng du?c t? ch?c thnh 6 phn h? l?n:
+
+| Phn h? | Route chnh | M t? ch?c nang |
+| :--- | :--- | :--- |
+| **Auth** | `/login`, `/signup`, `/forgot-password`, `/welcome`, `/unauthorized` | ang nh?p, phn quy?n, c?p quy?n truy c?p. |
+| **Batches** | `/batches`, `/batches/new`, `/batches/:id`, `/batches/:id/edit` | Qu?n l L s?n xu?t, ti?n d?, duy?t xu?t xu?ng. |
+| **Products** | `/products`, `/products/new`, `/products/:id`, `/materials`, `/product-formulas` | Qu?n l H? so s?n ph?m, Trung tm Qu?n l Nguyn li?u & Thnh ph?n (Material Hub 3-Tab), Cng th?c d?nh lu?ng. |
+| **QA / Testing**| `/test-results`, `/test-results/new`, `/test-results/:id/edit`, `/tccs`, `/criteria` | Nh?p k?t qu? ki?m nghi?m (OCR AI), TCCS, Qu?n l Ch? tiu & Alias. |
+| **Quality Analytics**| `/dashboard`, `/trend-analysis`, `/alerts`, `/quality-summary-report` | Dashboard phn tch xu hu?ng, SPC, c?nh bo r?i ro, Bo co t?ng h?p. |
+| **Public / Reports**| `/test-results/print/:id`, `/verify/:id` | Xem & in ?n CoA chu?n ha, Trang qut m QR xc th?c ch?ng ch?. |
+| **System** | `/settings`, `/users`, `/audit-logs` | C?u hnh Google Drive, ci d?t Model AI, Nh?t k ki?m ton (Audit Log). |
+
+---
+
+## 6. H? TH?NG TR TU? NHN T?O (AI INTELLIGENCE SUITE 2.0)
+
+H? th?ng AI d?a trn Google Gemini v?i 5 c?p d? v 4 phn h? thng minh chuyn su cho ngnh Du?c ph?m/Ki?m nghi?m:
+
+1. **OCR & Extraction (C?p d? 1  Nng c?p v1.5.1)**:
+   - **X? l tri?t d? PDF nhi?u trang (Canvas Rasterizer + Smart Chunking)**:
+     - T? d?ng chuy?n d?i t?ng trang PDF sang ?nh JPEG t?i uu (1600px, 0.85 quality) b?ng Canvas + `pdfjs-dist`. Gi?m 85% dung lu?ng truy?n t?i.
+     - Phn do?n thng minh (Chunking 3 trang/lu?t cho ti li?u di > 3 trang), lo?i b? 100% nguy co trn token, socket timeout ho?c l?i HTTP 500/503 t? Google server.
+     - G?p k?t qu? thng minh t? cc d?t qut (`testResults`, `notes`, `batchNo`, `labName`...).
+   - **Batch Scan**: Upload v x? l song song nhi?u file PDF/?nh cng lc (`Promise.all`), hi?n th? `BatchScanProgressModal` per-file.
+   - **Streaming Progress**: Callback `onProgress(step, percent)` theo t?ng bu?c x? l th?c t?, hi?n th? ti?n d? real-time trn UI.
+   - **Fallback Model**: T? d?ng chuy?n t? `gemini-2.5-flash` ? `gemini-2.0-flash` khi g?p l?i 503/429, km exponential backoff (2s?4s?8s).
+   - **Prompt OCR nng cao**: B? sung 4 guide m?i  `HANDWRITING_GUIDE` (ch? tay, s? nhe), `MULTI_COLUMN_GUIDE` (phi?u da c?t, nhi?u trang), `WATERMARK_STAMP_GUIDE` (b? qua watermark/con d?u), `VN_LAB_TERMINOLOGY` (nh?n di?n Quatest 3, CASE, Eurofins...).
+   - **Schema m? r?ng**: AI tr? v? thm `pageCount`, `documentType` (External_Lab|Internal|CoA|Supplier_CoA), `notes` (ghi ch d?c bi?t), `analysisMethod` (HPLC, UV-Vis...) cho t?ng ch? tiu.
+2. **Semantic Mapping & Auto-evaluation (C?p d? 2)**:
+   - T? d?ng d?i chi?u tn ch? tiu ti?ng Anh/Vi?t qua t? di?n du?c h?c `PHARMA_TERM_DICTIONARY` v thu?t ton Dice Coefficient/fuzzy semantic matching (v d?: *Moisture* -> *? ?m*).
+   - T? d?ng so snh v?i Min/Max trong TCCS ho?c cng th?c s?n ph?m (20%) d? g?n c? ?t/Khng ?t.
+3. **Self-Learning & Action Agents (C?p d? 3)**:
+   - H?c t? ph?n h?i ngu?i dng: Khi user s?a mapping, AI t? luu vo `aiLearnedMappings` d? ghi nh? cho cc l?n sau.
+   - H? tr? AI Tools (`aiTools.ts`): B? sung `compareLabResults`, `predictQualityStability`, `auditDataIntegrity`, `getAIInsights`, `generateOOSInvestigation`.
+   - **Auto-Create Batch khi upload phi?u KN**: Khi AI d?c du?c `batchNo` t? phi?u KN nhung l chua t?n t?i trong h? th?ng, t? d?ng m? `AutoCreateBatchModal` v?i thng tin pre-filled. Match s?n ph?m theo th? t? uu tin: 1) `productCode` (exact/partial), 2) `productName` (fuzzy). Sau khi user xc nh?n, t?o l m?i v?i `status=TESTING` v g?n ngay vo phi?u KN.
+4. **Active & Autonomous Self-Learning (`autoLearningService.ts` - C?p d? 4)**:
+   - **Post-OCR Auto-Learn**: T? d?ng h?c t? cc nh x? nh?n di?n thnh cng (high-confidence) ngay khi OCR m khng c?n ch? ngu?i dng can thi?p th? cng.
+   - **Pattern Mining & Dictionary Suggestion**: Pht hi?n cc c?p nh x? c t?n su?t cao ($\ge 3$ l?n) d? g?i  b? sung vo t? di?n tiu chu?n.
+   - **AI Quality Insight Engine**: T? d?ng phn tch ton di?n d? li?u (t? l? l?i theo s?n ph?m, tri ch? tiu qua cc l, r?i ro h?n dng) d? sinh insight ch? d?ng m?i ngy (**AI Morning Briefing**).
+   - **Contextual Session Memory**: T? d?ng tm t?t cc cu?c h?i tho?i tru?c v duy tr ng? c?nh lin phin chat theo t?ng User ID.
+5. **PQM AI Intelligence Suite 2.0 (4 Phn h? AI Chuyn su Chu?n Du?c ph?m/GMP - C?p d? 5)**:
+   - **Phn h? 1: AI ?i chi?u a phi?u & Directional Lab Bias Engine (`labComparisonService.ts`, `LabComparisonModal.tsx`)**:
+     - So snh Side-by-Side 2 phi?u lab (n?i b? vs QUATEST 3 / CASE / NIFC / Eurofins).
+     - **Censored Data %RPD Algorithm (ICH Q2 & US EPA Substitution $L/2$)**: X? l d? li?u ki?m nghi?m du?i ngu?ng pht hi?n (`KPH`, `< LOD`, `< LOQ`). $RPD=0\%$ khi c? hai d?u KPH ho?c gi tr? do $\le LOD$; C?nh bo b?t thu?ng khi gi tr? do th?c t? vu?t xa ngu?ng LOD c?a phng ngo?i ki?m.
+     - **Directional Lab Bias Engine (`computeLabBias`)**: nh gi khuynh hu?ng sai s? h? th?ng c d?nh hu?ng (`SOURCE1_HIGHER`, `SOURCE2_HIGHER`, `BALANCED`), tnh bias ratio % v m?c d? tin c?y (Confidence Level), t? d?ng xu?t khuy?n ngh? hnh d?ng th?c ch?ng cho phng ?m b?o Ch?t lu?ng (QA).
+     - **Lab Comparison Modal UI**: Th? Lab Bias Overview tr?c quan v?i thanh do t? l? sai l?ch, huy hi?u phuong php th? v ngu?ng pht hi?n KPH/LOD cho t?ng ch? tiu.
+   - **Phn h? 2: Tr? l Nh?p li?u Gi?ng ni Voice-to-Data (`voiceParserService.ts`, `VoiceInputButton.tsx`)**: Nh?n di?n gi?ng ni ti?ng Vi?t, t? d?ng chu?n ha s? do du?c h?c v di?n b?ng k?t qu?.
+   - **Phn h? 3: D? bo ?ng h?c Suy gi?m & H?n dng s?m (`stabilityPredictionService.ts`, `TrendAnalysisPage.tsx`)**: Phn tch suy gi?m ICH Q1A, tnh $k$, $R^2$, u?c tnh th?i di?m ch?m Min spec ($t_{90}$) v c?nh bo h?t h?n s?m.
+   - **Phn h? 4: AI Gim st Ton v?n D? li?u ALCOA+ (`dataIntegrityService.ts`)**: Qut Audit Trail, pht hi?n s?a d?i nhi?u l?n, thao tc ngoi gi?, tnh di?m Data Integrity Score (0-100).
+6. **PQM End-to-End AI Copilot & Embedded Intelligence (G?n k?t AI Ton di?n - C?p d? 6)**:
+   - **Context-Aware Floating AI Copilot ([AIAssistantChat.tsx](file:///D:/26%20Kiem%20nghiem/PQM/src/components/features/AIAssistantChat.tsx))**: T? d?ng nh?n di?n trang & th?c th? hi?n t?i (`/batches/:id`, `/products/:id`, `/tccs`, `/quality-summary-report`, `/audit-logs`) d? sinh cc nt tc v? nhanh (Contextual Prompt Chips) v n?p ng? c?nh vo cu tr? l?i c?a AI.
+   - **AI Batch Quality Clearance Dossier ([batchClearanceService.ts](file:///D:/26%20Kiem%20nghiem/PQM/src/services/ai/batchClearanceService.ts), [AIBatchClearanceModal.tsx](file:///D:/26%20Kiem%20nghiem/PQM/src/components/features/AIBatchClearanceModal.tsx))**: T? d?ng gom d? li?u (k?t qu? ki?m nghi?m, ti?n d? TCCS, nguy co ti?m c?n ngu?ng, l?ch s? l, audit trail) d? dua ra khuy?n ngh? duy?t xu?t xu?ng (**RELEASE**), duy?t c di?u ki?n (**CONDITIONAL**) ho?c t?m gi? di?u tra (**HOLD**).
+   - **AI TCCS Validator & Formulator ([tccsAssistantService.ts](file:///D:/26%20Kiem%20nghiem/PQM/src/services/ai/tccsAssistantService.ts), [TCCSFormPage.tsx](file:///D:/26%20Kiem%20nghiem/PQM/src/pages/qa/TCCSFormPage.tsx))**: G?i  danh m?c ch? tiu theo Du?c di?n VN V / USP (vin nn, nang, siro, c?m, thu?c tim...) v t? d?ng d?ng b? kho?ng d?nh lu?ng $\pm 5\% / \pm 10\% / \pm 20\%$ t? cng th?c s?n ph?m, km c?nh bo mu thu?n th?i gian th?c.
+   - **AI PQR / APR Narrative Generator ([pqrNarrativeService.ts](file:///D:/26%20Kiem%20nghiem/PQM/src/services/ai/pqrNarrativeService.ts), [QualitySummaryReport.tsx](file:///D:/26%20Kiem%20nghiem/PQM/src/pages/quality/QualitySummaryReport.tsx))**: T? d?ng so?n th?o ph?n *Nh?n xt & nh gi T?ng th? Ch?t lu?ng (Executive Quality Conclusion)* chu?n GMP g?m 4 ph?n chuyn mn d? xu?t bo co PQR/APR.
+   - **ALCOA+ Data Integrity Watchdog Widget ([ALCOAWatchdogWidget.tsx](file:///D:/26%20Kiem%20nghiem/PQM/src/components/features/ALCOAWatchdogWidget.tsx), [AuditLogPage.tsx](file:///D:/26%20Kiem%20nghiem/PQM/src/pages/system/AuditLogPage.tsx))**: Nhng tr?c ti?p b?ng di?m Data Integrity Score (0-100), phn r 6 nguyn t?c ALCOA+ v danh sch c?nh bo vi ph?m th?i gian th?c ln d?u trang Audit Log.
+7. **PQM Predictive & Proactive AI Engine (AI Ch? d?ng & D? bo Tuong lai - C?p d? 7)**:
+   - **Phn h? 1: AI Natural Language Query Engine ([nlQueryService.ts](file:///D:/26%20Kiem%20nghiem/PQM/src/services/ai/nlQueryService.ts), tool `queryDataNaturalLanguage`)**: Truy v?n d? li?u ton h? th?ng b?ng ti?ng Vi?t t? nhin.
+   - **Phn h? 2: AI Smart Deviation Report Generator ([deviationReportService.ts](file:///D:/26%20Kiem%20nghiem/PQM/src/services/ai/deviationReportService.ts), [DeviationReportModal.tsx](file:///D:/26%20Kiem%20nghiem/PQM/src/components/features/DeviationReportModal.tsx), tool `generateDeviationReport`)**: T? d?ng sinh bo co sai l?ch chu?n GMP-WHO/FDA d?y d? 6 ph?n.
+   - **Phn h? 3: AI Proactive Smart Alert Engine ([smartAlertService.ts](file:///D:/26%20Kiem%20nghiem/PQM/src/services/ai/smartAlertService.ts), [AlertsPage.tsx](file:///D:/26%20Kiem%20nghiem/PQM/src/pages/quality/AlertsPage.tsx))**: T? d?ng qut v pht hi?n 5 lo?i pattern nguy hi?m.
+   - **Phn h? 4: AI Batch Genealogy Tracer ([batchGenealogyService.ts](file:///D:/26%20Kiem%20nghiem/PQM/src/services/ai/batchGenealogyService.ts), [BatchGenealogyModal.tsx](file:///D:/26%20Kiem%20nghiem/PQM/src/components/features/BatchGenealogyModal.tsx), [BatchDetailPage.tsx](file:///D:/26%20Kiem%20nghiem/PQM/src/pages/batches/BatchDetailPage.tsx))**: Xy d?ng cy truy v?t 5 t?ng v ch?m di?m Traceability Score.
+   - **Phn h? 5: AI Predictive Incoming Inspection ([predictiveInspectionService.ts](file:///D:/26%20Kiem%20nghiem/PQM/src/services/ai/predictiveInspectionService.ts))**: D? bo xc su?t PASS/FAIL tru?c khi ki?m nghi?m.
+   - **Phn h? 6: AI Material Harmonization & Deduplication Engine ([materialHarmonizerService.ts](file:///D:/26%20Kiem%20nghiem/PQM/src/services/ai/materialHarmonizerService.ts), [MaterialList.tsx](file:///D:/26%20Kiem%20nghiem/PQM/src/pages/products/MaterialList.tsx))**: T? d?ng qut v phn tch d? tuong d?ng ng? nghia gi?a cc nguyn li?u trong danh m?c Master Catalog, pht hi?n cc nguyn li?u b? t?o trng l?p (v d?: "Cao kh B?ch qu?", "Ginkgo Biloba Extract", "Chi?t xu?t b?ch qu?"), d? xu?t k? ho?ch g?p (Merge Plan) gi? 1 tn chu?n v chuy?n cc tn cn l?i thnh Aliases, d?ng th?i t? d?ng c?p nh?t lin k?t `materialId` cho ton b? cc cng th?c s?n ph?m lin quan.
+
+---
+
+## 7. QU?N L STATE, OFFLINE QUEUE & STORAGE HYGIENE
+
+- **`useAppStore`**: Qu?n l ton b? danh sch Products, Batches, TCCS, TestResults, RawMaterials, Realtime subscriptions v?i Firebase, phuong th?c thm/s?a/xa c h? tr? Optimistic Update.
+- **`useUIStore`**: Qu?n l Theme (Light/Dark mode), Sidebar collapse, User preferences (luu theo t?ng User ID trong Cookie), u?ng d?n truy c?p g?n nh?t (`lastVisitedPath`), Material view mode (Grid/List).
+- **`offlineMutationQueue.ts` (IndexedDB v4)**: ?m b?o d? b?n v?ng d? li?u khi offline: ghi l?i cc payload mutation khi m?t m?ng v t? d?ng **Replay & Flush Queue** ln Firebase ngay khi c k?t n?i m?ng tr? l?i.
+- **`storageService.ts`**: T? d?ng d?n d?p ?nh s?n ph?m v file dnh km trn Firebase Storage khi th?c hi?n cascade delete s?n ph?m, l hng ho?c phi?u ki?m nghi?m, ngan ng?a hon ton t?p tin m? ci.
+
+---
+
+## 8. L?NH V?N HNH & KI?M TH? THU?NG DNG
+
+```bash
+# 1. Kh?i ch?y mi tru?ng pht tri?n (Local Dev)
+npm run dev
+
 # 2. Build ?ng d?ng s?n xu?t
 npm run build
 
-# 3. Deploy l�n Firebase Hosting
+# 3. Deploy ln Firebase Hosting
 npx firebase deploy --only hosting
 
-# 4. Ch?y Unit Test (Vitest - 326 tests passed 100% across 48 suites)
+# 4. Ch?y Unit Test (Vitest - 339 tests passed 100% across 51 suites)
 npm run test -- --run
 
 # 5. Ch?y End-to-End Test (Playwright)
@@ -210,11 +401,8 @@ npm run test:e2e
 
 | Ngay | Phien ban | Noi dung cap nhat tom tat | Nguoi thuc hien |
 | :--- | :---: | :--- | :--- |
+| **2026-09-09** | `2.5.7` | **Hoan thanh Batch 2 (TASK-014 -> TASK-016) - Core QMS Workflow & Compliance**: [TASK-014] TCCS Versioning UI & Approval Workflow (`TccsVersionDiffModal`, `TccsImpactAssessmentModal`, tich hop `ApprovalWorkflowService` & `ESignatureModal` vao `TccsDetailPage`); [TASK-015] Deviation & CAPA Complete Engine (`DeviationMetricsBar`, `CAPATrackerView`, `DeviationWorkflowModal`, rang buoc tham quyen QA/Admin khi dong sai lech); [TASK-016] Module Quan ly Thay doi Chuan GMP (Change Control Module: data types, `ChangeControlAppService`, `ChangeControlListPage`, `ChangeControlDetailModal`, danh gia rui ro FMEA, route `/change-control`, menu Layout). Dat 339/339 unit tests (51 suites) passed 100%. Build production thanh cong. | AI Pair Programmer |
 | **2026-09-09** | `2.5.4` | **Chuan hoa Repository Layer, Server-Side Filter & Pagination (TASK-004)**: Nang cap toan bo 7 Repositories ke thua `BaseFirebaseRepository`; mo rong `IRepository` voi `findPaginated`, `count`, `findByRelation`; xay dung `paginationHelper.ts` (loc da tieu chi, sap xep ISO date/so, cursor & offset pagination); tao hook `usePaginatedQuery`; viet 12 unit tests moi cho pagination. Toan bo 276/276 unit tests (39 suites) passed 100%. Build 2446 modules thanh cong. | AI Pair Programmer |
 | **2026-09-09** | `2.5.3` | **Phan ra useAppStore thanh Modular Slices (TASK-003)**: Tieu bien God Store (~800 dong) thanh 6 domain slices doc lap (`authSlice`, `systemSlice`, `productSlice`, `batchSlice`, `testResultSlice`, `tccsSlice`) trong `src/store/slices/`; trich xuat `storeHelpers.ts` quan ly mutation offline va chuan hoa cong thuc; bo sung cac selector hooks chuyen biet (`useAppAuth`, `useAppProducts`, `useAppBatches`, v.v.); viet unit test bao phu cac slice. Toan bo 264/264 unit tests (38 suites) va Playwright E2E passed. Build 2443 modules thanh cong. | AI Pair Programmer |
-| **2026-09-09** | `2.5.2` | **Tai cau truc TestResultFormPage Modularization (TASK-002)**: Chia nho God Component tu 1.610 dong xuong con ~300 dong bang cach tach thanh 7 specialized sub-components (`TestResultHeader`, `BatchLabSelector`, `TccsCriteriaSection`, `ExtraCriteriaSection`, `AttachmentSection`, `GDFileSelectorModal`, `BatchScanProgressModal`) va custom hook `useTestResultAIIntegration`. Toan bo 257 unit tests va Playwright E2E tests deu passed. Build 2436 modules thanh cong. | AI Pair Programmer |
-| **2026-09-08** | `2.5.1` | **Hoan thien Lab Bias Detail UI & Toi uu CI/CD**: [ENHANCE] LabComparisonModal.tsx - thay banner don gian bang Lab Bias Detail Card day du: Directional Bias Bar (phan bo huong do), meanBiasPercent, potentialCauses & actionRecommendations; [ENHANCE] playwright.config.ts - screenshot/video on-failure, github reporter cho CI; 123/123 Unit Tests passed, Build 2402 modules. | AI Pair Programmer |
-| **2026-09-07** | `2.5.0` | **Toi uu Do tin cay AI & Don dep Tai lieu**: [NEW] generateStructuredJson<T>() helper enforce JSON Schema cung qua responseSchema - loai bo 100% rui ro JSON.parse thu cong; Migrate batchClearanceService + pqrNarrativeService sang Structured Outputs; [NEW] tesseractFallback.ts OCR offline (Tesseract.js lazy-load) khi Gemini API khong kha dung; Tach CHANGELOG.md rieng; Xoa ban ghi trung v1.5.0/v1.4.0. | AI Pair Programmer |
-| **2026-09-05** | `2.4.2` | **Ra soat Toan dien Ma nguon & Hieu chinh Phan quyen**: [DELETE] RawMaterialCatalog.tsx; [FIX] Circular Import testResultEvaluation.ts; [FIX] Phan quyen Route Batches & TestResults theo nghiep vu thuc te. | AI Pair Programmer |
 | **2026-09-05** | `2.4.1` | **Khac phuc Firebase Security Rules & Form Lo hang**: [CRITICAL FIX] Bo newData.exists() chan cascade delete; [BUG FIX] Duplicate Audit Log trong BatchFormPage; [ENHANCEMENT] Bo sung field yield/packaging vao Form Lo. | AI Pair Programmer |
 | **2026-09-03** | `2.4.0` | **PQM AI Super-Engine 3.0**: 6 Action Tools cho AI Copilot; Stability Kinetics; Auto-Healing Engine. 116/116 tests passed. | AI Pair Programmer |

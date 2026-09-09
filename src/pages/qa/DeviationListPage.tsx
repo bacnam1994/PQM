@@ -21,6 +21,9 @@ import { deviationAppService } from '../../services/app/DeviationAppService';
 import { aiGateway } from '../../services/ai/AIGateway';
 import { formatDateStandard } from '../../utils';
 import { Modal } from '../../components/ui/CommonUI';
+import { DeviationMetricsBar } from '../quality/deviations/DeviationMetricsBar';
+import { CAPATrackerView } from '../quality/deviations/CAPATrackerView';
+import { DeviationWorkflowModal } from '../quality/deviations/DeviationWorkflowModal';
 
 // Trạng thái workflow hiển thị
 const STATUS_CONFIG: Record<DeviationStatus, { label: string; bg: string; text: string; border: string; step: number }> = {
@@ -60,12 +63,40 @@ const DeviationListPage: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const [severityFilter, setSeverityFilter] = useState<string>('ALL');
   const [selectedDeviation, setSelectedDeviation] = useState<QualityDeviation | null>(null);
+  const [activeViewTab, setActiveViewTab] = useState<'DEVIATIONS' | 'CAPA_TRACKER'>('DEVIATIONS');
 
   // Modal states
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showTransitionModal, setShowTransitionModal] = useState(false);
-  const [transitionNotes, setTransitionNotes] = useState('');
   const [targetStatus, setTargetStatus] = useState<DeviationStatus>('UNDER_INVESTIGATION');
+
+  const handleWorkflowConfirm = async (status: DeviationStatus, notes: string, investigator?: string) => {
+    if (!selectedDeviation) return;
+    try {
+      await deviationAppService.updateStatus(
+        selectedDeviation.id,
+        status,
+        user,
+        { notes, investigator }
+      );
+      toast.success(`Hồ sơ ${selectedDeviation.deviationNo} đã chuyển sang "${STATUS_CONFIG[status].label}"`);
+      setShowTransitionModal(false);
+      await loadDeviations();
+    } catch (err: any) {
+      toast.error(err.message || 'Lỗi chuyển đổi trạng thái.');
+      throw err;
+    }
+  };
+
+  const handleCompleteCAPAItem = async (deviationId: string, capaId: string) => {
+    try {
+      await deviationAppService.completeCAPAItem(deviationId, capaId, user);
+      toast.success('Đã cập nhật hoàn tất hành động CAPA!');
+      await loadDeviations();
+    } catch (err: any) {
+      toast.error(err.message || 'Lỗi cập nhật CAPA');
+    }
+  };
 
   // AI Root Cause state
   const [aiLoading, setAiLoading] = useState(false);
@@ -186,39 +217,7 @@ const DeviationListPage: React.FC = () => {
     }
   };
 
-  // Xử lý chuyển đổi trạng thái State Machine
-  const handleTransitionSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedDeviation) return;
 
-    if (targetStatus === 'CLOSED') {
-      if (role !== 'QA' && role !== 'ADMIN') {
-        toast.error('Chỉ Trưởng phòng QA hoặc Quản trị viên mới có thẩm quyền Đóng hồ sơ sai lệch.');
-        return;
-      }
-      if (!transitionNotes.trim()) {
-        toast.error('Quy chuẩn GMP: Bắt buộc phải ghi nhận ý kiến đánh giá hiệu quả và kết luận đóng hồ sơ.');
-        return;
-      }
-    }
-
-    try {
-      await deviationAppService.updateStatus(
-        selectedDeviation.id,
-        targetStatus,
-        user,
-        { notes: transitionNotes.trim() }
-      );
-
-      toast.success(`Hồ sơ ${selectedDeviation.deviationNo} đã chuyển sang "${STATUS_CONFIG[targetStatus].label}"`);
-      setShowTransitionModal(false);
-      setTransitionNotes('');
-      await loadDeviations();
-    } catch (err: any) {
-      console.error(err);
-      toast.error(err.message || 'Lỗi chuyển đổi trạng thái.');
-    }
-  };
 
   // Xử lý thêm hành động CAPA
   const handleAddCAPASubmit = async (e: React.FormEvent) => {
@@ -357,56 +356,53 @@ const DeviationListPage: React.FC = () => {
         </div>
       </div>
 
-      {/* ─── KPI Metric Cards ─── */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-        <div className="p-3.5 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800/80 shadow-sm">
-          <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400">Tổng hồ sơ</p>
-          <div className="flex items-baseline justify-between mt-1.5">
-            <span className="text-2xl font-bold text-zinc-900 dark:text-zinc-50">{stats.total}</span>
-            <FileText size={16} className="text-zinc-400" />
-          </div>
-        </div>
+      {/* ─── KPI Metric Cards (Module hóa) ─── */}
+      <DeviationMetricsBar
+        deviations={deviations}
+        activeFilter={statusFilter}
+        onSelectFilter={(filter) => {
+          setStatusFilter(filter);
+          setActiveViewTab('DEVIATIONS');
+        }}
+      />
 
-        <div className="p-3.5 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800/80 shadow-sm">
-          <p className="text-xs font-medium text-amber-600 dark:text-amber-400">Đang điều tra</p>
-          <div className="flex items-baseline justify-between mt-1.5">
-            <span className="text-2xl font-bold text-amber-600 dark:text-amber-400">{stats.underInvest}</span>
-            <AlertTriangle size={16} className="text-amber-500" />
-          </div>
-        </div>
-
-        <div className="p-3.5 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800/80 shadow-sm">
-          <p className="text-xs font-medium text-blue-600 dark:text-blue-400">Thực hiện CAPA</p>
-          <div className="flex items-baseline justify-between mt-1.5">
-            <span className="text-2xl font-bold text-blue-600 dark:text-blue-400">{stats.capa}</span>
-            <Clock size={16} className="text-blue-500" />
-          </div>
-        </div>
-
-        <div className="p-3.5 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800/80 shadow-sm">
-          <p className="text-xs font-medium text-purple-600 dark:text-purple-400">Đánh giá hiệu quả</p>
-          <div className="flex items-baseline justify-between mt-1.5">
-            <span className="text-2xl font-bold text-purple-600 dark:text-purple-400">{stats.review}</span>
-            <Activity size={16} className="text-purple-500" />
-          </div>
-        </div>
-
-        <div className="p-3.5 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800/80 shadow-sm">
-          <p className="text-xs font-medium text-emerald-600 dark:text-emerald-400">Đã đóng (Closed)</p>
-          <div className="flex items-baseline justify-between mt-1.5">
-            <span className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">{stats.closed}</span>
-            <CheckCircle2 size={16} className="text-emerald-500" />
-          </div>
-        </div>
-
-        <div className="p-3.5 rounded-2xl bg-white dark:bg-zinc-900 border border-rose-200 dark:border-rose-900/60 shadow-sm">
-          <p className="text-xs font-medium text-rose-600 dark:text-rose-400">Nghiêm trọng (Critical)</p>
-          <div className="flex items-baseline justify-between mt-1.5">
-            <span className="text-2xl font-bold text-rose-600 dark:text-rose-400">{stats.critical}</span>
-            <AlertOctagon size={16} className="text-rose-500" />
-          </div>
-        </div>
+      {/* ─── Tabs Điều hướng: Sai lệch vs CAPA Tracker ─── */}
+      <div className="flex items-center gap-2 border-b border-zinc-200 dark:border-zinc-800 pb-1">
+        <button
+          type="button"
+          onClick={() => setActiveViewTab('DEVIATIONS')}
+          className={`px-4 py-2 text-xs font-black uppercase tracking-wider rounded-xl transition-all ${
+            activeViewTab === 'DEVIATIONS'
+              ? 'bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300 border border-rose-200 dark:border-rose-800 shadow-sm'
+              : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'
+          }`}
+        >
+          Hồ sơ Sai lệch ({deviations.length})
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveViewTab('CAPA_TRACKER')}
+          className={`px-4 py-2 text-xs font-black uppercase tracking-wider rounded-xl transition-all ${
+            activeViewTab === 'CAPA_TRACKER'
+              ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 shadow-sm'
+              : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'
+          }`}
+        >
+          Theo dõi Hành động CAPA (CAPA Tracker)
+        </button>
       </div>
+
+      {activeViewTab === 'CAPA_TRACKER' ? (
+        <CAPATrackerView
+          deviations={deviations}
+          onCompleteItem={handleCompleteCAPAItem}
+          onSelectDeviation={(dev) => {
+            setSelectedDeviation(dev);
+            setActiveViewTab('DEVIATIONS');
+          }}
+        />
+      ) : (
+        <>
 
       {/* ─── Search & Filter Bar ─── */}
       <div className="bg-white dark:bg-zinc-900 p-3.5 rounded-2xl border border-zinc-200/80 dark:border-zinc-800/80 shadow-sm flex flex-col md:flex-row gap-3 items-center justify-between">
@@ -630,6 +626,8 @@ const DeviationListPage: React.FC = () => {
           </div>
         )}
       </div>
+        </>
+      )}
 
       {/* ─── Drawer: Hồ sơ Chi tiết & Điều tra CAPA ─── */}
       {selectedDeviation && (
@@ -979,72 +977,15 @@ const DeviationListPage: React.FC = () => {
         </div>
       )}
 
-      {/* ─── Modal: Chuyển đổi trạng thái Workflow ─── */}
-      <Modal
+      {/* ─── Modal: Chuyển bước Trạng thái Sai lệch (Module hóa) ─── */}
+      <DeviationWorkflowModal
         isOpen={showTransitionModal}
         onClose={() => setShowTransitionModal(false)}
-        title="Chuyển bước Trạng thái Sai lệch (Workflow Transition)"
-        icon={ArrowRight}
-        color="bg-rose-600"
-      >
-        <form onSubmit={handleTransitionSubmit} className="space-y-4 text-sm">
-          <div>
-            <label className="block text-xs font-semibold text-zinc-500 mb-1">
-              Trạng thái tiếp theo:
-            </label>
-            <select
-              value={targetStatus}
-              onChange={(e) => setTargetStatus(e.target.value as DeviationStatus)}
-              className="w-full p-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 font-medium"
-            >
-              <option value="UNDER_INVESTIGATION">2. Đang điều tra (Under Investigation)</option>
-              <option value="CAPA_PLANNED">3. Đang thực hiện CAPA (CAPA Planned)</option>
-              <option value="EFFECTIVENESS_REVIEW">4. Đánh giá hiệu quả CAPA (Effectiveness Review)</option>
-              <option value="CLOSED">5. Đóng hồ sơ (Closed - Yêu cầu quyền QA/Admin)</option>
-            </select>
-          </div>
-
-          {targetStatus === 'CLOSED' && (
-            <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-xs text-amber-800 dark:text-amber-200">
-              <p className="font-semibold flex items-center gap-1 mb-1">
-                <AlertTriangle size={14} />
-                <span>Yêu cầu tiêu chuẩn GMP-WHO:</span>
-              </p>
-              Chỉ Trưởng phòng QA hoặc Quản trị viên mới được phép Đóng hồ sơ sai lệch. Bắt buộc phải nhập kết luận thẩm định hiệu quả của các hành động CAPA bên dưới.
-            </div>
-          )}
-
-          <div>
-            <label className="block text-xs font-semibold text-zinc-500 mb-1">
-              Ghi chú chuyển bước {targetStatus === 'CLOSED' && <span className="text-rose-500">*</span>}:
-            </label>
-            <textarea
-              rows={3}
-              placeholder={targetStatus === 'CLOSED' ? 'Nhập kết luận đánh giá hiệu quả CAPA và xác nhận đóng hồ sơ...' : 'Ghi chú lý do chuyển trạng thái...'}
-              value={transitionNotes}
-              onChange={(e) => setTransitionNotes(e.target.value)}
-              required={targetStatus === 'CLOSED'}
-              className="w-full p-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 outline-none"
-            />
-          </div>
-
-          <div className="flex justify-end gap-2 pt-2">
-            <button
-              type="button"
-              onClick={() => setShowTransitionModal(false)}
-              className="px-4 py-2 rounded-xl text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800"
-            >
-              Hủy
-            </button>
-            <button
-              type="submit"
-              className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-semibold"
-            >
-              Xác nhận chuyển bước
-            </button>
-          </div>
-        </form>
-      </Modal>
+        deviation={selectedDeviation}
+        targetStatus={targetStatus}
+        onConfirm={handleWorkflowConfirm}
+        currentUserRole={role}
+      />
 
       {/* ─── Modal: Khởi tạo Hồ sơ Sai lệch Mới ─── */}
       <Modal
