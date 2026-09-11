@@ -82,16 +82,17 @@ const LoadingFallback = () => (
 );
 
 const ProtectedRoute: React.FC = () => {
-  const { user, role, authLoading } = useAppStore(useShallow(s => ({
+  const { user, role, isAdmin, authLoading } = useAppStore(useShallow(s => ({
     user: s.user,
     role: s.role,
+    isAdmin: s.isAdmin,
     authLoading: s.authLoading
   })));
 
   if (authLoading) return null;
   if (!user) return <Navigate to="/login" replace />;
   
-  if (role === 'GUEST') {
+  if (role === 'GUEST' && !isAdmin) {
     return <Navigate to="/welcome" replace />;
   }
 
@@ -99,27 +100,34 @@ const ProtectedRoute: React.FC = () => {
 };
 
 const GuestRoute: React.FC = () => {
-  const { user, authLoading } = useAppStore(useShallow(s => ({
+  const { user, role, isAdmin, authLoading } = useAppStore(useShallow(s => ({
     user: s.user,
+    role: s.role,
+    isAdmin: s.isAdmin,
     authLoading: s.authLoading
   })));
 
   if (authLoading) return null;
   if (!user) return <Navigate to="/login" replace />;
+  // Nếu là Admin thì không giữ ở trang chào mừng mà chuyển thẳng vào hệ thống
+  if (role === 'ADMIN' || isAdmin) {
+    return <Navigate to="/" replace />;
+  }
 
   return <Layout><Outlet /></Layout>;
 };
 
 const AdminRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user, role, authLoading } = useAppStore(useShallow(s => ({
+  const { user, role, isAdmin, authLoading } = useAppStore(useShallow(s => ({
     user: s.user,
     role: s.role,
+    isAdmin: s.isAdmin,
     authLoading: s.authLoading
   })));
 
   if (authLoading) return null;
   if (!user) return <Navigate to="/login" replace />;
-  if (role !== 'ADMIN') {
+  if (role !== 'ADMIN' && !isAdmin) {
     return <Navigate to="/unauthorized" replace />;
   }
   return <>{children}</>;

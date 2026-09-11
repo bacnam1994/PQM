@@ -22,6 +22,7 @@ interface DeviationWorkflowModalProps {
   targetStatus: DeviationStatus;
   onConfirm: (status: DeviationStatus, notes: string, investigator?: string) => Promise<void>;
   currentUserRole?: string | null;
+  isAdmin?: boolean;
 }
 
 export const DeviationWorkflowModal: React.FC<DeviationWorkflowModalProps> = ({
@@ -30,7 +31,8 @@ export const DeviationWorkflowModal: React.FC<DeviationWorkflowModalProps> = ({
   deviation,
   targetStatus,
   onConfirm,
-  currentUserRole
+  currentUserRole,
+  isAdmin = false
 }) => {
   const [notes, setNotes] = useState('');
   const [investigator, setInvestigator] = useState(deviation?.investigator || '');
@@ -57,7 +59,7 @@ export const DeviationWorkflowModal: React.FC<DeviationWorkflowModalProps> = ({
 
     // Kiểm tra thẩm quyền đóng hồ sơ
     if (isClosing) {
-      if (currentUserRole !== 'QA' && currentUserRole !== 'ADMIN') {
+      if (!isAdmin && currentUserRole !== 'QA' && currentUserRole !== 'ADMIN') {
         setErrorMsg('Chỉ Trưởng phòng QA hoặc Quản trị viên hệ thống mới có quyền phê duyệt ĐÓNG hồ sơ sai lệch.');
         return;
       }

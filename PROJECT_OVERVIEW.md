@@ -289,12 +289,24 @@ erDiagram
 
 ---
 
-## 4. PHN QUY?N & XC TH?C (AUTH & ROLES)
+## 4. PHÂN QUYỀN & XÁC THỰC (AUTH & ROLES)
 
-H? th?ng qu?n l ngu?i dng v?i 3 vai tr chnh qua Firebase Auth & RTDB (`users/`):
-- **`ADMIN`**: Ton quy?n qu?n tr? h? th?ng, thm/s?a/xa s?n ph?m, TCCS, cng th?c, duy?t ngu?i dng, qu?n l Criteria Alias, c?u hnh AI.
-- **`USER`**: Nhn vin ki?m nghi?m / QA / QC: Xem d? li?u, t?o v duy?t phi?u ki?m nghi?m, t?o l s?n xu?t, xem bo co & CoA.
-- **`GUEST`**: Ti kho?n m?i dang k chua du?c duy?t, ch? c quy?n truy c?p trang `/welcome`.
+Hệ thống quản lý người dùng với cơ chế phân quyền RBAC đa cấp độ chuẩn GMP & ALCOA+ qua Firebase Auth & RTDB (`users/` và `users/admins/`):
+- **`ADMIN` (Quản trị viên tối cao)**: 
+  - **Được thực hiện 100% tất cả các chức năng trong toàn bộ hệ thống**.
+  - Cơ chế nhận diện Admin kép (`role === 'ADMIN'` hoặc cờ `isAdmin === true` trong `users/admins/`).
+  - Toàn quyền quản trị tài khoản người dùng (phân bổ bất kỳ vai trò nào trong 8 vai trò, xóa tài khoản).
+  - Toàn quyền quản lý Master Data: Thêm/sửa/xóa sản phẩm, TCCS, công thức, nguyên liệu, chỉ tiêu & alias.
+  - Toàn quyền ký duyệt xuất xưởng Lô (Release Batch), từ chối Lô (Reject), sửa Lô trực tiếp từ trang chi tiết hoặc danh sách.
+  - Toàn quyền phê duyệt phiếu kiểm nghiệm, ban hành CoA, thẩm định/đóng hồ sơ Sai lệch CAPA và Kiểm soát thay đổi CR.
+  - Toàn quyền cấu hình hệ thống, AI model, xem và xuất toàn bộ Audit Trail.
+- **`QA` (Quality Assurance)**: Ký duyệt xuất xưởng Lô, ban hành CoA, phê duyệt TCCS/công thức, đóng Sai lệch CAPA & Thay đổi CR.
+- **`QC` (Quality Control)**: Soát xét kết quả kiểm nghiệm, cảnh báo OOS, theo dõi xu hướng SPC, in chứng nhận CoA.
+- **`LAB` (Kiểm nghiệm viên - Analyst)**: Tạo và nhập kết quả kiểm nghiệm (OCR Canvas AI), đính kèm dữ liệu phân tích.
+- **`PRODUCTION` (Sản xuất)**: Đăng ký tạo Lô sản xuất, cập nhật sản lượng thực tế, hạn dùng và quy cách đóng gói.
+- **`USER` (Nhân viên nghiệp vụ)**: Tương thích ngược: Được tạo Lô sản xuất và nhập kết quả kiểm nghiệm.
+- **`VIEWER` (Quan sát viên / Thanh tra)**: Chỉ xem báo cáo, tra cứu hồ sơ 360° và chứng chỉ CoA (quyền Read-Only).
+- **`GUEST` (Khách chờ duyệt)**: Tài khoản mới đăng ký chưa được cấp quyền, chỉ truy cập trang `/welcome`.
 
 ---
 
@@ -399,6 +411,7 @@ npm run test:e2e
 
 > Lich su day du (tat ca phien ban tu v1.3.0 tro ve truoc): xem tai [CHANGELOG.md](./CHANGELOG.md)
 
+| **2026-09-11** | `4.2.0-ADMIN-POWER` | **Trao quyền Toàn diện cho Admin Thực Hiện Tất cả Chức năng (Full Admin Capability Engine)**: Chuẩn hóa cơ chế phân quyền nhận diện Admin kép (`role === 'ADMIN'` hoặc cờ `isAdmin === true`) trên toàn hệ sinh thái PQM. [PermissionService & Route Guards] Chuẩn hóa `normalizeUser` và `isAdmin`, cập nhật `AdminRoute`, `ProtectedRoute`, `GuestRoute` trong `App.tsx` và menu lọc `Layout.tsx` để Admin không bao giờ bị chặn truy cập bất kỳ trang nào. [GMP Workflows] Trao quyền ký duyệt xuất xưởng Lô sản xuất (`BatchDetailPage`), thêm nút Sửa Lô trực tiếp trên Header chi tiết Lô; cho phép Admin thẩm định và đóng hồ sơ Sai lệch CAPA (`DeviationAppService`, `DeviationWorkflowModal`) và hồ sơ Kiểm soát thay đổi CR (`ChangeControlAppService`, `ChangeControlListPage`). [User Management 2.0] Đại tu toàn diện `UserManagement.tsx`, cho phép Admin phân bổ tự do đầy đủ 8 vai trò người dùng chuẩn GMP (`ADMIN`, `QA`, `QC`, `LAB`, `PRODUCTION`, `VIEWER`, `USER`, `GUEST`) kèm mô tả chi tiết, tự động đồng bộ `users/admins/{uid}`, bổ sung chức năng xóa người dùng kèm xác nhận bảo mật và ghi vết Audit Trail ALCOA+. Đạt 364/364 unit tests (56 suites) passed 100%. | AI Pair Programmer |
 | **2026-09-09** | `4.1.0-REFACTOR` | **Chuẩn hóa Kiến trúc Toàn diện (5 Phases Architecture & Domain Refactor)**: Hoàn thành 100% 5 Phase tái cấu trúc cốt lõi: **Phase 1**: Phân tách `src/types.ts` phình to thành các module miền nghiệp vụ trong `src/types/` (`product.ts`, `batch.ts`, `testResult.ts`, `tccs.ts`, `common.ts`) và thiết lập `src/types/index.ts` làm Barrel export tập trung; **Phase 2**: Hoàn thiện tầng Repository (`src/repositories/firebase/`), đảm bảo 100% kế thừa `BaseFirebaseRepository`, tích hợp `enqueueOfflineMutation` trong khối catch của các thao tác ghi, loại bỏ triệt để RBAC/UI toasts; **Phase 3**: Làm mỏng các Zustand Slices (`batchSlice`, `productSlice`, `tccsSlice`, `testResultSlice`), di dời toàn bộ logic tính toán, ràng buộc và tương tác Firebase sang các App Services tương ứng (`TCCSAppService`, `BatchAppService`, `ProductAppService`, v.v.); **Phase 4**: Tích hợp Cross-Cutting RBAC & ALCOA+ Audit Trail tự động cho mọi thao tác CUD trong `src/services/app/`, ném lỗi 'Từ chối quyền' trước khi chạm Database và ghi nhật ký kiểm toán ALCOA+; **Phase 5**: Chuẩn hóa AI Tools & Action Guard (`aiTools.ts`, `aiActionGuard.ts`), bọc các thao tác ghi qua `validateAIAction`, trả về `AIActionProposal` ở trạng thái `PENDING_APPROVAL` cho các hành động `isRegulated`. Toàn bộ Unit Tests và `npx tsc --noEmit` đạt 100% không lỗi. | AI Pair Programmer |
 | **2026-09-09** | `4.0.0-COMPLETE` | **Tailwind UI Global Refactor - HOÀN THÀNH TOÀN BỘ 8 PHASES (100% Loại bỏ `lucide-react`)**: Hoàn thành toàn diện cuộc đại tu UI lớn nhất toàn bộ hệ sinh thái PQM theo chuẩn Tailwind UI & Headless UI. Loại bỏ hoàn toàn 100% gói `lucide-react` khỏi toàn bộ codebase (`0 matches`), thay thế bằng `@heroicons/react/24/outline` kết hợp custom SVG chuyên biệt. Đồng bộ 100% semantic color tokens (`bg-surface`, `bg-surface-2`, `text-ink`, `text-ink-soft`, `text-ink-muted`, `border-border`, `emerald-*`). Hoàn tất các Phase 1 -> Phase 8: Setup & Primitives, Global Layout, List Pages & Data Tables, Detail & 360° Views, Form Pages & Workflow Modals, Dialogs & Flyouts & Specialized Modals, Dashboard, Analytics & Reports, System, Auth, Edge Cases & Polish (`SettingsPage`, `UserManagement`, `AuditLogPage`, `AccountPage`, `SearchPage`, `NotFoundPage`, `UnauthorizedPage`, `WelcomePage`, `LoginPage`, `SignupPage`, `ForgotPasswordPage`, `CoAVerifyPage`, `AppProvider`). Bảo toàn nguyên vẹn 100% business logic, store Zustand, Alcoa+ audit log, quyền RBAC, AI gateway Gemini, export data. `npx tsc --noEmit` và `npm run build` vượt qua 100% với 0 lỗi. | AI Pair Programmer |
 | **2026-09-09** | `4.0.0-p3` | **Tailwind UI Global Refactor - Hoàn thành Phase 3 (List Pages & Data Tables)**: Đại tu toàn diện 10/10 màn hình danh sách và bảng dữ liệu chính sang mẫu Card / Sticky Table / Two-Column Filters của Tailwind UI. Thay thế toàn bộ icon `lucide-react` thành `@heroicons/react/24/outline` (`BatchList`, `ProductList`, `MaterialListPage` + 7 subcomponents, `TCCSList`, `TestResultList`, `CriteriaList`, `ProductFormulaList`, `DeviationListPage` + `DeviationMetricsBar` + `CAPATrackerView` + `DeviationWorkflowModal`, `ChangeControlListPage` + `ChangeControlDetailModal`). Áp dụng chuẩn hệ thống token (`bg-surface`, `bg-surface-2`, `text-ink`, `text-ink-soft`, `text-ink-muted`, `border-border`, `emerald-*`). Bảo toàn 100% logic nghiệp vụ, RBAC, hooks, gateway AI và state Zustand. `npx tsc --noEmit` đạt 0 lỗi type. | AI Pair Programmer |

@@ -15,7 +15,8 @@ import {
   ShareIcon, 
   DocumentTextIcon, 
   ShieldCheckIcon, 
-  ChartBarSquareIcon 
+  ChartBarSquareIcon,
+  PencilSquareIcon 
 } from '@heroicons/react/24/outline';
 import { useDataGraph } from '../../hooks/useDataGraph';
 import { useAppStore } from '../../store/useAppStore';
@@ -106,7 +107,7 @@ const BatchDetailPage = () => {
   const [batchDeviations, setBatchDeviations] = useState<QualityDeviation[]>([]);
 
   const batch = useMemo(() => batches.find(b => b.id === id), [batches, id]);
-  const canSignRelease = isAdmin || role === 'QA';
+  const canSignRelease = isAdmin || role === 'ADMIN' || role === 'QA';
 
   const handleOpenSignRelease = () => {
     if (!batch) return;
@@ -310,6 +311,16 @@ const BatchDetailPage = () => {
                 <ShieldCheckIcon className="h-4 w-4" /> Ký xuất xưởng
               </button>
             ) : null}
+            {(isAdmin || role === 'ADMIN') && (
+              <button
+                type="button"
+                onClick={() => navigate(`/batches/edit/${batch.id}`)}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-surface text-ink-soft hover:bg-surface-2 rounded-xl font-bold border border-border text-xs cursor-pointer transition-colors shadow-sm"
+                title="Sửa thông tin Lô sản xuất"
+              >
+                <PencilSquareIcon className="h-4 w-4 text-ink-muted" /> Sửa Lô
+              </button>
+            )}
             <button
               type="button"
               onClick={() => navigate(`/batches/360/${batch.id}`)}

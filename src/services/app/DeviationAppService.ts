@@ -120,7 +120,7 @@ export class DeviationAppService {
 
     // 1. Kiểm tra thẩm quyền đóng sai lệch (Chỉ QA/Admin mới được CLOSE)
     if (newStatus === 'CLOSED') {
-      const isQAOrAdmin = currentUser?.role === 'QA' || currentUser?.role === 'ADMIN';
+      const isQAOrAdmin = currentUser?.isAdmin || currentUser?.role === 'QA' || currentUser?.role === 'ADMIN';
       if (!isQAOrAdmin) {
         throw new Error('Từ chối quyền: Chỉ Trưởng phòng QA hoặc Quản trị viên mới có quyền Đóng (Close) hồ sơ sai lệch.');
       }

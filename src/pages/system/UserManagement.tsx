@@ -5,23 +5,30 @@ import { useAppStore } from '../../store/useAppStore';
 import { 
   UserGroupIcon, 
   ShieldCheckIcon, 
-  MagnifyingGlassIcon, 
   CalendarIcon, 
-  Cog6ToothIcon, 
   ExclamationTriangleIcon, 
   ClockIcon,
-  UserIcon 
+  TrashIcon,
+  CheckCircleIcon,
+  AdjustmentsHorizontalIcon,
+  BeakerIcon,
+  CubeIcon,
+  EyeIcon,
+  UserIcon,
+  ClipboardDocumentCheckIcon
 } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 import { DSFilterBar, DSSearchInput, DSTable } from '../../components/ui/DesignSystem';
 import { ConfirmationModal, Modal } from '../../components/ui/CommonUI';
 import { formatDateStandard, formatDateTime } from '../../utils';
+import { Role } from '../../types/permissions';
 
-type UserRole = 'ADMIN' | 'USER' | 'GUEST';
+export type UserRole = Role;
 
-interface UserData {
+export interface UserData {
   uid: string;
   email: string;
+  displayName?: string;
   role: UserRole;
   createdAt: string;
 }
@@ -36,18 +43,87 @@ interface AuditLogEntry {
   timestamp: string;
 }
 
+const ROLE_DEFINITIONS: Record<UserRole, { label: string; desc: string; color: string; badgeBg: string; icon: React.ComponentType<{ className?: string }> }> = {
+  ADMIN: {
+    label: 'Quản trị viên (Admin)',
+    desc: 'Toàn quyền tối cao: Quản trị tài khoản, cấu hình hệ thống, duyệt mọi nghiệp vụ.',
+    color: 'text-indigo-700 dark:text-indigo-400',
+    badgeBg: 'bg-indigo-100 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800',
+    icon: ShieldCheckIcon
+  },
+  QA: {
+    label: 'Đảm bảo chất lượng (QA)',
+    desc: 'Ký duyệt xuất xưởng Lô, ban hành CoA, phê duyệt TCCS, đóng Sai lệch & Thay đổi.',
+    color: 'text-emerald-700 dark:text-emerald-400',
+    badgeBg: 'bg-emerald-100 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800',
+    icon: CheckCircleIcon
+  },
+  QC: {
+    label: 'Kiểm soát chất lượng (QC)',
+    desc: 'Soát xét kết quả kiểm nghiệm, cảnh báo OOS, theo dõi xu hướng phân tích SPC.',
+    color: 'text-blue-700 dark:text-blue-400',
+    badgeBg: 'bg-blue-100 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800',
+    icon: BeakerIcon
+  },
+  LAB: {
+    label: 'Kiểm nghiệm viên (Lab)',
+    desc: 'Nhập kết quả kiểm nghiệm, quét OCR thông minh, đính kèm dữ liệu phân tích.',
+    color: 'text-cyan-700 dark:text-cyan-400',
+    badgeBg: 'bg-cyan-100 dark:bg-cyan-950/50 text-cyan-700 dark:text-cyan-300 border-cyan-200 dark:border-cyan-800',
+    icon: ClipboardDocumentCheckIcon
+  },
+  PRODUCTION: {
+    label: 'Sản xuất (Production)',
+    desc: 'Tạo Lô sản xuất, cập nhật sản lượng thực tế, hạn dùng và quy cách đóng gói.',
+    color: 'text-amber-700 dark:text-amber-400',
+    badgeBg: 'bg-amber-100 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800',
+    icon: CubeIcon
+  },
+  USER: {
+    label: 'Nhân viên nghiệp vụ (User)',
+    desc: 'Vai trò tiêu chuẩn: Tạo và chỉnh sửa Lô sản xuất, nhập phiếu kiểm nghiệm.',
+    color: 'text-teal-700 dark:text-teal-400',
+    badgeBg: 'bg-teal-100 dark:bg-teal-950/50 text-teal-700 dark:text-teal-300 border-teal-200 dark:border-teal-800',
+    icon: UserIcon
+  },
+  VIEWER: {
+    label: 'Quan sát viên (Viewer)',
+    desc: 'Chỉ xem báo cáo, tra cứu hồ sơ lô và chứng nhận chất lượng (không chỉnh sửa).',
+    color: 'text-slate-700 dark:text-slate-400',
+    badgeBg: 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700',
+    icon: EyeIcon
+  },
+  GUEST: {
+    label: 'Khách chờ duyệt (Guest)',
+    desc: 'Tài khoản mới đăng ký, chưa được cấp quyền truy cập vào dữ liệu hệ thống.',
+    color: 'text-rose-700 dark:text-rose-400',
+    badgeBg: 'bg-rose-100 dark:bg-rose-950/50 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800',
+    icon: ClockIcon
+  }
+};
+
+const ALL_ROLES: UserRole[] = ['ADMIN', 'QA', 'QC', 'LAB', 'PRODUCTION', 'USER', 'VIEWER', 'GUEST'];
+
 const UserManagement: React.FC = () => {
   const currentUser = useAppStore(state => state.user);
   const [users, setUsers] = useState<UserData[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [roleFilter, setRoleFilter] = useState<string>('ALL');
   const [isLogOpen, setIsLogOpen] = useState(false);
   const [logs, setLogs] = useState<AuditLogEntry[]>([]);
 
-  // State for confirmation modal
+  // State modal phân quyền
+  const [selectedUserForRole, setSelectedUserForRole] = useState<UserData | null>(null);
+  const [targetRole, setTargetRole] = useState<UserRole>('USER');
+  const [isRoleModalOpen, setIsRoleModalOpen] = useState(false);
+
+  // State modal xác nhận chung (Xóa / Đổi quyền)
   const [confirmAction, setConfirmAction] = useState<(() => void) | null>(null);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+  const [confirmTitle, setConfirmTitle] = useState('');
   const [confirmMessage, setConfirmMessage] = useState('');
+  const [confirmButtonColor, setConfirmButtonColor] = useState('bg-emerald-600 hover:bg-emerald-700');
 
   useEffect(() => {
     const usersRef = ref(db, 'users');
@@ -57,7 +133,6 @@ const UserManagement: React.FC = () => {
     let adminsSnapshot: any = undefined;
 
     const syncData = () => {
-      // Chỉ xử lý khi cả 2 nguồn dữ liệu đã phản hồi ít nhất 1 lần (tránh flicker role)
       if (usersSnapshot === undefined || adminsSnapshot === undefined) return;
 
       const usersData = usersSnapshot || {};
@@ -67,8 +142,10 @@ const UserManagement: React.FC = () => {
         .filter(([key]) => key !== 'admins')
         .map(([key, value]: [string, any]) => ({
           uid: key,
-          ...value,
-          role: adminsData[key] ? 'ADMIN' : (value.role || 'GUEST')
+          email: value.email || '',
+          displayName: value.displayName || '',
+          createdAt: value.createdAt || '',
+          role: (adminsData[key] ? 'ADMIN' : (value.role || 'GUEST')) as UserRole
       }));
       setUsers(userList);
       setLoading(false);
@@ -116,188 +193,318 @@ const UserManagement: React.FC = () => {
     return () => unsubscribe();
   }, [isLogOpen]);
 
-  const handleRoleChange = async (targetUid: string, currentRole: UserRole, newRole: UserRole) => {
-    if (targetUid === currentUser?.uid) {
+  const handleOpenRoleModal = (user: UserData) => {
+    setSelectedUserForRole(user);
+    setTargetRole(user.role);
+    setIsRoleModalOpen(true);
+  };
+
+  const executeRoleChange = async (targetUid: string, currentRole: UserRole, newRole: UserRole) => {
+    try {
+      await set(ref(db, `users/${targetUid}/role`), newRole);
+
+      if (newRole === 'ADMIN') {
+        await set(ref(db, `users/admins/${targetUid}`), true);
+      } else {
+        await remove(ref(db, `users/admins/${targetUid}`));
+      }
+
+      // Ghi Audit Log ALCOA+
+      const targetUser = users.find(u => u.uid === targetUid);
+      await push(ref(db, 'audit_logs'), {
+        action: 'CHANGE_ROLE',
+        targetUid: targetUid,
+        targetEmail: targetUser?.email || 'Unknown',
+        performedBy: currentUser?.email || 'System Admin',
+        oldRole: currentRole,
+        newRole: newRole,
+        timestamp: serverTimestamp()
+      });
+
+      toast.success(`Đã chuyển đổi quyền của ${targetUser?.email || 'người dùng'} sang ${newRole}`);
+      setIsRoleModalOpen(false);
+    } catch (error: any) {
+      console.error(error);
+      toast.error(`Lỗi khi cập nhật quyền: ${error.message || 'Thao tác thất bại'}`);
+    }
+  };
+
+  const handleConfirmRoleChange = () => {
+    if (!selectedUserForRole) return;
+    if (selectedUserForRole.uid === currentUser?.uid) {
       toast.error("Không thể tự thay đổi quyền của chính mình!");
       return;
     }
-    
-    setConfirmMessage(`Bạn có chắc chắn muốn chuyển đổi quyền của tài khoản này thành ${newRole}?`);
+
+    if (selectedUserForRole.role === targetRole) {
+      setIsRoleModalOpen(false);
+      return;
+    }
+
+    setConfirmTitle("Xác nhận chuyển đổi vai trò");
+    setConfirmMessage(`Bạn có chắc chắn muốn thay đổi vai trò của tài khoản "${selectedUserForRole.email}" từ ${selectedUserForRole.role} sang ${targetRole}?`);
+    setConfirmButtonColor("bg-indigo-600 hover:bg-indigo-700");
+    setConfirmAction(() => () => executeRoleChange(selectedUserForRole.uid, selectedUserForRole.role, targetRole));
+    setIsConfirmOpen(true);
+  };
+
+  const handleDeleteUser = (user: UserData) => {
+    if (user.uid === currentUser?.uid) {
+      toast.error("Không thể tự xóa tài khoản của chính mình!");
+      return;
+    }
+
+    setConfirmTitle("Xác nhận xóa tài khoản người dùng");
+    setConfirmMessage(`CẢNH BÁO: Bạn đang thực hiện xóa tài khoản "${user.email}". Người dùng sẽ không thể đăng nhập hoặc truy cập dữ liệu nữa. Hành động này sẽ được ghi vết vào Audit Trail.`);
+    setConfirmButtonColor("bg-rose-600 hover:bg-rose-700");
     setConfirmAction(() => async () => {
       try {
-        await set(ref(db, `users/${targetUid}/role`), newRole);
+        await remove(ref(db, `users/${user.uid}`));
+        await remove(ref(db, `users/admins/${user.uid}`));
 
-        if (newRole === 'ADMIN') {
-          await set(ref(db, `users/admins/${targetUid}`), true);
-        } else {
-          await remove(ref(db, `users/admins/${targetUid}`));
-        }
-
-        // Ghi Audit Log
-        const targetUser = users.find(u => u.uid === targetUid);
         await push(ref(db, 'audit_logs'), {
-          action: 'CHANGE_ROLE',
-          targetUid: targetUid,
-          targetEmail: targetUser?.email || 'Unknown',
-          performedBy: currentUser?.email || 'System',
-          oldRole: currentRole,
-          newRole: newRole,
-          timestamp: serverTimestamp()  // [BẢO MẬT] Dùng server timestamp, không dùng client timestamp
+          action: 'DELETE_USER',
+          targetUid: user.uid,
+          targetEmail: user.email,
+          performedBy: currentUser?.email || 'System Admin',
+          timestamp: serverTimestamp()
         });
 
-        toast.success(`Đã cập nhật quyền thành ${newRole}`);
-      } catch (error) {
-        console.error(error);
-        toast.error("Lỗi khi cập nhật quyền.");
+        toast.success(`Đã xóa tài khoản ${user.email} khỏi hệ thống.`);
+      } catch (err: any) {
+        console.error("Lỗi xóa người dùng:", err);
+        toast.error("Lỗi khi xóa người dùng: " + (err.message || 'Không có quyền'));
       }
     });
     setIsConfirmOpen(true);
   };
 
-  const filteredUsers = users.filter(u => 
-    u.email?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredUsers = users.filter(u => {
+    const matchSearch = (u.email || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                        (u.displayName || '').toLowerCase().includes(searchTerm.toLowerCase());
+    const matchRole = roleFilter === 'ALL' || u.role === roleFilter;
+    return matchSearch && matchRole;
+  });
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500">
-      <div>
-        <h1 className="text-2xl font-extrabold text-ink flex items-center gap-3">
-          <UserGroupIcon className="text-emerald-600 dark:text-emerald-400 w-8 h-8" /> Quản lý Người dùng
-        </h1>
-        <p className="text-ink-muted mt-1">Phân quyền và quản lý tài khoản truy cập hệ thống.</p>
-      </div>
-
-      <DSFilterBar>
-        <DSSearchInput placeholder="Tìm kiếm theo email..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
-        <div className="px-4 py-2 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 rounded-xl text-xs font-bold whitespace-nowrap">
-          Tổng: {filteredUsers.length} tài khoản
+    <div className="space-y-6 animate-in fade-in duration-500 pb-20">
+      <div className="flex items-center justify-between flex-wrap gap-4">
+        <div>
+          <h1 className="text-2xl font-extrabold text-ink flex items-center gap-3">
+            <UserGroupIcon className="text-emerald-600 dark:text-emerald-400 w-8 h-8" /> Quản trị Người dùng & Phân quyền
+          </h1>
+          <p className="text-ink-muted mt-1 text-xs">
+            Quản trị viên có toàn quyền cấp phát, điều chuyển 8 vai trò nghiệp vụ chuẩn GMP và quản lý tài khoản truy cập.
+          </p>
         </div>
         <button 
           onClick={() => setIsLogOpen(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-surface border border-border text-ink-muted rounded-xl text-xs font-bold hover:bg-surface-2 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors shadow-sm ml-auto"
+          className="flex items-center gap-2 px-4 py-2 bg-surface border border-border text-ink rounded-xl text-xs font-bold hover:bg-surface-2 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors shadow-sm"
         >
-          <ClockIcon className="w-4 h-4" /> Lịch sử phân quyền
+          <ClockIcon className="w-4 h-4 text-emerald-600 dark:text-emerald-400" /> Lịch sử phân quyền (Audit Trail)
         </button>
+      </div>
+
+      <DSFilterBar>
+        <DSSearchInput 
+          placeholder="Tìm kiếm theo email, tên người dùng..." 
+          value={searchTerm} 
+          onChange={(e) => setSearchTerm(e.target.value)} 
+        />
+        <select
+          value={roleFilter}
+          onChange={(e) => setRoleFilter(e.target.value)}
+          className="px-3 py-2 bg-surface border border-border rounded-xl text-xs font-bold text-ink outline-none focus:ring-2 focus:ring-emerald-500"
+        >
+          <option value="ALL">Tất cả vai trò ({users.length})</option>
+          {ALL_ROLES.map(r => (
+            <option key={r} value={r}>
+              {r} ({users.filter(u => u.role === r).length})
+            </option>
+          ))}
+        </select>
+        <div className="px-4 py-2 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 rounded-xl text-xs font-bold whitespace-nowrap">
+          Hiển thị: {filteredUsers.length} tài khoản
+        </div>
       </DSFilterBar>
 
       <DSTable>
-            <thead className="bg-surface-2 border-b border-border">
-              <tr className="text-ink-muted text-[10px] font-black uppercase tracking-widest">
-                <th className="px-6 py-4">Người dùng</th>
-                <th className="px-6 py-4">Ngày đăng ký</th>
-                <th className="px-6 py-4 text-center">Vai trò</th>
-                <th className="px-6 py-4 text-right">Thao tác</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {loading ? (
-                <tr>
-                  <td colSpan={4} className="p-8 text-center text-ink-muted text-sm font-bold">Đang tải dữ liệu...</td>
-                </tr>
-              ) : filteredUsers.length === 0 ? (
-                <tr>
-                  <td colSpan={4} className="p-8 text-center text-ink-muted text-sm">Không tìm thấy người dùng nào.</td>
-                </tr>
-              ) : (
-                filteredUsers.map((u) => (
-                  <tr key={u.uid} className="hover:bg-surface-2/50 transition-colors">
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-emerald-100 dark:bg-emerald-950/40 flex items-center justify-center text-emerald-600 dark:text-emerald-400 font-bold text-xs shrink-0">
-                          {u.email?.charAt(0).toUpperCase()}
+        <thead className="bg-surface-2 border-b border-border">
+          <tr className="text-ink-muted text-[10px] font-black uppercase tracking-widest">
+            <th className="px-6 py-4">Người dùng</th>
+            <th className="px-6 py-4">Ngày tham gia</th>
+            <th className="px-6 py-4 text-center">Vai trò hiện tại</th>
+            <th className="px-6 py-4 text-right">Thao tác Quản trị viên</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-border">
+          {loading ? (
+            <tr>
+              <td colSpan={4} className="p-8 text-center text-ink-muted text-sm font-bold">Đang nạp danh sách tài khoản...</td>
+            </tr>
+          ) : filteredUsers.length === 0 ? (
+            <tr>
+              <td colSpan={4} className="p-8 text-center text-ink-muted text-sm">Không tìm thấy tài khoản nào khớp bộ lọc.</td>
+            </tr>
+          ) : (
+            filteredUsers.map((u) => {
+              const roleDef = ROLE_DEFINITIONS[u.role] || ROLE_DEFINITIONS.GUEST;
+              const RoleIcon = roleDef.icon;
+              const isSelf = u.uid === currentUser?.uid;
+
+              return (
+                <tr key={u.uid} className="hover:bg-surface-2/60 transition-colors">
+                  <td className="px-6 py-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-full bg-emerald-600/10 text-emerald-600 flex items-center justify-center font-bold text-xs border border-emerald-600/20">
+                        {u.email ? u.email.slice(0, 2).toUpperCase() : 'US'}
+                      </div>
+                      <div>
+                        <div className="font-bold text-ink text-xs flex items-center gap-2">
+                          <span>{u.displayName || u.email}</span>
+                          {isSelf && (
+                            <span className="px-2 py-0.5 rounded text-[9px] font-black bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                              BẠN
+                            </span>
+                          )}
                         </div>
-                        <div>
-                          <p className="font-bold text-ink text-sm flex items-center gap-2">
-                            {u.email}
-                            {u.uid === currentUser?.uid && <span className="text-[9px] bg-emerald-100 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 px-1.5 py-0.5 rounded uppercase font-black">Bạn</span>}
-                          </p>
-                          <p className="text-[10px] text-ink-muted font-mono">{u.uid}</p>
-                        </div>
+                        <div className="text-[11px] text-ink-muted font-mono">{u.email}</div>
                       </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-2 text-ink-muted text-xs font-medium">
-                        <CalendarIcon className="w-3.5 h-3.5" />
-                        {u.createdAt ? formatDateStandard(u.createdAt) : '---'}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 text-center">
-                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wide ${
-                        u.role === 'ADMIN' 
-                          ? 'bg-indigo-100 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-400' 
-                          : u.role === 'USER' 
-                            ? 'bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400' 
-                            : 'bg-amber-100 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400'
-                      }`}>
-                        {u.role === 'ADMIN' ? <ShieldCheckIcon className="w-3 h-3" /> : <UserGroupIcon className="w-3 h-3" />}
-                        {u.role}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <div className="flex justify-end items-center gap-2">
-                        {u.uid === currentUser?.uid ? (
-                          <span className="text-[11px] text-ink-muted font-bold bg-surface-2 px-2.5 py-1.5 rounded-lg border border-border">
-                            Không thể tự sửa
-                          </span>
-                        ) : (
-                          <>
-                            {u.role === 'GUEST' && (
-                              <button
-                                onClick={() => handleRoleChange(u.uid, 'GUEST', 'USER')}
-                                className="text-xs font-black px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-lg shadow-emerald-600/10 transition-all hover:-translate-y-0.5 duration-200"
-                              >
-                                Duyệt làm User
-                              </button>
-                            )}
-                            {u.role === 'USER' && (
-                              <>
-                                <button
-                                  onClick={() => handleRoleChange(u.uid, 'USER', 'ADMIN')}
-                                  className="text-xs font-bold px-3 py-1.5 bg-indigo-50 dark:bg-indigo-950/20 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/30 hover:text-indigo-700 rounded-lg border border-indigo-100 dark:border-indigo-900/50 transition-all"
-                                >
-                                  Thăng cấp Admin
-                                </button>
-                                <button
-                                  onClick={() => handleRoleChange(u.uid, 'USER', 'GUEST')}
-                                  className="text-xs font-bold px-3 py-1.5 bg-rose-50 dark:bg-rose-950/20 text-rose-600 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-900/30 hover:text-rose-700 rounded-lg border border-rose-100 dark:border-rose-900/50 transition-all"
-                                >
-                                  Hạ xuống Khách
-                                </button>
-                              </>
-                            )}
-                            {u.role === 'ADMIN' && (
-                              <button
-                                onClick={() => handleRoleChange(u.uid, 'ADMIN', 'USER')}
-                                className="text-xs font-bold px-3 py-1.5 bg-amber-50 dark:bg-amber-950/20 text-amber-600 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-900/30 hover:text-amber-700 rounded-lg border border-amber-100 dark:border-amber-900/50 transition-all"
-                              >
-                                Hạ cấp xuống User
-                              </button>
-                            )}
-                          </>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="flex items-center gap-1.5 text-xs text-ink-muted">
+                      <CalendarIcon className="w-3.5 h-3.5" />
+                      {u.createdAt ? formatDateStandard(u.createdAt) : '---'}
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 text-center">
+                    <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-wide border shadow-2xs ${roleDef.badgeBg}`}>
+                      <RoleIcon className="w-3.5 h-3.5" />
+                      {u.role}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 text-right">
+                    <div className="flex justify-end items-center gap-2">
+                      {isSelf ? (
+                        <span className="text-[11px] text-ink-muted font-bold bg-surface-2 px-3 py-1.5 rounded-lg border border-border">
+                          Tài khoản hiện tại
+                        </span>
+                      ) : (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => handleOpenRoleModal(u)}
+                            className="text-xs font-bold px-3 py-1.5 bg-indigo-50 dark:bg-indigo-950/20 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/30 rounded-lg border border-indigo-200 dark:border-indigo-900/50 transition-all flex items-center gap-1.5"
+                            title="Phân quyền / Đổi vai trò"
+                          >
+                            <AdjustmentsHorizontalIcon className="w-3.5 h-3.5" />
+                            Phân quyền
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteUser(u)}
+                            className="p-1.5 text-rose-500 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-lg border border-transparent hover:border-rose-200 dark:hover:border-rose-900/50 transition-colors"
+                            title="Xóa tài khoản khỏi hệ thống"
+                          >
+                            <TrashIcon className="w-4 h-4" />
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              );
+            })
+          )}
+        </tbody>
       </DSTable>
 
+      {/* Modal Phân quyền chi tiết cho Admin */}
+      <Modal
+        isOpen={isRoleModalOpen}
+        onClose={() => setIsRoleModalOpen(false)}
+        title={`Phân quyền cho tài khoản: ${selectedUserForRole?.email || ''}`}
+        icon={AdjustmentsHorizontalIcon}
+        color="bg-indigo-600"
+      >
+        <div className="space-y-4">
+          <p className="text-xs text-ink-muted">
+            Chọn vai trò phù hợp cho người dùng. Thẩm quyền sẽ có hiệu lực ngay lập tức trong toàn hệ thống.
+          </p>
+
+          <div className="space-y-2.5 max-h-[50vh] overflow-y-auto custom-scrollbar pr-1">
+            {ALL_ROLES.map((r) => {
+              const def = ROLE_DEFINITIONS[r];
+              const IconComp = def.icon;
+              const isSelected = targetRole === r;
+
+              return (
+                <div
+                  key={r}
+                  onClick={() => setTargetRole(r)}
+                  className={`p-3.5 rounded-xl border cursor-pointer transition-all flex items-start gap-3 ${
+                    isSelected
+                      ? 'bg-indigo-50/70 dark:bg-indigo-950/30 border-indigo-500 ring-2 ring-indigo-500/20'
+                      : 'bg-surface hover:bg-surface-2 border-border'
+                  }`}
+                >
+                  <div className={`p-2 rounded-lg shrink-0 mt-0.5 ${
+                    isSelected ? 'bg-indigo-600 text-white' : 'bg-surface-2 text-ink-soft'
+                  }`}>
+                    <IconComp className="w-4 h-4" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-xs text-ink">{def.label}</span>
+                      <span className="text-[10px] font-black uppercase font-mono px-2 py-0.5 rounded bg-surface-2 text-ink-muted">
+                        {r}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-ink-muted mt-1 leading-relaxed">{def.desc}</p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="flex justify-end items-center gap-3 pt-4 border-t border-border">
+            <button
+              type="button"
+              onClick={() => setIsRoleModalOpen(false)}
+              className="px-4 py-2 text-xs font-bold text-ink-muted hover:text-ink transition-colors"
+            >
+              Hủy
+            </button>
+            <button
+              type="button"
+              onClick={handleConfirmRoleChange}
+              className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-sm transition-colors flex items-center gap-2"
+            >
+              <ShieldCheckIcon className="w-4 h-4" /> Lưu quyền mới
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Modal xác nhận */}
       <ConfirmationModal
         isOpen={isConfirmOpen}
         onClose={() => setIsConfirmOpen(false)}
         onConfirm={() => confirmAction && confirmAction()}
-        title="Xác nhận thay đổi quyền"
+        title={confirmTitle}
         message={confirmMessage}
-        confirmText="Xác nhận"
+        confirmText="Xác nhận thực hiện"
         icon={ExclamationTriangleIcon}
-        confirmButtonColor="bg-emerald-600 hover:bg-emerald-700"
+        confirmButtonColor={confirmButtonColor}
       />
 
+      {/* Modal Lịch sử phân quyền */}
       <Modal
         isOpen={isLogOpen}
         onClose={() => setIsLogOpen(false)}
-        title="Nhật ký Phân quyền Hệ thống"
+        title="Nhật ký Phân quyền Hệ thống (Audit Trail)"
         icon={ClockIcon}
         color="bg-emerald-600"
       >
@@ -313,7 +520,15 @@ const UserManagement: React.FC = () => {
                     <span className="text-[10px] text-ink-muted font-mono">{formatDateTime(log.timestamp)}</span>
                   </div>
                   <div className="text-ink-muted">
-                    Đã thay đổi quyền của <span className="font-bold text-emerald-600 dark:text-emerald-400">{log.targetEmail}</span> từ <span className="font-mono bg-surface text-ink px-1 rounded text-[10px]">{log.oldRole}</span> sang <span className="font-mono bg-emerald-100 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 px-1 rounded text-[10px] font-bold">{log.newRole}</span>
+                    {log.action === 'DELETE_USER' ? (
+                      <>Đã xóa tài khoản <span className="font-bold text-rose-600 dark:text-rose-400">{log.targetEmail}</span> khỏi hệ thống</>
+                    ) : (
+                      <>
+                        Đã chuyển vai trò của <span className="font-bold text-emerald-600 dark:text-emerald-400">{log.targetEmail}</span> từ{' '}
+                        <span className="font-mono bg-surface text-ink px-1.5 py-0.5 rounded text-[10px] border border-border">{log.oldRole}</span> sang{' '}
+                        <span className="font-mono bg-indigo-100 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 px-1.5 py-0.5 rounded text-[10px] font-bold border border-indigo-200 dark:border-indigo-800">{log.newRole}</span>
+                      </>
+                    )}
                   </div>
                 </div>
               ))}

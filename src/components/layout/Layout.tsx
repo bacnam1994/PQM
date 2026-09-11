@@ -115,6 +115,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   
   const user = useAppStore(state => state.user);
   const role = useAppStore(state => state.role);
+  const isAdmin = useAppStore(state => state.isAdmin);
   const logout = useAppStore(state => state.logout);
   const theme = useAppStore(state => state.theme);
   const setTheme = useAppStore(state => state.setTheme);
@@ -215,7 +216,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
       {/* Nav Groups */}
       {navItems.slice(1).map((group, idx) => {
-        const visibleChildren = (group.children || []).filter(child => !child.adminOnly || role === 'ADMIN');
+        const visibleChildren = (group.children || []).filter(child => !child.adminOnly || role === 'ADMIN' || isAdmin);
         if (visibleChildren.length === 0) return null;
 
         return (
@@ -551,7 +552,9 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                 <MenuItems className="absolute right-0 z-50 mt-2 w-56 origin-top-right rounded-2xl bg-surface p-1.5 shadow-xl ring-1 ring-border focus:outline-none text-xs">
                   <div className="px-3 py-2 border-b border-border/80 mb-1">
                     <div className="font-semibold text-ink truncate">{user?.displayName || user?.email || 'Người dùng'}</div>
-                    <div className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold uppercase tracking-wider mt-0.5">{role}</div>
+                    <div className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold uppercase tracking-wider mt-0.5">
+                      {role === 'ADMIN' || isAdmin ? 'ADMIN' : (role || 'GUEST')}
+                    </div>
                   </div>
 
                   <MenuItem>

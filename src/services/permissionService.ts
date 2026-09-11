@@ -19,14 +19,15 @@ export function normalizeUser(user: any): UserIdentity | null {
   if (!user) return null;
   
   // Nếu là Firebase User hoặc custom user
-  const role: Role = user.role || (user.isAdmin ? 'ADMIN' : 'GUEST');
+  const isAdminFlag = user.role === 'ADMIN' || !!user.isAdmin;
+  const role: Role = isAdminFlag ? 'ADMIN' : (user.role || 'GUEST');
   
   return {
     uid: user.uid || '',
     email: user.email || null,
     displayName: user.displayName || null,
     role: role,
-    isAdmin: role === 'ADMIN' || !!user.isAdmin
+    isAdmin: isAdminFlag
   };
 }
 
@@ -135,7 +136,7 @@ export function hasRole(
  */
 export function isAdmin(user: any): boolean {
   const identity = normalizeUser(user);
-  return !!identity?.isAdmin;
+  return !!identity?.isAdmin || identity?.role === 'ADMIN';
 }
 
 /**

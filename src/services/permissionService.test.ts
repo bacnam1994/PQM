@@ -28,6 +28,24 @@ describe('permissionService - PQM 3.0 RBAC Engine', () => {
       expect(can(adminUser, 'ai:execute_action')).toBe(true);
       expect(isAdmin(adminUser)).toBe(true);
     });
+
+    it('should recognize dual Admin flags (isAdmin flag or role ADMIN)', () => {
+      const adminOnlyFlag = { uid: 'u-flag', email: 'flag@vbiotech.vn', isAdmin: true };
+      const roleOnlyAdmin = { uid: 'u-role', email: 'role@vbiotech.vn', role: 'ADMIN' as const };
+
+      expect(isAdmin(adminOnlyFlag)).toBe(true);
+      expect(isAdmin(roleOnlyAdmin)).toBe(true);
+      expect(can(adminOnlyFlag, 'user:manage')).toBe(true);
+      expect(can(roleOnlyAdmin, 'batch:release')).toBe(true);
+    });
+
+    it('should allow ADMIN to bypass locked states for emergency correction', () => {
+      expect(can(adminUser, 'batch:update', { status: 'RELEASED' })).toBe(true);
+      expect(can(adminUser, 'batch:update', { status: 'REJECTED' })).toBe(true);
+      expect(can(adminUser, 'test_result:update', { status: 'APPROVED' })).toBe(true);
+      expect(can(adminUser, 'test_result:update', { status: 'LOCKED' })).toBe(true);
+      expect(can(adminUser, 'test_result:delete', { status: 'APPROVED' })).toBe(true);
+    });
   });
 
   describe('2. QA (Quality Assurance) Capabilities', () => {

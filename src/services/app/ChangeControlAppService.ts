@@ -270,7 +270,7 @@ export class ChangeControlAppService {
   async updateStatus(
     id: string,
     newStatus: ChangeStatus,
-    currentUser: { email?: string; role?: string | null },
+    currentUser: { email?: string; role?: string | null; isAdmin?: boolean },
     notes?: string
   ): Promise<ChangeRequest> {
     const cr = await this.getById(id);
@@ -278,7 +278,7 @@ export class ChangeControlAppService {
 
     // Kiểm tra quy định khi đóng thay đổi
     if (newStatus === 'CLOSED') {
-      const isAuthorized = currentUser?.role === 'QA' || currentUser?.role === 'ADMIN';
+      const isAuthorized = currentUser?.isAdmin || currentUser?.role === 'QA' || currentUser?.role === 'ADMIN';
       if (!isAuthorized) {
         throw new Error('Từ chối quyền: Chỉ Quản lý QA hoặc Quản trị viên mới có thẩm quyền Đóng (Close) Change Request.');
       }

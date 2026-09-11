@@ -28,9 +28,10 @@ import { formatDateStandard } from '../../../utils';
 import { Modal } from '../../../components/ui/CommonUI';
 
 export const ChangeControlListPage: React.FC = () => {
-  const { user, role, products } = useAppStore(useShallow(s => ({
+  const { user, role, isAdmin, products } = useAppStore(useShallow(s => ({
     user: s.user,
     role: s.role,
+    isAdmin: s.isAdmin,
     products: s.products
   })));
 
@@ -110,7 +111,7 @@ export const ChangeControlListPage: React.FC = () => {
 
   const handleUpdateStatus = async (id: string, newStatus: ChangeStatus, notes?: string) => {
     try {
-      await changeControlAppService.updateStatus(id, newStatus, { email: user?.email, role }, notes);
+      await changeControlAppService.updateStatus(id, newStatus, { email: user?.email, role, isAdmin: isAdmin || role === 'ADMIN' }, notes);
       toast.success('Đã cập nhật trạng thái Change Request!');
       await loadData();
     } catch (err: any) {

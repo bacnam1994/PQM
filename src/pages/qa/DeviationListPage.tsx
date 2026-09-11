@@ -61,9 +61,10 @@ const SOURCE_LABELS: Record<DeviationSource, string> = {
 };
 
 const DeviationListPage: React.FC = () => {
-  const { user, role, batches, products } = useAppStore(useShallow(s => ({
+  const { user, role, isAdmin, batches, products } = useAppStore(useShallow(s => ({
     user: s.user,
     role: s.role,
+    isAdmin: s.isAdmin,
     batches: s.batches,
     products: s.products
   })));
@@ -87,7 +88,7 @@ const DeviationListPage: React.FC = () => {
       await deviationAppService.updateStatus(
         selectedDeviation.id,
         status,
-        user,
+        { ...user, role, isAdmin: isAdmin || role === 'ADMIN' },
         { notes, investigator }
       );
       toast.success(`Hồ sơ ${selectedDeviation.deviationNo} đã chuyển sang "${STATUS_CONFIG[status].label}"`);
@@ -957,6 +958,7 @@ const DeviationListPage: React.FC = () => {
         targetStatus={targetStatus}
         onConfirm={handleWorkflowConfirm}
         currentUserRole={role}
+        isAdmin={isAdmin || role === 'ADMIN'}
       />
 
       <Modal
