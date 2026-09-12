@@ -24,8 +24,9 @@ export const ActionButtons: React.FC<ActionButtonsProps> = ({ onView, onEdit, on
         <button
           type="button"
           onClick={(e) => { e.stopPropagation(); onView(); }}
-          className="p-1.5 text-ink-faint hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 rounded-lg transition-colors"
+          className="p-1.5 text-ink-muted hover:text-emerald-600 hover:bg-surface-2 rounded-lg transition-colors"
           title="Xem chi tiết"
+          aria-label="Xem chi tiết"
         >
           <EyeIcon className="w-4 h-4" />
         </button>
@@ -34,8 +35,9 @@ export const ActionButtons: React.FC<ActionButtonsProps> = ({ onView, onEdit, on
         <button
           type="button"
           onClick={(e) => { e.stopPropagation(); onClone(); }}
-          className="p-1.5 text-ink-faint hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 rounded-lg transition-colors"
+          className="p-1.5 text-ink-muted hover:text-emerald-600 hover:bg-surface-2 rounded-lg transition-colors"
           title="Sao chép"
+          aria-label="Sao chép"
         >
           <DocumentDuplicateIcon className="w-4 h-4" />
         </button>
@@ -44,8 +46,9 @@ export const ActionButtons: React.FC<ActionButtonsProps> = ({ onView, onEdit, on
         <button
           type="button"
           onClick={(e) => { e.stopPropagation(); onEdit(); }}
-          className="p-1.5 text-ink-faint hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 rounded-lg transition-colors"
+          className="p-1.5 text-ink-muted hover:text-emerald-600 hover:bg-surface-2 rounded-lg transition-colors"
           title="Chỉnh sửa"
+          aria-label="Chỉnh sửa"
         >
           <PencilSquareIcon className="w-4 h-4" />
         </button>
@@ -54,8 +57,9 @@ export const ActionButtons: React.FC<ActionButtonsProps> = ({ onView, onEdit, on
         <button
           type="button"
           onClick={(e) => { e.stopPropagation(); onDelete(); }}
-          className="p-1.5 text-ink-faint hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg transition-colors"
+          className="p-1.5 text-ink-muted hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg transition-colors"
           title="Xóa"
+          aria-label="Xóa"
         >
           <TrashIcon className="w-4 h-4" />
         </button>
@@ -80,21 +84,21 @@ export const DeleteModal: React.FC<DeleteModalProps> = ({
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Xác nhận xóa" icon={TrashIcon} color="bg-rose-100 text-rose-600 dark:bg-rose-950/60 dark:text-rose-400">
       <div className="space-y-4">
-        <div className="bg-rose-50/80 dark:bg-rose-950/40 p-4 rounded-xl border border-rose-200/80 dark:border-rose-800/60 text-rose-800 dark:text-rose-200">
+        <div className="bg-rose-50/80 dark:bg-rose-950/40 p-4 rounded-xl border border-rose-200 dark:border-rose-900/60 text-rose-800 dark:text-rose-200">
           <p className="font-semibold text-sm">Bạn có chắc chắn muốn xóa dữ liệu này?</p>
-          {itemName && <p className="text-xs mt-1.5 font-normal">Mục: <span className="font-bold">{itemName}</span></p>}
+          {itemName && <p className="text-xs mt-1 font-normal">Mục: <span className="font-semibold">{itemName}</span></p>}
         </div>
         
         {warningMessage && (
-          <p className="text-xs text-ink-faint italic">{warningMessage}</p>
+          <p className="text-xs text-ink-muted italic">{warningMessage}</p>
         )}
 
-        <div className="flex justify-end gap-3 pt-2">
+        <div className="flex justify-end gap-2.5 pt-2">
           <button 
             type="button"
             onClick={onClose} 
             disabled={isDeleting}
-            className="px-4 py-2 text-ink-soft hover:text-ink font-semibold text-xs uppercase tracking-wider hover:bg-surface-2 rounded-xl transition-colors border border-border"
+            className="px-3.5 py-2 text-ink-soft hover:text-ink font-medium text-sm hover:bg-surface-2 rounded-lg transition-colors border border-border"
           >
             Hủy bỏ
           </button>
@@ -102,7 +106,7 @@ export const DeleteModal: React.FC<DeleteModalProps> = ({
             type="button"
             onClick={onConfirm}
             disabled={isDeleting}
-            className="px-4 py-2 bg-rose-600 text-white font-semibold text-xs uppercase tracking-wider rounded-xl shadow-xs hover:bg-rose-700 flex items-center gap-2 transition-all disabled:opacity-50"
+            className="px-4 py-2 bg-rose-600 text-white font-medium text-sm rounded-lg shadow-xs hover:bg-rose-700 active:scale-[0.98] flex items-center gap-2 transition-all disabled:opacity-50"
           >
             {isDeleting ? 'Đang xóa...' : 'Xác nhận xóa'}
           </button>
@@ -117,7 +121,7 @@ export const AddButton: React.FC<{ onClick: () => void, label?: string }> = ({ o
   <button
     type="button"
     onClick={onClick}
-    className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 font-semibold shadow-xs hover:shadow-sm transition-all text-xs uppercase tracking-wider"
+    className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] text-white rounded-lg font-medium text-sm shadow-xs transition-all"
   >
     <PlusIcon className="w-4 h-4" /> <span>{label}</span>
   </button>

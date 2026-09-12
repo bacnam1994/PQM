@@ -233,12 +233,12 @@ const ProductFormPage = () => {
       <div className="flex items-center gap-4">
         <button 
           onClick={() => navigate('/products')} 
-          className="p-2 bg-surface text-ink-muted hover:text-emerald-600 rounded-xl border border-border shadow-sm transition-colors"
+          className="p-2 bg-surface text-ink-muted hover:text-emerald-700 dark:hover:text-emerald-400 rounded-lg border border-border shadow-xs transition-colors cursor-pointer"
         >
           <ArrowLeftIcon className="w-5 h-5" />
         </button>
         <div>
-          <h1 className="text-2xl font-bold text-ink tracking-tight">
+          <h1 className="text-xl sm:text-2xl font-bold text-ink tracking-tight">
             {id ? 'Chỉnh sửa Sản phẩm' : 'Thêm Sản phẩm mới'}
           </h1>
           <p className="text-xs text-ink-muted mt-0.5">
@@ -247,7 +247,7 @@ const ProductFormPage = () => {
         </div>
       </div>
 
-      <div className="bg-surface rounded-2xl shadow-sm border border-border p-6">
+      <div className="bg-surface rounded-xl shadow-xs border border-border p-6">
         {(!id || productToEdit) && (
           <form onSubmit={handleSave} className="space-y-6">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -259,35 +259,35 @@ const ProductFormPage = () => {
             
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <DSFormInput label="Số ĐKCB / Công bố" name="registrationNo" defaultValue={productToEdit?.registrationNo} placeholder="VD: 1234/2024/ATTP-XNCB" />
-              <DSFormInput label="Ngày cấp" type="date" name="registrationDate" defaultValue={productToEdit?.registrationDate?.split('T')[0] || new Date().toISOString().split('T')[0]} />
+              <DSFormInput type="date" label="Ngày cấp" name="registrationDate" defaultValue={productToEdit?.registrationDate?.split('T')[0] || new Date().toISOString().split('T')[0]} />
             </div>
             
             <DSFormInput label="Công ty đăng ký / Sở hữu" name="registrant" defaultValue={productToEdit?.registrant} placeholder="CÔNG TY CỔ PHẦN..." />
             
             {/* Ảnh sản phẩm */}
             <div className="space-y-2">
-              <label className="text-xs font-semibold text-ink-muted uppercase tracking-wider flex items-center gap-1.5">
+              <label className="text-xs font-semibold text-ink-muted flex items-center gap-1.5">
                 <PhotoIcon className="w-4 h-4 text-emerald-600" />
                 Ảnh sản phẩm
               </label>
               
-              <div className="flex items-center gap-6 bg-surface-2 p-4 rounded-2xl border border-border">
+              <div className="flex items-center gap-6 bg-surface-2/60 p-4 rounded-xl border border-border">
                 {imageUrl ? (
                   <div className="relative group shrink-0">
-                    <img src={imageUrl} alt="Preview" className="w-24 h-24 rounded-2xl object-cover border border-border shadow-sm" />
+                    <img src={imageUrl} alt="Preview" className="w-24 h-24 rounded-xl object-cover border border-border shadow-xs" />
                     <button
                       type="button"
                       onClick={() => setImageUrl('')}
-                      className="absolute -top-2 -right-2 p-1.5 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors shadow"
+                      className="absolute -top-2 -right-2 p-1.5 bg-rose-600 text-white rounded-full hover:bg-rose-700 transition-colors shadow-xs cursor-pointer"
                       title="Gỡ ảnh"
                     >
                       <XMarkIcon className="w-3.5 h-3.5" />
                     </button>
                   </div>
                 ) : (
-                  <div className="w-24 h-24 rounded-2xl border-2 border-dashed border-border bg-surface flex flex-col items-center justify-center text-ink-muted shrink-0">
+                  <div className="w-24 h-24 rounded-xl border-2 border-dashed border-border bg-surface flex flex-col items-center justify-center text-ink-muted shrink-0">
                     <PhotoIcon className="w-7 h-7 text-ink-muted/60" />
-                    <span className="text-[10px] font-semibold mt-1 uppercase text-ink-muted">Chưa có ảnh</span>
+                    <span className="text-[10px] font-medium mt-1 text-ink-muted">Chưa có ảnh</span>
                   </div>
                 )}
                 
@@ -303,14 +303,14 @@ const ProductFormPage = () => {
                     />
                     <label
                       htmlFor="product-image-upload"
-                      className={`px-4 py-2 bg-surface border border-border text-ink rounded-xl hover:bg-surface-3 font-semibold uppercase text-xs tracking-wider transition-all shadow-sm cursor-pointer flex items-center gap-2 ${isUploading ? 'opacity-50 pointer-events-none' : ''}`}
+                      className={`px-3.5 py-1.5 bg-surface border border-border text-ink-soft rounded-lg hover:bg-surface-2 font-medium text-xs transition-all shadow-xs cursor-pointer flex items-center gap-2 ${isUploading ? 'opacity-50 pointer-events-none' : ''}`}
                     >
                       {isUploading ? <ArrowPathIcon className="w-4 h-4 animate-spin text-emerald-600" /> : <ArrowUpTrayIcon className="w-4 h-4 text-emerald-600" />}
                       Tải ảnh lên
                     </label>
                     
                     {useGoogleDriveUpload && googleDriveClientId && googleDriveApiKey && (
-                      <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-full uppercase tracking-wider flex items-center gap-1 border border-emerald-500/20">
+                      <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-500/10 px-2.5 py-0.5 rounded-full flex items-center gap-1 border border-emerald-500/20">
                         <CloudIcon className="w-3.5 h-3.5" /> Google Drive
                       </span>
                     )}
@@ -321,7 +321,7 @@ const ProductFormPage = () => {
                       <div className="w-full bg-surface-3 rounded-full h-1.5 overflow-hidden">
                         <div className="bg-emerald-600 h-1.5 rounded-full transition-all duration-300" style={{ width: `${uploadProgress}%` }}></div>
                       </div>
-                      <p className="text-[10px] font-medium text-ink-muted uppercase">Đang tải lên: {uploadProgress}%</p>
+                      <p className="text-[10px] font-medium text-ink-muted">Đang tải lên: {uploadProgress}%</p>
                     </div>
                   )}
                   
@@ -335,22 +335,22 @@ const ProductFormPage = () => {
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-ink-muted uppercase tracking-wider">Mô tả tóm tắt</label>
+              <label className="text-xs font-semibold text-ink-muted">Mô tả tóm tắt</label>
               <textarea 
                 name="description" 
                 defaultValue={productToEdit?.description || ''} 
                 rows={3} 
-                className="w-full px-4 py-2.5 bg-surface border border-border rounded-xl font-medium text-ink placeholder:text-ink-muted outline-none text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all" 
+                className="w-full px-3.5 py-2.5 bg-surface border border-border rounded-xl font-medium text-ink placeholder:text-ink-faint outline-none text-sm focus:ring-2 focus:ring-emerald-500/15 focus:border-emerald-500 transition-all" 
                 placeholder="Mô tả ngắn về sản phẩm..."
               />
             </div>
             
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-ink-muted uppercase tracking-wider">Trạng thái lưu hành</label>
+              <label className="text-xs font-semibold text-ink-muted">Trạng thái lưu hành</label>
               <select 
                 name="status" 
                 defaultValue={productToEdit?.status || PRODUCT_STATUS.ACTIVE} 
-                className="w-full px-4 py-2.5 bg-surface border border-border rounded-xl font-medium text-ink outline-none text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all cursor-pointer"
+                className="w-full px-3.5 py-2.5 bg-surface border border-border rounded-xl font-medium text-ink outline-none text-sm focus:ring-2 focus:ring-emerald-500/15 focus:border-emerald-500 transition-all cursor-pointer"
               >
                 <option value={PRODUCT_STATUS.ACTIVE}>Đang công bố & Sản xuất</option>
                 <option value={PRODUCT_STATUS.DISCONTINUED}>Ngừng sản xuất</option>
@@ -362,14 +362,14 @@ const ProductFormPage = () => {
               <button 
                 type="button" 
                 onClick={() => navigate('/products')} 
-                className="px-5 py-2.5 text-ink-muted hover:text-ink font-semibold uppercase text-xs tracking-wider hover:bg-surface-2 rounded-xl transition-colors"
+                className="px-4 py-2 text-ink-muted hover:text-ink font-medium text-xs hover:bg-surface-2 rounded-lg transition-colors cursor-pointer"
               >
                 Hủy & Quay lại
               </button>
               <button 
                 type="submit" 
                 disabled={isSubmitting} 
-                className="px-8 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-semibold uppercase text-xs tracking-wider flex items-center gap-2 shadow-sm transition-all disabled:opacity-50"
+                className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white rounded-lg font-medium text-xs flex items-center gap-2 shadow-xs transition-all disabled:opacity-50 cursor-pointer"
               >
                 {isSubmitting && <ArrowPathIcon className="w-4 h-4 animate-spin" />}
                 {id ? 'Cập nhật Sản phẩm' : 'Lưu Sản phẩm mới'}

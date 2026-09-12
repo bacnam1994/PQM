@@ -8,21 +8,21 @@ import {
 import { useUIStore } from '../../store/useUIStore';
 import { parseDateToISO } from '../../utils';
 
-// 1. Container cho thanh công cụ (Filter Bar - Tailwind UI standard)
+// 1. Container cho thanh công cụ (Filter Bar - Modern Minimalist)
 export const DSFilterBar: React.FC<{ children: React.ReactNode; className?: string }> = ({ children, className = '' }) => (
-  <div className={`bg-surface p-3 sm:p-4 rounded-2xl border border-border shadow-xs flex flex-col md:flex-row gap-3 items-center ${className}`}>
+  <div className={`bg-surface p-3 sm:p-3.5 rounded-xl border border-border shadow-xs flex flex-col md:flex-row gap-3 items-center ${className}`}>
     {children}
   </div>
 );
 
-// 2. Ô tìm kiếm chuẩn (Tailwind UI Minimal Search Input)
+// 2. Ô tìm kiếm chuẩn (Linear Minimal Search Input)
 export const DSSearchInput = memo(forwardRef<HTMLInputElement, React.InputHTMLAttributes<HTMLInputElement> & { onClear?: () => void }>((props, ref) => (
   <div className="relative flex-1 w-full group">
     <MagnifyingGlassIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-faint group-focus-within:text-emerald-600 dark:group-focus-within:text-emerald-400 transition-colors pointer-events-none" />
     <input 
       ref={ref}
       {...props}
-      className={`w-full pl-10 pr-9 py-2 bg-surface-2 border border-border/80 focus:border-emerald-500 dark:focus:border-emerald-500 focus:bg-surface rounded-xl text-sm font-medium text-ink outline-none focus:ring-1 focus:ring-emerald-500 transition-all placeholder:text-ink-faint ${props.className || ''}`}
+      className={`w-full pl-10 pr-9 py-2 bg-surface-2 border border-border focus:border-emerald-500 dark:focus:border-emerald-500 focus:bg-surface rounded-xl text-sm font-medium text-ink outline-none focus:ring-2 focus:ring-emerald-500/15 transition-all placeholder:text-ink-faint ${props.className || ''}`}
     />
     {props.value && props.onClear && (
        <button
@@ -44,7 +44,7 @@ interface DSSelectProps extends React.SelectHTMLAttributes<HTMLSelectElement> {
 }
 
 export const DSSelect = forwardRef<HTMLSelectElement, DSSelectProps>(({ icon: Icon, containerClassName = '', className = '', children, ...props }, ref) => (
-  <div className={`flex items-center gap-2 bg-surface-2 rounded-xl px-3 border border-border/80 hover:border-border focus-within:border-emerald-500 focus-within:bg-surface focus-within:ring-1 focus-within:ring-emerald-500 transition-all ${containerClassName}`}>
+  <div className={`flex items-center gap-2 bg-surface-2 rounded-xl px-3 border border-border hover:border-ink-faint focus-within:border-emerald-500 focus-within:bg-surface focus-within:ring-2 focus-within:ring-emerald-500/15 transition-all ${containerClassName}`}>
     {Icon && (
       typeof Icon === 'function' || typeof Icon === 'object' ? (
         React.isValidElement(Icon) ? Icon : <Icon className="w-4 h-4 text-ink-faint shrink-0" />
@@ -78,7 +78,7 @@ export const DSViewToggle: React.FC<{
       <button 
         type="button"
         onClick={() => setViewMode('grid')} 
-        className={`p-1.5 rounded-md transition-all ${viewMode === 'grid' ? 'bg-surface text-emerald-700 dark:text-emerald-400 shadow-xs' : 'text-ink-faint hover:text-ink'}`}
+        className={`p-1.5 rounded-md transition-all ${viewMode === 'grid' ? 'bg-surface text-emerald-700 dark:text-emerald-400 shadow-2xs font-semibold' : 'text-ink-faint hover:text-ink'}`}
         title="Chế độ lưới"
       >
         {renderIcon(GridIcon)}
@@ -86,7 +86,7 @@ export const DSViewToggle: React.FC<{
       <button 
         type="button"
         onClick={() => setViewMode('list')} 
-        className={`p-1.5 rounded-md transition-all ${viewMode === 'list' ? 'bg-surface text-emerald-700 dark:text-emerald-400 shadow-xs' : 'text-ink-faint hover:text-ink'}`}
+        className={`p-1.5 rounded-md transition-all ${viewMode === 'list' ? 'bg-surface text-emerald-700 dark:text-emerald-400 shadow-2xs font-semibold' : 'text-ink-faint hover:text-ink'}`}
         title="Chế độ danh sách"
       >
         {renderIcon(ListIcon)}
@@ -97,14 +97,14 @@ export const DSViewToggle: React.FC<{
 
 // 5. Card chuẩn — Tailwind UI Card Panel
 export const DSCard: React.FC<{ children: React.ReactNode; className?: string; isExpanded?: boolean }> = ({ children, className = '', isExpanded = false }) => (
-  <div className={`bg-surface rounded-2xl border transition-all overflow-hidden ${isExpanded ? 'border-emerald-500/80 ring-1 ring-emerald-500 shadow-md' : 'border-border shadow-xs hover:shadow-sm'} ${className}`}>
+  <div className={`bg-surface rounded-xl border transition-all overflow-hidden ${isExpanded ? 'border-emerald-500 ring-1 ring-emerald-500/20 shadow-sm' : 'border-border shadow-xs hover:border-emerald-500/30'} ${className}`}>
     {children}
   </div>
 );
 
 // 6. Table Container chuẩn
 export const DSTable: React.FC<{ children: React.ReactNode; className?: string }> = ({ children, className = '' }) => (
-  <div className={`bg-surface rounded-2xl border border-border shadow-xs overflow-hidden ${className}`}>
+  <div className={`bg-surface rounded-xl border border-border shadow-xs overflow-hidden ${className}`}>
     <table className="w-full text-left">
       {children}
     </table>
@@ -113,12 +113,12 @@ export const DSTable: React.FC<{ children: React.ReactNode; className?: string }
 
 // 7. Input Form chuẩn (Tailwind UI Form Field)
 export const DSFormInput = memo(forwardRef<HTMLInputElement, React.InputHTMLAttributes<HTMLInputElement> & { label?: string }>(({ label, className = '', ...props }, ref) => (
-  <div className="space-y-1.5">
-    {label && <label className="text-[11px] font-semibold text-ink-faint uppercase tracking-wider pl-0.5">{label}</label>}
+  <div className="space-y-1">
+    {label && <label className="text-xs font-medium text-ink-soft pl-0.5 block">{label}</label>}
     <input 
       ref={ref}
       {...props}
-      className={`w-full px-3.5 py-2.5 bg-surface-2 border border-border/80 focus:border-emerald-500 focus:bg-surface rounded-xl font-medium outline-none text-sm text-ink transition-all placeholder:text-ink-faint focus:ring-1 focus:ring-emerald-500 ${className}`}
+      className={`w-full px-3.5 py-2.5 bg-surface-2 border border-border focus:border-emerald-500 focus:bg-surface rounded-xl font-medium outline-none text-sm text-ink transition-all placeholder:text-ink-faint focus:ring-2 focus:ring-emerald-500/15 ${className}`}
     />
   </div>
 )));
@@ -128,16 +128,16 @@ export const DSEmptyState: React.FC<{ title: string; message: string; icon?: any
   const renderIcon = () => {
     if (!Icon) return null;
     if (React.isValidElement(Icon)) return Icon;
-    return <Icon className="w-7 h-7 text-ink-faint" />;
+    return <Icon className="w-6 h-6 text-ink-muted" />;
   };
 
   return (
-    <div className={`col-span-full p-12 sm:p-16 flex flex-col items-center justify-center text-center bg-surface-2/30 rounded-2xl border-2 border-dashed border-border animate-in fade-in duration-300 ${className}`}>
-       <div className="p-3.5 bg-surface rounded-2xl mb-4 text-ink-faint shadow-xs border border-border">
+    <div className={`col-span-full p-8 sm:p-12 flex flex-col items-center justify-center text-center bg-surface-2/30 rounded-xl border border-dashed border-border animate-in fade-in duration-200 ${className}`}>
+       <div className="p-3 bg-surface rounded-xl mb-3 text-ink-muted shadow-xs border border-border">
          {renderIcon()}
        </div>
-       <h3 className="text-ink font-semibold text-sm tracking-tight mb-1.5">{title}</h3>
-       <p className="text-ink-faint text-xs sm:text-sm font-normal max-w-md leading-relaxed">{message}</p>
+       <h3 className="text-ink font-semibold text-sm tracking-tight mb-1">{title}</h3>
+       <p className="text-ink-muted text-xs sm:text-sm font-normal max-w-md leading-relaxed">{message}</p>
     </div>
   );
 };
@@ -215,8 +215,8 @@ export const DSDateInput: React.FC<DSDateInputProps> = ({
   };
 
   return (
-    <div className="space-y-1.5 w-full">
-      {label && <label className="text-[11px] font-semibold text-ink-faint uppercase tracking-wider pl-0.5">{label}</label>}
+    <div className="space-y-1 w-full">
+      {label && <label className="text-xs font-medium text-ink-soft pl-0.5 block">{label}</label>}
       <div className="relative flex items-center w-full">
         <input
           type="text"
@@ -225,7 +225,7 @@ export const DSDateInput: React.FC<DSDateInputProps> = ({
           onBlur={handleBlur}
           placeholder={dateFormat.toLowerCase()}
           required={required}
-          className={`w-full pl-3.5 pr-10 py-2.5 bg-surface-2 border border-border/80 focus:border-emerald-500 focus:bg-surface rounded-xl font-medium outline-none text-sm text-ink transition-all placeholder:text-ink-faint focus:ring-1 focus:ring-emerald-500 ${className}`}
+          className={`w-full pl-3.5 pr-10 py-2.5 bg-surface-2 border border-border focus:border-emerald-500 focus:bg-surface rounded-xl font-medium outline-none text-sm text-ink transition-all placeholder:text-ink-faint focus:ring-2 focus:ring-emerald-500/15 ${className}`}
         />
         <button
           type="button"

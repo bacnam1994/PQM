@@ -196,20 +196,20 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   };
 
   const renderNavLinks = (onItemClick?: () => void) => (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {/* Dashboard Item */}
       <div>
         <Link
           to="/"
           onClick={onItemClick}
-          className={`group flex items-center gap-x-3 rounded-xl px-3 py-2 text-xs font-semibold transition-all ${
+          className={`group relative flex items-center gap-x-3 rounded-lg px-3 py-2 text-xs font-medium transition-colors ${
             location.pathname === '/'
-              ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 ring-1 ring-inset ring-emerald-600/20 shadow-xs'
-              : 'text-ink-soft hover:bg-surface-2 hover:text-ink'
+              ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 font-semibold before:absolute before:left-0 before:top-1.5 before:bottom-1.5 before:w-0.5 before:bg-emerald-600 before:rounded-r'
+              : 'text-ink-muted hover:bg-surface-2 hover:text-ink'
           }`}
           title="Bảng điều khiển"
         >
-          <Squares2X2Icon className={`w-5 h-5 shrink-0 ${location.pathname === '/' ? 'text-emerald-600 dark:text-emerald-400' : 'text-ink-faint group-hover:text-ink'}`} />
+          <Squares2X2Icon className={`w-4 h-4 shrink-0 ${location.pathname === '/' ? 'text-emerald-600 dark:text-emerald-400' : 'text-ink-muted group-hover:text-ink'}`} />
           {!isCollapsed && <span className="truncate">Bảng điều khiển</span>}
         </Link>
       </div>
@@ -220,13 +220,13 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         if (visibleChildren.length === 0) return null;
 
         return (
-          <div key={idx} className="space-y-1">
+          <div key={idx} className="space-y-0.5">
             {!isCollapsed ? (
-              <div className="px-3 text-[10px] font-bold uppercase tracking-wider text-ink-faint">
+              <div className="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-ink-muted">
                 {group.name}
               </div>
             ) : (
-              <div className="w-6 mx-auto my-2 border-t border-border/60" />
+              <div className="w-5 mx-auto my-2 border-t border-border" />
             )}
 
             {visibleChildren.map((child) => {
@@ -238,19 +238,19 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                   key={child.path}
                   to={child.path}
                   onClick={onItemClick}
-                  className={`group flex items-center gap-x-3 rounded-xl px-3 py-2 text-xs font-semibold transition-all ${
+                  className={`group relative flex items-center gap-x-3 rounded-lg px-3 py-2 text-xs font-medium transition-colors ${
                     isActive
-                      ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 ring-1 ring-inset ring-emerald-600/20 shadow-xs'
-                      : 'text-ink-soft hover:bg-surface-2 hover:text-ink'
+                      ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 font-semibold before:absolute before:left-0 before:top-1.5 before:bottom-1.5 before:w-0.5 before:bg-emerald-600 before:rounded-r'
+                      : 'text-ink-muted hover:bg-surface-2 hover:text-ink'
                   }`}
                   title={child.name}
                 >
-                  <IconComp className={`w-5 h-5 shrink-0 ${isActive ? 'text-emerald-600 dark:text-emerald-400' : 'text-ink-faint group-hover:text-ink'}`} />
+                  <IconComp className={`w-4 h-4 shrink-0 ${isActive ? 'text-emerald-600 dark:text-emerald-400' : 'text-ink-muted group-hover:text-ink'}`} />
                   {!isCollapsed && (
                     <span className="flex-1 truncate">{child.name}</span>
                   )}
                   {child.isAlerts && hasAlerts && (
-                    <span className="px-1.5 py-0.5 text-[10px] font-bold rounded-full bg-rose-500 text-white shrink-0 shadow-xs animate-pulse">
+                    <span className="px-1.5 py-0.2 text-[10px] font-bold rounded-full bg-rose-500 text-white shrink-0">
                       {alertCount}
                     </span>
                   )}
@@ -262,9 +262,9 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       })}
 
       {/* Tools / Actions */}
-      <div className="space-y-1 pt-2 border-t border-border/70">
+      <div className="space-y-0.5 pt-2 border-t border-border">
         {!isCollapsed && (
-          <div className="px-3 text-[10px] font-bold uppercase tracking-wider text-ink-faint">
+          <div className="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-ink-muted">
             Công cụ
           </div>
         )}
@@ -274,20 +274,20 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
             onItemClick && onItemClick();
             window.dispatchEvent(new CustomEvent('trigger-ai-chat', { detail: { prompt: 'Tổng quan tình trạng tất cả lô hàng hiện tại' } }));
           }}
-          className="w-full group flex items-center gap-x-3 rounded-xl px-3 py-2 text-xs font-semibold text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 transition-all text-left"
-          title="Trợ lý AI"
+          className="w-full group flex items-center gap-x-3 rounded-lg px-3 py-2 text-xs font-medium text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/10 transition-colors text-left"
+          title="Trợ lý AI Copilot"
         >
-          <SparklesIcon className="w-5 h-5 shrink-0 text-emerald-600 dark:text-emerald-400 group-hover:scale-110 transition-transform" />
+          <SparklesIcon className="w-4 h-4 shrink-0 text-emerald-600 dark:text-emerald-400 group-hover:scale-105 transition-transform" />
           {!isCollapsed && <span className="truncate">Trợ lý AI Copilot</span>}
         </button>
 
         <button
           type="button"
           onClick={handleLogout}
-          className="w-full group flex items-center gap-x-3 rounded-xl px-3 py-2 text-xs font-semibold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-all text-left"
+          className="w-full group flex items-center gap-x-3 rounded-lg px-3 py-2 text-xs font-medium text-rose-600 dark:text-rose-400 hover:bg-rose-500/10 transition-colors text-left"
           title="Đăng xuất"
         >
-          <ArrowRightOnRectangleIcon className="w-5 h-5 shrink-0 text-rose-500 group-hover:translate-x-0.5 transition-transform" />
+          <ArrowRightOnRectangleIcon className="w-4 h-4 shrink-0 text-rose-500 group-hover:translate-x-0.5 transition-transform" />
           {!isCollapsed && <span className="truncate">Đăng xuất</span>}
         </button>
       </div>
@@ -301,10 +301,10 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         <Dialog as="div" className="relative z-50 xl:hidden" onClose={setMobileMenuOpen}>
           <TransitionChild
             as={Fragment}
-            enter="transition-opacity ease-linear duration-300"
+            enter="transition-opacity ease-linear duration-200"
             enterFrom="opacity-0"
             enterTo="opacity-100"
-            leave="transition-opacity ease-linear duration-300"
+            leave="transition-opacity ease-linear duration-200"
             leaveFrom="opacity-100"
             leaveTo="opacity-0"
           >
@@ -314,30 +314,30 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
           <div className="fixed inset-0 flex">
             <TransitionChild
               as={Fragment}
-              enter="transition ease-in-out duration-300 transform"
+              enter="transition ease-in-out duration-200 transform"
               enterFrom="-translate-x-full"
               enterTo="translate-x-0"
-              leave="transition ease-in-out duration-300 transform"
+              leave="transition ease-in-out duration-200 transform"
               leaveFrom="translate-x-0"
               leaveTo="-translate-x-full"
             >
               <DialogPanel className="relative mr-16 flex w-full max-w-xs flex-1">
                 <div className="flex grow flex-col gap-y-5 overflow-y-auto bg-surface px-6 pb-6 ring-1 ring-border shadow-2xl">
                   {/* Brand & Close Button */}
-                  <div className="flex h-16 shrink-0 items-center justify-between border-b border-border/80">
-                    <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-xl bg-emerald-600 text-white flex items-center justify-center shadow-xs">
-                        <CubeIcon className="w-5 h-5" />
+                  <div className="flex h-16 shrink-0 items-center justify-between border-b border-border">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-lg bg-emerald-600 text-white flex items-center justify-center shadow-xs">
+                        <CubeIcon className="w-4 h-4" />
                       </div>
                       <div>
                         <div className="text-sm font-bold tracking-tight text-ink">V-Biotech</div>
-                        <div className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 uppercase tracking-widest">QMS Platform</div>
+                        <div className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 tracking-wider uppercase">QMS Platform</div>
                       </div>
                     </div>
                     <button
                       type="button"
                       onClick={() => setMobileMenuOpen(false)}
-                      className="p-1.5 rounded-lg text-ink-faint hover:text-ink hover:bg-surface-2 transition-colors"
+                      className="p-1.5 rounded-lg text-ink-muted hover:text-ink hover:bg-surface-2 transition-colors"
                       aria-label="Đóng menu"
                     >
                       <XMarkIcon className="w-5 h-5" />
@@ -357,39 +357,40 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
       {/* ============ DESKTOP SIDEBAR ============ */}
       <aside
-        className={`hidden xl:flex flex-col shrink-0 border-r border-border bg-surface transition-all duration-300 sticky top-0 h-screen z-30 ${
-          isCollapsed ? 'w-20' : 'w-64'
+        className={`hidden xl:flex flex-col shrink-0 border-r border-border bg-surface transition-all duration-200 sticky top-0 h-screen z-30 ${
+          isCollapsed ? 'w-[72px]' : 'w-64'
         }`}
       >
         {/* Brand Header */}
-        <div className="flex h-16 shrink-0 items-center justify-between px-5 border-b border-border/80">
-          <Link to="/" className="flex items-center gap-3 overflow-hidden">
-            <div className="w-9 h-9 rounded-xl bg-emerald-600 text-white flex items-center justify-center shadow-xs shrink-0">
-              <CubeIcon className="w-5 h-5" />
+        <div className="flex h-16 shrink-0 items-center justify-between px-5 border-b border-border">
+          <Link to="/" className="flex items-center gap-2.5 overflow-hidden">
+            <div className="w-8 h-8 rounded-lg bg-emerald-600 text-white flex items-center justify-center shadow-xs shrink-0">
+              <CubeIcon className="w-4 h-4" />
             </div>
             {!isCollapsed && (
               <div className="min-w-0">
                 <div className="text-sm font-bold tracking-tight text-ink truncate">V-Biotech</div>
-                <div className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 uppercase tracking-widest truncate">QMS Platform</div>
+                <div className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 tracking-wider uppercase truncate">QMS Platform</div>
               </div>
             )}
           </Link>
         </div>
 
         {/* Sidebar Nav */}
-        <div className="flex-1 overflow-y-auto px-3 py-4 custom-scrollbar">
+        <div className="flex-1 overflow-y-auto px-3 py-3.5 custom-scrollbar">
           {renderNavLinks()}
         </div>
 
         {/* Sidebar Footer / Toggle */}
-        <div className="p-3 border-t border-border/80 shrink-0">
+        <div className="p-3 border-t border-border shrink-0">
           <button
             type="button"
             onClick={toggleSidebar}
-            className={`w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-ink-faint hover:text-ink hover:bg-surface-2 transition-colors ${
+            className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium text-ink-muted hover:text-ink hover:bg-surface-2 transition-colors ${
               isCollapsed ? 'justify-center' : ''
             }`}
             title={isCollapsed ? 'Mở rộng menu' : 'Thu gọn menu'}
+            aria-label={isCollapsed ? 'Mở rộng menu' : 'Thu gọn menu'}
           >
             {isCollapsed ? (
               <ChevronRightIcon className="w-4 h-4" />
@@ -406,41 +407,42 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       {/* ============ MAIN CONTENT WRAPPER ============ */}
       <div className="flex flex-col flex-1 min-w-0">
         {/* Topbar */}
-        <header className="sticky top-0 z-20 flex h-16 items-center justify-between gap-x-4 border-b border-border bg-surface/90 px-4 sm:px-6 lg:px-8 backdrop-blur-md transition-colors">
+        <header className="sticky top-0 z-30 flex h-16 items-center justify-between gap-x-4 border-b border-border bg-surface/90 px-4 sm:px-6 lg:px-8 backdrop-blur-md transition-colors">
           <div className="flex items-center gap-3 min-w-0">
             {/* Mobile menu toggle */}
             <button
               type="button"
               onClick={() => setMobileMenuOpen(true)}
-              className="xl:hidden p-2 rounded-xl text-ink-faint hover:text-ink hover:bg-surface-2 transition-colors -ml-1.5"
+              className="xl:hidden p-2 rounded-lg text-ink-muted hover:text-ink hover:bg-surface-2 transition-colors -ml-1.5"
               aria-label="Mở menu"
             >
-              <Bars3Icon className="w-6 h-6" />
+              <Bars3Icon className="w-5 h-5" />
             </button>
 
             <div className="min-w-0">
-              <h2 className="text-base sm:text-lg font-bold tracking-tight text-ink truncate">
+              <h2 className="text-sm sm:text-base font-bold tracking-tight text-ink truncate">
                 {headerInfo.title}
               </h2>
-              <p className="text-[11px] text-ink-faint truncate hidden sm:block">
+              <p className="text-[11px] text-ink-muted truncate hidden sm:block">
                 {getFormattedDate()}
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+          <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
             {role !== 'GUEST' && (
               <>
                 {/* Desktop Global Search Trigger */}
                 <button
                   type="button"
                   onClick={() => window.dispatchEvent(new CustomEvent('pqm:toggle-command-palette'))}
-                  className="hidden md:flex items-center gap-2.5 px-3 py-1.5 rounded-xl border border-border/80 bg-surface-2/60 hover:bg-surface-2 text-xs font-medium text-ink-faint hover:text-ink transition-all shadow-2xs"
+                  className="hidden md:flex items-center gap-2.5 px-3 py-1.5 rounded-lg border border-border bg-surface-2/60 hover:bg-surface-2 text-xs font-medium text-ink-muted hover:text-ink transition-all shadow-2xs"
                   title="Tìm kiếm nhanh toàn hệ thống (Ctrl+K)"
+                  aria-label="Tìm kiếm nhanh toàn hệ thống"
                 >
                   <MagnifyingGlassIcon className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
                   <span>Tìm kiếm nhanh...</span>
-                  <kbd className="px-1.5 py-0.5 text-[10px] font-mono bg-surface border border-border rounded text-ink-faint shadow-2xs">Ctrl K</kbd>
+                  <kbd className="px-1.5 py-0.5 text-[10px] font-mono bg-surface border border-border rounded text-ink-muted shadow-2xs">Ctrl K</kbd>
                 </button>
 
                 {/* Mobile Search Dropdown Trigger */}
@@ -515,7 +517,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
             <button
               type="button"
               onClick={toggleTheme}
-              className="p-2 rounded-xl text-ink-faint hover:text-ink hover:bg-surface-2 border border-border transition-colors shadow-2xs"
+              className="p-2 rounded-lg text-ink-muted hover:text-ink hover:bg-surface-2 border border-border transition-colors shadow-2xs"
               title={theme === 'dark' ? 'Chuyển sang chế độ sáng' : 'Chuyển sang chế độ tối'}
               aria-label="Chuyển chế độ sáng/tối"
             >
@@ -528,7 +530,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
             {/* User Profile Dropdown Menu (Tailwind UI Menu) */}
             <Menu as="div" className="relative ml-1">
               <MenuButton
-                className="flex items-center gap-2 rounded-full p-0.5 ring-2 ring-transparent hover:ring-emerald-500/50 transition-all focus:outline-none"
+                className="flex items-center gap-2 rounded-full p-0.5 ring-2 ring-transparent hover:ring-emerald-500/40 transition-all focus:outline-none cursor-pointer"
                 aria-label="Menu tài khoản"
               >
                 {user?.photoURL ? (
@@ -549,8 +551,8 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                 leaveFrom="transform opacity-100 scale-100"
                 leaveTo="transform opacity-0 scale-95"
               >
-                <MenuItems className="absolute right-0 z-50 mt-2 w-56 origin-top-right rounded-2xl bg-surface p-1.5 shadow-xl ring-1 ring-border focus:outline-none text-xs">
-                  <div className="px-3 py-2 border-b border-border/80 mb-1">
+                <MenuItems className="absolute right-0 z-50 mt-2 w-56 origin-top-right rounded-xl bg-surface p-1.5 shadow-xl border border-border focus:outline-none text-xs">
+                  <div className="px-3 py-2 border-b border-border mb-1">
                     <div className="font-semibold text-ink truncate">{user?.displayName || user?.email || 'Người dùng'}</div>
                     <div className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold uppercase tracking-wider mt-0.5">
                       {role === 'ADMIN' || isAdmin ? 'ADMIN' : (role || 'GUEST')}
@@ -561,11 +563,11 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                     {({ active }) => (
                       <Link
                         to="/account"
-                        className={`flex items-center gap-2 px-3 py-2 rounded-xl transition-colors ${
+                        className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${
                           active ? 'bg-surface-2 text-ink' : 'text-ink-soft'
                         }`}
                       >
-                        <UserCircleIcon className="w-4 h-4 text-ink-faint" />
+                        <UserCircleIcon className="w-4 h-4 text-ink-muted" />
                         <span>Hồ sơ cá nhân</span>
                       </Link>
                     )}
@@ -575,25 +577,25 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                     {({ active }) => (
                       <Link
                         to="/settings"
-                        className={`flex items-center gap-2 px-3 py-2 rounded-xl transition-colors ${
+                        className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${
                           active ? 'bg-surface-2 text-ink' : 'text-ink-soft'
                         }`}
                       >
-                        <Cog6ToothIcon className="w-4 h-4 text-ink-faint" />
+                        <Cog6ToothIcon className="w-4 h-4 text-ink-muted" />
                         <span>Cài đặt hệ thống</span>
                       </Link>
                     )}
                   </MenuItem>
 
-                  <div className="my-1 border-t border-border/80" />
+                  <div className="my-1 border-t border-border" />
 
                   <MenuItem>
                     {({ active }) => (
                       <button
                         type="button"
                         onClick={handleLogout}
-                        className={`w-full flex items-center gap-2 px-3 py-2 rounded-xl transition-colors text-rose-600 dark:text-rose-400 ${
-                          active ? 'bg-rose-50 dark:bg-rose-950/40' : ''
+                        className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg transition-colors text-rose-600 dark:text-rose-400 ${
+                          active ? 'bg-rose-500/10' : ''
                         }`}
                       >
                         <ArrowRightOnRectangleIcon className="w-4 h-4" />
@@ -608,7 +610,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         </header>
 
         {/* Main Content Area */}
-        <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
+        <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 bg-surface-2/30">
           <div className="mx-auto max-w-7xl">
             {children}
           </div>
@@ -635,14 +637,14 @@ const QualityAlertBadge: React.FC = () => {
     <Link
       to="/alerts"
       title={hasAlerts ? `${totalCount} cảnh báo chất lượng (${highCount} mức cao)` : 'Không có cảnh báo chất lượng'}
-      className={`p-2 rounded-xl relative border transition-colors shadow-2xs ${
+      className={`p-2 rounded-lg relative border transition-colors shadow-2xs ${
         isActive 
-          ? 'border-rose-500 text-rose-600 dark:text-rose-400 bg-rose-50/50 dark:bg-rose-950/30' 
-          : 'border-border text-ink-faint hover:text-ink hover:bg-surface-2'
+          ? 'border-rose-500 text-rose-600 dark:text-rose-400 bg-rose-500/10' 
+          : 'border-border text-ink-muted hover:text-ink hover:bg-surface-2'
       }`}
       aria-label="Xem cảnh báo chất lượng"
     >
-      <BellIcon className={`w-4 h-4 ${hasAlerts && highCount > 0 ? 'text-rose-500 animate-bounce' : ''}`} />
+      <BellIcon className={`w-4 h-4 ${hasAlerts && highCount > 0 ? 'text-rose-500 animate-pulse' : ''}`} />
       {hasAlerts && (
         <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 text-[10px] font-bold rounded-full bg-rose-500 text-white flex items-center justify-center shadow-xs border-2 border-surface">
           {totalCount > 99 ? '99+' : totalCount}

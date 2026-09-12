@@ -38,103 +38,98 @@ import { useNavigate } from 'react-router-dom';
 
 const TCCSGridItem = React.memo(({ tccs, product, isExpanded, onExpand, onView, onClone, onEdit, onDelete, handleViewHistory, isAdmin }: any) => {
   return (
-    <DSCard isExpanded={isExpanded} className={`group ${isExpanded ? 'md:col-span-2 xl:col-span-3' : 'hover:-translate-y-1 hover:shadow-lg transition-all duration-300'} relative overflow-hidden bg-surface border border-border`}>
-      <div className="p-5 flex flex-col gap-4 relative z-10 h-full">
-        {/* Header: Product Name and Status */}
-        <div className="flex items-start justify-between gap-2">
-          <div className="flex items-center gap-1.5 text-xs font-semibold text-ink-muted">
-            <CubeIcon className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
-            <span className="truncate max-w-[200px]" title={product?.name}>{product?.name || 'Chưa rõ sản phẩm'}</span>
-          </div>
-          {tccs.isActive 
-            ? <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-800/40">Hiệu lực</span> 
-            : <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-surface-2 text-ink-muted border border-border">Hết hiệu lực</span>}
+    <div className={`p-4 rounded-xl transition-all duration-200 group relative overflow-hidden bg-surface border border-border shadow-xs hover:border-emerald-500/30 flex flex-col gap-3 ${isExpanded ? 'md:col-span-2 xl:col-span-3 ring-1 ring-emerald-500/30' : ''}`}>
+      {/* Header: Product Name and Status */}
+      <div className="flex items-start justify-between gap-2 relative z-10">
+        <div className="flex items-center gap-1.5 text-xs text-ink-muted truncate pr-2">
+          <CubeIcon className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+          <span className="truncate font-medium" title={product?.name}>{product?.name || 'Chưa rõ sản phẩm'}</span>
         </div>
+        {tccs.isActive 
+          ? <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20">Hiệu lực</span> 
+          : <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-surface-2 text-ink-muted border border-border">Hết hiệu lực</span>}
+      </div>
 
-        {/* Content Box */}
-        <div className="bg-surface-2 border border-border rounded-xl p-4 flex flex-col gap-3 flex-grow">
-          {/* Main Info: TCCS Code and Date */}
-          <div className="flex items-center gap-3.5">
-            <div className="p-2.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 shrink-0 border border-emerald-100 dark:border-emerald-900/30">
-              <DocumentTextIcon className="w-6 h-6" />
-            </div>
-            <div className="flex flex-col min-w-0">
-              <h3 className="font-semibold text-ink text-base leading-tight group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors truncate">{tccs.code}</h3>
-              <div className="flex items-center gap-1.5 mt-1 text-xs text-ink-muted">
-                <CalendarDaysIcon className="w-3.5 h-3.5 shrink-0" />
-                <span>Ban hành: {formatDateStandard(tccs.issueDate)}</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Badges */}
-          <div className="flex flex-wrap gap-1.5 pt-2 border-t border-border">
-            <Link
-              to={`/batches?productId=${tccs.productId}`}
-              onClick={e => e.stopPropagation()}
-              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-surface text-ink-soft text-xs font-medium border border-border hover:border-emerald-300 dark:hover:border-emerald-700 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors"
-            >
-              <Square3Stack3DIcon className="w-3.5 h-3.5" />
-              {tccs.batchesCount > 0 ? `${tccs.batchesCount} lô` : 'Chưa có lô'}
-            </Link>
-            {tccs.testResultsCount > 0 && (
-              <Link
-                to={`/test-results?productId=${tccs.productId}`}
-                onClick={e => e.stopPropagation()}
-                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-surface text-ink-soft text-xs font-medium border border-border hover:border-sky-300 dark:hover:border-sky-700 hover:text-sky-600 dark:hover:text-sky-400 transition-colors"
-              >
-                <ClipboardDocumentCheckIcon className="w-3.5 h-3.5" />
-                {tccs.testResultsCount} phiếu KN
-              </Link>
-            )}
-            {tccs.testResultsCount > 0 && (
-              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium border ${
-                tccs.passRate >= 80
-                  ? 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800/40'
-                  : tccs.passRate >= 50
-                  ? 'bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800/40'
-                  : 'bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-400 border-red-200 dark:border-red-800/40'
-              }`}>
-                <ArrowTrendingUpIcon className="w-3.5 h-3.5" />
-                Đạt: {tccs.passRate}%
-              </span>
-            )}
-          </div>
+      {/* Main Info: TCCS Code and Date */}
+      <div className="flex items-center gap-3 pt-1">
+        <div className="w-9 h-9 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0 border border-emerald-500/20">
+          <DocumentTextIcon className="w-5 h-5" />
         </div>
-
-        {/* Footer: Actions */}
-        <div className="flex items-center justify-between pt-3 border-t border-border mt-auto">
-          <div className="relative z-10 flex items-center gap-1 opacity-90 group-hover:opacity-100 transition-opacity">
-            <button 
-              onClick={() => handleViewHistory(tccs.productId)} 
-              className="p-1.5 text-ink-muted hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-surface-2 rounded-lg transition-colors" 
-              title="Lịch sử phiên bản"
-            >
-              <ClockIcon className="w-4 h-4" />
-            </button>
-            <ActionButtons
-              onView={() => onView(tccs)}
-              onClone={isAdmin ? () => onClone(tccs) : undefined}
-              onEdit={isAdmin ? () => onEdit(tccs) : undefined}
-              onDelete={isAdmin ? () => onDelete(tccs) : undefined}
-            />
+        <div className="flex flex-col min-w-0">
+          <h3 className="font-semibold text-ink text-base leading-tight group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors truncate">{tccs.code}</h3>
+          <div className="flex items-center gap-1.5 mt-0.5 text-xs text-ink-muted">
+            <CalendarDaysIcon className="w-3.5 h-3.5 shrink-0" />
+            <span>Ban hành: {formatDateStandard(tccs.issueDate)}</span>
           </div>
-          <button 
-            onClick={() => onExpand(tccs.id)} 
-            className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all ml-auto ${
-              isExpanded 
-                ? 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800' 
-                : 'bg-surface-2 text-ink-soft hover:bg-surface-3 border border-border'
-            }`}
-          >
-            {isExpanded ? 'Đóng lại' : 'Xem cấu trúc'} 
-            <ChevronDownIcon className={`w-3.5 h-3.5 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
-          </button>
         </div>
       </div>
 
+      {/* Badges / Stats */}
+      <div className="flex flex-wrap gap-1.5 pt-2.5 border-t border-border/80">
+        <Link
+          to={`/batches?productId=${tccs.productId}`}
+          onClick={e => e.stopPropagation()}
+          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-surface-2 text-ink-muted text-[11px] font-medium border border-border hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors"
+        >
+          <Square3Stack3DIcon className="w-3 h-3" />
+          {tccs.batchesCount > 0 ? `${tccs.batchesCount} lô` : 'Chưa có lô'}
+        </Link>
+        {tccs.testResultsCount > 0 && (
+          <Link
+            to={`/test-results?productId=${tccs.productId}`}
+            onClick={e => e.stopPropagation()}
+            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-teal-500/10 text-teal-700 dark:text-teal-300 text-[11px] font-medium border border-teal-500/20 hover:bg-teal-500/20 transition-colors"
+          >
+            <ClipboardDocumentCheckIcon className="w-3 h-3" />
+            {tccs.testResultsCount} phiếu KN
+          </Link>
+        )}
+        {tccs.testResultsCount > 0 && (
+          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium border ${
+            tccs.passRate >= 80
+              ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20'
+              : tccs.passRate >= 50
+              ? 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20'
+              : 'bg-rose-500/10 text-rose-700 dark:text-rose-400 border-rose-500/20'
+          }`}>
+            <ArrowTrendingUpIcon className="w-3 h-3" />
+            Đạt: {tccs.passRate}%
+          </span>
+        )}
+      </div>
+
+      {/* Footer: Actions */}
+      <div className="flex items-center justify-between pt-2.5 border-t border-border/80 mt-auto">
+        <div className="relative z-10 flex items-center gap-1 opacity-80 group-hover:opacity-100 transition-opacity">
+          <button 
+            onClick={() => handleViewHistory(tccs.productId)} 
+            className="p-1.5 text-ink-muted hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-surface-2 rounded-lg transition-colors" 
+            title="Lịch sử phiên bản"
+          >
+            <ClockIcon className="w-4 h-4" />
+          </button>
+          <ActionButtons
+            onView={() => onView(tccs)}
+            onClone={isAdmin ? () => onClone(tccs) : undefined}
+            onEdit={isAdmin ? () => onEdit(tccs) : undefined}
+            onDelete={isAdmin ? () => onDelete(tccs) : undefined}
+          />
+        </div>
+        <button 
+          onClick={() => onExpand(tccs.id)} 
+          className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ml-auto ${
+            isExpanded 
+              ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20' 
+              : 'bg-surface-2 text-ink-muted hover:text-ink hover:bg-surface-3 border border-border'
+          }`}
+        >
+          {isExpanded ? 'Thu gọn' : 'Xem cấu trúc'} 
+          <ChevronDownIcon className={`w-3.5 h-3.5 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+        </button>
+      </div>
+
       {isExpanded && <TCCSExpandedStructure tccs={tccs} />}
-    </DSCard>
+    </div>
   );
 });
 
@@ -202,16 +197,16 @@ const TCCSExpandedStructure = ({ tccs }: { tccs: any }) => {
 };
 
 const TCCSListItem = React.memo(({ tccs, product, onView, onClone, onEdit, onDelete, isAdmin }: any) => (
-  <tr className="hover:bg-surface-2 transition-colors">
-    <td className="px-4 py-3 font-semibold text-ink">{tccs.code}</td>
-    <td className="px-4 py-3 font-medium text-ink-soft">{product?.name}</td>
+  <tr className="hover:bg-surface-2/60 transition-colors">
+    <td className="px-4 py-3 font-mono font-medium text-ink text-sm">{tccs.code}</td>
+    <td className="px-4 py-3 font-medium text-ink">{product?.name}</td>
     <td className="px-4 py-3 text-xs text-ink-muted">{formatDateStandard(tccs.issueDate)}</td>
     <td className="px-4 py-3">
       <div className="flex flex-wrap gap-1">
         <Link
           to={`/batches?productId=${tccs.productId}`}
           onClick={e => e.stopPropagation()}
-          className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-surface text-ink-soft border border-border hover:text-emerald-600 hover:border-emerald-300 transition-colors"
+          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-surface-2 text-ink-muted border border-border hover:text-emerald-600 transition-colors"
         >
           <Square3Stack3DIcon className="w-3 h-3" /> {tccs.batchesCount} lô
         </Link>
@@ -219,16 +214,16 @@ const TCCSListItem = React.memo(({ tccs, product, onView, onClone, onEdit, onDel
           <Link
             to={`/test-results?productId=${tccs.productId}`}
             onClick={e => e.stopPropagation()}
-            className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-surface text-ink-soft border border-border hover:text-sky-600 hover:border-sky-300 transition-colors"
+            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-teal-500/10 text-teal-700 dark:text-teal-300 border border-teal-500/20 hover:bg-teal-500/20 transition-colors"
           >
             <ClipboardDocumentCheckIcon className="w-3 h-3" /> {tccs.testResultsCount} KN
           </Link>
         )}
         {tccs.testResultsCount > 0 && (
-          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium border ${
-            tccs.passRate >= 80 ? 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800/40'
-            : tccs.passRate >= 50 ? 'bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800/40'
-            : 'bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-400 border-red-200 dark:border-red-800/40'
+          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium border ${
+            tccs.passRate >= 80 ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20'
+            : tccs.passRate >= 50 ? 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20'
+            : 'bg-rose-500/10 text-rose-700 dark:text-rose-400 border-rose-500/20'
           }`}>
             <ArrowTrendingUpIcon className="w-3 h-3" /> {tccs.passRate}%
           </span>
@@ -237,9 +232,9 @@ const TCCSListItem = React.memo(({ tccs, product, onView, onClone, onEdit, onDel
     </td>
     <td className="px-4 py-3 text-center">
       {tccs.isActive ? (
-        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-800/40">Hiệu lực</span>
+        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20">Hiệu lực</span>
       ) : (
-        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-surface-2 text-ink-muted border border-border">Hết hiệu lực</span>
+        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-surface-2 text-ink-muted border border-border">Hết hiệu lực</span>
       )}
     </td>
     <td className="px-4 py-3 text-right">
@@ -255,11 +250,10 @@ const TCCSListItem = React.memo(({ tccs, product, onView, onClone, onEdit, onDel
   </tr>
 ));
 
-
 const TCCSDataList = ({ viewMode, data, products, expandedIds, onExpand, onView, onClone, onEdit, onDelete, handleViewHistory, isAdmin }: any) => {
   if (viewMode === 'grid') {
     return (
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
         {data.map((tccs: any) => (
           <TCCSGridItem 
             key={tccs.id}
@@ -280,12 +274,12 @@ const TCCSDataList = ({ viewMode, data, products, expandedIds, onExpand, onView,
   }
   return (
     <DSTable>
-      <thead className="bg-surface-2 border-b border-border">
-        <tr className="text-ink-muted text-xs font-semibold uppercase tracking-wider">
-          <th className="px-4 py-3">Mã TCCS</th>
-          <th className="px-4 py-3">Sản phẩm</th>
-          <th className="px-4 py-3">Ngày ban hành</th>
-          <th className="px-4 py-3">Thống kê</th>
+      <thead className="bg-surface-2/60 border-b border-border">
+        <tr className="text-ink-muted text-xs font-semibold">
+          <th className="px-4 py-3 text-left">Mã TCCS</th>
+          <th className="px-4 py-3 text-left">Sản phẩm</th>
+          <th className="px-4 py-3 text-left">Ngày ban hành</th>
+          <th className="px-4 py-3 text-left">Thống kê</th>
           <th className="px-4 py-3 text-center">Trạng thái</th>
           <th className="px-4 py-3 text-right">Thao tác</th>
         </tr>
@@ -480,7 +474,7 @@ const TCCSList: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-in fade-in duration-200">
       <PageHeader 
         title="Tiêu chuẩn Cơ sở (TCCS)" 
         subtitle="Quản lý định mức kỹ thuật và chỉ tiêu chất lượng sản phẩm." 

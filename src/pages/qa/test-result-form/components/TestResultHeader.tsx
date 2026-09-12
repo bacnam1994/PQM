@@ -51,12 +51,12 @@ export const TestResultHeader: React.FC<TestResultHeaderProps> = ({
         <button
           type="button"
           onClick={onBack}
-          className="p-2 bg-surface text-ink-muted hover:text-emerald-600 rounded-xl border border-border shadow-sm transition-all"
+          className="p-2 bg-surface text-ink-muted hover:text-emerald-700 dark:hover:text-emerald-400 rounded-lg border border-border shadow-xs transition-all cursor-pointer"
         >
           <ArrowLeftIcon className="w-5 h-5" />
         </button>
         <div>
-          <h1 className="text-2xl font-bold text-ink tracking-tight">
+          <h1 className="text-xl sm:text-2xl font-bold text-ink tracking-tight">
             {isEditMode ? 'Chỉnh sửa Phiếu Kiểm Nghiệm' : 'Nhập Phiếu Kiểm Nghiệm Mới'}
           </h1>
         </div>
@@ -80,7 +80,7 @@ export const TestResultHeader: React.FC<TestResultHeaderProps> = ({
         <button
           type="button"
           onClick={onOpenLabComparison}
-          className="flex items-center gap-2 px-3.5 py-2 bg-blue-500/10 hover:bg-blue-500/20 text-blue-700 dark:text-blue-400 rounded-xl font-semibold text-xs border border-blue-500/20 transition-all shadow-sm"
+          className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-500/10 hover:bg-blue-500/20 text-blue-700 dark:text-blue-400 rounded-lg font-medium text-xs border border-blue-500/20 transition-all shadow-xs cursor-pointer"
           title="Đối chiếu kết quả giữa 2 phòng lab hoặc CoA nhà cung cấp"
         >
           <ScaleIcon className="w-4 h-4" />
@@ -91,7 +91,7 @@ export const TestResultHeader: React.FC<TestResultHeaderProps> = ({
           type="button"
           disabled={isAiProcessing}
           onClick={onOpenGDScan}
-          className="flex items-center gap-2 px-4 py-2 bg-surface text-ink hover:bg-surface-2 rounded-xl font-semibold text-xs tracking-wider border border-border shadow-sm transition-all disabled:opacity-50"
+          className="flex items-center gap-1.5 px-3 py-1.5 bg-surface text-ink-soft hover:bg-surface-2 rounded-lg font-medium text-xs border border-border shadow-xs transition-all disabled:opacity-50 cursor-pointer"
         >
           {isAiProcessing ? <ArrowPathIcon className="w-4 h-4 animate-spin text-emerald-600" /> : <CloudIcon className="w-4 h-4 text-emerald-600" />}
           Quét Google Drive
@@ -101,7 +101,7 @@ export const TestResultHeader: React.FC<TestResultHeaderProps> = ({
           type="button"
           disabled={isAiProcessing}
           onClick={() => fileInputRef.current?.click()}
-          className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-xl font-semibold text-xs tracking-wider hover:bg-emerald-700 shadow-sm transition-all disabled:opacity-50"
+          className="flex items-center gap-1.5 px-3.5 py-1.5 bg-emerald-600 text-white rounded-lg font-medium text-xs hover:bg-emerald-700 shadow-xs transition-all disabled:opacity-50 cursor-pointer"
         >
           {isAiProcessing ? <ArrowPathIcon className="w-4 h-4 animate-spin" /> : <DocumentDuplicateIcon className="w-4 h-4" />}
           {isAiProcessing ? 'Đang trích xuất...' : 'Nhập dữ liệu bằng AI'}

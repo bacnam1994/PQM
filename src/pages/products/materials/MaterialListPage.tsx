@@ -23,7 +23,7 @@ export const MaterialListPage: React.FC = () => {
   const state = useMaterialListState();
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto p-4 md:p-6 animate-in fade-in duration-300">
+    <div className="space-y-6 max-w-7xl mx-auto p-4 md:p-6 animate-in fade-in duration-200">
       <datalist id="standards-datalist">
         {COMMON_PHARMA_STANDARDS.map(s => <option key={s} value={s} />)}
       </datalist>
@@ -34,23 +34,23 @@ export const MaterialListPage: React.FC = () => {
         subtitle="Trung tâm Quản lý Danh mục Nguyên liệu chuẩn (Master Catalog), Tiêu chuẩn Dược điển, Ma trận Công thức và Rà soát AI"
         icon={IdentificationIcon}
         action={
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={state.handleOpenHarmonizer}
-              className="px-3.5 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-lg text-xs font-bold flex items-center gap-2 hover:opacity-95 transition-all shadow-sm cursor-pointer"
+              className="px-3.5 py-2 bg-surface hover:bg-surface-2 text-ink border border-border rounded-lg text-xs font-medium flex items-center gap-2 transition-colors shadow-2xs cursor-pointer"
             >
-              <SparklesIcon className="h-4 w-4 animate-pulse" />
-              <span>AI Rà soát & Chuẩn hóa</span>
+              <SparklesIcon className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+              <span>AI rà soát & chuẩn hóa</span>
             </button>
             {state.isAdmin && (
               <button
                 type="button"
                 onClick={() => state.handleOpenAdd()}
-                className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white rounded-lg text-xs font-bold flex items-center gap-2 transition-all shadow-sm cursor-pointer"
+                className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] text-white rounded-lg text-xs font-medium flex items-center gap-2 transition-all shadow-2xs cursor-pointer"
               >
                 <PlusIcon className="h-4 w-4" />
-                <span>Thêm Nguyên liệu</span>
+                <span>Thêm nguyên liệu</span>
               </button>
             )}
           </div>
@@ -61,51 +61,51 @@ export const MaterialListPage: React.FC = () => {
       <MaterialMetricsBar metrics={state.metrics} />
 
       {/* Tabs Navigation */}
-      <Surface variant="subtle" padding="sm" className="flex items-center gap-1.5 overflow-x-auto scrollbar-hide">
+      <div className="flex items-center gap-1.5 border-b border-border pb-2 overflow-x-auto scrollbar-hide">
         <button
           type="button"
           onClick={() => state.setActiveTab('CATALOG')}
-          className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
+          className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-medium transition-colors whitespace-nowrap cursor-pointer ${
             state.activeTab === 'CATALOG'
-              ? 'bg-surface text-emerald-700 dark:text-emerald-300 shadow-sm border border-border'
-              : 'text-ink-muted hover:bg-surface-2'
+              ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 font-semibold'
+              : 'text-ink-muted hover:text-ink hover:bg-surface-2'
           }`}
         >
           <IdentificationIcon className="h-4 w-4" />
-          <span>Danh mục Chuẩn ({state.rawMaterials.length})</span>
+          <span>Danh mục chuẩn ({state.rawMaterials.length})</span>
         </button>
 
         <button
           type="button"
           onClick={() => state.setActiveTab('MATRIX')}
-          className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
+          className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-medium transition-colors whitespace-nowrap cursor-pointer ${
             state.activeTab === 'MATRIX'
-              ? 'bg-surface text-emerald-700 dark:text-emerald-300 shadow-sm border border-border'
-              : 'text-ink-muted hover:bg-surface-2'
+              ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 font-semibold'
+              : 'text-ink-muted hover:text-ink hover:bg-surface-2'
           }`}
         >
           <BeakerIcon className="h-4 w-4" />
-          <span>Ma trận Công thức ({state.aggregatedFormulaItems.length})</span>
+          <span>Ma trận công thức ({state.aggregatedFormulaItems.length})</span>
         </button>
 
         <button
           type="button"
           onClick={() => state.setActiveTab('CONSISTENCY')}
-          className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
+          className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-medium transition-colors whitespace-nowrap cursor-pointer ${
             state.activeTab === 'CONSISTENCY'
-              ? 'bg-surface text-emerald-700 dark:text-emerald-300 shadow-sm border border-border'
-              : 'text-ink-muted hover:bg-surface-2'
+              ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 font-semibold'
+              : 'text-ink-muted hover:text-ink hover:bg-surface-2'
           }`}
         >
           <ShieldCheckIcon className="h-4 w-4" />
-          <span>Toàn vẹn &amp; Auto-Link</span>
+          <span>Toàn vẹn & Auto-Link</span>
           {state.metrics.unlinkedIngredients > 0 && (
-            <span className="px-1.5 py-0.5 rounded-full bg-amber-500 text-white text-[10px] font-bold">
+            <span className="px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/20 text-[11px] font-medium">
               {state.metrics.unlinkedIngredients}
             </span>
           )}
         </button>
-      </Surface>
+      </div>
 
       {/* Filter Bar */}
       <MaterialFilterSection

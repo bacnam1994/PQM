@@ -50,15 +50,15 @@ export const PageHeader: React.FC<PageHeaderProps> = ({
   };
 
   return (
-    <div className={`space-y-2 pb-5 mb-5 border-b border-border/80 ${className}`}>
+    <div className={`space-y-2 pb-5 mb-6 border-b border-border ${className}`}>
       {/* Tầng 1: Breadcrumbs & Nút quay lại */}
       {(effectiveBreadcrumbs.length > 0 || backPath) && (
-        <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-xs text-ink-faint">
+        <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-xs text-ink-muted">
           {backPath && (
             <button
               type="button"
               onClick={() => navigate(backPath)}
-              className="p-1 -ml-1 text-ink-faint hover:text-ink hover:bg-surface-2 rounded-lg transition-colors"
+              className="p-1.5 -ml-1 text-ink-muted hover:text-ink hover:bg-surface-2 rounded-lg transition-colors"
               title="Quay lại"
             >
               <ArrowLeftIcon className="w-4 h-4" />
@@ -69,7 +69,7 @@ export const PageHeader: React.FC<PageHeaderProps> = ({
             const isLast = index === effectiveBreadcrumbs.length - 1;
             return (
               <React.Fragment key={index}>
-                {index > 0 && <ChevronRightIcon className="w-3.5 h-3.5 text-ink-faint/60 shrink-0" />}
+                {index > 0 && <ChevronRightIcon className="w-3.5 h-3.5 text-ink-faint shrink-0" />}
                 {item.onClick && !isLast ? (
                   <button
                     type="button"
@@ -97,10 +97,10 @@ export const PageHeader: React.FC<PageHeaderProps> = ({
       )}
 
       {/* Tầng 2: Title, StatusBadge & Actions */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-0.5">
         <div className="flex items-center gap-3 flex-wrap min-w-0">
           {icon && (
-            <div className="p-2 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 ring-1 ring-inset ring-emerald-600/20 shrink-0">
+            <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 shrink-0">
               {renderIcon()}
             </div>
           )}
@@ -118,7 +118,7 @@ export const PageHeader: React.FC<PageHeaderProps> = ({
       </div>
 
       {subtitle && (
-        <p className="text-xs sm:text-sm text-ink-faint max-w-3xl leading-relaxed">
+        <p className="text-xs sm:text-sm text-ink-muted max-w-3xl leading-relaxed">
           {subtitle}
         </p>
       )}

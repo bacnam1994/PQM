@@ -100,7 +100,7 @@ export const Modal: React.FC<{ isOpen: boolean; onClose: () => void; title: stri
           >
             <DialogPanel className="relative transform overflow-hidden rounded-2xl bg-surface text-left shadow-2xl transition-all w-full max-w-2xl border border-border">
               {/* Header with accent indicator */}
-              <div className="relative px-6 py-4 border-b border-border/80 flex items-center justify-between bg-surface-2/50">
+              <div className="relative px-6 py-4 border-b border-border flex items-center justify-between bg-surface-2/40">
                 <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-emerald-500 via-emerald-400 to-transparent" />
                 <div className="flex items-center gap-3">
                   {Icon && (
@@ -115,7 +115,7 @@ export const Modal: React.FC<{ isOpen: boolean; onClose: () => void; title: stri
                 <button
                   type="button"
                   onClick={onClose}
-                  className="rounded-lg p-1 text-ink-faint hover:text-ink hover:bg-surface-3/80 transition-colors"
+                  className="rounded-lg p-1 text-ink-muted hover:text-ink hover:bg-surface-3 transition-colors"
                 >
                   <span className="sr-only">Đóng</span>
                   <XMarkIcon className="w-5 h-5" aria-hidden="true" />
@@ -142,15 +142,15 @@ export const LegacyPageHeader: React.FC<{ title: string; subtitle: string; icon:
   };
 
   return (
-    <div className="flex flex-col md:flex-row md:items-center justify-between gap-5 mb-7">
+    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 pb-4 border-b border-border">
       <div>
         <h1 className="text-2xl font-bold tracking-tight text-ink flex items-center gap-3">
-          <div className="p-2 rounded-xl text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 ring-1 ring-inset ring-emerald-600/20">
+          <div className="p-2 rounded-xl text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border border-emerald-500/20">
             {renderIcon()}
           </div>
           {title}
         </h1>
-        <p className="text-ink-faint font-medium text-xs uppercase tracking-wider mt-2 pl-1">{subtitle}</p>
+        <p className="text-ink-muted font-medium text-xs mt-1.5 pl-1">{subtitle}</p>
       </div>
       {action && <div className="flex gap-2.5">{action}</div>}
     </div>
@@ -168,24 +168,24 @@ export const Pagination: React.FC<{
   }
 
   return (
-    <div className="flex justify-center items-center gap-3 mt-6 pt-5 border-t border-border/70 no-print">
+    <div className="flex justify-center items-center gap-3 mt-6 pt-4 border-t border-border no-print">
       <button
         type="button"
         onClick={() => onPageChange(Math.max(1, currentPage - 1))}
         disabled={currentPage === 1}
-        className="p-2 rounded-lg border border-border bg-surface hover:bg-surface-2 disabled:opacity-40 disabled:cursor-not-allowed text-ink transition-colors shadow-xs"
+        className="p-1.5 rounded-lg border border-border bg-surface hover:bg-surface-2 disabled:opacity-30 disabled:cursor-not-allowed text-ink transition-colors shadow-2xs"
         aria-label="Trang trước"
       >
         <ChevronLeftIcon className="w-4 h-4" />
       </button>
-      <span className="text-xs font-medium text-ink-faint tabular-nums">
+      <span className="text-xs font-medium text-ink-muted tabular-nums">
         Trang <span className="font-semibold text-ink">{currentPage}</span> / <span className="font-semibold text-ink">{totalPages}</span>
       </span>
       <button
         type="button"
         onClick={() => onPageChange(Math.min(totalPages, currentPage + 1))}
         disabled={currentPage === totalPages}
-        className="p-2 rounded-lg border border-border bg-surface hover:bg-surface-2 disabled:opacity-40 disabled:cursor-not-allowed text-ink transition-colors shadow-xs"
+        className="p-1.5 rounded-lg border border-border bg-surface hover:bg-surface-2 disabled:opacity-30 disabled:cursor-not-allowed text-ink transition-colors shadow-2xs"
         aria-label="Trang tiếp theo"
       >
         <ChevronRightIcon className="w-4 h-4" />
@@ -214,24 +214,24 @@ export const ConfirmationModal: React.FC<{
   confirmText = 'Xác nhận',
   cancelText = 'Hủy',
   icon: Icon = ExclamationTriangleIcon,
-  confirmButtonColor = 'bg-rose-600 hover:bg-rose-700 text-white',
+  confirmButtonColor = 'bg-rose-600 hover:bg-rose-700 active:scale-[0.98] text-white',
 }) => {
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={title} icon={Icon} color="bg-rose-100 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400">
       <div className="space-y-5">
         <div className="text-ink-soft text-sm leading-relaxed">{message}</div>
-        <div className="flex justify-end gap-3 pt-2">
+        <div className="flex justify-end gap-2.5 pt-2">
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 text-ink-soft hover:text-ink font-medium text-sm hover:bg-surface-2 rounded-xl transition-colors border border-border"
+            className="px-3.5 py-2 text-ink-soft hover:text-ink font-medium text-sm hover:bg-surface-2 rounded-lg transition-colors border border-border"
           >
             {cancelText}
           </button>
           <button
             type="button"
             onClick={onConfirm}
-            className={`px-5 py-2 rounded-xl font-semibold text-sm shadow-xs transition-all ${confirmButtonColor}`}
+            className={`px-4 py-2 rounded-lg font-medium text-sm shadow-xs transition-all ${confirmButtonColor}`}
           >
             {confirmText}
           </button>

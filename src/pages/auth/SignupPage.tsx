@@ -51,65 +51,66 @@ const SignupPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#f8faf9] dark:bg-[#07130e] p-4 relative overflow-hidden transition-colors duration-300">
-      <div className="absolute top-0 right-0 w-[50vw] h-[50vw] bg-emerald-100/50 dark:bg-emerald-950/20 rounded-full blur-[120px] -mr-[25vw] -mt-[25vw]" />
-      <div className="absolute bottom-0 left-0 w-[40vw] h-[40vw] bg-emerald-100/30 dark:bg-emerald-950/10 rounded-full blur-[100px] -ml-[20vw] -mb-[20vw]" />
-
-      <div className="w-full max-w-md relative z-10 animate-in fade-in zoom-in-95 duration-500">
-        <div className="bg-white dark:bg-zinc-950/80 rounded-[2.5rem] shadow-2xl shadow-emerald-900/5 dark:shadow-black/50 border border-white dark:border-zinc-800/40 p-10 backdrop-blur-md">
-          <div className="flex flex-col items-center mb-8">
-            <div className="bg-emerald-600 p-4 rounded-3xl text-white shadow-xl shadow-emerald-500/20 mb-6">
-              <LeafIcon className="w-10 h-10" />
+    <div className="min-h-screen flex items-center justify-center bg-surface-2 p-4 relative transition-colors duration-200">
+      <div className="w-full max-w-sm relative z-10 animate-in fade-in duration-200">
+        <div className="bg-surface rounded-2xl shadow-xs border border-border p-6 sm:p-8">
+          <div className="flex flex-col items-center mb-6">
+            <div className="bg-emerald-600 p-2.5 rounded-xl text-white shadow-xs mb-3">
+              <LeafIcon className="w-7 h-7" />
             </div>
-            <h1 className="text-2xl font-bold text-slate-800 dark:text-zinc-100 tracking-tight text-center">Đăng ký tài khoản</h1>
+            <h1 className="text-xl font-bold text-ink tracking-tight text-center">Đăng ký tài khoản</h1>
+            <p className="text-ink-muted text-xs font-medium mt-1">Hệ thống Quản lý Chất lượng V-Biotech</p>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-3.5">
             {error && (
-              <div className="p-4 bg-rose-50 dark:bg-rose-950/20 border border-rose-100 dark:border-rose-900/30 rounded-2xl flex items-center gap-3 text-rose-600 dark:text-rose-400 text-sm animate-in slide-in-from-top-2">
-                <ExclamationCircleIcon className="w-5 h-5 shrink-0" />
-                <span className="font-semibold">{error}</span>
+              <div className="p-3 bg-rose-500/10 border border-rose-500/20 rounded-xl flex items-center gap-2.5 text-rose-600 dark:text-rose-400 text-xs animate-in slide-in-from-top-1">
+                <ExclamationCircleIcon className="w-4 h-4 shrink-0" />
+                <span className="font-medium">{error}</span>
               </div>
             )}
 
-            <div className="space-y-1.5">
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-ink-muted pl-1">Email đăng ký</label>
               <div className="relative">
-                <EnvelopeIcon className="w-5 h-5 absolute left-5 top-1/2 -translate-y-1/2 text-slate-300 dark:text-zinc-500" />
+                <EnvelopeIcon className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-muted" />
                 <input 
                   type="email" 
                   required 
                   value={email} 
                   onChange={(e) => setEmail(e.target.value)} 
-                  className="w-full pl-12 pr-6 py-4 bg-slate-50 dark:bg-zinc-900/50 border border-transparent dark:border-zinc-800/50 rounded-2xl font-semibold text-slate-700 dark:text-zinc-200 outline-none focus:ring-2 focus:ring-emerald-500/20 transition-all shadow-inner" 
-                  placeholder="Email đăng ký" 
+                  className="w-full pl-10 pr-3.5 py-2.5 bg-surface border border-border rounded-xl font-medium text-sm text-ink outline-none focus:ring-2 focus:ring-emerald-500/15 focus:border-emerald-500 transition-all shadow-2xs" 
+                  placeholder="name@v-biotech.vn" 
                 />
               </div>
             </div>
 
-            <div className="space-y-1.5">
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-ink-muted pl-1">Mật khẩu</label>
               <div className="relative">
-                <LockClosedIcon className="w-5 h-5 absolute left-5 top-1/2 -translate-y-1/2 text-slate-300 dark:text-zinc-500" />
+                <LockClosedIcon className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-muted" />
                 <input 
                   type="password" 
                   required 
                   value={password} 
                   onChange={(e) => setPassword(e.target.value)} 
-                  className="w-full pl-12 pr-6 py-4 bg-slate-50 dark:bg-zinc-900/50 border border-transparent dark:border-zinc-800/50 rounded-2xl font-semibold text-slate-700 dark:text-zinc-200 outline-none focus:ring-2 focus:ring-emerald-500/20 transition-all shadow-inner" 
-                  placeholder="Mật khẩu" 
+                  className="w-full pl-10 pr-3.5 py-2.5 bg-surface border border-border rounded-xl font-medium text-sm text-ink outline-none focus:ring-2 focus:ring-emerald-500/15 focus:border-emerald-500 transition-all shadow-2xs" 
+                  placeholder="Tối thiểu 6 ký tự" 
                 />
               </div>
             </div>
 
-            <div className="space-y-1.5">
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-ink-muted pl-1">Xác nhận mật khẩu</label>
               <div className="relative">
-                <LockClosedIcon className="w-5 h-5 absolute left-5 top-1/2 -translate-y-1/2 text-slate-300 dark:text-zinc-500" />
+                <LockClosedIcon className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-muted" />
                 <input 
                   type="password" 
                   required 
                   value={confirmPassword} 
                   onChange={(e) => setConfirmPassword(e.target.value)} 
-                  className="w-full pl-12 pr-6 py-4 bg-slate-50 dark:bg-zinc-900/50 border border-transparent dark:border-zinc-800/50 rounded-2xl font-semibold text-slate-700 dark:text-zinc-200 outline-none focus:ring-2 focus:ring-emerald-500/20 transition-all shadow-inner" 
-                  placeholder="Xác nhận mật khẩu" 
+                  className="w-full pl-10 pr-3.5 py-2.5 bg-surface border border-border rounded-xl font-medium text-sm text-ink outline-none focus:ring-2 focus:ring-emerald-500/15 focus:border-emerald-500 transition-all shadow-2xs" 
+                  placeholder="Nhập lại mật khẩu" 
                 />
               </div>
             </div>
@@ -117,17 +118,17 @@ const SignupPage: React.FC = () => {
             <button 
               type="submit" 
               disabled={isSubmitting} 
-              className="w-full py-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl font-bold uppercase text-xs tracking-widest shadow-xl shadow-emerald-500/20 hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-2 mt-4"
+              className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-medium text-sm shadow-xs active:scale-[0.98] transition-all disabled:opacity-50 flex items-center justify-center gap-2 mt-2"
             >
-              {isSubmitting ? <ArrowPathIcon className="w-5 h-5 animate-spin" /> : <UserPlusIcon className="w-5 h-5" />}
-              {isSubmitting ? 'ĐANG TẠO...' : 'ĐĂNG KÝ NGAY'}
+              {isSubmitting ? <ArrowPathIcon className="w-4 h-4 animate-spin" /> : <UserPlusIcon className="w-4 h-4" />}
+              {isSubmitting ? 'Đang tạo tài khoản...' : 'Đăng ký ngay'}
             </button>
           </form>
 
-          <div className="mt-8 text-center">
-            <p className="text-sm text-slate-500 dark:text-slate-400 font-medium">
+          <div className="mt-6 pt-4 border-t border-border text-center">
+            <p className="text-xs text-ink-muted font-normal">
               Đã có tài khoản?{' '}
-              <Link to="/login" className="font-bold text-emerald-600 dark:text-emerald-400 hover:underline">Đăng nhập</Link>
+              <Link to="/login" className="font-medium text-emerald-600 dark:text-emerald-400 hover:underline">Đăng nhập</Link>
             </p>
           </div>
         </div>

@@ -36,11 +36,11 @@ export const Surface: React.FC<SurfaceProps> = ({
   const resolvedVariant = variant || (intensity ? intensityToVariant[intensity] : 'default') || 'default';
   
   const variantStyles = {
-    default: 'bg-surface text-ink shadow-sm ring-1 ring-border/50 dark:ring-border',
+    default: 'bg-surface text-ink shadow-xs',
     flat: 'bg-surface text-ink shadow-none',
     subtle: 'bg-surface-2 text-ink shadow-none',
-    inset: 'bg-surface-3/50 text-ink shadow-inner',
-    elevated: 'bg-surface text-ink shadow-md ring-1 ring-border/60'
+    inset: 'bg-surface-2/60 text-ink shadow-inner',
+    elevated: 'bg-surface text-ink shadow-md'
   };
 
   const paddingStyles = {
@@ -58,7 +58,7 @@ export const Surface: React.FC<SurfaceProps> = ({
   };
 
   const borderStyle = bordered
-    ? 'border border-border/80 dark:border-border'
+    ? 'border border-border'
     : 'border-0';
 
   return (
@@ -67,9 +67,9 @@ export const Surface: React.FC<SurfaceProps> = ({
       {...props}
     >
       {(title || subtitle) && (
-        <div className="mb-4 pb-3 border-b border-border/70 dark:border-border/80">
-          {title && <h3 className="text-base font-semibold leading-6 text-ink tracking-tight">{title}</h3>}
-          {subtitle && <p className="text-xs text-ink-faint mt-1 leading-normal">{subtitle}</p>}
+        <div className="mb-4 pb-3 border-b border-border">
+          {title && <h3 className="text-sm sm:text-base font-semibold text-ink tracking-tight">{title}</h3>}
+          {subtitle && <p className="text-xs text-ink-muted mt-0.5 leading-normal">{subtitle}</p>}
         </div>
       )}
       {children}

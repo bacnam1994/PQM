@@ -61,10 +61,10 @@ export const WorkflowSteps: React.FC<WorkflowStepsProps> = ({
                 onClick={() => onStepClick && onStepClick(step.id)}
                 className={`flex items-center gap-2.5 px-3 py-1.5 rounded-xl border text-left transition-all ${
                   stepStatus === 'current'
-                    ? 'border-emerald-600 bg-emerald-50/60 dark:bg-emerald-950/40 text-emerald-900 dark:text-emerald-100 shadow-xs ring-1 ring-inset ring-emerald-600/30'
+                    ? 'border-emerald-600 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 shadow-xs ring-1 ring-emerald-500/20'
                     : stepStatus === 'completed'
-                    ? 'border-emerald-200 dark:border-emerald-800/60 bg-surface text-ink hover:bg-surface-2'
-                    : 'border-border bg-surface text-ink-faint opacity-70 cursor-not-allowed'
+                    ? 'border-border bg-surface text-ink hover:bg-surface-2'
+                    : 'border-border bg-surface text-ink-muted opacity-60 cursor-not-allowed'
                 }`}
               >
                 <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[11px] font-bold shrink-0 ${
@@ -72,7 +72,7 @@ export const WorkflowSteps: React.FC<WorkflowStepsProps> = ({
                     ? 'bg-emerald-600 text-white'
                     : stepStatus === 'current'
                     ? 'bg-emerald-600 text-white'
-                    : 'bg-surface-3 text-ink-faint border border-border'
+                    : 'bg-surface-3 text-ink-muted border border-border'
                 }`}>
                   {stepStatus === 'completed' ? <CheckIcon className="w-3.5 h-3.5" /> : index + 1}
                 </div>
@@ -82,7 +82,7 @@ export const WorkflowSteps: React.FC<WorkflowStepsProps> = ({
                     {stepTitle}
                   </span>
                   {stepSubtitle && (
-                    <span className="text-[10px] text-ink-faint truncate max-w-[140px]">
+                    <span className="text-[10px] text-ink-muted truncate max-w-[140px]">
                       {stepSubtitle}
                     </span>
                   )}

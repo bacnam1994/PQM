@@ -172,69 +172,71 @@ export const ChangeControlListPage: React.FC = () => {
   }, [changeRequests, statusFilter, categoryFilter, searchQuery]);
 
   return (
-    <div className="space-y-6 pb-12 animate-in fade-in duration-300">
+    <div className="space-y-6 pb-12 animate-in fade-in duration-200">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="p-2.5 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-xl border border-emerald-500/20">
-            <ArrowsRightLeftIcon className="h-6 w-6" />
-          </div>
-          <div>
-            <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-ink">
-              Quản lý Thay đổi Chuẩn GMP (Change Control)
-            </h1>
-            <p className="text-xs sm:text-sm text-ink-muted">
-              Kiểm soát các thay đổi về công thức, quy trình, tiêu chuẩn, thiết bị và nhà cung cấp (ICH Q10 / PIC/S)
-            </p>
+        <div>
+          <div className="flex items-center gap-2.5">
+            <div className="w-10 h-10 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-xl border border-emerald-500/20 flex items-center justify-center shrink-0">
+              <ArrowsRightLeftIcon className="w-5 h-5" />
+            </div>
+            <div>
+              <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-ink">
+                Kiểm soát Thay đổi (Change Control)
+              </h1>
+              <p className="text-xs sm:text-sm text-ink-muted">
+                Quy trình thẩm định và phê duyệt thay đổi công thức, quy trình sản xuất và phương pháp kiểm nghiệm (ICH Q10 / GMP-WHO).
+              </p>
+            </div>
           </div>
         </div>
 
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2">
           <button
             onClick={loadData}
             disabled={loading}
-            className="p-2.5 rounded-xl border border-border bg-surface text-ink-soft hover:bg-surface-2 transition-colors"
+            className="p-2 rounded-lg border border-border text-ink-muted hover:text-ink hover:bg-surface-2 transition-colors"
             title="Tải lại dữ liệu"
           >
-            <ArrowPathIcon className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+            <ArrowPathIcon className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
           </button>
 
           <button
             onClick={() => setShowCreateModal(true)}
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs uppercase tracking-wider shadow-sm transition-all"
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] text-white font-medium text-xs shadow-2xs transition-all"
           >
-            <PlusIcon className="h-4 w-4 stroke-[2.5]" />
-            <span>Tạo Yêu cầu Thay đổi</span>
+            <PlusIcon className="w-4 h-4" />
+            <span>Tạo yêu cầu thay đổi</span>
           </button>
         </div>
       </div>
 
       {/* KPI Metrics */}
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-        <div className="p-3.5 rounded-2xl bg-surface border border-border shadow-sm">
-          <span className="text-[10px] font-black uppercase text-ink-muted tracking-wider">Tổng yêu cầu</span>
-          <p className="text-2xl font-black text-ink mt-1">{total}</p>
+        <div className="p-4 rounded-xl bg-surface border border-border shadow-xs">
+          <span className="text-xs font-medium text-ink-muted">Tổng yêu cầu</span>
+          <p className="text-2xl font-bold text-ink tabular-nums mt-0.5">{total}</p>
         </div>
-        <div className="p-3.5 rounded-2xl bg-amber-50/60 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800/50 shadow-sm">
-          <span className="text-[10px] font-black uppercase text-amber-700 dark:text-amber-400 tracking-wider">Đánh giá tác động</span>
-          <p className="text-2xl font-black text-amber-600 dark:text-amber-300 mt-1">{assessmentCount}</p>
+        <div className="p-4 rounded-xl bg-surface border border-border shadow-xs">
+          <span className="text-xs font-medium text-amber-700 dark:text-amber-400">Đánh giá tác động</span>
+          <p className="text-2xl font-bold text-amber-600 dark:text-amber-400 tabular-nums mt-0.5">{assessmentCount}</p>
         </div>
-        <div className="p-3.5 rounded-2xl bg-purple-50/60 dark:bg-purple-950/20 border border-purple-200 dark:border-purple-800/50 shadow-sm">
-          <span className="text-[10px] font-black uppercase text-purple-700 dark:text-purple-400 tracking-wider">Đang triển khai</span>
-          <p className="text-2xl font-black text-purple-600 dark:text-purple-300 mt-1">{implementingCount}</p>
+        <div className="p-4 rounded-xl bg-surface border border-border shadow-xs">
+          <span className="text-xs font-medium text-purple-700 dark:text-purple-400">Đang triển khai</span>
+          <p className="text-2xl font-bold text-purple-600 dark:text-purple-400 tabular-nums mt-0.5">{implementingCount}</p>
         </div>
-        <div className="p-3.5 rounded-2xl bg-emerald-50/60 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800/50 shadow-sm">
-          <span className="text-[10px] font-black uppercase text-emerald-700 dark:text-emerald-400 tracking-wider">Đã đóng (Closed)</span>
-          <p className="text-2xl font-black text-emerald-600 dark:text-emerald-300 mt-1">{closedCount}</p>
+        <div className="p-4 rounded-xl bg-surface border border-border shadow-xs">
+          <span className="text-xs font-medium text-emerald-700 dark:text-emerald-400">Đã đóng (Closed)</span>
+          <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400 tabular-nums mt-0.5">{closedCount}</p>
         </div>
-        <div className="p-3.5 rounded-2xl bg-rose-50/60 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-800/50 shadow-sm">
-          <span className="text-[10px] font-black uppercase text-rose-700 dark:text-rose-400 tracking-wider">Critical / Khẩn cấp</span>
-          <p className="text-2xl font-black text-rose-600 dark:text-rose-300 mt-1">{criticalCount}</p>
+        <div className="p-4 rounded-xl bg-surface border border-border shadow-xs">
+          <span className="text-xs font-medium text-rose-700 dark:text-rose-400">Khẩn cấp</span>
+          <p className="text-2xl font-bold text-rose-600 dark:text-rose-400 tabular-nums mt-0.5">{criticalCount}</p>
         </div>
       </div>
 
       {/* Search & Filter Toolbar */}
-      <div className="bg-surface p-4 rounded-2xl border border-border shadow-sm flex flex-wrap items-center justify-between gap-3">
+      <div className="bg-surface p-3.5 rounded-xl border border-border shadow-xs flex flex-wrap items-center justify-between gap-3">
         <div className="relative flex-1 min-w-[260px]">
           <MagnifyingGlassIcon className="h-4 w-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-muted" />
           <input
@@ -242,15 +244,15 @@ export const ChangeControlListPage: React.FC = () => {
             placeholder="Tìm theo mã CR, tiêu đề thay đổi hoặc sản phẩm..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 bg-surface-2 border border-border rounded-xl text-xs font-bold text-ink placeholder:text-ink-muted outline-none focus:border-emerald-500 transition-colors"
+            className="w-full pl-9 pr-4 py-2 bg-surface-2 border border-border rounded-xl text-xs font-normal text-ink placeholder:text-ink-muted outline-none focus:ring-2 focus:ring-emerald-500/20 transition-colors"
           />
         </div>
 
-        <div className="flex items-center gap-2.5 flex-wrap">
+        <div className="flex items-center gap-2 flex-wrap">
           <select
             value={categoryFilter}
             onChange={(e) => setCategoryFilter(e.target.value)}
-            className="px-3 py-2 bg-surface-2 border border-border rounded-xl text-xs font-bold outline-none text-ink"
+            className="px-3 py-2 bg-surface-2 border border-border rounded-xl text-xs font-medium outline-none text-ink cursor-pointer"
           >
             <option value="ALL">Tất cả phân loại</option>
             <option value="FORMULA">Công thức (Formula)</option>
@@ -265,7 +267,7 @@ export const ChangeControlListPage: React.FC = () => {
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-3 py-2 bg-surface-2 border border-border rounded-xl text-xs font-bold outline-none text-ink"
+            className="px-3 py-2 bg-surface-2 border border-border rounded-xl text-xs font-medium outline-none text-ink cursor-pointer"
           >
             <option value="ALL">Tất cả trạng thái</option>
             <option value="DRAFT">Bản nháp</option>
@@ -278,78 +280,78 @@ export const ChangeControlListPage: React.FC = () => {
       </div>
 
       {/* Change Requests Table */}
-      <div className="bg-surface rounded-2xl border border-border shadow-sm overflow-hidden">
+      <div className="bg-surface rounded-xl border border-border shadow-xs overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse text-xs">
             <thead>
-              <tr className="bg-surface-2 border-b border-border text-ink-muted uppercase tracking-wider font-black">
-                <th className="p-4 w-36">Mã CR</th>
-                <th className="p-4 min-w-[260px]">Tiêu đề Thay đổi</th>
-                <th className="p-4 w-40">Phân loại</th>
-                <th className="p-4 w-28">Mức độ</th>
-                <th className="p-4 w-32">FMEA RPN</th>
-                <th className="p-4 w-36">Hạn hoàn thành</th>
-                <th className="p-4 w-32 text-center">Trạng thái</th>
-                <th className="p-4 w-20 text-center">Chi tiết</th>
+              <tr className="bg-surface-2/60 border-b border-border text-ink-muted font-semibold text-xs">
+                <th className="py-3 px-4 w-36">Mã CR</th>
+                <th className="py-3 px-4 min-w-[260px]">Tiêu đề thay đổi</th>
+                <th className="py-3 px-4 w-40">Phân loại</th>
+                <th className="py-3 px-4 w-28">Mức độ</th>
+                <th className="py-3 px-4 w-32">FMEA RPN</th>
+                <th className="py-3 px-4 w-36">Hạn hoàn thành</th>
+                <th className="py-3 px-4 w-32 text-center">Trạng thái</th>
+                <th className="py-3 px-4 w-20 text-center">Chi tiết</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
               {filtered.length === 0 ? (
                 <tr>
                   <td colSpan={8} className="p-12 text-center text-ink-muted font-medium">
-                    Chưa có Yêu cầu Thay đổi nào phù hợp.
+                    Chưa có yêu cầu thay đổi nào phù hợp.
                   </td>
                 </tr>
               ) : (
                 filtered.map(cr => {
                   const rpn = cr.riskAssessment?.rpn;
                   const rpnColor = rpn 
-                    ? rpn >= 60 ? 'text-rose-600 bg-rose-500/10 border-rose-500/30' 
-                    : rpn >= 25 ? 'text-amber-600 bg-amber-500/10 border-amber-500/30' 
-                    : 'text-emerald-600 bg-emerald-500/10 border-emerald-500/30'
+                    ? rpn >= 60 ? 'text-rose-700 dark:text-rose-400 bg-rose-500/10 border-rose-500/20' 
+                    : rpn >= 25 ? 'text-amber-700 dark:text-amber-400 bg-amber-500/10 border-amber-500/20' 
+                    : 'text-emerald-700 dark:text-emerald-400 bg-emerald-500/10 border-emerald-500/20'
                     : 'text-ink-muted bg-surface-2 border-border';
 
                   return (
                     <tr 
                       key={cr.id}
                       onClick={() => setSelectedCR(cr)}
-                      className="hover:bg-surface-2 transition-colors cursor-pointer"
+                      className="hover:bg-surface-2/60 transition-colors cursor-pointer"
                     >
-                      <td className="p-4 font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                      <td className="py-3 px-4 font-mono font-medium text-emerald-600 dark:text-emerald-400">
                         {cr.crNo}
                       </td>
-                      <td className="p-4">
-                        <p className="font-bold text-ink">{cr.title}</p>
+                      <td className="py-3 px-4">
+                        <p className="font-medium text-ink">{cr.title}</p>
                         {cr.productName && (
-                          <span className="text-[11px] text-ink-muted">Sản phẩm: {cr.productName}</span>
+                          <span className="text-xs text-ink-muted">Sản phẩm: {cr.productName}</span>
                         )}
                       </td>
-                      <td className="p-4">
-                        <span className="font-medium text-ink-soft">{cr.category}</span>
+                      <td className="py-3 px-4">
+                        <span className="text-ink-soft">{cr.category}</span>
                       </td>
-                      <td className="p-4">
-                        <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase border border-border text-ink-soft">
+                      <td className="py-3 px-4">
+                        <span className="px-2 py-0.5 rounded-full text-[11px] font-medium border border-border text-ink-soft bg-surface-2">
                           {cr.changeType}
                         </span>
                       </td>
-                      <td className="p-4">
+                      <td className="py-3 px-4">
                         {rpn ? (
-                          <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-black border ${rpnColor}`}>
+                          <span className={`px-2 py-0.5 rounded-full text-[11px] font-mono font-medium border ${rpnColor}`}>
                             RPN: {rpn}
                           </span>
                         ) : (
-                          <span className="text-ink-muted text-[11px]">Chưa tính</span>
+                          <span className="text-ink-muted text-xs">Chưa tính</span>
                         )}
                       </td>
-                      <td className="p-4 font-mono text-ink-soft">
+                      <td className="py-3 px-4 font-mono text-ink-soft">
                         {formatDateStandard(cr.targetImplementationDate)}
                       </td>
-                      <td className="p-4 text-center">
-                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-surface-2 text-ink-soft border border-border">
+                      <td className="py-3 px-4 text-center">
+                        <span className="px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-surface-2 text-ink-soft border border-border">
                           {cr.status}
                         </span>
                       </td>
-                      <td className="p-4 text-center">
+                      <td className="py-3 px-4 text-center">
                         <ArrowRightIcon className="h-3.5 w-3.5 text-ink-muted mx-auto" />
                       </td>
                     </tr>

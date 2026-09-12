@@ -30,18 +30,18 @@ class ErrorBoundary extends Component<Props, State> {
     if (this.state.hasError) {
       return (
         <div className="min-h-screen flex items-center justify-center bg-surface-2 p-4 font-sans">
-          <div className="bg-surface p-8 rounded-3xl shadow-xl max-w-md w-full text-center border border-rose-200/80 dark:border-rose-950/60">
-            <div className="w-16 h-16 bg-rose-50 text-rose-600 dark:bg-rose-950/60 dark:text-rose-400 rounded-2xl flex items-center justify-center mx-auto mb-5 ring-1 ring-inset ring-rose-600/20">
-              <ExclamationTriangleIcon className="w-8 h-8" />
+          <div className="bg-surface p-6 sm:p-8 rounded-2xl shadow-xl max-w-sm w-full text-center border border-border">
+            <div className="w-12 h-12 bg-rose-500/10 text-rose-600 dark:text-rose-400 rounded-xl flex items-center justify-center mx-auto mb-4 border border-rose-500/20">
+              <ExclamationTriangleIcon className="w-6 h-6" />
             </div>
-            <h1 className="text-lg font-bold text-ink uppercase tracking-tight mb-2">Đã xảy ra sự cố</h1>
-            <p className="text-xs sm:text-sm font-medium text-ink-faint mb-6 line-clamp-3 leading-relaxed">
+            <h1 className="text-base font-bold text-ink tracking-tight mb-1.5">Đã xảy ra sự cố</h1>
+            <p className="text-xs sm:text-sm text-ink-muted mb-5 line-clamp-3 leading-relaxed">
               {this.state.error?.message || 'Có lỗi không xác định xảy ra trong quá trình hiển thị giao diện. Vui lòng tải lại trang để tiếp tục.'}
             </p>
             <button
               type="button"
               onClick={() => window.location.reload()}
-              className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-semibold text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-all shadow-xs"
+              className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] text-white rounded-xl font-medium text-sm flex items-center justify-center gap-2 transition-all shadow-xs"
             >
               <ArrowPathIcon className="w-4 h-4" />
               Tải lại trang

@@ -200,29 +200,29 @@ export const Batch360Page: React.FC = () => {
   return (
     <div className="max-w-7xl mx-auto space-y-6 pb-12">
       {/* Header điều hướng & Tiêu đề Batch 360 */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-surface p-5 rounded-2xl border border-border shadow-sm">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-surface p-5 rounded-xl border border-border shadow-xs">
         <div className="flex items-center gap-3.5">
           <button
             onClick={() => navigate(`/batches/${batch.id}`)}
-            className="p-2 text-ink-muted hover:text-ink hover:bg-surface-2 rounded-xl transition-colors border border-border"
+            className="p-2 text-ink-muted hover:text-ink hover:bg-surface-2 rounded-lg transition-colors border border-border cursor-pointer"
             title="Quay lại chi tiết lô"
           >
             <ArrowLeftIcon className="w-5 h-5" />
           </button>
           <div>
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">
+              <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-blue-500/10 text-blue-700 dark:text-blue-400 border border-blue-500/20">
                 BATCH 360° QUALITY COCKPIT
               </span>
-              <span className={`text-xs font-bold px-2.5 py-0.5 rounded-full ${
-                batch.status === 'RELEASED' ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20' :
-                batch.status === 'REJECTED' ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20' :
-                'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20'
+              <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full ${
+                batch.status === 'RELEASED' ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20' :
+                batch.status === 'REJECTED' ? 'bg-rose-500/10 text-rose-700 dark:text-rose-400 border border-rose-500/20' :
+                'bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20'
               }`}>
                 {batch.status}
               </span>
             </div>
-            <h1 className="text-2xl font-bold text-ink mt-1">
+            <h1 className="text-xl sm:text-2xl font-bold text-ink tracking-tight mt-1">
               Lô {batch.batchNo} — {batch.product?.name || 'Sản phẩm'}
             </h1>
             <p className="text-xs text-ink-muted mt-0.5">
@@ -234,14 +234,14 @@ export const Batch360Page: React.FC = () => {
         <div className="flex items-center gap-2">
           <Link
             to={`/batches/${batch.id}`}
-            className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-ink-soft bg-surface-2 hover:bg-surface-3 border border-border rounded-xl transition-colors shadow-sm"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-ink-soft bg-surface hover:bg-surface-2 border border-border rounded-lg transition-colors shadow-xs"
           >
             <Square3Stack3DIcon className="w-3.5 h-3.5" />
             <span>Trang quản lý lô</span>
           </Link>
           <button
             onClick={() => window.print()}
-            className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/30 hover:bg-emerald-100 border border-emerald-500/20 rounded-xl transition-colors shadow-sm"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-emerald-700 dark:text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 rounded-lg transition-colors shadow-xs cursor-pointer"
           >
             <PrinterIcon className="w-3.5 h-3.5" />
             <span>In hồ sơ 360</span>
@@ -251,26 +251,26 @@ export const Batch360Page: React.FC = () => {
 
       {/* Thông tin vắn tắt Lô & Sản phẩm */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div className="p-3.5 bg-surface rounded-xl border border-border shadow-sm">
-          <span className="text-[11px] text-ink-muted block">Sản phẩm</span>
+        <div className="p-3.5 bg-surface rounded-xl border border-border shadow-xs">
+          <span className="text-xs font-medium text-ink-muted block">Sản phẩm</span>
           <span className="font-semibold text-sm text-ink truncate block mt-0.5">
             {batch.product?.name || 'Chưa gắn SP'}
           </span>
         </div>
-        <div className="p-3.5 bg-surface rounded-xl border border-border shadow-sm">
-          <span className="text-[11px] text-ink-muted block">Tiêu chuẩn áp dụng</span>
+        <div className="p-3.5 bg-surface rounded-xl border border-border shadow-xs">
+          <span className="text-xs font-medium text-ink-muted block">Tiêu chuẩn áp dụng</span>
           <span className="font-semibold text-sm text-ink truncate block mt-0.5">
             {batch.tccs?.code || 'Chưa gắn TCCS'}
           </span>
         </div>
-        <div className="p-3.5 bg-surface rounded-xl border border-border shadow-sm">
-          <span className="text-[11px] text-ink-muted block">Ngày sản xuất / Hạn dùng</span>
+        <div className="p-3.5 bg-surface rounded-xl border border-border shadow-xs">
+          <span className="text-xs font-medium text-ink-muted block">Ngày sản xuất / Hạn dùng</span>
           <span className="font-semibold text-sm text-ink truncate block mt-0.5">
             {formatDateStandard(batch.mfgDate)} — {formatDateStandard(batch.expDate)}
           </span>
         </div>
-        <div className="p-3.5 bg-surface rounded-xl border border-border shadow-sm">
-          <span className="text-[11px] text-ink-muted block">Năng suất thực tế</span>
+        <div className="p-3.5 bg-surface rounded-xl border border-border shadow-xs">
+          <span className="text-xs font-medium text-ink-muted block">Năng suất thực tế</span>
           <span className="font-semibold text-sm text-ink truncate block mt-0.5">
             {batch.actualYield ? `${batch.actualYield} ${batch.yieldUnit || ''}` : 'Chưa ghi nhận'}
           </span>
@@ -278,12 +278,12 @@ export const Batch360Page: React.FC = () => {
       </div>
 
       {/* Tabs điều hướng */}
-      <div className="flex border-b border-border">
+      <div className="flex border-b border-border gap-2">
         <button
           onClick={() => setActiveTab('GENEALOGY')}
-          className={`flex items-center gap-2 px-5 py-3 text-sm font-semibold border-b-2 transition-all ${
+          className={`flex items-center gap-2 px-4 py-2.5 text-xs font-semibold border-b-2 transition-all cursor-pointer ${
             activeTab === 'GENEALOGY'
-              ? 'border-emerald-600 text-emerald-600 dark:text-emerald-400'
+              ? 'border-emerald-600 text-emerald-700 dark:text-emerald-400'
               : 'border-transparent text-ink-muted hover:text-ink'
           }`}
         >
@@ -292,9 +292,9 @@ export const Batch360Page: React.FC = () => {
         </button>
         <button
           onClick={() => setActiveTab('TIMELINE')}
-          className={`flex items-center gap-2 px-5 py-3 text-sm font-semibold border-b-2 transition-all ${
+          className={`flex items-center gap-2 px-4 py-2.5 text-xs font-semibold border-b-2 transition-all cursor-pointer ${
             activeTab === 'TIMELINE'
-              ? 'border-emerald-600 text-emerald-600 dark:text-emerald-400'
+              ? 'border-emerald-600 text-emerald-700 dark:text-emerald-400'
               : 'border-transparent text-ink-muted hover:text-ink'
           }`}
         >
@@ -306,9 +306,9 @@ export const Batch360Page: React.FC = () => {
         </button>
         <button
           onClick={() => setActiveTab('CQAS')}
-          className={`flex items-center gap-2 px-5 py-3 text-sm font-semibold border-b-2 transition-all ${
+          className={`flex items-center gap-2 px-4 py-2.5 text-xs font-semibold border-b-2 transition-all cursor-pointer ${
             activeTab === 'CQAS'
-              ? 'border-emerald-600 text-emerald-600 dark:text-emerald-400'
+              ? 'border-emerald-600 text-emerald-700 dark:text-emerald-400'
               : 'border-transparent text-ink-muted hover:text-ink'
           }`}
         >
@@ -334,7 +334,7 @@ export const Batch360Page: React.FC = () => {
       )}
 
       {activeTab === 'CQAS' && (
-        <div className="bg-surface rounded-2xl border border-border p-5 shadow-sm space-y-4">
+        <div className="bg-surface rounded-xl border border-border p-5 shadow-xs space-y-4">
           <div className="flex items-center justify-between pb-3 border-b border-border">
             <div>
               <h3 className="font-semibold text-ink text-sm">
@@ -350,13 +350,13 @@ export const Batch360Page: React.FC = () => {
           </div>
 
           {batchTestResults.length === 0 ? (
-            <div className="text-center py-8 text-ink-muted text-sm">
+            <div className="text-center py-8 text-ink-muted text-sm italic">
               Chưa có phiếu kiểm nghiệm nào được ghi nhận cho lô sản xuất này.
             </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-xs text-left">
-                <thead className="bg-surface-2 text-ink uppercase font-semibold">
+                <thead className="bg-surface-2/60 text-ink-muted font-semibold text-xs border-b border-border">
                   <tr>
                     <th className="p-3">Ngày kiểm nghiệm</th>
                     <th className="p-3">Đơn vị kiểm nghiệm</th>
@@ -371,7 +371,7 @@ export const Batch360Page: React.FC = () => {
                     const passCount = ensureArray(tr.results).filter(r => r.isPass).length;
                     const totalCount = ensureArray(tr.results).length;
                     return (
-                      <tr key={tr.id} className="hover:bg-surface-2 transition-colors">
+                      <tr key={tr.id} className="hover:bg-surface-2/60 transition-colors">
                         <td className="p-3 font-medium text-ink">
                           {formatDateStandard(tr.testDate)}
                         </td>
@@ -379,12 +379,12 @@ export const Batch360Page: React.FC = () => {
                           {tr.labName || 'Phòng Lab'}
                         </td>
                         <td className="p-3">
-                          <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
+                          <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${
                             tr.overallStatus === 'PASS'
-                              ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
-                              : 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20'
+                              ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20'
+                              : 'bg-rose-500/10 text-rose-700 dark:text-rose-400 border border-rose-500/20'
                           }`}>
-                            {tr.overallStatus === 'PASS' ? <CheckCircleIcon className="w-3.5 h-3.5" /> : <XCircleIcon className="w-3.5 h-3.5" />}
+                            {tr.overallStatus === 'PASS' ? <CheckCircleIcon className="w-3.5 h-3.5 text-emerald-600" /> : <XCircleIcon className="w-3.5 h-3.5 text-rose-600" />}
                             {tr.overallStatus === 'PASS' ? 'ĐẠT' : 'KHÔNG ĐẠT'}
                           </span>
                         </td>
@@ -397,7 +397,7 @@ export const Batch360Page: React.FC = () => {
                         <td className="p-3 text-right">
                           <Link
                             to={`/test-results/print/${tr.id}`}
-                            className="text-emerald-600 dark:text-emerald-400 hover:underline font-medium inline-flex items-center gap-1"
+                            className="text-emerald-700 dark:text-emerald-400 hover:underline font-medium inline-flex items-center gap-1"
                           >
                             Xem phiếu <ArrowTopRightOnSquareIcon className="w-3.5 h-3.5" />
                           </Link>

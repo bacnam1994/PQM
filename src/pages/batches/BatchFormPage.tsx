@@ -115,12 +115,12 @@ const BatchFormPage = () => {
       <div className="flex items-center gap-4">
         <button 
           onClick={() => navigate('/batches')} 
-          className="p-2 bg-surface text-ink-muted hover:text-emerald-600 rounded-xl border border-border shadow-sm transition-colors"
+          className="p-2 bg-surface text-ink-muted hover:text-emerald-700 dark:hover:text-emerald-400 rounded-lg border border-border shadow-xs transition-colors cursor-pointer"
         >
           <ArrowLeftIcon className="w-5 h-5" />
         </button>
         <div>
-          <h1 className="text-2xl font-bold text-ink tracking-tight">
+          <h1 className="text-xl sm:text-2xl font-bold text-ink tracking-tight">
             {id ? 'Chỉnh sửa Lô hàng' : 'Thêm Lô hàng mới'}
           </h1>
           <p className="text-xs text-ink-muted mt-0.5">
@@ -129,20 +129,20 @@ const BatchFormPage = () => {
         </div>
       </div>
 
-      <div className="bg-surface rounded-2xl shadow-sm border border-border p-6">
+      <div className="bg-surface rounded-xl shadow-xs border border-border p-6">
         {/* Đợi Load xong dữ liệu cũ rồi mới Render Form */}
         {(!id || batchToEdit) && (
           <form onSubmit={handleSave} className="space-y-6">
             {/* Khối chọn Sản phẩm */}
             <div>
-              <label className="block text-xs font-semibold text-ink-muted uppercase tracking-wider mb-2">
+              <label className="block text-xs font-semibold text-ink-muted mb-2">
                 Sản phẩm *
               </label>
               {id ? (
                 <div className="relative">
-                  <div className="w-full px-4 py-3 bg-surface-2 border border-border rounded-xl font-medium text-ink flex justify-between items-center text-sm">
+                  <div className="w-full px-4 py-2.5 bg-surface-2 border border-border rounded-xl font-medium text-ink flex justify-between items-center text-sm">
                      <span>{productSearch}</span>
-                     <span className="text-[10px] uppercase font-semibold bg-surface-3 px-2 py-1 rounded text-ink-muted border border-border">Không thể đổi SP</span>
+                     <span className="text-[10px] font-semibold bg-surface-3 px-2 py-0.5 rounded text-ink-muted border border-border">Không thể đổi SP</span>
                   </div>
                 </div>
               ) : (
@@ -159,24 +159,24 @@ const BatchFormPage = () => {
                     onFocus={() => setShowProductDropdown(true)}
                     onBlur={() => setTimeout(() => setShowProductDropdown(false), 200)}
                     placeholder="Tìm kiếm sản phẩm theo tên hoặc mã..."
-                    className="w-full pl-10 pr-10 py-2.5 bg-surface border border-border rounded-xl font-medium text-ink placeholder:text-ink-muted outline-none shadow-sm text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all"
+                    className="w-full pl-10 pr-10 py-2.5 bg-surface border border-border rounded-xl font-medium text-ink placeholder:text-ink-faint outline-none shadow-xs text-sm focus:ring-2 focus:ring-emerald-500/15 focus:border-emerald-500 transition-all"
                   />
                   
                   {selectedProductId ? (
                     <button 
                       type="button" 
                       onClick={() => { setSelectedProductId(''); setProductSearch(''); setShowProductDropdown(true); }} 
-                      className="absolute right-3.5 top-1/2 -translate-y-1/2 group transition-colors" 
+                      className="absolute right-3.5 top-1/2 -translate-y-1/2 group transition-colors cursor-pointer" 
                       title="Hủy chọn"
                     >
                       <CheckCircleIcon className="w-5 h-5 text-emerald-600 group-hover:hidden" />
-                      <XMarkIcon className="w-5 h-5 text-red-500 hidden group-hover:block" />
+                      <XMarkIcon className="w-5 h-5 text-rose-500 hidden group-hover:block" />
                     </button>
                   ) : productSearch ? (
                     <button 
                       type="button" 
                       onClick={() => { setProductSearch(''); setSelectedProductId(''); }} 
-                      className="absolute right-3.5 top-1/2 -translate-y-1/2 text-ink-muted hover:text-ink transition-colors" 
+                      className="absolute right-3.5 top-1/2 -translate-y-1/2 text-ink-muted hover:text-ink transition-colors cursor-pointer" 
                       title="Xóa"
                     >
                       <XMarkIcon className="w-5 h-5" />
@@ -194,10 +194,10 @@ const BatchFormPage = () => {
                             setProductSearch(`${p.code} - ${p.name}`);
                             setShowProductDropdown(false);
                           }}
-                          className={`px-4 py-3 hover:bg-surface-2 cursor-pointer transition-colors ${selectedProductId === p.id ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' : ''}`}
+                          className={`px-4 py-3 hover:bg-surface-2 cursor-pointer transition-colors ${selectedProductId === p.id ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400' : ''}`}
                         >
                           <p className="text-sm font-semibold text-ink">{p.name}</p>
-                          <p className="text-[11px] font-mono text-ink-muted uppercase">{p.code}</p>
+                          <p className="text-xs font-mono text-ink-muted">{p.code}</p>
                         </div>
                       ))}
                     </div>
@@ -216,7 +216,7 @@ const BatchFormPage = () => {
 
             {/* Sản lượng */}
             <div className="border-t border-border pt-5">
-              <p className="text-xs font-semibold text-ink-muted uppercase tracking-wider mb-4">Thông tin Sản lượng</p>
+              <p className="text-xs font-semibold text-ink-muted mb-4">Thông tin Sản lượng</p>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <DSFormInput
                   label="Sản lượng lý thuyết"
@@ -257,14 +257,14 @@ const BatchFormPage = () => {
               <button 
                 type="button" 
                 onClick={() => navigate('/batches')} 
-                className="px-5 py-2.5 text-ink-muted hover:text-ink font-semibold uppercase text-xs tracking-wider hover:bg-surface-2 rounded-xl transition-colors"
+                className="px-4 py-2 text-ink-muted hover:text-ink font-medium text-xs hover:bg-surface-2 rounded-lg transition-colors cursor-pointer"
               >
                 Hủy & Quay lại
               </button>
               <button 
                 type="submit" 
                 disabled={isSubmitting} 
-                className="px-8 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-semibold uppercase text-xs tracking-wider flex items-center gap-2 shadow-sm transition-all disabled:opacity-50"
+                className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white rounded-lg font-medium text-xs flex items-center gap-2 shadow-xs transition-all disabled:opacity-50 cursor-pointer"
               >
                 {isSubmitting && <ArrowPathIcon className="w-4 h-4 animate-spin" />}
                 {id ? 'Cập nhật Lô hàng' : 'Đăng ký Lô mới'}

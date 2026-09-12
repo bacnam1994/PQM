@@ -192,9 +192,9 @@ const TestResultFormPage: React.FC = () => {
   if (id && editItemNotFound) {
     return (
       <div className="min-h-[70vh] flex items-center justify-center p-4">
-        <div className="bg-surface p-8 rounded-2xl shadow-sm border border-border flex flex-col items-center gap-3 text-center max-w-md w-full">
+        <div className="bg-surface p-8 rounded-xl shadow-xs border border-border flex flex-col items-center gap-3 text-center max-w-md w-full">
           <ExclamationTriangleIcon className="h-10 w-10 text-amber-500" />
-          <h2 className="font-bold text-ink text-lg uppercase tracking-tight">
+          <h2 className="font-bold text-ink text-lg tracking-tight">
             Không tìm thấy phiếu kiểm nghiệm
           </h2>
           <p className="text-sm text-ink-muted">
@@ -203,7 +203,7 @@ const TestResultFormPage: React.FC = () => {
           <button
             type="button"
             onClick={() => navigate('/test-results')}
-            className="mt-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-semibold text-xs uppercase tracking-wider transition-all shadow-sm"
+            className="mt-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-medium text-xs transition-all shadow-xs cursor-pointer"
           >
             Quay lại danh sách
           </button>
@@ -215,8 +215,8 @@ const TestResultFormPage: React.FC = () => {
   if (id && isLoadingEditItem) {
     return (
       <div className="min-h-[70vh] flex items-center justify-center p-4">
-        <div className="bg-surface p-8 rounded-2xl shadow-sm border border-border flex items-center gap-3 text-ink font-semibold text-sm">
-          <ArrowPathIcon className="animate-spin text-emerald-600 dark:text-emerald-400 h-6 w-6" /> Đang tải dữ liệu phiếu kiểm nghiệm...
+        <div className="bg-surface p-8 rounded-xl shadow-xs border border-border flex items-center gap-3 text-ink font-medium text-sm">
+          <ArrowPathIcon className="animate-spin text-emerald-600 dark:text-emerald-400 h-5 w-5" /> Đang tải dữ liệu phiếu kiểm nghiệm...
         </div>
       </div>
     );
@@ -256,7 +256,7 @@ const TestResultFormPage: React.FC = () => {
         />
 
         {/* Workflow Progression Stepper */}
-        <Surface variant="subtle" padding="sm" className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-xs">
+        <Surface variant="subtle" padding="sm" className="bg-surface-2/60 backdrop-blur-xs">
           <WorkflowSteps steps={workflowSteps} activeStep={currentWorkflowStep} />
         </Surface>
 
@@ -310,7 +310,7 @@ const TestResultFormPage: React.FC = () => {
           <Surface variant="flat" padding="lg" title="3. Hồ sơ Minh chứng & Kết luận" subtitle="Ghi nhận đánh giá cảm quan, lưu ý kiểm nghiệm và tệp đính kèm CoA/Spectra">
             <div className="space-y-6">
               <div className="space-y-2">
-                <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider pl-1">
+                <label className="text-xs font-semibold text-ink-muted pl-1">
                   Ghi chú phiếu kiểm nghiệm
                 </label>
                 <textarea
@@ -318,7 +318,7 @@ const TestResultFormPage: React.FC = () => {
                   value={formValues.notes}
                   onChange={(e) => setFieldValue('notes', e.target.value)}
                   rows={2}
-                  className="w-full px-3.5 py-2.5 bg-slate-50/80 dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-800 rounded-xl font-medium outline-none text-sm focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 transition-all text-slate-800 dark:text-slate-200"
+                  className="w-full px-3.5 py-2.5 bg-surface border border-border rounded-xl font-medium outline-none text-sm focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 transition-all text-ink placeholder:text-ink-faint"
                   placeholder="Ghi chú thêm về điều kiện thử nghiệm, độ ẩm phòng lab, lưu ý đặc biệt..."
                 />
               </div>
@@ -337,7 +337,7 @@ const TestResultFormPage: React.FC = () => {
               <button
                 type="button"
                 onClick={() => navigate('/test-results')}
-                className="px-4 py-2 text-slate-500 dark:text-slate-400 font-semibold text-xs tracking-wide hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
+                className="px-4 py-2 text-ink-muted hover:text-ink font-medium text-xs hover:bg-surface-2 rounded-lg transition-colors cursor-pointer"
               >
                 ← Hủy &amp; Quay lại danh sách
               </button>
@@ -347,7 +347,7 @@ const TestResultFormPage: React.FC = () => {
                 <button
                   type="submit"
                   disabled={!activeTCCS || isSubmitting}
-                  className={`px-6 py-2.5 text-white font-semibold rounded-xl shadow-sm transition-all text-xs tracking-wide flex items-center gap-2 cursor-pointer ${
+                  className={`px-5 py-2 text-white font-medium rounded-lg shadow-xs transition-all text-xs tracking-wide flex items-center gap-2 cursor-pointer ${
                     crud.mode === 'EDIT'
                       ? 'bg-blue-600 hover:bg-blue-700 active:bg-blue-800'
                       : 'bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800'

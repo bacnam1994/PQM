@@ -187,25 +187,27 @@ const MaterialFormPage = () => {
       <div className="flex items-center gap-4">
         <button 
           onClick={() => navigate('/materials')} 
-          className="p-2 bg-surface text-ink-muted hover:text-emerald-600 rounded-xl border border-border shadow-sm transition-colors"
+          className="p-2 bg-surface text-ink-muted hover:text-emerald-700 dark:hover:text-emerald-400 rounded-lg border border-border shadow-xs transition-colors cursor-pointer"
         >
           <ArrowLeftIcon className="w-5 h-5" />
         </button>
         <div>
-          <h1 className="text-2xl font-bold text-ink tracking-tight">
-            {materialToEdit ? 'Chỉnh sửa Nguyên liệu' : 'Thêm Nguyên liệu mới'}
+          <h1 className="text-xl sm:text-2xl font-bold text-ink tracking-tight">
+            {materialToEdit ? 'Chỉnh sửa Nguyên liệu Master' : 'Thêm Nguyên liệu Master mới'}
           </h1>
           <p className="text-xs text-ink-muted mt-0.5">
-            Quản lý hồ sơ nguyên liệu chuẩn (Master Catalog), tiêu chuẩn Dược điển và bí danh (Aliases).
+            {materialToEdit 
+              ? `Cập nhật thông tin chuẩn hóa cho: ${materialToEdit.name}` 
+              : 'Định nghĩa tên chuẩn (canonical) và quy chuẩn kiểm soát cho danh mục toàn hệ thống.'}
           </p>
         </div>
       </div>
 
-      <div className="bg-surface rounded-2xl shadow-sm border border-border p-6 md:p-8">
+      <div className="bg-surface rounded-xl shadow-xs border border-border p-6 md:p-8">
         <form onSubmit={handleSave} className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-ink-muted uppercase tracking-wider flex items-center gap-1.5">
+              <label className="text-xs font-semibold text-ink-muted flex items-center gap-1.5">
                 <HashtagIcon className="w-3.5 h-3.5 text-emerald-600" />
                 Mã nguyên liệu (Code)
               </label>
@@ -214,12 +216,12 @@ const MaterialFormPage = () => {
                 value={code}
                 onChange={e => setCode(e.target.value)}
                 placeholder="VD: NL-GINKGO-01"
-                className="w-full px-4 py-2.5 bg-surface border border-border rounded-xl font-medium text-sm outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-ink placeholder:text-ink-muted transition-all"
+                className="w-full px-3.5 py-2.5 bg-surface border border-border rounded-xl font-medium text-sm outline-none focus:ring-2 focus:ring-emerald-500/15 focus:border-emerald-500 text-ink placeholder:text-ink-faint transition-all"
               />
             </div>
 
             <div className="md:col-span-2 space-y-1.5">
-              <label className="text-xs font-semibold text-ink-muted uppercase tracking-wider flex items-center gap-1.5">
+              <label className="text-xs font-semibold text-ink-muted flex items-center gap-1.5">
                 <BookOpenIcon className="w-3.5 h-3.5 text-emerald-600" />
                 Tên nguyên liệu chuẩn (Canonical Name) *
               </label>
@@ -232,15 +234,15 @@ const MaterialFormPage = () => {
                 }}
                 placeholder="VD: Ginkgo Biloba Extract (Cao khô Bạch quả)"
                 required
-                className={`w-full px-4 py-2.5 bg-surface border rounded-xl font-medium text-sm outline-none focus:ring-2 text-ink placeholder:text-ink-muted transition-all ${
+                className={`w-full px-3.5 py-2.5 bg-surface border rounded-xl font-medium text-sm outline-none focus:ring-2 text-ink placeholder:text-ink-faint transition-all ${
                   duplicateWarnings.length > 0
                     ? 'border-amber-500 focus:ring-amber-500/20'
-                    : 'border-border focus:ring-emerald-500 focus:border-emerald-500'
+                    : 'border-border focus:ring-emerald-500/15 focus:border-emerald-500'
                 }`}
               />
               {duplicateWarnings.length > 0 && (
                 <div className="mt-2 p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl">
-                  <div className="flex items-center gap-1.5 text-xs font-semibold uppercase text-amber-700 dark:text-amber-400 mb-2">
+                  <div className="flex items-center gap-1.5 text-xs font-semibold text-amber-700 dark:text-amber-400 mb-2">
                     <ExclamationTriangleIcon className="w-4 h-4" />
                     <span>Phát hiện {duplicateWarnings.length} nguyên liệu tương đồng trong Master Catalog!</span>
                   </div>
@@ -259,11 +261,11 @@ const MaterialFormPage = () => {
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-ink-muted uppercase tracking-wider">Phân loại</label>
+              <label className="text-xs font-semibold text-ink-muted">Phân loại</label>
               <select
                 value={category}
                 onChange={e => setCategory(e.target.value as any)}
-                className="w-full px-4 py-2.5 bg-surface border border-border rounded-xl font-medium text-sm outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-ink cursor-pointer transition-all"
+                className="w-full px-3.5 py-2.5 bg-surface border border-border rounded-xl font-medium text-sm outline-none focus:ring-2 focus:ring-emerald-500/15 focus:border-emerald-500 text-ink cursor-pointer transition-all"
               >
                 <option value="ACTIVE">Hoạt chất (Active Ingredient)</option>
                 <option value="EXCIPIENT">Tá dược / Phụ liệu (Excipient)</option>
@@ -272,7 +274,7 @@ const MaterialFormPage = () => {
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-ink-muted uppercase tracking-wider flex items-center gap-1.5">
+              <label className="text-xs font-semibold text-ink-muted flex items-center gap-1.5">
                 <ShieldCheckIcon className="w-3.5 h-3.5 text-emerald-600" />
                 Tiêu chuẩn áp dụng
               </label>
@@ -282,12 +284,12 @@ const MaterialFormPage = () => {
                 value={standard}
                 onChange={e => setStandard(e.target.value)}
                 placeholder="VD: DĐVN V, USP 43..."
-                className="w-full px-4 py-2.5 bg-surface border border-border rounded-xl font-medium text-sm outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-ink placeholder:text-ink-muted transition-all"
+                className="w-full px-3.5 py-2.5 bg-surface border border-border rounded-xl font-medium text-sm outline-none focus:ring-2 focus:ring-emerald-500/15 focus:border-emerald-500 text-ink placeholder:text-ink-faint transition-all"
               />
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-ink-muted uppercase tracking-wider">Mã số CAS (Tùy chọn)</label>
+              <label className="text-xs font-semibold text-ink-muted">Mã số CAS (Tùy chọn)</label>
               <input
                 type="text"
                 value={casNumber}
@@ -303,8 +305,8 @@ const MaterialFormPage = () => {
                   }
                 }}
                 placeholder="VD: 90045-36-6"
-                className={`w-full px-4 py-2.5 bg-surface border rounded-xl font-medium text-sm outline-none focus:ring-2 text-ink placeholder:text-ink-muted font-mono transition-all ${
-                  casError ? 'border-rose-500 focus:ring-rose-500/20' : 'border-border focus:ring-emerald-500 focus:border-emerald-500'
+                className={`w-full px-3.5 py-2.5 bg-surface border rounded-xl font-medium text-sm outline-none focus:ring-2 text-ink placeholder:text-ink-faint font-mono transition-all ${
+                  casError ? 'border-rose-500 focus:ring-rose-500/20' : 'border-border focus:ring-emerald-500/15 focus:border-emerald-500'
                 }`}
               />
               {casError && (
@@ -317,15 +319,15 @@ const MaterialFormPage = () => {
 
           {/* Aliases Tag Input */}
           <div className="space-y-2">
-            <label className="text-xs font-semibold text-ink-muted uppercase tracking-wider flex items-center gap-2">
+            <label className="text-xs font-semibold text-ink-muted flex items-center gap-2">
               <Square3Stack3DIcon className="w-4 h-4 text-emerald-600" />
               Các tên gọi khác & Bí danh (Aliases)
             </label>
-            <div className="p-2.5 bg-surface-2 rounded-xl border border-border flex flex-wrap gap-2 min-h-[50px] items-center focus-within:ring-2 focus-within:ring-emerald-500 focus-within:border-emerald-500 transition-all">
+            <div className="p-2.5 bg-surface-2/60 rounded-xl border border-border flex flex-wrap gap-2 min-h-[50px] items-center focus-within:ring-2 focus-within:ring-emerald-500/15 focus-within:border-emerald-500 transition-all">
               {aliases.map((alias, i) => (
                 <div key={i} className="flex items-center gap-1.5 bg-surface border border-emerald-500/20 text-emerald-700 dark:text-emerald-400 text-xs font-medium px-2.5 py-1 rounded-lg shadow-xs">
                   {alias}
-                  <button type="button" onClick={() => removeAlias(i)} className="text-ink-muted hover:text-rose-500 transition-colors">
+                  <button type="button" onClick={() => removeAlias(i)} className="text-ink-muted hover:text-rose-500 transition-colors cursor-pointer">
                     <XMarkIcon className="w-3.5 h-3.5" />
                   </button>
                 </div>
@@ -338,13 +340,13 @@ const MaterialFormPage = () => {
                   onKeyDown={handleAliasKeyDown}
                   onPaste={handlePaste}
                   placeholder="Gõ tên khác rồi nhấn Enter hoặc dán danh sách..."
-                  className="flex-1 bg-transparent outline-none text-xs p-1 placeholder:text-ink-muted font-medium text-ink"
+                  className="flex-1 bg-transparent outline-none text-xs p-1 placeholder:text-ink-faint font-medium text-ink"
                 />
                 <button 
                   type="button" 
                   onClick={handleAddAlias}
                   disabled={!aliasInput.trim()}
-                  className="ml-2 p-1.5 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-lg hover:bg-emerald-600 hover:text-white transition-colors disabled:opacity-0 disabled:pointer-events-none"
+                  className="ml-2 p-1.5 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 rounded-lg hover:bg-emerald-600 hover:text-white transition-colors disabled:opacity-0 disabled:pointer-events-none cursor-pointer"
                 >
                   <PlusIcon className="w-4 h-4" />
                 </button>
@@ -356,13 +358,13 @@ const MaterialFormPage = () => {
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-ink-muted uppercase tracking-wider">Mô tả & Nguồn gốc xuất xứ</label>
+            <label className="text-xs font-semibold text-ink-muted">Mô tả & Nguồn gốc xuất xứ</label>
             <textarea
               value={description}
               onChange={e => setDescription(e.target.value)}
               placeholder="Ghi chú về nguồn gốc, quy cách bảo quản, nhà sản xuất, đặc tính kỹ thuật..."
               rows={3}
-              className="w-full px-4 py-2.5 bg-surface border border-border rounded-xl font-medium text-sm outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-ink placeholder:text-ink-muted resize-none transition-all"
+              className="w-full px-3.5 py-2.5 bg-surface border border-border rounded-xl font-medium text-sm outline-none focus:ring-2 focus:ring-emerald-500/15 focus:border-emerald-500 text-ink placeholder:text-ink-faint resize-none transition-all"
             />
           </div>
 
@@ -370,14 +372,14 @@ const MaterialFormPage = () => {
             <button
               type="button"
               onClick={() => navigate('/materials')}
-              className="px-5 py-2.5 text-ink-muted hover:text-ink font-semibold uppercase text-xs tracking-wider hover:bg-surface-2 rounded-xl transition-colors"
+              className="px-4 py-2 text-ink-muted hover:text-ink font-medium text-xs hover:bg-surface-2 rounded-lg transition-colors cursor-pointer"
             >
               Hủy
             </button>
             <button
               type="submit"
               disabled={isSubmitting}
-              className="px-8 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-semibold uppercase text-xs tracking-wider flex items-center gap-2 transition-all shadow-sm disabled:opacity-50"
+              className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white rounded-lg font-medium text-xs flex items-center gap-2 transition-all shadow-xs disabled:opacity-50 cursor-pointer"
             >
               {isSubmitting ? <ArrowPathIcon className="w-4 h-4 animate-spin" /> : <CheckIcon className="w-4 h-4" />}
               {materialToEdit ? 'Cập nhật Nguyên liệu' : 'Lưu Nguyên liệu'}

@@ -47,57 +47,57 @@ const ROLE_DEFINITIONS: Record<UserRole, { label: string; desc: string; color: s
   ADMIN: {
     label: 'Quản trị viên (Admin)',
     desc: 'Toàn quyền tối cao: Quản trị tài khoản, cấu hình hệ thống, duyệt mọi nghiệp vụ.',
-    color: 'text-indigo-700 dark:text-indigo-400',
-    badgeBg: 'bg-indigo-100 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800',
+    color: 'text-indigo-600 dark:text-indigo-400',
+    badgeBg: 'bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 border-indigo-500/20',
     icon: ShieldCheckIcon
   },
   QA: {
     label: 'Đảm bảo chất lượng (QA)',
     desc: 'Ký duyệt xuất xưởng Lô, ban hành CoA, phê duyệt TCCS, đóng Sai lệch & Thay đổi.',
-    color: 'text-emerald-700 dark:text-emerald-400',
-    badgeBg: 'bg-emerald-100 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800',
+    color: 'text-emerald-600 dark:text-emerald-400',
+    badgeBg: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20',
     icon: CheckCircleIcon
   },
   QC: {
     label: 'Kiểm soát chất lượng (QC)',
     desc: 'Soát xét kết quả kiểm nghiệm, cảnh báo OOS, theo dõi xu hướng phân tích SPC.',
-    color: 'text-blue-700 dark:text-blue-400',
-    badgeBg: 'bg-blue-100 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800',
+    color: 'text-sky-600 dark:text-sky-400',
+    badgeBg: 'bg-sky-500/10 text-sky-700 dark:text-sky-400 border-sky-500/20',
     icon: BeakerIcon
   },
   LAB: {
     label: 'Kiểm nghiệm viên (Lab)',
     desc: 'Nhập kết quả kiểm nghiệm, quét OCR thông minh, đính kèm dữ liệu phân tích.',
-    color: 'text-cyan-700 dark:text-cyan-400',
-    badgeBg: 'bg-cyan-100 dark:bg-cyan-950/50 text-cyan-700 dark:text-cyan-300 border-cyan-200 dark:border-cyan-800',
+    color: 'text-cyan-600 dark:text-cyan-400',
+    badgeBg: 'bg-cyan-500/10 text-cyan-700 dark:text-cyan-400 border-cyan-500/20',
     icon: ClipboardDocumentCheckIcon
   },
   PRODUCTION: {
     label: 'Sản xuất (Production)',
     desc: 'Tạo Lô sản xuất, cập nhật sản lượng thực tế, hạn dùng và quy cách đóng gói.',
-    color: 'text-amber-700 dark:text-amber-400',
-    badgeBg: 'bg-amber-100 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800',
+    color: 'text-amber-600 dark:text-amber-400',
+    badgeBg: 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20',
     icon: CubeIcon
   },
   USER: {
     label: 'Nhân viên nghiệp vụ (User)',
     desc: 'Vai trò tiêu chuẩn: Tạo và chỉnh sửa Lô sản xuất, nhập phiếu kiểm nghiệm.',
-    color: 'text-teal-700 dark:text-teal-400',
-    badgeBg: 'bg-teal-100 dark:bg-teal-950/50 text-teal-700 dark:text-teal-300 border-teal-200 dark:border-teal-800',
+    color: 'text-teal-600 dark:text-teal-400',
+    badgeBg: 'bg-teal-500/10 text-teal-700 dark:text-teal-400 border-teal-500/20',
     icon: UserIcon
   },
   VIEWER: {
     label: 'Quan sát viên (Viewer)',
     desc: 'Chỉ xem báo cáo, tra cứu hồ sơ lô và chứng nhận chất lượng (không chỉnh sửa).',
-    color: 'text-slate-700 dark:text-slate-400',
-    badgeBg: 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700',
+    color: 'text-ink-muted',
+    badgeBg: 'bg-surface-2 text-ink-muted border-border',
     icon: EyeIcon
   },
   GUEST: {
     label: 'Khách chờ duyệt (Guest)',
     desc: 'Tài khoản mới đăng ký, chưa được cấp quyền truy cập vào dữ liệu hệ thống.',
-    color: 'text-rose-700 dark:text-rose-400',
-    badgeBg: 'bg-rose-100 dark:bg-rose-950/50 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800',
+    color: 'text-rose-600 dark:text-rose-400',
+    badgeBg: 'bg-rose-500/10 text-rose-700 dark:text-rose-400 border-rose-500/20',
     icon: ClockIcon
   }
 };
@@ -287,11 +287,11 @@ const UserManagement: React.FC = () => {
   });
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500 pb-20">
+    <div className="space-y-6 animate-in fade-in duration-200 pb-20">
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
-          <h1 className="text-2xl font-extrabold text-ink flex items-center gap-3">
-            <UserGroupIcon className="text-emerald-600 dark:text-emerald-400 w-8 h-8" /> Quản trị Người dùng & Phân quyền
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-ink flex items-center gap-2.5">
+            <UserGroupIcon className="text-emerald-600 dark:text-emerald-400 w-6 h-6" /> Quản trị Người dùng & Phân quyền
           </h1>
           <p className="text-ink-muted mt-1 text-xs">
             Quản trị viên có toàn quyền cấp phát, điều chuyển 8 vai trò nghiệp vụ chuẩn GMP và quản lý tài khoản truy cập.
@@ -299,7 +299,7 @@ const UserManagement: React.FC = () => {
         </div>
         <button 
           onClick={() => setIsLogOpen(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-surface border border-border text-ink rounded-xl text-xs font-bold hover:bg-surface-2 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors shadow-sm"
+          className="flex items-center gap-2 px-3.5 py-2 bg-surface border border-border text-ink rounded-lg text-xs font-medium hover:bg-surface-2 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors shadow-xs active:scale-[0.98]"
         >
           <ClockIcon className="w-4 h-4 text-emerald-600 dark:text-emerald-400" /> Lịch sử phân quyền (Audit Trail)
         </button>
@@ -314,7 +314,7 @@ const UserManagement: React.FC = () => {
         <select
           value={roleFilter}
           onChange={(e) => setRoleFilter(e.target.value)}
-          className="px-3 py-2 bg-surface border border-border rounded-xl text-xs font-bold text-ink outline-none focus:ring-2 focus:ring-emerald-500"
+          className="px-3.5 py-2 bg-surface border border-border rounded-xl text-xs font-medium text-ink outline-none focus:ring-2 focus:ring-emerald-500/15 focus:border-emerald-500 transition-all shadow-2xs"
         >
           <option value="ALL">Tất cả vai trò ({users.length})</option>
           {ALL_ROLES.map(r => (
@@ -323,24 +323,24 @@ const UserManagement: React.FC = () => {
             </option>
           ))}
         </select>
-        <div className="px-4 py-2 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 rounded-xl text-xs font-bold whitespace-nowrap">
+        <div className="px-3.5 py-2 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20 rounded-xl text-xs font-medium whitespace-nowrap">
           Hiển thị: {filteredUsers.length} tài khoản
         </div>
       </DSFilterBar>
 
       <DSTable>
-        <thead className="bg-surface-2 border-b border-border">
-          <tr className="text-ink-muted text-[10px] font-black uppercase tracking-widest">
-            <th className="px-6 py-4">Người dùng</th>
-            <th className="px-6 py-4">Ngày tham gia</th>
-            <th className="px-6 py-4 text-center">Vai trò hiện tại</th>
-            <th className="px-6 py-4 text-right">Thao tác Quản trị viên</th>
+        <thead className="bg-surface-2/60 border-b border-border">
+          <tr className="text-ink-muted text-xs font-semibold">
+            <th className="px-5 py-3">Người dùng</th>
+            <th className="px-5 py-3">Ngày tham gia</th>
+            <th className="px-5 py-3 text-center">Vai trò hiện tại</th>
+            <th className="px-5 py-3 text-right">Thao tác Quản trị viên</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-border">
           {loading ? (
             <tr>
-              <td colSpan={4} className="p-8 text-center text-ink-muted text-sm font-bold">Đang nạp danh sách tài khoản...</td>
+              <td colSpan={4} className="p-8 text-center text-ink-muted text-sm font-medium">Đang nạp danh sách tài khoản...</td>
             </tr>
           ) : filteredUsers.length === 0 ? (
             <tr>
@@ -353,17 +353,17 @@ const UserManagement: React.FC = () => {
               const isSelf = u.uid === currentUser?.uid;
 
               return (
-                <tr key={u.uid} className="hover:bg-surface-2/60 transition-colors">
-                  <td className="px-6 py-4">
+                <tr key={u.uid} className="hover:bg-surface-2/50 transition-colors">
+                  <td className="px-5 py-3.5">
                     <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-full bg-emerald-600/10 text-emerald-600 flex items-center justify-center font-bold text-xs border border-emerald-600/20">
+                      <div className="w-8 h-8 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-bold text-xs border border-emerald-500/20">
                         {u.email ? u.email.slice(0, 2).toUpperCase() : 'US'}
                       </div>
                       <div>
-                        <div className="font-bold text-ink text-xs flex items-center gap-2">
+                        <div className="font-medium text-ink text-xs flex items-center gap-2">
                           <span>{u.displayName || u.email}</span>
                           {isSelf && (
-                            <span className="px-2 py-0.5 rounded text-[9px] font-black bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                            <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20">
                               BẠN
                             </span>
                           )}
@@ -372,22 +372,22 @@ const UserManagement: React.FC = () => {
                       </div>
                     </div>
                   </td>
-                  <td className="px-6 py-4">
+                  <td className="px-5 py-3.5">
                     <div className="flex items-center gap-1.5 text-xs text-ink-muted">
                       <CalendarIcon className="w-3.5 h-3.5" />
                       {u.createdAt ? formatDateStandard(u.createdAt) : '---'}
                     </div>
                   </td>
-                  <td className="px-6 py-4 text-center">
-                    <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-wide border shadow-2xs ${roleDef.badgeBg}`}>
+                  <td className="px-5 py-3.5 text-center">
+                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium border shadow-2xs ${roleDef.badgeBg}`}>
                       <RoleIcon className="w-3.5 h-3.5" />
                       {u.role}
                     </span>
                   </td>
-                  <td className="px-6 py-4 text-right">
+                  <td className="px-5 py-3.5 text-right">
                     <div className="flex justify-end items-center gap-2">
                       {isSelf ? (
-                        <span className="text-[11px] text-ink-muted font-bold bg-surface-2 px-3 py-1.5 rounded-lg border border-border">
+                        <span className="text-xs text-ink-muted font-medium bg-surface-2 px-3 py-1.5 rounded-lg border border-border">
                           Tài khoản hiện tại
                         </span>
                       ) : (
@@ -395,7 +395,7 @@ const UserManagement: React.FC = () => {
                           <button
                             type="button"
                             onClick={() => handleOpenRoleModal(u)}
-                            className="text-xs font-bold px-3 py-1.5 bg-indigo-50 dark:bg-indigo-950/20 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/30 rounded-lg border border-indigo-200 dark:border-indigo-900/50 transition-all flex items-center gap-1.5"
+                            className="text-xs font-medium px-3 py-1.5 bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 hover:bg-indigo-500/15 rounded-lg border border-indigo-500/20 transition-all flex items-center gap-1.5 active:scale-[0.98]"
                             title="Phân quyền / Đổi vai trò"
                           >
                             <AdjustmentsHorizontalIcon className="w-3.5 h-3.5" />
@@ -405,7 +405,7 @@ const UserManagement: React.FC = () => {
                           <button
                             type="button"
                             onClick={() => handleDeleteUser(u)}
-                            className="p-1.5 text-rose-500 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-lg border border-transparent hover:border-rose-200 dark:hover:border-rose-900/50 transition-colors"
+                            className="p-1.5 text-rose-500 hover:text-rose-700 hover:bg-rose-500/10 rounded-lg border border-transparent hover:border-rose-500/20 transition-colors active:scale-[0.98]"
                             title="Xóa tài khoản khỏi hệ thống"
                           >
                             <TrashIcon className="w-4 h-4" />
@@ -473,14 +473,14 @@ const UserManagement: React.FC = () => {
             <button
               type="button"
               onClick={() => setIsRoleModalOpen(false)}
-              className="px-4 py-2 text-xs font-bold text-ink-muted hover:text-ink transition-colors"
+              className="px-4 py-2 text-xs font-medium text-ink-muted hover:text-ink hover:bg-surface-2 rounded-lg border border-border transition-colors active:scale-[0.98]"
             >
               Hủy
             </button>
             <button
               type="button"
               onClick={handleConfirmRoleChange}
-              className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-sm transition-colors flex items-center gap-2"
+              className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-medium shadow-xs transition-all active:scale-[0.98] flex items-center gap-2"
             >
               <ShieldCheckIcon className="w-4 h-4" /> Lưu quyền mới
             </button>
@@ -514,19 +514,19 @@ const UserManagement: React.FC = () => {
           ) : (
             <div className="space-y-3">
               {logs.map(log => (
-                <div key={log.id} className="bg-surface-2 p-3 rounded-xl border border-border text-xs">
+                <div key={log.id} className="bg-surface-2/60 p-3 rounded-xl border border-border text-xs">
                   <div className="flex justify-between items-start mb-1">
-                    <span className="font-bold text-ink">{log.performedBy}</span>
+                    <span className="font-semibold text-ink">{log.performedBy}</span>
                     <span className="text-[10px] text-ink-muted font-mono">{formatDateTime(log.timestamp)}</span>
                   </div>
                   <div className="text-ink-muted">
                     {log.action === 'DELETE_USER' ? (
-                      <>Đã xóa tài khoản <span className="font-bold text-rose-600 dark:text-rose-400">{log.targetEmail}</span> khỏi hệ thống</>
+                      <>Đã xóa tài khoản <span className="font-medium text-rose-600 dark:text-rose-400">{log.targetEmail}</span> khỏi hệ thống</>
                     ) : (
                       <>
-                        Đã chuyển vai trò của <span className="font-bold text-emerald-600 dark:text-emerald-400">{log.targetEmail}</span> từ{' '}
+                        Đã chuyển vai trò của <span className="font-medium text-emerald-600 dark:text-emerald-400">{log.targetEmail}</span> từ{' '}
                         <span className="font-mono bg-surface text-ink px-1.5 py-0.5 rounded text-[10px] border border-border">{log.oldRole}</span> sang{' '}
-                        <span className="font-mono bg-indigo-100 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 px-1.5 py-0.5 rounded text-[10px] font-bold border border-indigo-200 dark:border-indigo-800">{log.newRole}</span>
+                        <span className="font-mono bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 px-1.5 py-0.5 rounded text-[10px] font-medium border border-indigo-500/20">{log.newRole}</span>
                       </>
                     )}
                   </div>

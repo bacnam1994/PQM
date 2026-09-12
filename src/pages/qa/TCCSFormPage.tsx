@@ -303,12 +303,12 @@ const TCCSFormPage = () => {
       <div className="flex items-center gap-4">
         <button 
           onClick={() => navigate('/tccs')} 
-          className="p-2 bg-surface text-ink-muted hover:text-emerald-600 rounded-xl border border-border shadow-sm transition-colors"
+          className="p-2 bg-surface text-ink-muted hover:text-emerald-700 dark:hover:text-emerald-400 rounded-lg border border-border shadow-xs transition-colors cursor-pointer"
         >
           <ArrowLeftIcon className="w-5 h-5" />
         </button>
         <div>
-          <h1 className="text-2xl font-bold text-ink tracking-tight">
+          <h1 className="text-xl sm:text-2xl font-bold text-ink tracking-tight">
             {id && !cloneId ? 'Chỉnh sửa TCCS' : cloneId ? 'Sao chép TCCS' : 'Tạo TCCS mới'}
           </h1>
           <p className="text-xs text-ink-muted mt-0.5">
@@ -317,7 +317,7 @@ const TCCSFormPage = () => {
         </div>
       </div>
 
-      <div className="bg-surface rounded-2xl shadow-sm border border-border p-6">
+      <div className="bg-surface rounded-xl shadow-xs border border-border p-6">
         <form onSubmit={handleSave}>
           <div className="space-y-6 pr-1">
             <datalist id="criteria-name-suggestions">{allCriteriaNames.map(name => <option key={name} value={name} />)}</datalist>
@@ -622,8 +622,8 @@ const TCCSFormPage = () => {
           </div>
           
           <div className="pt-6 border-t border-border mt-6 flex justify-end gap-3">
-            <button type="button" onClick={() => navigate('/tccs')} className="px-6 py-2.5 text-ink-muted hover:text-ink font-semibold uppercase text-xs tracking-wider hover:bg-surface-2 rounded-xl transition-colors">Hủy</button>
-            <button type="submit" disabled={isSubmitting} className="px-8 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-semibold uppercase text-xs tracking-wider shadow-sm flex items-center gap-2 transition-all disabled:opacity-50">
+            <button type="button" onClick={() => navigate('/tccs')} className="px-5 py-2 text-ink-muted hover:text-ink font-medium text-xs hover:bg-surface-2 rounded-lg border border-border transition-colors">Hủy</button>
+            <button type="submit" disabled={isSubmitting} className="px-6 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-medium text-xs shadow-xs flex items-center gap-2 transition-all active:scale-[0.98] disabled:opacity-50">
               {isSubmitting && <ArrowPathIcon className="w-4 h-4 animate-spin" />}
               {id && !cloneId ? 'Cập nhật TCCS' : 'Lưu hồ sơ TCCS'}
             </button>

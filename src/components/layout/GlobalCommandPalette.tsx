@@ -180,7 +180,7 @@ export const GlobalCommandPalette: React.FC = () => {
                   onMouseEnter={() => setSelectedIndex(index)}
                   className={`flex items-center justify-between px-3.5 py-2.5 rounded-xl cursor-pointer transition-all ${
                     isSelected 
-                      ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-900 dark:text-emerald-100 ring-1 ring-inset ring-emerald-600/30' 
+                      ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 font-medium ring-1 ring-emerald-500/20' 
                       : 'hover:bg-surface-2 text-ink border border-transparent'
                   }`}
                 >
@@ -188,7 +188,7 @@ export const GlobalCommandPalette: React.FC = () => {
                     <div className={`p-2 rounded-lg shrink-0 ${
                       isSelected 
                         ? 'bg-emerald-600 text-white shadow-xs' 
-                        : 'bg-surface-2 text-ink-faint'
+                        : 'bg-surface-2 text-ink-muted'
                     }`}>
                       <Icon className="w-4 h-4" />
                     </div>
@@ -197,23 +197,23 @@ export const GlobalCommandPalette: React.FC = () => {
                         <span className="font-semibold text-sm truncate text-ink">
                           {item.title}
                         </span>
-                        <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-surface-3/60 text-ink-faint border border-border">
+                        <span className="text-[10px] uppercase font-semibold tracking-wider px-2 py-0.5 rounded-full bg-surface-3/60 text-ink-muted border border-border">
                           {categoryLabel}
                         </span>
                         {item.badge && (
-                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                            item.badgeColor === 'green' ? 'bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300' :
-                            item.badgeColor === 'red' ? 'bg-rose-100 dark:bg-rose-950/80 text-rose-800 dark:text-rose-300' :
-                            item.badgeColor === 'amber' ? 'bg-amber-100 dark:bg-amber-950/80 text-amber-800 dark:text-amber-300' :
-                            item.badgeColor === 'purple' ? 'bg-purple-100 dark:bg-purple-950/80 text-purple-800 dark:text-purple-300' :
-                            'bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300'
+                          <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
+                            item.badgeColor === 'green' ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300' :
+                            item.badgeColor === 'red' ? 'bg-rose-500/10 text-rose-700 dark:text-rose-300' :
+                            item.badgeColor === 'amber' ? 'bg-amber-500/10 text-amber-700 dark:text-amber-300' :
+                            item.badgeColor === 'purple' ? 'bg-indigo-500/10 text-indigo-700 dark:text-indigo-300' :
+                            'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
                           }`}>
                             {item.badge}
                           </span>
                         )}
                       </div>
                       {item.subtitle && (
-                        <p className="text-xs text-ink-faint truncate mt-0.5">
+                        <p className="text-xs text-ink-muted truncate mt-0.5">
                           {item.subtitle}
                         </p>
                       )}

@@ -63,28 +63,28 @@ export const Product360Page: React.FC = () => {
   return (
     <div className="max-w-7xl mx-auto space-y-6 pb-12">
       {/* Header điều hướng & Tiêu đề Product 360 */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-surface p-5 rounded-2xl border border-border shadow-sm">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-surface p-5 rounded-xl border border-border shadow-xs">
         <div className="flex items-center gap-3.5">
           <button
             onClick={() => navigate(`/products/${product.id}`)}
-            className="p-2 text-ink-muted hover:text-ink hover:bg-surface-2 rounded-xl transition-colors border border-border"
+            className="p-2 text-ink-muted hover:text-ink hover:bg-surface-2 rounded-lg transition-colors border border-border cursor-pointer"
             title="Quay lại chi tiết sản phẩm"
           >
             <ArrowLeftIcon className="w-5 h-5" />
           </button>
           <div>
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20">
+              <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20">
                 PRODUCT 360° QUALITY COCKPIT
               </span>
-              <span className={`text-xs font-bold px-2.5 py-0.5 rounded-full ${
+              <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full ${
                 product.status === 'ACTIVE' ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20' :
-                'bg-surface-3 text-ink-muted border border-border'
+                'bg-surface-2 text-ink-muted border border-border'
               }`}>
                 {product.status || 'ACTIVE'}
               </span>
             </div>
-            <h1 className="text-2xl font-bold text-ink mt-1">
+            <h1 className="text-xl sm:text-2xl font-bold text-ink tracking-tight mt-1">
               {product.name} ({product.code})
             </h1>
             <p className="text-xs text-ink-muted mt-0.5">
@@ -96,14 +96,14 @@ export const Product360Page: React.FC = () => {
         <div className="flex items-center gap-2">
           <Link
             to={`/products/${product.id}`}
-            className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-ink-soft bg-surface-2 hover:bg-surface-3 border border-border rounded-xl transition-colors shadow-sm"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-ink-soft bg-surface hover:bg-surface-2 border border-border rounded-lg transition-colors shadow-xs"
           >
             <CubeIcon className="w-3.5 h-3.5" />
             <span>Hồ sơ gốc</span>
           </Link>
           <button
             onClick={() => window.print()}
-            className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/30 hover:bg-emerald-100 border border-emerald-500/20 rounded-xl transition-colors shadow-sm"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-emerald-700 dark:text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 rounded-lg transition-colors shadow-xs cursor-pointer"
           >
             <PrinterIcon className="w-3.5 h-3.5" />
             <span>In hồ sơ 360</span>
@@ -113,39 +113,39 @@ export const Product360Page: React.FC = () => {
 
       {/* Thông tin vắn tắt KPI */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div className="p-3.5 bg-surface rounded-xl border border-border shadow-sm">
-          <span className="text-[11px] text-ink-muted block">Nhóm sản phẩm</span>
+        <div className="p-3.5 bg-surface rounded-xl border border-border shadow-xs">
+          <span className="text-xs font-medium text-ink-muted block">Nhóm sản phẩm</span>
           <span className="font-semibold text-sm text-ink truncate block mt-0.5">
             {product.group || 'Chưa phân nhóm'}
           </span>
         </div>
-        <div className="p-3.5 bg-surface rounded-xl border border-border shadow-sm">
-          <span className="text-[11px] text-ink-muted block">TCCS hiện hành</span>
+        <div className="p-3.5 bg-surface rounded-xl border border-border shadow-xs">
+          <span className="text-xs font-medium text-ink-muted block">TCCS hiện hành</span>
           <span className="font-semibold text-sm text-ink truncate block mt-0.5">
             {activeTccs ? activeTccs.code : 'Chưa kích hoạt'}
           </span>
         </div>
-        <div className="p-3.5 bg-surface rounded-xl border border-border shadow-sm">
-          <span className="text-[11px] text-ink-muted block">Tổng số lô đã sản xuất</span>
+        <div className="p-3.5 bg-surface rounded-xl border border-border shadow-xs">
+          <span className="text-xs font-medium text-ink-muted block">Tổng số lô đã sản xuất</span>
           <span className="font-semibold text-sm text-ink truncate block mt-0.5">
             {totalBatches} lô ({releasedBatches} đạt)
           </span>
         </div>
-        <div className="p-3.5 bg-surface rounded-xl border border-border shadow-sm">
-          <span className="text-[11px] text-ink-muted block">Tỷ lệ xuất xưởng</span>
-          <span className="font-semibold text-sm text-emerald-600 dark:text-emerald-400 truncate block mt-0.5">
+        <div className="p-3.5 bg-surface rounded-xl border border-border shadow-xs">
+          <span className="text-xs font-medium text-ink-muted block">Tỷ lệ xuất xưởng</span>
+          <span className="font-semibold text-sm text-emerald-700 dark:text-emerald-400 truncate block mt-0.5">
             {releaseRate}%
           </span>
         </div>
       </div>
 
       {/* Tabs điều hướng */}
-      <div className="flex border-b border-border">
+      <div className="flex border-b border-border gap-2">
         <button
           onClick={() => setActiveTab('BATCHES')}
-          className={`flex items-center gap-2 px-5 py-3 text-sm font-semibold border-b-2 transition-all ${
+          className={`flex items-center gap-2 px-4 py-2.5 text-xs font-semibold border-b-2 transition-all cursor-pointer ${
             activeTab === 'BATCHES'
-              ? 'border-emerald-600 text-emerald-600 dark:text-emerald-400'
+              ? 'border-emerald-600 text-emerald-700 dark:text-emerald-400'
               : 'border-transparent text-ink-muted hover:text-ink'
           }`}
         >
@@ -157,9 +157,9 @@ export const Product360Page: React.FC = () => {
         </button>
         <button
           onClick={() => setActiveTab('TCCS')}
-          className={`flex items-center gap-2 px-5 py-3 text-sm font-semibold border-b-2 transition-all ${
+          className={`flex items-center gap-2 px-4 py-2.5 text-xs font-semibold border-b-2 transition-all cursor-pointer ${
             activeTab === 'TCCS'
-              ? 'border-emerald-600 text-emerald-600 dark:text-emerald-400'
+              ? 'border-emerald-600 text-emerald-700 dark:text-emerald-400'
               : 'border-transparent text-ink-muted hover:text-ink'
           }`}
         >
@@ -171,9 +171,9 @@ export const Product360Page: React.FC = () => {
         </button>
         <button
           onClick={() => setActiveTab('FORMULA')}
-          className={`flex items-center gap-2 px-5 py-3 text-sm font-semibold border-b-2 transition-all ${
+          className={`flex items-center gap-2 px-4 py-2.5 text-xs font-semibold border-b-2 transition-all cursor-pointer ${
             activeTab === 'FORMULA'
-              ? 'border-emerald-600 text-emerald-600 dark:text-emerald-400'
+              ? 'border-emerald-600 text-emerald-700 dark:text-emerald-400'
               : 'border-transparent text-ink-muted hover:text-ink'
           }`}
         >
@@ -192,7 +192,7 @@ export const Product360Page: React.FC = () => {
       )}
 
       {activeTab === 'FORMULA' && (
-        <div className="bg-surface rounded-2xl border border-border p-5 shadow-sm space-y-4">
+        <div className="bg-surface rounded-xl border border-border p-5 shadow-xs space-y-4">
           <div className="flex items-center justify-between pb-3 border-b border-border">
             <div>
               <h3 className="font-semibold text-ink text-sm">
@@ -205,7 +205,7 @@ export const Product360Page: React.FC = () => {
             {formula && (
               <Link
                 to={`/product-formulas/edit/${formula.id}`}
-                className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 hover:underline inline-flex items-center gap-1"
+                className="text-xs font-semibold text-emerald-700 dark:text-emerald-400 hover:underline inline-flex items-center gap-1"
               >
                 Chỉnh sửa công thức <ArrowTopRightOnSquareIcon className="w-3.5 h-3.5" />
               </Link>
@@ -213,13 +213,13 @@ export const Product360Page: React.FC = () => {
           </div>
 
           {!formula || !formula.ingredients || formula.ingredients.length === 0 ? (
-            <div className="text-center py-8 text-ink-muted text-sm">
+            <div className="text-center py-8 text-ink-muted text-sm italic">
               Sản phẩm chưa có hồ sơ công thức định mức.
             </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-xs text-left">
-                <thead className="bg-surface-2 text-ink uppercase font-semibold">
+                <thead className="bg-surface-2/60 text-ink-muted font-semibold text-xs border-b border-border">
                   <tr>
                     <th className="p-3">Thành phần hoạt chất</th>
                     <th className="p-3">Hàm lượng công bố</th>
@@ -230,14 +230,14 @@ export const Product360Page: React.FC = () => {
                 </thead>
                 <tbody className="divide-y divide-border">
                   {formula.ingredients.map((ing, idx) => (
-                    <tr key={idx} className="hover:bg-surface-2 transition-colors">
+                    <tr key={idx} className="hover:bg-surface-2/60 transition-colors">
                       <td className="p-3 font-medium text-ink">{ing.name}</td>
                       <td className="p-3 text-ink-soft">{ing.declaredContent ?? '—'}</td>
                       <td className="p-3 text-ink-soft">{ing.elementalContent ?? '—'}</td>
                       <td className="p-3 text-ink-muted">{ing.unit || '—'}</td>
                       <td className="p-3 text-ink-muted">
                         {ing.materialId ? (
-                          <Link to="/materials" className="text-emerald-600 dark:text-emerald-400 hover:underline">
+                          <Link to="/materials" className="text-emerald-700 dark:text-emerald-400 hover:underline">
                             Mã: {ing.materialId}
                           </Link>
                         ) : 'Chưa gắn'}

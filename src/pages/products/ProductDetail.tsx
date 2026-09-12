@@ -382,7 +382,7 @@ const ProductDetail: React.FC = () => {
             <button
               type="button"
               onClick={() => navigate(`/products/360/${product.id}`)}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 rounded-xl font-bold border border-emerald-500/20 transition-all text-xs cursor-pointer shadow-sm"
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/20 rounded-lg font-medium border border-emerald-500/20 transition-all text-xs cursor-pointer shadow-xs"
             >
               <ChartBarSquareIcon className="h-3.5 w-3.5" /> Hồ sơ Product 360°
             </button>
@@ -390,7 +390,7 @@ const ProductDetail: React.FC = () => {
         }
       />
 
-      <Surface variant="subtle" padding="sm" className="flex gap-1 overflow-x-auto scrollbar-hide">
+      <div className="flex border-b border-border gap-2 overflow-x-auto scrollbar-hide">
         {[
           { id: 'info', label: 'Thông tin kỹ thuật', icon: InformationCircleIcon },
           { id: 'formula', label: 'Công thức & Thành phần', icon: BeakerIcon },
@@ -402,23 +402,23 @@ const ProductDetail: React.FC = () => {
             key={tab.id}
             onClick={() => setActiveTab(tab.id as any)}
             className={`
-              flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer
+              flex items-center gap-2 px-4 py-2.5 text-xs font-semibold border-b-2 transition-all whitespace-nowrap cursor-pointer
               ${activeTab === tab.id 
-                ? 'bg-surface text-emerald-600 dark:text-emerald-400 shadow-sm border border-border' 
-                : 'text-ink-muted hover:bg-surface-2'}
+                ? 'border-emerald-600 text-emerald-700 dark:text-emerald-400' 
+                : 'border-transparent text-ink-muted hover:text-ink'}
             `}
           >
             <tab.icon className="h-4 w-4" />
             {tab.label}
           </button>
         ))}
-      </Surface>
+      </div>
 
       <Surface variant="flat" padding="lg" className="min-h-[400px]">
         {activeTab === 'info' && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             <div className="space-y-6">
-              <h3 className="text-lg font-bold text-ink flex items-center gap-2 border-b border-border pb-2">
+              <h3 className="text-base font-semibold text-ink flex items-center gap-2 border-b border-border pb-2">
                 <TagIcon className="h-4 w-4 text-emerald-600" />
                 Hồ sơ Pháp lý
               </h3>
@@ -429,12 +429,12 @@ const ProductDetail: React.FC = () => {
                 <InfoItem label="Nhóm sản phẩm" value={product.group} />
               </div>
               <div className="pt-4 space-y-2">
-                 <p className="text-xs font-bold text-ink-muted uppercase tracking-widest">Mô tả tóm lược</p>
+                 <p className="text-xs font-semibold text-ink-muted">Mô tả tóm lược</p>
                  <p className="text-ink-soft leading-relaxed text-sm">{product.description || 'Không có mô tả.'}</p>
               </div>
             </div>
             <div className="space-y-6">
-              <h3 className="text-lg font-bold text-ink flex items-center gap-2 border-b border-border pb-2">
+              <h3 className="text-base font-semibold text-ink flex items-center gap-2 border-b border-border pb-2">
                 <EyeIcon className="h-4 w-4 text-emerald-600" />
                 Đặc tính & Nhận diện
               </h3>
@@ -463,7 +463,7 @@ const ProductDetail: React.FC = () => {
                    
                    {/* Ecosystem Linkages Card */}
                    <div className="col-span-1 md:col-span-2 pt-6 border-t border-border">
-                     <h3 className="text-sm font-black text-ink uppercase tracking-wider mb-4 flex items-center gap-2">
+                     <h3 className="text-sm font-semibold text-ink mb-4 flex items-center gap-2">
                        <Square3Stack3DIcon className="h-4 w-4 text-emerald-600" />
                        Hệ sinh thái Liên kết Dữ liệu (Data Ecosystem)
                      </h3>
@@ -471,16 +471,16 @@ const ProductDetail: React.FC = () => {
                        {/* Formula Link */}
                        <div 
                          onClick={() => setActiveTab('formula')}
-                         className="p-4 bg-surface-2 rounded-xl border border-border hover:border-emerald-500 cursor-pointer transition-all group"
+                         className="p-3.5 bg-surface rounded-xl border border-border hover:border-emerald-500/50 cursor-pointer transition-all group shadow-xs"
                        >
                          <div className="flex items-center justify-between mb-2">
-                           <span className="text-[10px] font-black text-ink-muted uppercase tracking-widest">Công thức</span>
-                           <BeakerIcon className="h-4 w-4 text-emerald-600 group-hover:scale-110 transition-transform" />
+                           <span className="text-xs font-medium text-ink-muted">Công thức</span>
+                           <BeakerIcon className="h-4 w-4 text-emerald-600 group-hover:scale-105 transition-transform" />
                          </div>
-                         <p className="text-sm font-bold text-ink">
+                         <p className="text-sm font-semibold text-ink">
                            {productFormula ? `${productFormula.ingredients.length} hoạt chất` : 'Chưa có'}
                          </p>
-                         <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold mt-1 inline-flex items-center gap-1 group-hover:underline">
+                         <span className="text-xs text-emerald-700 dark:text-emerald-400 font-medium mt-1 inline-flex items-center gap-1 group-hover:underline">
                            Xem công thức <ArrowRightIcon className="h-3 w-3" />
                          </span>
                        </div>
@@ -488,16 +488,16 @@ const ProductDetail: React.FC = () => {
                        {/* TCCS Link */}
                        <div 
                          onClick={() => setActiveTab('tccs')}
-                         className="p-4 bg-surface-2 rounded-xl border border-border hover:border-emerald-500 cursor-pointer transition-all group"
+                         className="p-3.5 bg-surface rounded-xl border border-border hover:border-emerald-500/50 cursor-pointer transition-all group shadow-xs"
                        >
                          <div className="flex items-center justify-between mb-2">
-                           <span className="text-[10px] font-black text-ink-muted uppercase tracking-widest">Tiêu chuẩn TCCS</span>
-                           <DocumentTextIcon className="h-4 w-4 text-emerald-600 group-hover:scale-110 transition-transform" />
+                           <span className="text-xs font-medium text-ink-muted">Tiêu chuẩn TCCS</span>
+                           <DocumentTextIcon className="h-4 w-4 text-emerald-600 group-hover:scale-105 transition-transform" />
                          </div>
-                         <p className="text-sm font-bold text-ink truncate" title={activeTCCS?.code || 'Chưa có'}>
+                         <p className="text-sm font-semibold text-ink truncate" title={activeTCCS?.code || 'Chưa có'}>
                            {activeTCCS?.code || 'Chưa có TCCS'}
                          </p>
-                         <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold mt-1 inline-flex items-center gap-1 group-hover:underline">
+                         <span className="text-xs text-emerald-700 dark:text-emerald-400 font-medium mt-1 inline-flex items-center gap-1 group-hover:underline">
                            {productTCCSList.length} phiên bản <ArrowRightIcon className="h-3 w-3" />
                          </span>
                        </div>
@@ -505,16 +505,16 @@ const ProductDetail: React.FC = () => {
                        {/* Batches Link */}
                        <div 
                          onClick={() => navigate(`/batches?productId=${product.id}`)}
-                         className="p-4 bg-surface-2 rounded-xl border border-border hover:border-amber-500 cursor-pointer transition-all group"
+                         className="p-3.5 bg-surface rounded-xl border border-border hover:border-amber-500/50 cursor-pointer transition-all group shadow-xs"
                        >
                          <div className="flex items-center justify-between mb-2">
-                           <span className="text-[10px] font-black text-ink-muted uppercase tracking-widest">Lô sản xuất</span>
-                           <CubeIcon className="h-4 w-4 text-amber-500 group-hover:scale-110 transition-transform" />
+                           <span className="text-xs font-medium text-ink-muted">Lô sản xuất</span>
+                           <CubeIcon className="h-4 w-4 text-amber-500 group-hover:scale-105 transition-transform" />
                          </div>
-                         <p className="text-sm font-bold text-ink">
+                         <p className="text-sm font-semibold text-ink">
                            {batches.filter(b => b.productId === product.id).length} lô đã tạo
                          </p>
-                         <span className="text-[11px] text-amber-600 dark:text-amber-400 font-semibold mt-1 inline-flex items-center gap-1 group-hover:underline">
+                         <span className="text-xs text-amber-700 dark:text-amber-400 font-medium mt-1 inline-flex items-center gap-1 group-hover:underline">
                            Quản lý lô hàng <ArrowRightIcon className="h-3 w-3" />
                          </span>
                        </div>
@@ -522,16 +522,16 @@ const ProductDetail: React.FC = () => {
                        {/* Quality / Lab Results Link */}
                        <div 
                          onClick={() => setActiveTab('history')}
-                         className="p-4 bg-surface-2 rounded-xl border border-border hover:border-violet-500 cursor-pointer transition-all group"
+                         className="p-3.5 bg-surface rounded-xl border border-border hover:border-violet-500/50 cursor-pointer transition-all group shadow-xs"
                        >
                          <div className="flex items-center justify-between mb-2">
-                           <span className="text-[10px] font-black text-ink-muted uppercase tracking-widest">Kiểm nghiệm Lab</span>
-                           <ChartBarSquareIcon className="h-4 w-4 text-violet-500 group-hover:scale-110 transition-transform" />
+                           <span className="text-xs font-medium text-ink-muted">Kiểm nghiệm Lab</span>
+                           <ChartBarSquareIcon className="h-4 w-4 text-violet-500 group-hover:scale-105 transition-transform" />
                          </div>
-                         <p className="text-sm font-bold text-ink">
+                         <p className="text-sm font-semibold text-ink">
                            {allProductResults.length} phiếu đã nhập
                          </p>
-                         <span className="text-[11px] text-violet-600 dark:text-violet-400 font-semibold mt-1 inline-flex items-center gap-1 group-hover:underline">
+                         <span className="text-xs text-violet-700 dark:text-violet-400 font-medium mt-1 inline-flex items-center gap-1 group-hover:underline">
                            Lịch sử chi tiết <ArrowRightIcon className="h-3 w-3" />
                          </span>
                        </div>
@@ -550,7 +550,7 @@ const ProductDetail: React.FC = () => {
         {activeTab === 'formula' && (
           <div className="space-y-6">
             <div className="flex justify-between items-center">
-              <h3 className="text-lg font-bold text-ink flex items-center gap-2">
+              <h3 className="text-base font-semibold text-ink flex items-center gap-2">
                 <BeakerIcon className="h-5 w-5 text-emerald-600" />
                 Thành phần công thức
               </h3>
@@ -559,28 +559,28 @@ const ProductDetail: React.FC = () => {
                 {isAdmin && (
                   <button 
                     onClick={() => navigate(productFormula ? `/product-formulas/edit/${productFormula.id}` : '/product-formulas/new')}
-                    className="text-xs font-black text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 px-3 py-1.5 rounded-xl transition-all border border-emerald-500/20"
+                    className="text-xs font-medium text-emerald-700 dark:text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 px-3 py-1.5 rounded-lg transition-all border border-emerald-500/20 cursor-pointer"
                   >
-                    {productFormula ? 'CHỈNH SỬA' : 'TẠO MỚI'}
+                    {productFormula ? 'Chỉnh sửa' : 'Tạo mới'}
                   </button>
                 )}
               </div>
             </div>
             
-            <div className="bg-surface rounded-2xl border border-border overflow-hidden">
+            <div className="bg-surface rounded-xl border border-border overflow-hidden shadow-xs">
               {productFormula && productFormula.ingredients.length > 0 ? (
-                <table className="w-full text-left text-sm">
-                  <thead className="bg-surface-2 border-b border-border text-[10px] font-black text-ink-muted uppercase">
-                    <tr><th className="px-6 py-3">Tên hoạt chất</th><th className="px-6 py-3 text-right">Hàm lượng</th><th className="px-6 py-3 text-center">Đơn vị</th></tr>
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-surface-2/60 border-b border-border text-xs font-semibold text-ink-muted">
+                    <tr><th className="px-5 py-3">Tên hoạt chất</th><th className="px-5 py-3 text-right">Hàm lượng</th><th className="px-5 py-3 text-center">Đơn vị</th></tr>
                   </thead>
                   <tbody className="divide-y divide-border">
                     {productFormula.ingredients.map((ing, idx) => (
-                      <tr key={idx} className="hover:bg-surface-2 transition-colors">
-                        <td className="px-6 py-3 font-bold text-ink">{ing.name}</td>
-                        <td className="px-6 py-3 text-right font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                      <tr key={idx} className="hover:bg-surface-2/60 transition-colors">
+                        <td className="px-5 py-3 font-medium text-ink">{ing.name}</td>
+                        <td className="px-5 py-3 text-right font-mono font-semibold text-emerald-700 dark:text-emerald-400">
                           {formatScientific(ing.declaredContent)}
                         </td>
-                        <td className="px-6 py-3 text-center text-ink-muted">{ing.unit}</td>
+                        <td className="px-5 py-3 text-center text-ink-muted">{ing.unit}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -595,10 +595,10 @@ const ProductDetail: React.FC = () => {
         {activeTab === 'tccs' && (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
             {productTCCSList.map(tccs => (
-              <div key={tccs.id} className={`p-6 rounded-2xl border transition-all ${tccs.isActive ? 'border-emerald-600 bg-emerald-500/5' : 'border-border bg-surface'}`}>
+              <div key={tccs.id} className={`p-5 rounded-xl border transition-all ${tccs.isActive ? 'border-emerald-600/50 bg-emerald-500/5' : 'border-border bg-surface'} shadow-xs`}>
                 <div className="flex items-center gap-2 mb-4">
                   <DocumentTextIcon className={`h-5 w-5 ${tccs.isActive ? 'text-emerald-600 dark:text-emerald-400' : 'text-ink-muted'}`} />
-                  <h4 className="font-bold text-ink">{tccs.code}</h4>
+                  <h4 className="font-semibold text-ink text-sm">{tccs.code}</h4>
                 </div>
                 <div className="space-y-3 mb-4">
                    <div className="p-3 bg-surface-2 rounded-xl border border-border text-xs text-ink-muted italic">
@@ -606,13 +606,13 @@ const ProductDetail: React.FC = () => {
                    </div>
                 </div>
                 <div className="flex items-center justify-between mt-6">
-                   <span className="text-[10px] font-bold text-ink-muted uppercase tracking-widest">{tccs.mainQualityCriteria.length + tccs.safetyCriteria.length} Chỉ tiêu</span>
+                   <span className="text-xs font-medium text-ink-muted">{tccs.mainQualityCriteria.length + tccs.safetyCriteria.length} Chỉ tiêu</span>
                    {tccs.standardRefs && (
-                      <span className="text-[9px] font-black text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-1 rounded uppercase tracking-tighter max-w-[100px] truncate border border-emerald-500/20" title={tccs.standardRefs}>
+                      <span className="text-[10px] font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded max-w-[120px] truncate border border-emerald-500/20" title={tccs.standardRefs}>
                         {tccs.standardRefs}
                       </span>
                    )}
-                   <button onClick={() => navigate(`/tccs/detail/${tccs.id}`)} className="text-emerald-600 dark:text-emerald-400 text-xs font-black hover:underline">CHI TIẾT</button>
+                   <button onClick={() => navigate(`/tccs/detail/${tccs.id}`)} className="text-emerald-700 dark:text-emerald-400 text-xs font-semibold hover:underline cursor-pointer">Chi tiết</button>
                 </div>
               </div>
             ))}
@@ -622,24 +622,24 @@ const ProductDetail: React.FC = () => {
         {activeTab === 'history' && (
           <div className="space-y-3">
             {isFetchingAll && (
-              <div className="flex items-center gap-2 text-xs text-emerald-600 dark:text-emerald-400 font-bold bg-emerald-500/10 px-4 py-2 rounded-xl border border-emerald-500/20">
+              <div className="flex items-center gap-2 text-xs text-emerald-700 dark:text-emerald-400 font-medium bg-emerald-500/10 px-4 py-2 rounded-xl border border-emerald-500/20">
                 <ArrowPathIcon className="h-3.5 w-3.5 animate-spin" /> Đang tải đầy đủ lịch sử kiểm nghiệm từ cơ sở dữ liệu...
               </div>
             )}
             {hasFetchedAll && !isFetchingAll && (
-              <div className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold bg-emerald-500/10 px-4 py-2 rounded-xl border border-emerald-500/20">
+              <div className="text-xs text-emerald-700 dark:text-emerald-400 font-medium bg-emerald-500/10 px-4 py-2 rounded-xl border border-emerald-500/20">
                 ✓ Đã tải đầy đủ {allProductResults.length} phiếu kiểm nghiệm
               </div>
             )}
-            <div className="bg-surface rounded-2xl border border-border overflow-hidden">
-              <table className="w-full text-left text-sm">
-                <thead className="bg-surface-2 border-b border-border">
-                  <tr className="text-ink-muted font-bold uppercase text-[10px] tracking-widest">
-                    <th className="py-4 px-4">Lô hàng</th>
-                    <th className="py-4 px-4">Ngày kiểm</th>
-                    <th className="py-4 px-4">Phòng Lab</th>
-                    <th className="py-4 px-4 text-center">Kết quả</th>
-                    <th className="py-4 px-4 text-right">Thao tác</th>
+            <div className="bg-surface rounded-xl border border-border overflow-hidden shadow-xs">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-surface-2/60 border-b border-border">
+                  <tr className="text-ink-muted font-semibold text-xs">
+                    <th className="py-3 px-4">Lô hàng</th>
+                    <th className="py-3 px-4">Ngày kiểm</th>
+                    <th className="py-3 px-4">Phòng Lab</th>
+                    <th className="py-3 px-4 text-center">Kết quả</th>
+                    <th className="py-3 px-4 text-right">Thao tác</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
@@ -677,27 +677,27 @@ const ProductDetail: React.FC = () => {
         {activeTab === 'analytics' && (
           <div className="space-y-6">
             {/* Panel chọn chỉ tiêu */}
-            <div className="bg-surface-2 p-4 rounded-xl border border-border space-y-3">
+            <div className="bg-surface-2/60 p-4 rounded-xl border border-border space-y-3">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>
-                  <p className="text-xs font-black text-ink uppercase tracking-widest flex items-center gap-2">
-                    <ArrowTrendingUpIcon className="w-4 h-4 text-emerald-500" />
+                  <p className="text-xs font-semibold text-ink flex items-center gap-2">
+                    <ArrowTrendingUpIcon className="w-4 h-4 text-emerald-600" />
                     Chọn chỉ tiêu chất lượng để phân tích biến động:
                   </p>
-                  <p className="text-[11px] text-ink-muted mt-0.5">
+                  <p className="text-xs text-ink-muted mt-0.5">
                     Hệ thống tự động quy đổi tỉ lệ % theo hàm lượng công bố / chuẩn TCCS và đánh giá hệ số biến động (CV%).
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
                   <button
                     onClick={selectAllCriteria}
-                    className="text-[10px] font-black text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/30 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 px-3 py-1.5 rounded-lg transition-all uppercase tracking-wider"
+                    className="text-xs font-medium text-emerald-700 dark:text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 px-2.5 py-1 rounded-lg transition-all cursor-pointer"
                   >
                     Chọn tất cả
                   </button>
                   <button
                     onClick={clearAllCriteria}
-                    className="text-[10px] font-black text-ink-muted bg-surface hover:bg-surface-3 border border-border px-3 py-1.5 rounded-lg transition-all uppercase tracking-wider"
+                    className="text-xs font-medium text-ink-muted bg-surface hover:bg-surface-2 border border-border px-2.5 py-1 rounded-lg transition-all cursor-pointer"
                   >
                     Bỏ chọn
                   </button>
@@ -715,13 +715,13 @@ const ProductDetail: React.FC = () => {
                       <button
                         key={name}
                         onClick={() => toggleCriterion(name)}
-                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-all cursor-pointer ${
                           isSelected
-                            ? 'bg-emerald-600 text-white border-emerald-600 shadow-md shadow-emerald-600/10'
-                            : 'bg-surface text-ink-soft border-border hover:border-emerald-300 hover:text-emerald-600'
+                            ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
+                            : 'bg-surface text-ink-soft border-border hover:border-emerald-500/50 hover:text-emerald-700'
                         }`}
                       >
-                        {isSelected && <span className="text-[10px]">✓</span>}
+                        {isSelected && <span className="text-[11px]">✓</span>}
                         <span>{name}</span>
                         {count > 0 && (
                           <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${isSelected ? 'bg-emerald-700 text-white' : 'bg-surface-3 text-ink-muted'}`}>

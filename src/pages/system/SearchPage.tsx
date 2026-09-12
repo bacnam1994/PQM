@@ -98,26 +98,27 @@ const SearchPage: React.FC = () => {
 
   if (!query) {
     return (
-      <div className="space-y-6 animate-in fade-in duration-500">
-        <div className="flex flex-col items-center justify-center py-12 text-ink-muted">
-          <MagnifyingGlassIcon className="w-12 h-12 mb-4 opacity-20" />
-          <p className="text-ink-muted font-medium">Nhập từ khóa để tìm kiếm...</p>
+      <div className="space-y-6 animate-in fade-in duration-200">
+        <div className="flex flex-col items-center justify-center py-16 text-ink-muted">
+          <MagnifyingGlassIcon className="w-10 h-10 mb-3 opacity-30 text-ink-muted" />
+          <p className="text-ink font-medium text-sm">Tìm kiếm dữ liệu toàn hệ thống</p>
+          <p className="text-xs text-ink-muted mt-1">Nhập mã hoặc tên sản phẩm, số lô, nguyên liệu, TCCS...</p>
         </div>
 
         {searchHistory.length > 0 && (
           <div className="max-w-xl mx-auto">
-            <h3 className="text-sm font-bold text-ink-muted mb-3 flex items-center gap-2">
+            <h3 className="text-xs font-semibold text-ink-muted mb-3 flex items-center gap-2">
               <ClockIcon className="w-3.5 h-3.5" />
-              Lịch sử tìm kiếm
+              Lịch sử tìm kiếm gần đây
             </h3>
             <div className="space-y-1.5">
               {searchHistory.map((h, i) => (
                 <button
                   key={i}
                   onClick={() => navigate(`/search?q=${encodeURIComponent(h)}`)}
-                  className="w-full flex items-center justify-between px-4 py-2.5 bg-surface hover:bg-emerald-50 dark:hover:bg-emerald-950/20 border border-border rounded-xl text-left transition-all group"
+                  className="w-full flex items-center justify-between px-3.5 py-2 bg-surface hover:bg-surface-2 border border-border rounded-lg text-left transition-all group active:scale-[0.98]"
                 >
-                  <span className="flex items-center gap-2.5 text-ink group-hover:text-emerald-600 dark:group-hover:text-emerald-400">
+                  <span className="flex items-center gap-2.5 text-xs text-ink group-hover:text-emerald-600 dark:group-hover:text-emerald-400 font-medium">
                     <ClockIcon className="w-3.5 h-3.5 text-ink-muted group-hover:text-emerald-500" />
                     {h}
                   </span>
@@ -132,28 +133,31 @@ const SearchPage: React.FC = () => {
   }
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500">
+    <div className="space-y-8 animate-in fade-in duration-200">
       <PageHeader 
         title={`Kết quả tìm kiếm: "${query}"`} 
-        subtitle={`Tìm thấy ${totalCount} kết quả phù hợp.`}
+        subtitle={`Tìm thấy ${totalCount} kết quả phù hợp trên toàn hệ thống.`}
         icon={MagnifyingGlassIcon} 
       />
 
       {/* Products */}
       {results.products.length > 0 && (
-        <section className="space-y-4">
-          <h3 className="flex items-center gap-2 text-lg font-bold text-ink">
-            <CubeIcon className="w-5 h-5 text-emerald-600 dark:text-emerald-400" /> Sản phẩm ({results.products.length})
+        <section className="space-y-3">
+          <h3 className="flex items-center gap-2 text-sm font-semibold text-ink">
+            <CubeIcon className="w-4 h-4 text-emerald-600 dark:text-emerald-400" /> Sản phẩm
+            <span className="text-[11px] font-medium bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 px-2 py-0.5 rounded-full border border-emerald-500/20">
+              {results.products.length}
+            </span>
           </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
             {results.products.map(p => (
-              <Link key={p.id} to={`/products/${p.id}`} className="block p-4 bg-surface rounded-xl border border-border hover:shadow-md transition-all group">
+              <Link key={p.id} to={`/products/${p.id}`} className="block p-3.5 bg-surface rounded-xl border border-border hover:bg-surface-2/50 shadow-xs hover:shadow-sm transition-all group active:scale-[0.99]">
                 <div className="flex justify-between items-start">
                   <div>
-                    <p className="font-bold text-ink group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">{p.name}</p>
-                    <p className="text-xs text-ink-muted font-bold uppercase">{p.code}</p>
+                    <p className="font-semibold text-ink text-xs group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">{p.name}</p>
+                    <p className="text-[10px] text-ink-muted font-mono font-medium uppercase mt-0.5">{p.code}</p>
                   </div>
-                  <ArrowRightIcon className="w-4 h-4 text-ink-muted group-hover:text-emerald-500 -translate-x-2 opacity-0 group-hover:translate-x-0 group-hover:opacity-100 transition-all" />
+                  <ArrowRightIcon className="w-3.5 h-3.5 text-ink-muted group-hover:text-emerald-500 -translate-x-1 opacity-0 group-hover:translate-x-0 group-hover:opacity-100 transition-all shrink-0 mt-0.5" />
                 </div>
               </Link>
             ))}
@@ -163,19 +167,22 @@ const SearchPage: React.FC = () => {
 
       {/* Batches */}
       {results.batches.length > 0 && (
-        <section className="space-y-4">
-          <h3 className="flex items-center gap-2 text-lg font-bold text-ink">
-            <Square3Stack3DIcon className="w-5 h-5 text-teal-600 dark:text-teal-400" /> Lô sản xuất ({results.batches.length})
+        <section className="space-y-3">
+          <h3 className="flex items-center gap-2 text-sm font-semibold text-ink">
+            <Square3Stack3DIcon className="w-4 h-4 text-teal-600 dark:text-teal-400" /> Lô sản xuất
+            <span className="text-[11px] font-medium bg-teal-500/10 text-teal-700 dark:text-teal-400 px-2 py-0.5 rounded-full border border-teal-500/20">
+              {results.batches.length}
+            </span>
           </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
             {results.batches.map(b => (
-              <Link key={b.id} to={`/batches/${b.id}`} className="block p-4 bg-surface rounded-xl border border-border hover:shadow-md transition-all group">
+              <Link key={b.id} to={`/batches/${b.id}`} className="block p-3.5 bg-surface rounded-xl border border-border hover:bg-surface-2/50 shadow-xs hover:shadow-sm transition-all group active:scale-[0.99]">
                 <div className="flex justify-between items-start">
                   <div>
-                    <p className="font-bold text-ink group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">Lô: {b.batchNo}</p>
-                    <p className="text-xs text-ink-muted">{b.productName}</p>
+                    <p className="font-semibold text-ink text-xs group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">Lô: {b.batchNo}</p>
+                    <p className="text-xs text-ink-muted mt-0.5">{b.productName}</p>
                   </div>
-                  <ArrowRightIcon className="w-4 h-4 text-ink-muted group-hover:text-emerald-500 -translate-x-2 opacity-0 group-hover:translate-x-0 group-hover:opacity-100 transition-all" />
+                  <ArrowRightIcon className="w-3.5 h-3.5 text-ink-muted group-hover:text-emerald-500 -translate-x-1 opacity-0 group-hover:translate-x-0 group-hover:opacity-100 transition-all shrink-0 mt-0.5" />
                 </div>
               </Link>
             ))}
@@ -185,20 +192,23 @@ const SearchPage: React.FC = () => {
 
       {/* Materials */}
       {results.materials.length > 0 && (
-        <section className="space-y-4">
-          <h3 className="flex items-center gap-2 text-lg font-bold text-ink">
-            <BeakerIcon className="w-5 h-5 text-amber-600 dark:text-amber-400" /> Nguyên liệu ({results.materials.length})
+        <section className="space-y-3">
+          <h3 className="flex items-center gap-2 text-sm font-semibold text-ink">
+            <BeakerIcon className="w-4 h-4 text-amber-600 dark:text-amber-400" /> Nguyên liệu
+            <span className="text-[11px] font-medium bg-amber-500/10 text-amber-700 dark:text-amber-400 px-2 py-0.5 rounded-full border border-amber-500/20">
+              {results.materials.length}
+            </span>
           </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
             {results.materials.map(m => (
-              <Link key={m.id} to={`/materials/edit/${m.id}`} className="block p-4 bg-surface rounded-xl border border-border hover:shadow-md transition-all group">
+              <Link key={m.id} to={`/materials/edit/${m.id}`} className="block p-3.5 bg-surface rounded-xl border border-border hover:bg-surface-2/50 shadow-xs hover:shadow-sm transition-all group active:scale-[0.99]">
                 <div className="flex justify-between items-start">
                   <div>
-                    <p className="font-bold text-ink group-hover:text-amber-600 dark:group-hover:text-amber-400 transition-colors">{m.name}</p>
-                    <p className="text-xs text-ink-muted font-bold uppercase">{m.code || m.category}</p>
+                    <p className="font-semibold text-ink text-xs group-hover:text-amber-600 dark:group-hover:text-amber-400 transition-colors">{m.name}</p>
+                    <p className="text-[10px] text-ink-muted font-mono font-medium uppercase mt-0.5">{m.code || m.category}</p>
                     {m.aliases?.length > 0 && <p className="text-[10px] text-ink-muted mt-0.5 italic">{m.aliases.slice(0, 2).join(', ')}</p>}
                   </div>
-                  <ArrowRightIcon className="w-4 h-4 text-ink-muted group-hover:text-amber-500 -translate-x-2 opacity-0 group-hover:translate-x-0 group-hover:opacity-100 transition-all" />
+                  <ArrowRightIcon className="w-3.5 h-3.5 text-ink-muted group-hover:text-amber-500 -translate-x-1 opacity-0 group-hover:translate-x-0 group-hover:opacity-100 transition-all shrink-0 mt-0.5" />
                 </div>
               </Link>
             ))}
@@ -208,23 +218,26 @@ const SearchPage: React.FC = () => {
 
       {/* Test Results */}
       {results.testResults.length > 0 && (
-        <section className="space-y-4">
-          <h3 className="flex items-center gap-2 text-lg font-bold text-ink">
-            <ClipboardDocumentCheckIcon className="w-5 h-5 text-purple-600 dark:text-purple-400" /> Phiếu Kiểm nghiệm ({results.testResults.length})
+        <section className="space-y-3">
+          <h3 className="flex items-center gap-2 text-sm font-semibold text-ink">
+            <ClipboardDocumentCheckIcon className="w-4 h-4 text-indigo-600 dark:text-indigo-400" /> Phiếu Kiểm nghiệm
+            <span className="text-[11px] font-medium bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 px-2 py-0.5 rounded-full border border-indigo-500/20">
+              {results.testResults.length}
+            </span>
           </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
             {results.testResults.map((r: any) => (
-              <Link key={r.id} to={`/test-results/print/${r.id}`} className="block p-4 bg-surface rounded-xl border border-border hover:shadow-md transition-all group">
+              <Link key={r.id} to={`/test-results/print/${r.id}`} className="block p-3.5 bg-surface rounded-xl border border-border hover:bg-surface-2/50 shadow-xs hover:shadow-sm transition-all group active:scale-[0.99]">
                 <div className="flex justify-between items-start">
                   <div className="min-w-0">
-                    <p className="font-bold text-ink group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors">Lô: {r.batchNo || r.batchId}</p>
-                    <p className="text-xs text-ink-muted truncate">{r.productName}</p>
-                    <div className="flex items-center gap-2 mt-1.5">
-                      <span className={`text-[9px] font-black px-2 py-0.5 rounded-full ${r.overallStatus === 'PASS' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300' : 'bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300'}`}>{r.overallStatus}</span>
+                    <p className="font-semibold text-ink text-xs group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">Lô: {r.batchNo || r.batchId}</p>
+                    <p className="text-xs text-ink-muted truncate mt-0.5">{r.productName}</p>
+                    <div className="flex items-center gap-2 mt-2">
+                      <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${r.overallStatus === 'PASS' ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20' : 'bg-rose-500/10 text-rose-700 dark:text-rose-400 border border-rose-500/20'}`}>{r.overallStatus}</span>
                       <span className="text-[10px] text-ink-muted">{formatDateStandard(r.testDate)}</span>
                     </div>
                   </div>
-                  <ArrowRightIcon className="w-4 h-4 text-ink-muted group-hover:text-purple-500 -translate-x-2 opacity-0 group-hover:translate-x-0 group-hover:opacity-100 transition-all shrink-0" />
+                  <ArrowRightIcon className="w-3.5 h-3.5 text-ink-muted group-hover:text-indigo-500 -translate-x-1 opacity-0 group-hover:translate-x-0 group-hover:opacity-100 transition-all shrink-0 mt-0.5" />
                 </div>
               </Link>
             ))}
@@ -234,19 +247,22 @@ const SearchPage: React.FC = () => {
 
       {/* TCCS */}
       {results.tccs.length > 0 && (
-        <section className="space-y-4">
-          <h3 className="flex items-center gap-2 text-lg font-bold text-ink">
-            <DocumentTextIcon className="w-5 h-5 text-sky-600 dark:text-sky-400" /> Tiêu chuẩn cơ sở ({results.tccs.length})
+        <section className="space-y-3">
+          <h3 className="flex items-center gap-2 text-sm font-semibold text-ink">
+            <DocumentTextIcon className="w-4 h-4 text-sky-600 dark:text-sky-400" /> Tiêu chuẩn cơ sở
+            <span className="text-[11px] font-medium bg-sky-500/10 text-sky-700 dark:text-sky-400 px-2 py-0.5 rounded-full border border-sky-500/20">
+              {results.tccs.length}
+            </span>
           </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
             {results.tccs.map(t => (
-              <Link key={t.id} to={`/tccs/detail/${t.id}`} className="block p-4 bg-surface rounded-xl border border-border hover:shadow-md transition-all group">
+              <Link key={t.id} to={`/tccs/detail/${t.id}`} className="block p-3.5 bg-surface rounded-xl border border-border hover:bg-surface-2/50 shadow-xs hover:shadow-sm transition-all group active:scale-[0.99]">
                 <div className="flex justify-between items-start">
                   <div>
-                    <p className="font-bold text-ink group-hover:text-sky-600 dark:group-hover:text-sky-400 transition-colors">{t.code}</p>
-                    <p className="text-xs text-ink-muted">{t.productName}</p>
+                    <p className="font-semibold text-ink text-xs group-hover:text-sky-600 dark:group-hover:text-sky-400 transition-colors">{t.code}</p>
+                    <p className="text-xs text-ink-muted mt-0.5">{t.productName}</p>
                   </div>
-                  <ArrowRightIcon className="w-4 h-4 text-ink-muted group-hover:text-sky-500 -translate-x-2 opacity-0 group-hover:translate-x-0 group-hover:opacity-100 transition-all" />
+                  <ArrowRightIcon className="w-3.5 h-3.5 text-ink-muted group-hover:text-sky-500 -translate-x-1 opacity-0 group-hover:translate-x-0 group-hover:opacity-100 transition-all shrink-0 mt-0.5" />
                 </div>
               </Link>
             ))}
@@ -255,8 +271,8 @@ const SearchPage: React.FC = () => {
       )}
 
       {totalCount === 0 && (
-        <div className="text-center py-12 bg-surface-2 rounded-2xl border border-border border-dashed">
-          <p className="text-ink-muted font-medium">Không tìm thấy kết quả nào cho "{query}"</p>
+        <div className="text-center py-12 bg-surface rounded-xl border border-border border-dashed shadow-2xs">
+          <p className="text-ink-muted text-xs">Không tìm thấy kết quả nào phù hợp với từ khóa "{query}"</p>
         </div>
       )}
     </div>

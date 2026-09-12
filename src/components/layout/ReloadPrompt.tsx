@@ -35,18 +35,18 @@ const ReloadPrompt: React.FC = () => {
   if (!needRefresh) return null;
 
   return (
-    <div className="fixed bottom-4 right-4 z-[100] p-4 bg-surface text-ink rounded-2xl shadow-xl border border-border animate-in slide-in-from-bottom-5 fade-in duration-300 flex flex-col gap-3 max-w-xs">
+    <div className="fixed bottom-4 right-4 z-[100] p-4 bg-surface text-ink rounded-xl shadow-lg border border-border animate-in slide-in-from-bottom-4 fade-in duration-200 flex flex-col gap-2.5 max-w-xs">
       <div className="flex justify-between items-start">
-        <h3 className="font-semibold text-sm">Cập nhật mới</h3>
-        <button type="button" onClick={close} className="text-ink-faint hover:text-ink transition-colors">
+        <h3 className="font-semibold text-sm text-ink">Cập nhật phiên bản mới</h3>
+        <button type="button" onClick={close} className="text-ink-muted hover:text-ink p-0.5 rounded transition-colors" aria-label="Đóng thông báo">
           <XMarkIcon className="w-4 h-4"/>
         </button>
       </div>
-      <p className="text-xs text-ink-faint">Đã có phiên bản mới của hệ thống. Vui lòng làm mới để cập nhật.</p>
+      <p className="text-xs text-ink-muted leading-relaxed">Đã có bản cập nhật mới của hệ thống. Vui lòng làm mới để áp dụng.</p>
       <button 
         type="button"
         onClick={() => updateServiceWorker(true)}
-        className="w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold uppercase flex items-center justify-center gap-2 transition-all shadow-xs"
+        className="w-full py-2 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] text-white rounded-lg text-xs font-medium flex items-center justify-center gap-1.5 transition-all shadow-xs"
       >
         <ArrowPathIcon className="w-4 h-4" /> Làm mới ngay
       </button>

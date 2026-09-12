@@ -33,101 +33,98 @@ const SELF_ANNOUNCED_COMPANY = "CÔNG TY CỔ PHẦN CÔNG NGHỆ SINH PHẨM NA
 const ProductGridItem = memo(({ product, hProduct, onEdit, onDelete, isAdmin }: { product: Product, hProduct: any, onEdit: (p: Product) => void, onDelete: (p: Product) => void, isAdmin: boolean }) => {
   const isSelf = product.registrant.trim().toUpperCase() === SELF_ANNOUNCED_COMPANY;
   return (
-    <DSCard className="p-5 flex flex-col gap-4 hover:-translate-y-1 hover:shadow-md transition-all duration-300 group relative overflow-hidden bg-surface border border-border">
+    <div className="p-4 flex flex-col gap-3 rounded-xl transition-all duration-200 group relative overflow-hidden bg-surface border border-border shadow-xs hover:border-emerald-500/30">
       {/* Header: Eyebrow text and Status */}
       <div className="flex items-start justify-between gap-2 relative z-10">
-        <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-ink-muted">
+        <div className="flex items-center gap-1.5 text-xs text-ink-muted truncate">
           <CubeIcon className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
-          <span className="truncate max-w-[150px]" title={product.group}>{product.group} • {isSelf ? 'Tự công bố' : 'Gia công'}</span>
+          <span className="truncate max-w-[150px]" title={product.group}>{product.group} · {isSelf ? 'Tự công bố' : 'Gia công'}</span>
         </div>
         <StatusBadge type="PRODUCT" status={product.status} />
       </div>
 
-      {/* Main Content */}
-      <div className="bg-surface-2/60 border border-border/80 rounded-xl p-4 flex flex-col gap-3 relative z-10 flex-grow">
-        {/* Main Info: Name and Icon */}
-        <div className="flex items-center gap-3">
-          {product.imageUrl ? (
-            <img src={product.imageUrl} alt={product.name} className="w-12 h-12 rounded-lg object-cover shrink-0 border border-border shadow-sm" />
-          ) : (
-            <div className="bg-emerald-50 dark:bg-emerald-950/40 p-2.5 rounded-lg text-emerald-600 dark:text-emerald-400 shrink-0 border border-emerald-100 dark:border-emerald-900/30">
-              <CubeIcon className="h-6 w-6" />
-            </div>
-          )}
-          <Link to={`/products/${product.id}`} className="flex flex-col group/link min-w-0">
-            <h3 className="font-bold text-ink text-sm leading-snug group-hover/link:text-emerald-600 dark:group-hover/link:text-emerald-400 transition-colors line-clamp-2">{product.name}</h3>
-            <p className="text-[10px] font-semibold text-ink-muted uppercase tracking-wider mt-0.5">{product.code}</p>
-          </Link>
-        </div>
-
-        {/* Meta Info */}
-        <div className="space-y-1.5 pt-2.5 border-t border-border/60 mt-auto">
-            <div className="flex justify-between items-start gap-2 text-[11px]">
-              <span className="text-ink-muted font-medium uppercase whitespace-nowrap shrink-0">Số ĐKCB:</span>
-              <span className="text-ink font-semibold text-right break-all">{product.registrationNo || '-'}</span>
-            </div>
-            <div className="flex justify-between items-start gap-2 text-[11px]">
-              <span className="text-ink-muted font-medium uppercase whitespace-nowrap shrink-0">Ngày cấp:</span>
-              <span className="text-ink font-semibold text-right">{formatDateStandard(product.registrationDate)}</span>
-            </div>
-        </div>
-
-        {/* --- MINI STATS: Lô, Kết quả, Tỷ lệ đạt --- */}
-        {hProduct && (
-          <div className="flex flex-wrap gap-1.5 pt-2 border-t border-border/60">
-            <Link
-              to={`/batches?productId=${product.id}`}
-              onClick={e => e.stopPropagation()}
-              className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-sky-50 dark:bg-sky-950/40 text-sky-700 dark:text-sky-300 text-[10px] font-semibold border border-sky-200 dark:border-sky-900/40 hover:bg-sky-100 dark:hover:bg-sky-900/60 transition-colors"
-            >
-              <Square3Stack3DIcon className="h-3 w-3" /> {hProduct.batchesCount > 0 ? `${hProduct.batchesCount} lô` : 'Chưa có lô'}
-            </Link>
-            {hProduct.testResultsCount > 0 && (
-              <Link
-                to={`/test-results?productId=${product.id}`}
-                onClick={e => e.stopPropagation()}
-                className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-teal-50 dark:bg-teal-950/40 text-teal-700 dark:text-teal-300 text-[10px] font-semibold border border-teal-200 dark:border-teal-900/40 hover:bg-teal-100 dark:hover:bg-teal-900/60 transition-colors"
-              >
-                <ClipboardDocumentCheckIcon className="h-3 w-3" /> {hProduct.testResultsCount} KN
-              </Link>
-            )}
-            {hProduct.testResultsCount > 0 && (
-              <span className={`flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold border ${
-                hProduct.passRate >= 80 ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-900/40'
-                : hProduct.passRate >= 50 ? 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-900/40'
-                : 'bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-900/40'
-              }`}>
-                <ArrowTrendingUpIcon className="h-3 w-3" /> {hProduct.passRate}%
-              </span>
-            )}
-            {hProduct.activeTCCS && (
-              <Link
-                to={`/tccs/detail/${hProduct.activeTCCS.id}`}
-                onClick={e => e.stopPropagation()}
-                className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-surface text-ink-muted text-[10px] font-semibold border border-border hover:bg-surface-2 transition-colors"
-              >
-                <DocumentTextIcon className="h-3 w-3" /> TCCS
-              </Link>
-            )}
+      {/* Main Info: Name and Icon */}
+      <div className="flex items-center gap-3 pt-1">
+        {product.imageUrl ? (
+          <img src={product.imageUrl} alt={product.name} className="w-11 h-11 rounded-lg object-cover shrink-0 border border-border shadow-2xs" />
+        ) : (
+          <div className="w-10 h-10 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0 border border-emerald-500/20">
+            <CubeIcon className="h-5 w-5" />
           </div>
         )}
+        <Link to={`/products/${product.id}`} className="flex flex-col group/link min-w-0">
+          <h3 className="font-semibold text-ink text-sm leading-snug group-hover/link:text-emerald-600 dark:group-hover/link:text-emerald-400 transition-colors line-clamp-2">{product.name}</h3>
+          <p className="text-xs font-mono text-ink-muted mt-0.5">{product.code}</p>
+        </Link>
       </div>
 
+      {/* Meta Info */}
+      <div className="space-y-1 pt-2.5 border-t border-border/80 text-xs">
+        <div className="flex justify-between items-start gap-2">
+          <span className="text-ink-muted font-normal whitespace-nowrap shrink-0">Số ĐKCB:</span>
+          <span className="text-ink font-medium text-right truncate">{product.registrationNo || '-'}</span>
+        </div>
+        <div className="flex justify-between items-start gap-2">
+          <span className="text-ink-muted font-normal whitespace-nowrap shrink-0">Ngày cấp:</span>
+          <span className="text-ink font-medium text-right">{formatDateStandard(product.registrationDate)}</span>
+        </div>
+      </div>
+
+      {/* --- MINI STATS: Lô, Kết quả, Tỷ lệ đạt --- */}
+      {hProduct && (
+        <div className="flex flex-wrap gap-1.5 pt-2.5 border-t border-border/80">
+          <Link
+            to={`/batches?productId=${product.id}`}
+            onClick={e => e.stopPropagation()}
+            className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-sky-500/10 text-sky-700 dark:text-sky-300 text-[11px] font-medium border border-sky-500/20 hover:bg-sky-500/20 transition-colors"
+          >
+            <Square3Stack3DIcon className="h-3 w-3" /> {hProduct.batchesCount > 0 ? `${hProduct.batchesCount} lô` : 'Chưa có lô'}
+          </Link>
+          {hProduct.testResultsCount > 0 && (
+            <Link
+              to={`/test-results?productId=${product.id}`}
+              onClick={e => e.stopPropagation()}
+              className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-teal-500/10 text-teal-700 dark:text-teal-300 text-[11px] font-medium border border-teal-500/20 hover:bg-teal-500/20 transition-colors"
+            >
+              <ClipboardDocumentCheckIcon className="h-3 w-3" /> {hProduct.testResultsCount} KN
+            </Link>
+          )}
+          {hProduct.testResultsCount > 0 && (
+            <span className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium border ${
+              hProduct.passRate >= 80 ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20'
+              : hProduct.passRate >= 50 ? 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20'
+              : 'bg-rose-500/10 text-rose-700 dark:text-rose-400 border-rose-500/20'
+            }`}>
+              <ArrowTrendingUpIcon className="h-3 w-3" /> {hProduct.passRate}%
+            </span>
+          )}
+          {hProduct.activeTCCS && (
+            <Link
+              to={`/tccs/detail/${hProduct.activeTCCS.id}`}
+              onClick={e => e.stopPropagation()}
+              className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-surface-2 text-ink-muted text-[11px] font-medium border border-border hover:text-ink transition-colors"
+            >
+              <DocumentTextIcon className="h-3 w-3" /> TCCS
+            </Link>
+          )}
+        </div>
+      )}
+
       {/* Footer: Actions */}
-      <div className="flex items-center justify-between pt-3 mt-auto border-t border-border/60 relative z-10">
+      <div className="flex items-center justify-between pt-2.5 mt-auto border-t border-border/80 relative z-10">
         {isAdmin && (
-          <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+          <div className="flex gap-1 opacity-80 group-hover:opacity-100 transition-opacity">
             <ActionButtons 
               onEdit={() => onEdit(product)}
               onDelete={() => onDelete(product)}
             />
           </div>
         )}
-        <Link to={`/products/${product.id}`} className="flex items-center gap-1 px-2.5 py-1.5 rounded-md font-semibold text-[11px] bg-surface-2 text-ink-soft hover:bg-surface-3 transition-colors ml-auto">
+        <Link to={`/products/${product.id}`} className="flex items-center gap-1 px-2.5 py-1 rounded-lg font-medium text-xs bg-surface-2 text-ink-muted hover:text-ink hover:bg-surface-3 transition-colors ml-auto">
           Chi tiết hồ sơ
         </Link>
       </div>
-    </DSCard>
+    </div>
   );
 });
 
@@ -135,36 +132,36 @@ const ProductGridItem = memo(({ product, hProduct, onEdit, onDelete, isAdmin }: 
 const ProductListItem = memo(({ product, onEdit, onDelete, isAdmin }: { product: Product, onEdit: (p: Product) => void, onDelete: (p: Product) => void, isAdmin: boolean }) => {
   const isSelf = product.registrant.trim().toUpperCase() === SELF_ANNOUNCED_COMPANY;
   return (
-    <tr className="hover:bg-surface-2 transition-colors group">
-      <td className="px-4 py-3.5">
+    <tr className="hover:bg-surface-2/60 transition-colors group">
+      <td className="px-4 py-3">
         <div className="flex items-center gap-3">
           {product.imageUrl ? (
-            <img src={product.imageUrl} alt={product.name} className="w-8 h-8 rounded-lg object-cover shrink-0 border border-border shadow-sm" />
+            <img src={product.imageUrl} alt={product.name} className="w-8 h-8 rounded-lg object-cover shrink-0 border border-border shadow-2xs" />
           ) : (
-            <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-white font-bold text-xs shrink-0 ${product.status === PRODUCT_STATUS.ACTIVE ? 'bg-emerald-600' : 'bg-ink-muted'}`}>
+            <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-white font-medium text-xs shrink-0 ${product.status === PRODUCT_STATUS.ACTIVE ? 'bg-emerald-600' : 'bg-surface-3 text-ink-muted'}`}>
               <CubeIcon className="h-4 w-4" />
             </div>
           )}
           <div>
-            <Link to={`/products/${product.id}`} className="font-semibold text-ink hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors block text-sm">{product.name}</Link>
-            <span className="text-[10px] font-bold text-ink-muted uppercase">{product.code}</span>
+            <Link to={`/products/${product.id}`} className="font-medium text-ink hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors block text-sm">{product.name}</Link>
+            <span className="text-xs font-mono text-ink-muted">{product.code}</span>
           </div>
         </div>
       </td>
-      <td className="px-4 py-3.5 font-medium text-ink-soft text-xs">
+      <td className="px-4 py-3 font-normal text-ink-soft text-xs">
         <div>{product.group}</div>
-        <div className={`text-[9px] uppercase font-bold mt-0.5 ${isSelf ? 'text-sky-600 dark:text-sky-400' : 'text-ink-muted'}`}>
+        <div className={`text-[11px] font-medium mt-0.5 ${isSelf ? 'text-sky-600 dark:text-sky-400' : 'text-ink-muted'}`}>
           {isSelf ? 'Tự công bố' : 'Gia công'}
         </div>
       </td>
-      <td className="px-4 py-3.5">
-        <div className="text-xs font-semibold text-ink">{product.registrationNo || '-'}</div>
-        <div className="text-[10px] text-ink-muted">{formatDateStandard(product.registrationDate)}</div>
+      <td className="px-4 py-3">
+        <div className="text-xs font-medium text-ink">{product.registrationNo || '-'}</div>
+        <div className="text-xs text-ink-muted">{formatDateStandard(product.registrationDate)}</div>
       </td>
-      <td className="px-4 py-3.5">
+      <td className="px-4 py-3">
         <StatusBadge type="PRODUCT" status={product.status} />
       </td>
-      <td className="px-4 py-3.5 text-right">
+      <td className="px-4 py-3 text-right">
         {isAdmin && (
           <div className="flex justify-end gap-1">
             <ActionButtons 
@@ -181,12 +178,12 @@ const ProductListItem = memo(({ product, onEdit, onDelete, isAdmin }: { product:
 
 const ProductDataList = ({ viewMode, data, hydratedProductMap, onEdit, onDelete, isAdmin }: any) => {
   if (data.length === 0) {
-     return <DSEmptyState icon={MagnifyingGlassCircleIcon} title="Không tìm thấy Sản phẩm" message="Chưa có sản phẩm nào khớp với từ khóa hoặc bộ lọc." />;
+     return <DSEmptyState icon={MagnifyingGlassCircleIcon} title="Không tìm thấy sản phẩm" message="Chưa có sản phẩm nào khớp với từ khóa hoặc bộ lọc." />;
   }
 
   if (viewMode === 'grid') {
     return (
-      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
         {data.map((product: Product) => (
           <ProductGridItem key={product.id} product={product} hProduct={hydratedProductMap?.get(product.id)} onEdit={onEdit} onDelete={onDelete} isAdmin={isAdmin} />
         ))}
@@ -195,8 +192,8 @@ const ProductDataList = ({ viewMode, data, hydratedProductMap, onEdit, onDelete,
   }
   return (
     <DSTable>
-      <thead className="bg-surface-2 border-b border-border">
-        <tr className="text-ink-soft text-[10px] font-bold uppercase tracking-wider">
+      <thead className="bg-surface-2/60 border-b border-border">
+        <tr className="text-ink-muted text-xs font-semibold">
           <th className="px-4 py-3 text-left">Sản phẩm</th>
           <th className="px-4 py-3 text-left">Phân loại</th>
           <th className="px-4 py-3 text-left">Số ĐKCB</th>
@@ -445,15 +442,15 @@ const ProductList: React.FC = () => {
   }, [crud.selectedItem, deleteProduct, user]);
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-300">
+    <div className="space-y-6 animate-in fade-in duration-200">
       <PageHeader 
         title="Danh mục Sản phẩm" 
         subtitle="Quản lý sản phẩm và hồ sơ pháp lý V-Biotech." 
         icon={CubeIcon}
         action={isAdmin ? (
-          <div className="flex items-center gap-2.5">
-            <button onClick={() => setIsImportModalOpen(true)} className="flex items-center gap-2 px-3.5 py-2 bg-surface border border-border text-ink-soft rounded-lg hover:bg-surface-2 font-bold text-xs transition-colors shadow-sm">
-              <ArrowUpTrayIcon className="h-4 w-4" /> Nhập Excel
+          <div className="flex items-center gap-2">
+            <button onClick={() => setIsImportModalOpen(true)} className="flex items-center gap-1.5 px-3 py-2 bg-surface border border-border text-ink rounded-lg hover:bg-surface-2 font-medium text-xs transition-colors shadow-2xs">
+              <ArrowUpTrayIcon className="h-4 w-4 text-ink-muted" /> Nhập Excel
             </button>
             <AddButton onClick={() => navigate('/products/new')} label="Thêm sản phẩm" />
           </div>

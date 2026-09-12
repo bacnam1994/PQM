@@ -183,18 +183,18 @@ const TccsDetailPage = () => {
         <div className="flex items-center gap-4">
           <button 
             onClick={() => navigate('/tccs')} 
-            className="p-2 bg-surface text-ink-muted hover:text-emerald-600 dark:hover:text-emerald-400 rounded-xl shadow-sm transition-all border border-border"
+            className="p-2 bg-surface text-ink-muted hover:text-emerald-700 dark:hover:text-emerald-400 rounded-lg shadow-xs transition-all border border-border cursor-pointer"
             title="Quay lại danh sách"
           >
             <ArrowLeftIcon className="w-5 h-5" />
           </button>
           <div>
-            <h1 className="text-2xl font-black text-ink uppercase tracking-tight flex items-center gap-2">
+            <h1 className="text-xl sm:text-2xl font-bold text-ink tracking-tight flex items-center gap-2">
               <DocumentTextIcon className="w-6 h-6 text-emerald-600 dark:text-emerald-400" />
               Chi tiết TCCS: {tccs.code}
             </h1>
             <p className="text-xs text-ink-muted font-medium">
-              Sản phẩm: <span className="font-bold text-ink">{product?.name || 'N/A'}</span>
+              Sản phẩm: <span className="font-semibold text-ink">{product?.name || 'N/A'}</span>
             </p>
           </div>
         </div>
@@ -202,7 +202,7 @@ const TccsDetailPage = () => {
         <div className="flex items-center gap-2">
           <button 
             onClick={() => window.print()} 
-            className="flex items-center gap-2 px-4 py-2 bg-surface-2 hover:bg-surface-3 text-ink-soft rounded-xl text-xs font-bold border border-border transition-colors shadow-sm"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-surface hover:bg-surface-2 text-ink-soft rounded-lg text-xs font-medium border border-border transition-colors shadow-xs cursor-pointer"
           >
             <PrinterIcon className="w-4 h-4" /> In TCCS
           </button>
@@ -210,17 +210,17 @@ const TccsDetailPage = () => {
       </div>
 
       {/* --- THANH CÔNG CỤ XÉT DUYỆT & KIỂM SOÁT THAY ĐỔI GMP --- */}
-      <div className="print:hidden bg-surface border border-emerald-500/20 p-4 rounded-2xl shadow-sm flex flex-wrap items-center justify-between gap-4">
+      <div className="print:hidden bg-surface border border-emerald-500/20 p-4 rounded-xl shadow-xs flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="p-2.5 bg-emerald-600 text-white rounded-xl shadow-sm">
+          <div className="p-2 bg-emerald-600 text-white rounded-lg shadow-xs">
             <ShieldCheckIcon className="w-5 h-5" />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-xs font-black uppercase tracking-wider text-ink">
+              <span className="text-xs font-semibold text-ink">
                 Quy trình Phê duyệt TCCS (21 CFR Part 11)
               </span>
-              <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase ${
+              <span className={`px-2 py-0.5 rounded text-[10px] font-semibold ${
                 currentTask.status === 'APPROVED' 
                   ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20' 
                   : 'bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/20'
@@ -229,26 +229,26 @@ const TccsDetailPage = () => {
               </span>
             </div>
             <p className="text-xs text-ink-muted mt-0.5">
-              Yêu cầu vai trò tối thiểu: <span className="font-bold text-ink">{currentStep?.roleRequired || 'QA'}</span>
+              Yêu cầu vai trò tối thiểu: <span className="font-semibold text-ink">{currentStep?.roleRequired || 'QA'}</span>
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2.5 flex-wrap">
+        <div className="flex items-center gap-2 flex-wrap">
           {previousVersion && (
             <>
               <button
                 onClick={() => handleOpenDiff()}
-                className="flex items-center gap-1.5 px-3 py-2 bg-surface border border-border hover:border-emerald-400 text-ink-soft rounded-xl text-xs font-bold shadow-sm transition-all"
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-surface border border-border hover:border-emerald-500/50 text-ink-soft rounded-lg text-xs font-medium shadow-xs transition-all cursor-pointer"
                 title="So sánh với phiên bản TCCS trước đó"
               >
-                <ArrowsRightLeftIcon className="w-3.5 h-3.5 text-emerald-500" />
+                <ArrowsRightLeftIcon className="w-3.5 h-3.5 text-emerald-600" />
                 So sánh bản cũ ({previousVersion.code})
               </button>
 
               <button
                 onClick={handleOpenImpactAssessment}
-                className="flex items-center gap-1.5 px-3 py-2 bg-surface border border-border hover:border-amber-400 text-ink-soft rounded-xl text-xs font-bold shadow-sm transition-all"
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-surface border border-border hover:border-amber-500/50 text-ink-soft rounded-lg text-xs font-medium shadow-xs transition-all cursor-pointer"
                 title="Đánh giá tác động thay đổi tới lô hàng và phiếu kiểm nghiệm"
               >
                 <ShieldExclamationIcon className="w-3.5 h-3.5 text-amber-500" />
@@ -260,7 +260,7 @@ const TccsDetailPage = () => {
           {currentTask.status !== 'APPROVED' && (
             <button
               onClick={() => setShowSignModal(true)}
-              className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-sm transition-colors"
+              className="flex items-center gap-1.5 px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white rounded-lg text-xs font-medium shadow-xs transition-colors cursor-pointer"
             >
               <CheckBadgeIcon className="w-4 h-4" />
               Ký duyệt điện tử
@@ -275,75 +275,75 @@ const TccsDetailPage = () => {
           {/* Sản phẩm */}
           {product && (
             <Link to={`/products/${product.id}`}
-              className="flex flex-col gap-1.5 p-3.5 bg-surface border border-border rounded-xl shadow-sm hover:border-emerald-400 hover:shadow-md hover:-translate-y-0.5 transition-all group">
-              <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-ink-muted">
+              className="flex flex-col gap-1.5 p-3.5 bg-surface border border-border rounded-xl shadow-xs hover:border-emerald-500/50 transition-all group">
+              <div className="flex items-center gap-2 text-xs font-medium text-ink-muted">
                 <CubeIcon className="w-3.5 h-3.5 text-emerald-500" /> Sản phẩm
               </div>
-              <p className="font-black text-ink text-sm leading-tight line-clamp-2 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">{product.name}</p>
-              <p className="text-[10px] font-bold text-ink-muted uppercase">{product.code}</p>
+              <p className="font-semibold text-ink text-sm leading-tight line-clamp-2 group-hover:text-emerald-700 dark:group-hover:text-emerald-400 transition-colors">{product.name}</p>
+              <p className="text-xs font-medium text-ink-muted font-mono">{product.code}</p>
             </Link>
           )}
           {/* Lô đang dùng */}
           <Link to={`/batches?productId=${tccs.productId}`}
-            className="flex flex-col gap-1.5 p-3.5 bg-surface border border-border rounded-xl shadow-sm hover:border-blue-400 hover:shadow-md hover:-translate-y-0.5 transition-all group">
-            <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-ink-muted">
-              <Square3Stack3DIcon className="w-3.5 h-3.5 text-blue-500" /> Lô áp dụng
-            </div>
-            <p className="font-black text-blue-600 dark:text-blue-400 text-2xl">{tccs.batchesCount}</p>
-            <p className="text-[10px] font-bold text-ink-muted uppercase flex items-center gap-1">Xem lô <ArrowRightIcon className="w-3 h-3 group-hover:translate-x-1 transition-transform" /></p>
+            className="flex flex-col gap-1.5 p-3.5 bg-surface border border-border rounded-xl shadow-xs hover:border-blue-500/50 transition-all group">
+              <div className="flex items-center gap-2 text-xs font-medium text-ink-muted">
+                <Square3Stack3DIcon className="w-3.5 h-3.5 text-blue-500" /> Lô áp dụng
+              </div>
+            <p className="font-bold text-blue-700 dark:text-blue-400 text-2xl">{tccs.batchesCount}</p>
+            <p className="text-xs font-medium text-ink-muted flex items-center gap-1">Xem lô <ArrowRightIcon className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" /></p>
           </Link>
           {/* Phiếu kiểm nghiệm */}
           <Link to={`/test-results?productId=${tccs.productId}`}
-            className="flex flex-col gap-1.5 p-3.5 bg-surface border border-border rounded-xl shadow-sm hover:border-cyan-400 hover:shadow-md hover:-translate-y-0.5 transition-all group">
-            <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-ink-muted">
-              <ClipboardDocumentCheckIcon className="w-3.5 h-3.5 text-cyan-500" /> Phiếu KN
-            </div>
-            <p className="font-black text-cyan-600 dark:text-cyan-400 text-2xl">{tccs.testResultsCount}</p>
-            <p className="text-[10px] font-bold text-ink-muted uppercase flex items-center gap-1">Xem phiếu <ArrowRightIcon className="w-3 h-3 group-hover:translate-x-1 transition-transform" /></p>
+            className="flex flex-col gap-1.5 p-3.5 bg-surface border border-border rounded-xl shadow-xs hover:border-cyan-500/50 transition-all group">
+              <div className="flex items-center gap-2 text-xs font-medium text-ink-muted">
+                <ClipboardDocumentCheckIcon className="w-3.5 h-3.5 text-cyan-500" /> Phiếu KN
+              </div>
+            <p className="font-bold text-cyan-700 dark:text-cyan-400 text-2xl">{tccs.testResultsCount}</p>
+            <p className="text-xs font-medium text-ink-muted flex items-center gap-1">Xem phiếu <ArrowRightIcon className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" /></p>
           </Link>
           {/* Tỷ lệ đạt */}
-          <div className="flex flex-col gap-1.5 p-3.5 bg-surface border border-border rounded-xl shadow-sm">
-            <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-ink-muted">
+          <div className="flex flex-col gap-1.5 p-3.5 bg-surface border border-border rounded-xl shadow-xs">
+            <div className="flex items-center gap-2 text-xs font-medium text-ink-muted">
               <ArrowTrendingUpIcon className={`w-3.5 h-3.5 ${tccs.passRate >= 80 ? 'text-emerald-500' : tccs.passRate >= 50 ? 'text-amber-500' : 'text-rose-500'}`} /> Tỷ lệ đạt
             </div>
-            <p className={`font-black text-2xl ${tccs.passRate >= 80 ? 'text-emerald-600 dark:text-emerald-400' : tccs.passRate >= 50 ? 'text-amber-600 dark:text-amber-400' : 'text-rose-600 dark:text-rose-400'}`}>
+            <p className={`font-bold text-2xl ${tccs.passRate >= 80 ? 'text-emerald-700 dark:text-emerald-400' : tccs.passRate >= 50 ? 'text-amber-700 dark:text-amber-400' : 'text-rose-700 dark:text-rose-400'}`}>
               {tccs.testResultsCount > 0 ? `${tccs.passRate}%` : '—'}
             </p>
-            <p className="text-[10px] font-bold text-ink-muted uppercase">{tccs.testResultsCount > 0 ? 'Tổng hợp' : 'Chưa có KN'}</p>
+            <p className="text-xs font-medium text-ink-muted">{tccs.testResultsCount > 0 ? 'Tổng hợp' : 'Chưa có KN'}</p>
           </div>
         </div>
       )}
 
       {/* --- DANH SÁCH LÔ GẦN NHẤT DÙNG TCCS NÀY --- */}
       {batchesUsingTccs.length > 0 && (
-        <div className="print-hidden bg-surface rounded-xl border border-border shadow-sm overflow-hidden">
-          <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-surface-2">
-            <h3 className="text-xs font-black text-ink uppercase tracking-widest flex items-center gap-2">
+        <div className="print-hidden bg-surface rounded-xl border border-border shadow-xs overflow-hidden">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-surface-2/60">
+            <h3 className="text-xs font-semibold text-ink flex items-center gap-2">
               <Square3Stack3DIcon className="w-4 h-4 text-blue-500" /> Lô sản xuất đang áp dụng TCCS này
             </h3>
-            <Link to={`/batches?productId=${tccs.productId}`} className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-1">
+            <Link to={`/batches?productId=${tccs.productId}`} className="text-xs font-medium text-emerald-700 dark:text-emerald-400 hover:underline flex items-center gap-1">
               Xem tất cả <ArrowRightIcon className="w-3 h-3" />
             </Link>
           </div>
           <div className="divide-y divide-border">
             {batchesUsingTccs.map(batch => (
               <Link key={batch.id} to={`/batches/${batch.id}`}
-                className="flex items-center justify-between px-4 py-2.5 hover:bg-surface-2 transition-colors group">
+                className="flex items-center justify-between px-4 py-2.5 hover:bg-surface-2/60 transition-colors group">
                 <div className="flex items-center gap-3">
                   <HashtagIcon className="w-3.5 h-3.5 text-ink-muted" />
-                  <span className="font-bold text-ink text-sm group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">{batch.batchNo}</span>
-                  <span className="text-[10px] font-bold text-ink-muted font-mono">{formatDateStandard(batch.mfgDate)}</span>
+                  <span className="font-semibold text-ink text-xs group-hover:text-emerald-700 dark:group-hover:text-emerald-400 transition-colors">{batch.batchNo}</span>
+                  <span className="text-[11px] font-medium text-ink-muted font-mono">{formatDateStandard(batch.mfgDate)}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   {batch.testResultsCount > 0 && (
-                    <span className="text-[10px] font-bold text-cyan-600 dark:text-cyan-400 bg-cyan-50 dark:bg-cyan-950/30 px-2 py-0.5 rounded">
+                    <span className="text-[10px] font-semibold text-cyan-700 dark:text-cyan-400 bg-cyan-50 dark:bg-cyan-950/30 px-2 py-0.5 rounded border border-cyan-500/20">
                       {batch.testResultsCount} phiếu KN
                     </span>
                   )}
-                  <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded ${getBatchStatusColor(batch.status)}`}>
+                  <span className={`text-[10px] font-semibold px-2 py-0.5 rounded ${getBatchStatusColor(batch.status)}`}>
                     {getBatchStatusLabel(batch.status)}
                   </span>
-                  <ArrowRightIcon className="w-3.5 h-3.5 text-ink-muted group-hover:text-emerald-500 group-hover:translate-x-0.5 transition-all" />
+                  <ArrowRightIcon className="w-3.5 h-3.5 text-ink-muted group-hover:text-emerald-600 group-hover:translate-x-0.5 transition-all" />
                 </div>
               </Link>
             ))}
@@ -351,31 +351,31 @@ const TccsDetailPage = () => {
         </div>
       )}
 
-      <div className="bg-surface rounded-2xl shadow-sm border border-border p-10 print:shadow-none print:border-0 print:p-0">
+      <div className="bg-surface rounded-xl shadow-xs border border-border p-8 print:shadow-none print:border-0 print:p-0">
         <div className="tccs-print-title hidden text-center mb-8 border-b-2 border-slate-800 pb-6">
-          <h1 className="text-2xl font-black uppercase tracking-tight text-slate-900">Tiêu chuẩn Cơ sở</h1>
-          <p className="text-sm font-bold text-slate-600 uppercase">Specification Document</p>
+          <h1 className="text-2xl font-bold uppercase tracking-tight text-slate-900">Tiêu chuẩn Cơ sở</h1>
+          <p className="text-xs font-semibold text-slate-600 uppercase">Specification Document</p>
         </div>
 
-        <div className="bg-surface-2 p-4 rounded-xl border border-border space-y-2 mb-8 print:bg-transparent print:border-slate-800 print:rounded-none">
-          <p><span className="font-bold text-ink-muted">Mã TCCS:</span> <span className="font-black text-emerald-600 dark:text-emerald-400 text-lg ml-2 print:text-slate-900">{tccs.code}</span></p>
+        <div className="bg-surface-2/60 p-4 rounded-xl border border-border space-y-2 mb-8 print:bg-transparent print:border-slate-800 print:rounded-none text-xs">
+          <p><span className="font-medium text-ink-muted">Mã TCCS:</span> <span className="font-bold text-emerald-700 dark:text-emerald-400 text-base ml-2 print:text-slate-900">{tccs.code}</span></p>
           <p>
-            <span className="font-bold text-ink-muted">Sản phẩm:</span>{' '}
+            <span className="font-medium text-ink-muted">Sản phẩm:</span>{' '}
             {product ? (
-              <Link to={`/products/${product.id}`} className="font-bold text-ink ml-2 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors print:text-slate-900">
+              <Link to={`/products/${product.id}`} className="font-semibold text-ink ml-2 hover:text-emerald-700 dark:hover:text-emerald-400 transition-colors print:text-slate-900">
                 {product.name}
               </Link>
             ) : (
-              <span className="font-bold text-ink ml-2 print:text-slate-900">—</span>
+              <span className="font-semibold text-ink ml-2 print:text-slate-900">—</span>
             )}
           </p>
-          <p><span className="font-bold text-ink-muted">Ngày ban hành:</span> <span className="font-medium text-ink ml-2 print:text-slate-900">{formatDateStandard(tccs.issueDate)}</span></p>
-          <p className="print:hidden"><span className="font-bold text-ink-muted">Trạng thái:</span> <span className={`font-black uppercase ml-2 text-[10px] px-2 py-0.5 rounded ${tccs.isActive ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20' : 'bg-surface-3 text-ink-muted border border-border'}`}>{tccs.isActive ? 'Hiệu lực' : 'Hết hiệu lực'}</span></p>
+          <p><span className="font-medium text-ink-muted">Ngày ban hành:</span> <span className="font-medium text-ink ml-2 print:text-slate-900">{formatDateStandard(tccs.issueDate)}</span></p>
+          <p className="print:hidden"><span className="font-medium text-ink-muted">Trạng thái:</span> <span className={`font-semibold ml-2 text-[10px] px-2 py-0.5 rounded ${tccs.isActive ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20' : 'bg-surface-2 text-ink-muted border border-border'}`}>{tccs.isActive ? 'Hiệu lực' : 'Hết hiệu lực'}</span></p>
           {tccs.formula && (
             <p className="print:hidden">
-              <span className="font-bold text-ink-muted">Công thức:</span>{' '}
-              <Link to={`/product-formulas`} className="font-bold text-purple-600 dark:text-purple-400 ml-2 hover:underline text-sm flex items-center gap-1 inline-flex">
-                <BeakerIcon className="w-4 h-4" /> Xem công thức sản phẩm
+              <span className="font-medium text-ink-muted">Công thức:</span>{' '}
+              <Link to={`/product-formulas`} className="font-medium text-purple-700 dark:text-purple-400 ml-2 hover:underline text-xs flex items-center gap-1 inline-flex">
+                <BeakerIcon className="w-3.5 h-3.5" /> Xem công thức sản phẩm
               </Link>
             </p>
           )}
@@ -387,19 +387,19 @@ const TccsDetailPage = () => {
             if (list.length === 0) return null;
             return (
               <div key={group.title} className="break-inside-avoid">
-                <h4 className={`text-sm font-black uppercase tracking-widest mb-3 ${group.color} print:text-slate-900 border-b-2 border-border print:border-slate-800 pb-2`}>{group.title}</h4>
-                <table className="w-full text-left text-[13px] border-collapse">
-                  <thead className="bg-surface-2 print:bg-transparent text-ink-muted print:text-slate-900">
+                <h4 className={`text-xs font-semibold uppercase tracking-wider mb-3 ${group.color} print:text-slate-900 border-b border-border print:border-slate-800 pb-2`}>{group.title}</h4>
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead className="bg-surface-2/60 print:bg-transparent text-ink-muted print:text-slate-900">
                     <tr>
-                      <th className="p-3 border border-border print:border-slate-800 font-bold">Tên chỉ tiêu</th>
-                      <th className="p-3 border border-border print:border-slate-800 font-bold">Mức yêu cầu</th>
-                      <th className="p-3 border border-border print:border-slate-800 font-bold text-center">Đơn vị</th>
+                      <th className="p-3 border border-border print:border-slate-800 font-semibold">Tên chỉ tiêu</th>
+                      <th className="p-3 border border-border print:border-slate-800 font-semibold">Mức yêu cầu</th>
+                      <th className="p-3 border border-border print:border-slate-800 font-semibold text-center">Đơn vị</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
                     {list.map((c, idx) => (
-                      <tr key={idx} className="hover:bg-surface-2 transition-colors break-inside-avoid">
-                        <td className="p-3 border border-border print:border-slate-800 font-bold text-ink print:text-slate-900">{c.name}</td>
+                      <tr key={idx} className="hover:bg-surface-2/60 transition-colors break-inside-avoid">
+                        <td className="p-3 border border-border print:border-slate-800 font-medium text-ink print:text-slate-900">{c.name}</td>
                         <td className="p-3 border border-border print:border-slate-800 font-mono text-ink-soft print:text-slate-900">
                           {c.expectedText || (
                             c.min !== undefined && c.max !== undefined ? `${c.min} ~ ${c.max}` : c.min !== undefined ? `≥ ${c.min}` : c.max !== undefined ? `≤ ${c.max}` : ''

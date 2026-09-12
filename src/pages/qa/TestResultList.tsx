@@ -52,80 +52,77 @@ const TestResultGridItem = memo(({ res, onEdit, onDelete, onPrint, onOOS, isAdmi
   const isPass = res.overallStatus === TEST_RESULT_STATUS.PASS;
 
   return (
-    <DSCard className="p-5 flex flex-col gap-4 hover:-translate-y-1 hover:shadow-lg transition-all duration-300 group relative overflow-hidden h-full bg-surface border border-border">
+    <div className="p-4 flex flex-col gap-3 rounded-xl transition-all duration-200 group relative overflow-hidden h-full bg-surface border border-border shadow-xs hover:border-emerald-500/30">
       {/* Header: Product and Status */}
       <div className="flex items-start justify-between gap-2 relative z-10">
-        <div className="flex items-center gap-1.5 text-xs font-semibold text-ink-muted truncate pr-2" title={res.product?.name}>
-          <ClipboardDocumentCheckIcon className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
-          <span className="truncate">{res.product?.name || 'Sản phẩm'}</span>
+        <div className="flex items-center gap-1.5 text-xs text-ink-muted truncate pr-2" title={res.product?.name}>
+          <ClipboardDocumentCheckIcon className="w-4 h-4 text-emerald-500 shrink-0" />
+          <span className="truncate font-medium">{res.product?.name || 'Sản phẩm'}</span>
         </div>
-        <span className={`shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${
+        <span className={`shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium border ${
           isPass 
-            ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400 border-emerald-200/60 dark:border-emerald-800/40' 
-            : 'bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-400 border-rose-200/60 dark:border-rose-800/40'
+            ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20' 
+            : 'bg-rose-500/10 text-rose-700 dark:text-rose-400 border-rose-500/20'
         }`}>
           {res.overallStatus}
         </span>
       </div>
 
-      {/* Main Content Box */}
-      <div className="bg-surface-2 border border-border rounded-xl p-4 flex flex-col gap-3 relative z-10 flex-grow">
-        {/* Main Info */}
-        <div className="flex items-center gap-3.5">
-          <div className={`p-2.5 rounded-lg shrink-0 border ${
-            isPass 
-              ? 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 border-emerald-100 dark:border-emerald-900/30' 
-              : 'bg-rose-50 dark:bg-rose-950/50 text-rose-600 dark:text-rose-400 border-rose-100 dark:border-rose-900/30'
-          }`}>
-            {isPass ? <CheckCircleIcon className="w-6 h-6" /> : <ExclamationCircleIcon className="w-6 h-6" />}
-          </div>
-          <div className="flex flex-col flex-1 min-w-0">
-            {res.batch?.id ? (
-              <Link
-                to={`/batches/${res.batch.id}`}
-                onClick={e => e.stopPropagation()}
-                className={`font-semibold text-ink text-base leading-tight transition-colors line-clamp-1 hover:underline ${
-                  isPass ? 'hover:text-emerald-600 dark:hover:text-emerald-400' : 'hover:text-rose-600 dark:hover:text-rose-400'
-                }`}
-              >
-                {res.batch?.batchNo || `Lô ${res.batchId || 'N/A'}`}
-              </Link>
-            ) : (
-              <h3 className="font-semibold text-ink text-base leading-tight line-clamp-1">
-                {res.batch?.batchNo || `Lô ${res.batchId || 'N/A'}`}
-              </h3>
-            )}
-            <div className="flex flex-wrap items-center gap-1.5 mt-1">
-              <span className="text-xs text-ink-muted">Phiếu số: {res.id.slice(-6)}</span>
-              {res.tccs && (
-                <Link
-                  to={`/tccs/detail/${res.tccs.id}`}
-                  onClick={e => e.stopPropagation()}
-                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-surface text-ink-soft border border-border hover:border-emerald-300 hover:text-emerald-600 transition-colors"
-                >
-                  <DocumentTextIcon className="w-3 h-3" /> {res.tccs.code}
-                </Link>
-              )}
-            </div>
-          </div>
+      {/* Main Info */}
+      <div className="flex items-center gap-3 pt-1">
+        <div className={`w-9 h-9 rounded-lg shrink-0 flex items-center justify-center border ${
+          isPass 
+            ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20' 
+            : 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20'
+        }`}>
+          {isPass ? <CheckCircleIcon className="w-5 h-5" /> : <ExclamationCircleIcon className="w-5 h-5" />}
         </div>
-
-        {/* Meta Info */}
-        <div className="space-y-1.5 pt-2.5 border-t border-border mt-auto text-xs">
-          <div className="flex justify-between items-start gap-2">
-            <span className="text-ink-muted whitespace-nowrap shrink-0">Ngày xuất phiếu:</span>
-            <span className="text-ink font-medium text-right">{formatDateStandard(res.testDate)}</span>
-          </div>
-          <div className="flex justify-between items-start gap-2">
-            <span className="text-ink-muted whitespace-nowrap shrink-0">Phòng Lab:</span>
-            <span className="text-emerald-600 dark:text-emerald-400 font-medium text-right break-words">{res.labName}</span>
+        <div className="flex flex-col flex-1 min-w-0">
+          {res.batch?.id ? (
+            <Link
+              to={`/batches/${res.batch.id}`}
+              onClick={e => e.stopPropagation()}
+              className={`font-semibold text-ink text-base leading-tight transition-colors line-clamp-1 hover:underline ${
+                isPass ? 'hover:text-emerald-600 dark:hover:text-emerald-400' : 'hover:text-rose-600 dark:hover:text-rose-400'
+              }`}
+            >
+              {res.batch?.batchNo || `Lô ${res.batchId || 'N/A'}`}
+            </Link>
+          ) : (
+            <h3 className="font-semibold text-ink text-base leading-tight line-clamp-1">
+              {res.batch?.batchNo || `Lô ${res.batchId || 'N/A'}`}
+            </h3>
+          )}
+          <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
+            <span className="text-xs font-mono text-ink-muted">Phiếu số: {res.id.slice(-6)}</span>
+            {res.tccs && (
+              <Link
+                to={`/tccs/detail/${res.tccs.id}`}
+                onClick={e => e.stopPropagation()}
+                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[11px] font-medium bg-surface-2 text-ink-muted border border-border hover:text-emerald-600 transition-colors"
+              >
+                <DocumentTextIcon className="w-3 h-3" /> {res.tccs.code}
+              </Link>
+            )}
           </div>
         </div>
       </div>
 
+      {/* Meta Info */}
+      <div className="space-y-1 pt-2.5 border-t border-border/80 text-xs">
+        <div className="flex justify-between items-center gap-2">
+          <span className="text-ink-muted whitespace-nowrap shrink-0">Ngày xuất phiếu:</span>
+          <span className="text-ink font-medium text-right">{formatDateStandard(res.testDate)}</span>
+        </div>
+        <div className="flex justify-between items-center gap-2">
+          <span className="text-ink-muted whitespace-nowrap shrink-0">Phòng Lab:</span>
+          <span className="text-emerald-600 dark:text-emerald-400 font-medium text-right truncate">{res.labName}</span>
+        </div>
+      </div>
+
       {/* Footer: Actions */}
-      <div className="flex items-center justify-between pt-3 mt-auto border-t border-border relative z-10">
-        <div className="flex gap-1 opacity-90 group-hover:opacity-100 transition-opacity">
+      <div className="flex items-center justify-between pt-2.5 mt-auto border-t border-border/80 relative z-10">
+        <div className="flex gap-1 opacity-80 group-hover:opacity-100 transition-opacity">
           <ActionButtons 
             onEdit={isAdmin ? () => onEdit(res) : undefined}
             onDelete={isAdmin ? () => onDelete(res) : undefined}
@@ -135,20 +132,20 @@ const TestResultGridItem = memo(({ res, onEdit, onDelete, onPrint, onOOS, isAdmi
           {!isPass && (
             <button 
               onClick={() => onOOS(res)} 
-              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-400 hover:bg-rose-100 border border-rose-200 dark:border-rose-900/60 transition-all shadow-xs"
+              className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium bg-rose-500/10 text-rose-700 dark:text-rose-400 hover:bg-rose-500/20 border border-rose-500/20 transition-colors shadow-2xs"
             >
               <ShieldExclamationIcon className="w-3.5 h-3.5" /> OOS (AI)
             </button>
           )}
           <button 
             onClick={() => onPrint(res)} 
-            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-surface-2 text-ink-soft hover:bg-surface-3 hover:text-emerald-600 dark:hover:text-emerald-400 transition-all border border-border"
+            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium bg-surface-2 text-ink-muted hover:text-ink hover:bg-surface-3 transition-colors border border-border"
           >
             <PrinterIcon className="w-3.5 h-3.5" /> Xem phiếu
           </button>
         </div>
       </div>
-    </DSCard>
+    </div>
   );
 });
 
@@ -164,7 +161,7 @@ const TestResultListItem = memo(({ res, onEdit, onDelete, onPrint, onOOS, isAdmi
   const isPass = res.overallStatus === TEST_RESULT_STATUS.PASS;
 
   return (
-    <tr className="hover:bg-surface-2 transition-colors">
+    <tr className="hover:bg-surface-2/60 transition-colors">
       <td className="px-4 py-3 font-medium text-ink text-xs">{formatDateStandard(res.testDate)}</td>
       <td className="px-4 py-3">
         <div className="flex flex-col gap-0.5">
@@ -176,13 +173,13 @@ const TestResultListItem = memo(({ res, onEdit, onDelete, onPrint, onOOS, isAdmi
             <span className="font-semibold text-ink text-sm">{res.batch?.batchNo || `Lô ${res.batchId || 'N/A'}`}</span>
           )}
           {res.tccs && (
-            <Link to={`/tccs/detail/${res.tccs.id}`} className="text-xs text-ink-muted hover:text-emerald-600 transition-colors inline-flex items-center gap-1">
+            <Link to={`/tccs/detail/${res.tccs.id}`} className="text-xs text-ink-muted hover:text-emerald-600 transition-colors inline-flex items-center gap-1 font-mono">
               <DocumentTextIcon className="w-3 h-3" /> {res.tccs.code}
             </Link>
           )}
         </div>
       </td>
-      <td className="px-4 py-3 text-xs font-medium">
+      <td className="px-4 py-3 text-xs font-normal">
         {res.product ? (
           <Link to={`/products/${res.product.id}`} className="text-ink-soft hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors">
             {res.product.name}
@@ -191,10 +188,10 @@ const TestResultListItem = memo(({ res, onEdit, onDelete, onPrint, onOOS, isAdmi
       </td>
       <td className="px-4 py-3 text-xs text-ink font-medium">{res.labName}</td>
       <td className="px-4 py-3 text-center">
-        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${
+        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium border ${
           isPass 
-            ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400 border-emerald-200/60 dark:border-emerald-800/40' 
-            : 'bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-400 border-rose-200/60 dark:border-rose-800/40'
+            ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20' 
+            : 'bg-rose-500/10 text-rose-700 dark:text-rose-400 border-rose-500/20'
         }`}>
           {res.overallStatus}
         </span>
@@ -204,7 +201,7 @@ const TestResultListItem = memo(({ res, onEdit, onDelete, onPrint, onOOS, isAdmi
           {!isPass && (
             <button 
               onClick={() => onOOS(res)} 
-              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-400 hover:bg-rose-100 border border-rose-200 dark:border-rose-900/60 transition-all"
+              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-xs font-medium bg-rose-500/10 text-rose-700 dark:text-rose-400 hover:bg-rose-500/20 border border-rose-500/20 transition-colors"
             >
               <ShieldExclamationIcon className="w-3.5 h-3.5" /> OOS
             </button>
@@ -245,12 +242,12 @@ const TestResultDataList = ({ viewMode, data, onEdit, onDelete, onPrint, onOOS, 
   }
   return (
     <DSTable>
-      <thead className="bg-surface-2 border-b border-border">
-        <tr className="text-ink-muted text-xs font-semibold uppercase tracking-wider">
-          <th className="px-4 py-3">Ngày xuất phiếu</th>
-          <th className="px-4 py-3">Lô hàng</th>
-          <th className="px-4 py-3">Sản phẩm</th>
-          <th className="px-4 py-3">Phòng Lab</th>
+      <thead className="bg-surface-2/60 border-b border-border">
+        <tr className="text-ink-muted text-xs font-semibold">
+          <th className="px-4 py-3 text-left">Ngày xuất phiếu</th>
+          <th className="px-4 py-3 text-left">Lô hàng</th>
+          <th className="px-4 py-3 text-left">Sản phẩm</th>
+          <th className="px-4 py-3 text-left">Phòng Lab</th>
           <th className="px-4 py-3 text-center">Kết quả</th>
           <th className="px-4 py-3 text-right">Thao tác</th>
         </tr>
@@ -390,7 +387,7 @@ const TestResultList: React.FC = () => {
   const hasMoreData = hydratedResults.length >= testResultLimit && debouncedSearchTerm.length < 2;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-in fade-in duration-200">
       <div className="no-print">
         <PageHeader 
           title="Kết quả Lab (QC)" 
@@ -401,12 +398,12 @@ const TestResultList: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setIsComparisonOpen(true)}
-                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-surface text-ink-soft hover:text-emerald-600 dark:hover:text-emerald-400 font-medium text-xs border border-border shadow-xs transition-all"
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-surface text-ink hover:bg-surface-2 font-medium text-xs border border-border shadow-2xs transition-colors"
               >
                 <ScaleIcon className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
                 Đối chiếu Lab (AI)
               </button>
-              {isAdmin && <AddButton onClick={handleOpenAdd} label="NHẬP KẾT QUẢ MỚI" />}
+              {isAdmin && <AddButton onClick={handleOpenAdd} label="Nhập kết quả mới" />}
             </div>
           }
         />

@@ -310,16 +310,16 @@ const DeviationListPage: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6 pb-12">
+    <div className="space-y-6 pb-12 animate-in fade-in duration-200">
       {/* Header & Top Actions */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2.5">
-            <div className="p-2.5 bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 rounded-xl border border-rose-200 dark:border-rose-900/50">
-              <ShieldExclamationIcon className="w-6 h-6" />
+            <div className="w-10 h-10 bg-rose-500/10 text-rose-600 dark:text-rose-400 rounded-xl border border-rose-500/20 flex items-center justify-center shrink-0">
+              <ShieldExclamationIcon className="w-5 h-5" />
             </div>
             <div>
-              <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-ink">
+              <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-ink">
                 Quản lý Sai lệch & CAPA
               </h1>
               <p className="text-xs sm:text-sm text-ink-muted">
@@ -329,11 +329,11 @@ const DeviationListPage: React.FC = () => {
           </div>
         </div>
 
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2">
           <button
             onClick={loadDeviations}
             disabled={loading}
-            className="p-2 rounded-lg border border-border text-ink-soft hover:bg-surface-2 transition-colors"
+            className="p-2 rounded-lg border border-border text-ink-muted hover:text-ink hover:bg-surface-2 transition-colors"
             title="Tải lại dữ liệu"
           >
             <ArrowPathIcon className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
@@ -341,10 +341,10 @@ const DeviationListPage: React.FC = () => {
 
           <button
             onClick={() => setShowCreateModal(true)}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-medium text-xs shadow-xs transition-all"
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-rose-600 hover:bg-rose-700 active:scale-[0.98] text-white font-medium text-xs shadow-2xs transition-all"
           >
             <PlusIcon className="w-4 h-4" />
-            <span>Khởi tạo Sai lệch</span>
+            <span>Khởi tạo sai lệch</span>
           </button>
         </div>
       </div>
@@ -360,28 +360,28 @@ const DeviationListPage: React.FC = () => {
       />
 
       {/* Tabs */}
-      <div className="flex items-center gap-2 border-b border-border pb-1">
+      <div className="flex items-center gap-2 border-b border-border pb-2">
         <button
           type="button"
           onClick={() => setActiveViewTab('DEVIATIONS')}
-          className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-all ${
+          className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
             activeViewTab === 'DEVIATIONS'
-              ? 'bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300 border border-rose-200 dark:border-rose-800 shadow-xs'
-              : 'text-ink-muted hover:text-ink'
+              ? 'bg-rose-500/10 text-rose-700 dark:text-rose-300 border border-rose-500/20 font-semibold'
+              : 'text-ink-muted hover:text-ink hover:bg-surface-2'
           }`}
         >
-          Hồ sơ Sai lệch ({deviations.length})
+          Hồ sơ sai lệch ({deviations.length})
         </button>
         <button
           type="button"
           onClick={() => setActiveViewTab('CAPA_TRACKER')}
-          className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-all ${
+          className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
             activeViewTab === 'CAPA_TRACKER'
-              ? 'bg-sky-50 text-sky-700 dark:bg-sky-950/40 dark:text-sky-300 border border-sky-200 dark:border-sky-800 shadow-xs'
-              : 'text-ink-muted hover:text-ink'
+              ? 'bg-sky-500/10 text-sky-700 dark:text-sky-300 border border-sky-500/20 font-semibold'
+              : 'text-ink-muted hover:text-ink hover:bg-surface-2'
           }`}
         >
-          Theo dõi Hành động CAPA (CAPA Tracker)
+          Theo dõi hành động CAPA (CAPA Tracker)
         </button>
       </div>
 
@@ -405,7 +405,7 @@ const DeviationListPage: React.FC = () => {
             placeholder="Tìm theo mã hồ sơ (DEV-...), lô sản xuất, tên sản phẩm hoặc tiêu đề..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-8 py-1.5 bg-surface-2 border border-border rounded-lg text-xs text-ink outline-none focus:border-rose-500 transition-colors"
+            className="w-full pl-9 pr-8 py-2 bg-surface-2 border border-border rounded-xl text-xs text-ink outline-none focus:ring-2 focus:ring-rose-500/20 transition-colors"
           />
           {searchQuery && (
             <button
@@ -418,7 +418,7 @@ const DeviationListPage: React.FC = () => {
         </div>
 
         <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
-          <div className="flex items-center gap-1.5 bg-surface-2 border border-border rounded-lg px-2.5 py-1">
+          <div className="flex items-center gap-1.5 bg-surface-2 border border-border rounded-xl px-2.5 py-1">
             <FunnelIcon className="w-3.5 h-3.5 text-ink-muted" />
             <select
               value={statusFilter}
@@ -434,7 +434,7 @@ const DeviationListPage: React.FC = () => {
             </select>
           </div>
 
-          <div className="flex items-center gap-1.5 bg-surface-2 border border-border rounded-lg px-2.5 py-1">
+          <div className="flex items-center gap-1.5 bg-surface-2 border border-border rounded-xl px-2.5 py-1">
             <select
               value={severityFilter}
               onChange={(e) => setSeverityFilter(e.target.value)}
@@ -470,7 +470,7 @@ const DeviationListPage: React.FC = () => {
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse text-xs">
               <thead>
-                <tr className="border-b border-border bg-surface-2 text-ink-muted font-semibold uppercase tracking-wider">
+                <tr className="border-b border-border bg-surface-2/60 text-ink-muted font-semibold text-xs">
                   <th className="py-3 px-4">Mã hồ sơ</th>
                   <th className="py-3 px-4">Tiêu đề & Nguồn</th>
                   <th className="py-3 px-4">Lô / Sản phẩm</th>

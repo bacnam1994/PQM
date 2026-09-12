@@ -121,10 +121,10 @@ const calculateBatchProgress = (batch: any, batchResults: TestResult[]) => {
 const BatchStatusSelect = ({ status, batchId, onUpdate, isAdmin }: { status: string, batchId: string, onUpdate: (s: string, id: string) => void, isAdmin: boolean }) => {
   const getStatusColor = (s: string) => {
     switch(s) {
-      case 'RELEASED': return 'bg-emerald-600 text-white border-emerald-600 hover:bg-emerald-700 shadow-sm';
-      case 'REJECTED': return 'bg-rose-600 text-white border-rose-600 hover:bg-rose-700 shadow-sm';
-      case 'TESTING': return 'bg-sky-600 text-white border-sky-600 hover:bg-sky-700 shadow-sm';
-      default: return 'bg-surface-2 text-ink-soft border-border hover:bg-surface-3';
+      case 'RELEASED': return 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20 hover:bg-emerald-500/20';
+      case 'REJECTED': return 'bg-rose-500/10 text-rose-700 dark:text-rose-400 border-rose-500/20 hover:bg-rose-500/20';
+      case 'TESTING': return 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20 hover:bg-amber-500/20';
+      default: return 'bg-surface-2 text-ink-muted border-border hover:bg-surface-3';
     }
   };
 
@@ -138,7 +138,7 @@ const BatchStatusSelect = ({ status, batchId, onUpdate, isAdmin }: { status: str
   };
 
   const IconComponent = getStatusIcon(status);
-  const iconColor = status === 'PENDING' ? 'text-ink-muted' : 'text-white';
+  const iconColor = status === 'PENDING' ? 'text-ink-muted' : 'text-current';
 
   if (!isAdmin) {
      return <StatusBadge type="BATCH" status={status} />;
@@ -152,7 +152,7 @@ const BatchStatusSelect = ({ status, batchId, onUpdate, isAdmin }: { status: str
       <select
         value={status}
         onChange={(e) => onUpdate(e.target.value, batchId)}
-        className={`appearance-none pl-7 pr-6 py-1 rounded-md text-[10px] font-bold uppercase border cursor-pointer outline-none focus:ring-2 focus:ring-offset-1 focus:ring-emerald-500 transition-all ${getStatusColor(status)}`}
+        className={`appearance-none pl-6 pr-5 py-1 rounded-full text-xs font-medium border cursor-pointer outline-none focus:ring-2 focus:ring-emerald-500/20 transition-colors ${getStatusColor(status)}`}
       >
         <option value="PENDING" className="bg-surface text-ink">Chờ kiểm</option>
         <option value="TESTING" className="bg-surface text-ink">Đang kiểm</option>
@@ -183,7 +183,7 @@ const BatchGridItem = memo(({ batch, isExpanded, onExpand, onEdit, onDelete, onV
   const diffTime = expDate.getTime() - today.getTime();
   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
   const isExpired = diffDays < 0;
-  const isNearExpiry = diffDays > 0 && diffDays <= 90; // Cảnh báo trước 90 ngày
+  const isNearExpiry = diffDays > 0 && diffDays <= 90;
 
   const { missingCriteria, progressPercent: calculatedProgress } = useMemo(() => calculateBatchProgress(batch, testResults), [batch, testResults]);
   
@@ -191,16 +191,16 @@ const BatchGridItem = memo(({ batch, isExpanded, onExpand, onEdit, onDelete, onV
   const progressPercent = (isExpanded || hasLocalResults) ? calculatedProgress : (batch.progressPercent ?? 0);
 
   return (
-    <DSCard isExpanded={isExpanded} className={`p-5 flex flex-col gap-4 hover:-translate-y-1 hover:shadow-md transition-all duration-300 group relative overflow-hidden h-full bg-surface border border-border ${isExpanded ? 'col-span-2 ring-1 ring-emerald-500/30' : ''}`}>
+    <div className={`p-4 flex flex-col gap-3 rounded-xl transition-all duration-200 group relative overflow-hidden h-full bg-surface border border-border shadow-xs hover:border-emerald-500/30 ${isExpanded ? 'col-span-1 md:col-span-2 ring-1 ring-emerald-500/30' : ''}`}>
       {/* Date Warnings */}
-      {isExpired && <div className="absolute top-0 right-0 bg-rose-600 text-white text-[9px] font-bold px-3 py-1 rounded-bl-lg uppercase tracking-wider flex items-center gap-1 z-20"><CalendarDaysIcon className="h-3 w-3"/> Đã hết hạn</div>}
-      {isNearExpiry && <div className="absolute top-0 right-0 bg-amber-500 text-white text-[9px] font-bold px-3 py-1 rounded-bl-lg uppercase tracking-wider flex items-center gap-1 z-20"><ExclamationTriangleIcon className="h-3 w-3"/> Cận date ({diffDays} ngày)</div>}
+      {isExpired && <div className="absolute top-0 right-0 bg-rose-600 text-white text-[10px] font-medium px-2.5 py-0.5 rounded-bl-lg flex items-center gap-1 z-20"><CalendarDaysIcon className="h-3 w-3"/> Đã hết hạn</div>}
+      {isNearExpiry && <div className="absolute top-0 right-0 bg-amber-500 text-white text-[10px] font-medium px-2.5 py-0.5 rounded-bl-lg flex items-center gap-1 z-20"><ExclamationTriangleIcon className="h-3 w-3"/> Cận date ({diffDays} ngày)</div>}
 
-      {/* Header: Eyebrow text and Status */}
+      {/* Header: Product name & Status */}
       <div className="flex items-start justify-between gap-2 relative z-10">
-        <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-ink-muted truncate pr-2" title={batch.product?.name}>
+        <div className="flex items-center gap-1.5 text-xs text-ink-muted truncate pr-2" title={batch.product?.name}>
           <ArchiveBoxIcon className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
-          <span className="truncate">{batch.product?.name || 'Sản phẩm'}</span>
+          <span className="truncate font-medium">{batch.product?.name || 'Sản phẩm'}</span>
         </div>
         <div className="shrink-0">
           <BatchStatusSelect 
@@ -212,86 +212,82 @@ const BatchGridItem = memo(({ batch, isExpanded, onExpand, onEdit, onDelete, onV
         </div>
       </div>
 
-      {/* Content Box */}
-      <div className="bg-surface-2/60 border border-border/80 rounded-xl p-4 flex flex-col gap-3 relative z-10">
-        
-        {/* Main Info: Batch No and Icon */}
-        <div className="flex items-center gap-3">
-          <div className="bg-emerald-50 dark:bg-emerald-950/40 p-2.5 rounded-lg text-emerald-600 dark:text-emerald-400 shrink-0 border border-emerald-100 dark:border-emerald-900/40">
-            <HashtagIcon className="h-5 w-5" />
-          </div>
-          <div className="flex flex-col group/link cursor-pointer min-w-0" onClick={() => onView(batch)}>
-            <h3 className="font-bold text-ink text-lg uppercase leading-tight group-hover/link:text-emerald-600 dark:group-hover/link:text-emerald-400 transition-colors truncate">{batch.batchNo}</h3>
-            <div className="flex items-center gap-2 mt-1">
-              <span className="text-[11px] font-medium text-ink-muted uppercase tracking-wider">{batch.product?.code}</span>
-              <span className="w-1 h-1 rounded-full bg-border"></span>
-              <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
-                <BeakerIcon className="h-3 w-3" /> {progressPercent}%
-              </span>
-            </div>
+      {/* Main Info: Batch No and Code */}
+      <div className="flex items-center gap-3 pt-1">
+        <div className="w-9 h-9 rounded-lg bg-surface-2 border border-border flex items-center justify-center text-ink-muted shrink-0">
+          <HashtagIcon className="h-4 w-4" />
+        </div>
+        <div className="flex flex-col group/link cursor-pointer min-w-0" onClick={() => onView(batch)}>
+          <h3 className="font-semibold text-ink text-base leading-tight group-hover/link:text-emerald-600 dark:group-hover/link:text-emerald-400 transition-colors truncate">{batch.batchNo}</h3>
+          <div className="flex items-center gap-2 mt-0.5">
+            <span className="text-xs font-mono text-ink-muted">{batch.product?.code}</span>
+            <span className="w-1 h-1 rounded-full bg-border"></span>
+            <span className="text-xs font-medium text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+              <BeakerIcon className="h-3 w-3" /> {progressPercent}%
+            </span>
           </div>
         </div>
+      </div>
 
-        {/* Meta Info */}
-        <div className="space-y-1.5 pt-3 border-t border-border/60">
-            <div className="flex justify-between items-start gap-2 text-[11px]">
-              <span className="text-ink-muted font-medium uppercase flex items-center gap-1 whitespace-nowrap shrink-0">Ngày SX</span>
-              <span className="text-ink font-semibold text-right">{formatDateStandard(batch.mfgDate)}</span>
-            </div>
-            <div className="flex justify-between items-start gap-2 text-[11px]">
-              <span className="text-ink-muted font-medium uppercase flex items-center gap-1 whitespace-nowrap shrink-0">Hạn dùng</span>
-              <span className={`text-right font-semibold ${isExpired ? 'text-rose-600 dark:text-rose-400' : isNearExpiry ? 'text-amber-600 dark:text-amber-400' : 'text-ink'}`}>{formatDateStandard(batch.expDate)}</span>
-            </div>
+      {/* Meta Info */}
+      <div className="space-y-1 pt-2.5 border-t border-border/80 text-xs">
+        <div className="flex justify-between items-center gap-2">
+          <span className="text-ink-muted font-normal">Ngày SX</span>
+          <span className="text-ink font-medium">{formatDateStandard(batch.mfgDate)}</span>
+        </div>
+        <div className="flex justify-between items-center gap-2">
+          <span className="text-ink-muted font-normal">Hạn dùng</span>
+          <span className={`font-medium ${isExpired ? 'text-rose-600 dark:text-rose-400' : isNearExpiry ? 'text-amber-600 dark:text-amber-400' : 'text-ink'}`}>{formatDateStandard(batch.expDate)}</span>
         </div>
       </div>
 
       {/* Footer: Actions */}
-      <div className="flex items-center justify-between pt-3 mt-auto border-t border-border/60 relative z-10">
-        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-            <ActionButtons 
-              onEdit={() => onEdit(batch)}
-              onDelete={() => onDelete(batch)}
-            />
+      <div className="flex items-center justify-between pt-2.5 mt-auto border-t border-border/80 relative z-10">
+        <div className="flex gap-1 opacity-80 group-hover:opacity-100 transition-opacity">
+          <ActionButtons 
+            onEdit={() => onEdit(batch)}
+            onDelete={() => onDelete(batch)}
+          />
         </div>
-        <div className="flex items-center gap-2 ml-auto">
-          <button onClick={() => onExpand(batch.id)} className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md font-semibold text-[11px] bg-surface-2 text-ink-soft hover:bg-surface-3 transition-colors">
-            <ClockIcon className="h-3.5 w-3.5" /> {isExpanded ? 'Ẩn' : 'Lịch sử'}
+        <div className="flex items-center gap-1.5 ml-auto">
+          <button onClick={() => onExpand(batch.id)} className="flex items-center gap-1 px-2.5 py-1 rounded-lg font-medium text-xs bg-surface-2 text-ink-muted hover:text-ink hover:bg-surface-3 transition-colors">
+            <ClockIcon className="h-3 w-3" /> {isExpanded ? 'Ẩn' : 'Lịch sử'}
           </button>
-          <button onClick={() => onView(batch)} className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md font-semibold text-[11px] bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 transition-colors">
+          <button onClick={() => onView(batch)} className="flex items-center gap-1 px-2.5 py-1 rounded-lg font-medium text-xs bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/20 transition-colors">
             Chi tiết
           </button>
         </div>
       </div>
 
       {isExpanded && (
-        <div className="mt-4 pt-4 border-t border-border animate-in fade-in">
-          <div className="space-y-3">
+        <div className="mt-2 pt-3 border-t border-border animate-in fade-in">
+          <div className="space-y-2.5">
             <div className="flex items-center gap-3">
               <CircularProgress progress={progressPercent} />
               <div>
-                <h4 className="text-[10px] font-bold text-ink-muted uppercase tracking-wider flex items-center gap-1.5"><BeakerIcon className="h-3.5 w-3.5"/> Tiến độ kiểm nghiệm</h4>
-                <p className="text-[10px] text-ink-soft font-medium mt-0.5">Hoàn thành {progressPercent}% chỉ tiêu</p>
+                <h4 className="text-xs font-semibold text-ink flex items-center gap-1.5"><BeakerIcon className="h-3.5 w-3.5"/> Tiến độ kiểm nghiệm</h4>
+                <p className="text-xs text-ink-muted mt-0.5">Hoàn thành {progressPercent}% chỉ tiêu</p>
               </div>
             </div>
             {missingCriteria.length > 0 ? (
-              <div className="bg-amber-50 dark:bg-amber-950/20 p-3 rounded-lg border border-amber-200 dark:border-amber-900/30">
-                <p className="text-[10px] font-bold text-amber-700 dark:text-amber-400 mb-1.5 flex items-center gap-1"><ClipboardDocumentListIcon className="h-3.5 w-3.5"/> Còn thiếu {missingCriteria.length} chỉ tiêu:</p>
+              <div className="bg-amber-500/10 p-2.5 rounded-lg border border-amber-500/20">
+                <p className="text-xs font-medium text-amber-700 dark:text-amber-400 mb-1 flex items-center gap-1"><ClipboardDocumentListIcon className="h-3.5 w-3.5"/> Còn thiếu {missingCriteria.length} chỉ tiêu:</p>
                 <div className="flex flex-wrap gap-1">
                   {missingCriteria.map((c, idx) => (
-                    <span key={idx} className="px-2 py-0.5 bg-surface border border-amber-200 dark:border-amber-900/30 text-amber-800 dark:text-amber-300 text-[9px] font-semibold rounded">{c.name}</span>
+                    <span key={idx} className="px-2 py-0.5 bg-surface border border-amber-500/20 text-amber-800 dark:text-amber-300 text-[11px] font-medium rounded-full">{c.name}</span>
                   ))}
                 </div>
               </div>
             ) : (
-              <div className="bg-emerald-50 dark:bg-emerald-950/20 p-3 rounded-lg border border-emerald-200 dark:border-emerald-900/30 flex items-center gap-2">
-                <CheckCircleIcon className="h-4 w-4 text-emerald-500 shrink-0"/>
-                <span className="text-[10px] font-semibold text-emerald-700 dark:text-emerald-400">Đã kiểm đủ tất cả chỉ tiêu theo TCCS.</span>
+              <div className="bg-emerald-500/10 p-2.5 rounded-lg border border-emerald-500/20 flex items-center gap-2">
+                <CheckCircleIcon className="h-4 w-4 text-emerald-600 dark:text-emerald-400 shrink-0"/>
+                <span className="text-xs font-medium text-emerald-700 dark:text-emerald-400">Đã kiểm đủ tất cả chỉ tiêu theo TCCS.</span>
               </div>
             )}
           </div>
         </div>
       )}
-    </DSCard>
+    </div>
   );
 });
 
@@ -301,26 +297,26 @@ const BatchListItem = memo(({ batch, onEdit, onDelete, onView, onUpdateBatchStat
   const progressPercent = hasLocalResults ? calculatedProgress : (batch.progressPercent ?? 0);
 
   return (
-    <tr className="hover:bg-surface-2 transition-colors">
-      <td className="px-4 py-3.5 font-bold text-ink text-sm">{batch.batchNo}</td>
-      <td className="px-4 py-3.5">
-        <div className="font-semibold text-ink text-sm">{batch.product?.name}</div>
-        <div className="text-[10px] text-ink-muted uppercase tracking-wider">{batch.product?.code}</div>
+    <tr className="hover:bg-surface-2/60 transition-colors">
+      <td className="px-4 py-3 font-mono font-medium text-ink text-sm">{batch.batchNo}</td>
+      <td className="px-4 py-3">
+        <div className="font-medium text-ink text-sm">{batch.product?.name}</div>
+        <div className="text-xs font-mono text-ink-muted">{batch.product?.code}</div>
       </td>
-      <td className="px-4 py-3.5 text-xs">
+      <td className="px-4 py-3 text-xs">
         <div className="text-ink-soft">SX: {formatDateStandard(batch.mfgDate)}</div>
-        <div className="font-semibold text-rose-600 dark:text-rose-400">HD: {formatDateStandard(batch.expDate)}</div>
+        <div className="font-medium text-rose-600 dark:text-rose-400">HD: {formatDateStandard(batch.expDate)}</div>
       </td>
-      <td className="px-4 py-3.5 text-center">
+      <td className="px-4 py-3 text-center">
         <BatchStatusSelect 
           status={batch.status} 
           batchId={batch.id} 
           onUpdate={onUpdateBatchStatus} 
           isAdmin={isAdmin} 
         />
-        <div className="mt-1 text-[10px] font-medium text-ink-muted">Tiến độ: {progressPercent}%</div>
+        <div className="mt-1 text-xs font-medium text-ink-muted">Tiến độ: {progressPercent}%</div>
       </td>
-      <td className="px-4 py-3.5 text-right">
+      <td className="px-4 py-3 text-right">
         <div className="flex justify-end items-center gap-1">
           <ActionButtons 
             onView={() => onView(batch)}
@@ -335,12 +331,12 @@ const BatchListItem = memo(({ batch, onEdit, onDelete, onView, onUpdateBatchStat
 
 const BatchDataList = ({ viewMode, data, expandedId, onExpand, onEdit, onDelete, onView, testResults, onUpdateBatchStatus, isAdmin }: any) => {
   if (data.length === 0) {
-     return <DSEmptyState icon={ArchiveBoxIcon} title="Không tìm thấy Lô hàng" message="Không có lô hàng nào khớp với điều kiện tìm kiếm hoặc bộ lọc hiện tại của bạn." />;
+     return <DSEmptyState icon={ArchiveBoxIcon} title="Không tìm thấy lô hàng" message="Không có lô hàng nào khớp với điều kiện tìm kiếm hoặc bộ lọc hiện tại của bạn." />;
   }
 
   if (viewMode === 'grid') {
     return (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
         {data.map((batch: any) => (
           <BatchGridItem 
             key={batch.id}
@@ -360,9 +356,9 @@ const BatchDataList = ({ viewMode, data, expandedId, onExpand, onEdit, onDelete,
   }
   return (
     <DSTable>
-      <thead className="bg-surface-2 border-b border-border">
-        <tr className="text-ink-soft text-[10px] font-bold uppercase tracking-wider">
-          <th className="px-4 py-3 text-left">Số Lô</th>
+      <thead className="bg-surface-2/60 border-b border-border">
+        <tr className="text-ink-muted text-xs font-semibold">
+          <th className="px-4 py-3 text-left">Số lô</th>
           <th className="px-4 py-3 text-left">Sản phẩm</th>
           <th className="px-4 py-3 text-left">Ngày SX / Hạn dùng</th>
           <th className="px-4 py-3 text-center">Trạng thái</th>
@@ -750,18 +746,18 @@ const BatchList: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-300">
+    <div className="space-y-6 animate-in fade-in duration-200">
       <PageHeader 
         title="Quản lý Lô & Tồn kho" 
         subtitle="Quản lý dòng đời sản phẩm và tiến độ kiểm nghiệm theo GMP." 
         icon={Square3Stack3DIcon} 
         action={
-          <div className="flex items-center gap-2.5">
-            <button onClick={handleExportExcel} className="flex items-center gap-2 px-3.5 py-2 bg-surface border border-border text-ink-soft rounded-lg hover:bg-surface-2 font-bold text-xs transition-colors shadow-sm">
-              <ArrowDownTrayIcon className="h-4 w-4" /> Xuất Excel
+          <div className="flex items-center gap-2">
+            <button onClick={handleExportExcel} className="flex items-center gap-1.5 px-3 py-2 bg-surface border border-border text-ink rounded-lg hover:bg-surface-2 font-medium text-xs transition-colors shadow-2xs">
+              <ArrowDownTrayIcon className="h-4 w-4 text-ink-muted" /> Xuất Excel
             </button>
-            <button onClick={() => setIsImportModalOpen(true)} className="flex items-center gap-2 px-3.5 py-2 bg-surface border border-border text-ink-soft rounded-lg hover:bg-surface-2 font-bold text-xs transition-colors shadow-sm">
-              <ArrowUpTrayIcon className="h-4 w-4" /> Nhập Excel
+            <button onClick={() => setIsImportModalOpen(true)} className="flex items-center gap-1.5 px-3 py-2 bg-surface border border-border text-ink rounded-lg hover:bg-surface-2 font-medium text-xs transition-colors shadow-2xs">
+              <ArrowUpTrayIcon className="h-4 w-4 text-ink-muted" /> Nhập Excel
             </button>
             <AddButton onClick={() => navigate('/batches/new')} label="Đăng ký Lô mới" />
           </div>
@@ -803,7 +799,7 @@ const BatchList: React.FC = () => {
         
         <button 
           onClick={() => setIsAdvancedFilterOpen(!isAdvancedFilterOpen)}
-          className={`p-2 rounded-lg border transition-colors ${isAdvancedFilterOpen ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-surface border-border text-ink-soft hover:bg-surface-2'}`}
+          className={`p-2 rounded-xl border transition-colors ${isAdvancedFilterOpen ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-surface border-border text-ink-muted hover:text-ink hover:bg-surface-2'}`}
           title="Lọc nâng cao"
         >
           <FunnelIcon className="h-4 w-4" />
@@ -813,24 +809,24 @@ const BatchList: React.FC = () => {
       </DSFilterBar>
 
       {isAdvancedFilterOpen && (
-        <div className="bg-surface p-4 rounded-xl border border-border shadow-sm grid grid-cols-1 md:grid-cols-4 gap-4 animate-in slide-in-from-top-2">
-           <div className="space-y-1">
-              <label className="text-[10px] font-bold text-ink-muted uppercase flex items-center gap-1"><CalendarDaysIcon className="h-3 w-3"/> Từ ngày (SX)</label>
-              <input type="date" value={dateRange.from} onChange={e => setDateRange({...dateRange, from: e.target.value})} className="w-full px-3 py-2 bg-surface-2 border border-border rounded-lg text-xs font-semibold text-ink outline-none focus:ring-2 focus:ring-emerald-500" />
+        <div className="bg-surface p-4 rounded-xl border border-border shadow-xs grid grid-cols-1 md:grid-cols-4 gap-4 animate-in slide-in-from-top-2">
+           <div className="space-y-1.5">
+              <label className="text-xs font-medium text-ink-muted flex items-center gap-1"><CalendarDaysIcon className="h-3.5 w-3.5"/> Từ ngày (SX)</label>
+              <input type="date" value={dateRange.from} onChange={e => setDateRange({...dateRange, from: e.target.value})} className="w-full px-3 py-2 bg-surface-2 border border-border rounded-xl text-xs font-medium text-ink outline-none focus:ring-2 focus:ring-emerald-500/20" />
            </div>
-           <div className="space-y-1">
-              <label className="text-[10px] font-bold text-ink-muted uppercase flex items-center gap-1"><CalendarDaysIcon className="h-3 w-3"/> Đến ngày (SX)</label>
-              <input type="date" value={dateRange.to} onChange={e => setDateRange({...dateRange, to: e.target.value})} className="w-full px-3 py-2 bg-surface-2 border border-border rounded-lg text-xs font-semibold text-ink outline-none focus:ring-2 focus:ring-emerald-500" />
+           <div className="space-y-1.5">
+              <label className="text-xs font-medium text-ink-muted flex items-center gap-1"><CalendarDaysIcon className="h-3.5 w-3.5"/> Đến ngày (SX)</label>
+              <input type="date" value={dateRange.to} onChange={e => setDateRange({...dateRange, to: e.target.value})} className="w-full px-3 py-2 bg-surface-2 border border-border rounded-xl text-xs font-medium text-ink outline-none focus:ring-2 focus:ring-emerald-500/20" />
            </div>
-           <div className="space-y-1 md:col-span-2">
+           <div className="space-y-1.5 md:col-span-2">
               <div className="flex justify-between items-center">
-                <label className="text-[10px] font-bold text-ink-muted uppercase">Sản phẩm cụ thể</label>
-                <button onClick={() => { setDateRange({ from: '', to: '' }); setFilterProductId(''); setFilterStatus('ALL' as any); }} className="text-[10px] font-semibold text-rose-500 hover:underline flex items-center gap-1"><XMarkIcon className="h-3 w-3"/> Xóa bộ lọc</button>
+                <label className="text-xs font-medium text-ink-muted">Sản phẩm cụ thể</label>
+                <button onClick={() => { setDateRange({ from: '', to: '' }); setFilterProductId(''); setFilterStatus('ALL' as any); }} className="text-xs font-medium text-rose-600 dark:text-rose-400 hover:underline flex items-center gap-1"><XMarkIcon className="h-3 w-3"/> Xóa bộ lọc</button>
               </div>
               <select 
                 value={filterProductId} 
                 onChange={e => setFilterProductId(e.target.value)} 
-                className="w-full px-3 py-2 bg-surface-2 border border-border rounded-lg text-xs font-semibold text-ink outline-none focus:ring-2 focus:ring-emerald-500"
+                className="w-full px-3 py-2 bg-surface-2 border border-border rounded-xl text-xs font-medium text-ink outline-none focus:ring-2 focus:ring-emerald-500/20"
               >
                  <option value="" className="bg-surface text-ink">-- Tất cả sản phẩm --</option>
                  {products.map(p => <option key={p.id} value={p.id} className="bg-surface text-ink">{p.name} - {p.code}</option>)}

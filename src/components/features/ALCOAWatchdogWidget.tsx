@@ -57,11 +57,11 @@ export const ALCOAWatchdogWidget: React.FC<ALCOAWatchdogWidgetProps> = ({ logs }
     : 'bg-rose-500/10 text-rose-700 border-rose-500/20 dark:text-rose-300';
 
   return (
-    <div className="bg-surface rounded-3xl border border-border p-5 shadow-xs transition-all overflow-hidden space-y-4">
+    <div className="bg-surface rounded-xl border border-border p-5 shadow-xs transition-all overflow-hidden space-y-4">
       {/* Header Bar */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="p-2.5 rounded-2xl bg-gradient-to-br from-emerald-600 to-teal-600 text-white shadow-sm">
+          <div className="p-2.5 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
             <ShieldCheckIcon className="w-5 h-5" />
           </div>
           <div>
