@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import toast from 'react-hot-toast';
 import { geminiService, formatGeminiError } from '../../../../services/ai/geminiService';
 import { isCriteriaMatch } from '../../../../utils/aiMapping';
@@ -13,6 +13,7 @@ import { useUIStore } from '../../../../store/useUIStore';
 import { useAppStore } from '../../../../store/useAppStore';
 import { HydratedBatch } from '../../../../hooks/useDataGraph';
 import { Criterion, TCCS, Product, AILearnedMapping } from '../../../../types';
+import { normalizeAIData } from '../../../../services/ai/aiDraftManager';
 
 interface UseTestResultAIIntegrationProps {
   allActiveTccsNames: string[];
@@ -32,11 +33,12 @@ interface UseTestResultAIIntegrationProps {
   setFieldValue: (field: string, value: any) => void;
   setMapValue: (field: string, key: string, value: any) => void;
   addToArray: (field: string, item: any) => void;
-  handleBatchSelect: (batchId: string) => void;
+  handleBatchSelect: (batchId: string, preserveResults?: boolean) => void;
   setBatchSearch: (val: string) => void;
   aiFilledFields: Set<string>;
   setAiFilledFields: React.Dispatch<React.SetStateAction<Set<string>>>;
   addBatch: (data: any) => Promise<any>;
+  setFormValues?: React.Dispatch<React.SetStateAction<any>>;
 }
 
 export function useTestResultAIIntegration({
@@ -53,10 +55,19 @@ export function useTestResultAIIntegration({
   aiFilledFields,
   setAiFilledFields,
   addBatch,
+  setFormValues,
 }: UseTestResultAIIntegrationProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const mountedRef = useRef(true);
   const [isAiProcessing, setIsAiProcessing] = useState(false);
   const [aiScanInfo, setAiScanInfo] = useState<AIScanInfo | null>(null);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
 
   const addAiLearnedMapping = useAppStore((state) => state.addAiLearnedMapping);
 
@@ -104,20 +115,25 @@ export function useTestResultAIIntegration({
     };
   }, []);
 
-  const handleDataExtracted = (data: any) => {
-    if (data.labName) setFieldValue('labName', data.labName);
-    if (data.testDate) {
-      let isoDate = data.testDate;
-      if (data.testDate.includes('/')) {
-        const parts = data.testDate.split('/');
-        if (parts.length === 3) isoDate = `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
-      }
-      setFieldValue('testDate', isoDate);
+  const handleDataExtracted = useCallback((data: any) => {
+    const normalized = normalizeAIData(data);
+    if (!normalized) {
+      toast.error('Dữ liệu AI không hợp lệ.');
+      return;
     }
 
-    if (data.batchNo) {
-      const cleanNo = data.batchNo.trim().toUpperCase();
-      let matchedBatch = hydratedBatches.find((b) => b.batchNo?.trim().toUpperCase() === cleanNo);
+    let isoDate = normalized.testDate;
+    if (isoDate && isoDate.includes('/')) {
+      const parts = isoDate.split('/');
+      if (parts.length === 3) {
+        isoDate = `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+      }
+    }
+
+    let matchedBatch: HydratedBatch | undefined;
+    if (normalized.batchNo) {
+      const cleanNo = normalized.batchNo.trim().toUpperCase();
+      matchedBatch = hydratedBatches.find((b) => b.batchNo?.trim().toUpperCase() === cleanNo);
 
       if (!matchedBatch) {
         const normCleanNo = cleanNo.replace(/[^A-Z0-9]/g, '');
@@ -126,40 +142,30 @@ export function useTestResultAIIntegration({
           return norm && norm === normCleanNo;
         });
       }
-
-      if (matchedBatch) {
-        handleBatchSelect(matchedBatch.id);
-        setBatchSearch(`${matchedBatch.batchNo} - ${matchedBatch.product?.name}`);
-        toast.success(`Đã tự động chọn lô hàng: ${matchedBatch.batchNo}`);
-      } else {
-        setPendingAutoCreateData({
-          batchNo: data.batchNo,
-          productName: data.productName,
-          productCode: data.productCode,
-          mfgDate: data.mfgDate,
-          expDate: data.expDate,
-        });
-        setIsAutoCreateModalOpen(true);
-      }
     }
 
-    if (data.testResults && Array.isArray(data.testResults)) {
-      const newAiFilled = new Set(aiFilledFields);
-      let matchCount = 0;
-      let extraCount = 0;
+    const nextTestResultsMap: Record<string, string | number> = {};
+    const nextExtraCriteria: any[] = [];
+    const newAiFilled = new Set(aiFilledFields);
+    let matchCount = 0;
+    let extraCount = 0;
 
-      data.testResults.forEach((r: any) => {
+    if (normalized.testResults && Array.isArray(normalized.testResults)) {
+      normalized.testResults.forEach((r: any, index: number) => {
         const matchCrit = allCriteria.find((c) =>
           isCriteriaMatch(r.criteriaName, c.name, aiLearnedMappings)
         );
 
         if (matchCrit) {
-          setMapValue('testResultsMap', matchCrit.name, r.value);
+          nextTestResultsMap[matchCrit.name] = r.value;
           newAiFilled.add(matchCrit.name);
           matchCount++;
         } else {
-          addToArray('extraCriteria', {
-            id: 'extra_' + Math.random().toString(36).substring(2, 9),
+          nextExtraCriteria.push({
+            id:
+              typeof crypto !== 'undefined' && 'randomUUID' in crypto
+                ? `extra_${crypto.randomUUID()}`
+                : `extra_${Date.now()}_${index}`,
             name: r.criteriaName,
             value: r.value,
             unit: r.unit || '',
@@ -168,16 +174,78 @@ export function useTestResultAIIntegration({
           extraCount++;
         }
       });
+    }
 
-      setAiFilledFields(newAiFilled);
+    // Atomic form values update
+    if (setFormValues) {
+      setFormValues((prev: any) => ({
+        ...prev,
+        ...(normalized.labName ? { labName: normalized.labName } : {}),
+        ...(isoDate ? { testDate: isoDate } : {}),
+        ...(matchedBatch ? { batchId: matchedBatch.id } : {}),
+        testResultsMap: {
+          ...(prev?.testResultsMap || {}),
+          ...nextTestResultsMap,
+        },
+        extraCriteria: [
+          ...(prev?.extraCriteria || []),
+          ...nextExtraCriteria,
+        ],
+      }));
+    } else {
+      if (normalized.labName) setFieldValue('labName', normalized.labName);
+      if (isoDate) setFieldValue('testDate', isoDate);
+      if (matchedBatch) setFieldValue('batchId', matchedBatch.id);
+      Object.entries(nextTestResultsMap).forEach(([k, v]) => {
+        setMapValue('testResultsMap', k, v);
+      });
+      nextExtraCriteria.forEach((item) => {
+        addToArray('extraCriteria', item);
+      });
+    }
+
+    // Handle batch side effects safely
+    if (matchedBatch) {
+      handleBatchSelect(matchedBatch.id, true);
+      setBatchSearch(
+        matchedBatch.product?.name
+          ? `${matchedBatch.batchNo} - ${matchedBatch.product.name}`
+          : matchedBatch.batchNo
+      );
+      toast.success(`Đã tự động chọn lô hàng: ${matchedBatch.batchNo}`);
+    } else if (normalized.batchNo) {
+      setPendingAutoCreateData({
+        batchNo: normalized.batchNo,
+        productName: normalized.productName,
+        productCode: normalized.productCode,
+        mfgDate: normalized.mfgDate,
+        expDate: normalized.expDate,
+      });
+      setIsAutoCreateModalOpen(true);
+    }
+
+    setAiFilledFields(newAiFilled);
+    if (matchCount > 0 || extraCount > 0) {
       toast.success(
         `AI: Đã điền ${matchCount} chỉ tiêu theo TCCS` +
           (extraCount > 0 ? `, ${extraCount} chỉ tiêu bổ sung.` : '.')
       );
     }
-  };
+  }, [
+    hydratedBatches,
+    allCriteria,
+    aiLearnedMappings,
+    aiFilledFields,
+    setFormValues,
+    setFieldValue,
+    setMapValue,
+    addToArray,
+    handleBatchSelect,
+    setBatchSearch,
+    setAiFilledFields,
+  ]);
 
-  const handleAutoCreateBatchConfirm = async (newBatchData: {
+  const handleAutoCreateBatchConfirm = useCallback(async (newBatchData: {
     batchNo: string;
     productId: string;
     mfgDate?: string;
@@ -187,21 +255,23 @@ export function useTestResultAIIntegration({
   }) => {
     try {
       const createdBatch = await addBatch(newBatchData);
+      if (!mountedRef.current) return;
       toast.success(`Đã tạo lô mới ${newBatchData.batchNo} thành công!`);
       setIsAutoCreateModalOpen(false);
       setPendingAutoCreateData(null);
       if (createdBatch && createdBatch.id) {
-        handleBatchSelect(createdBatch.id);
+        handleBatchSelect(createdBatch.id, true);
         const prod = hydratedBatches.find((b) => b.id === createdBatch.id)?.product;
         setBatchSearch(`${createdBatch.batchNo}${prod ? ' - ' + prod.name : ''}`);
       }
     } catch (err: any) {
+      if (!mountedRef.current) return;
       console.error(err);
       toast.error('Lỗi khi tạo lô mới: ' + (err.message || 'Thất bại'));
     }
-  };
+  }, [addBatch, handleBatchSelect, hydratedBatches, setBatchSearch]);
 
-  const finalizeAiMapping = (result: any, highItems: AIExtractedItem[], confirmedLowItems: ConfirmedMapping[]) => {
+  const finalizeAiMapping = useCallback((result: any, highItems: AIExtractedItem[], confirmedLowItems: ConfirmedMapping[]) => {
     const autoMappings = highItems
       .filter((i) => i.mappedName && i.criteriaName !== i.mappedName)
       .map((i) => ({ originalName: i.criteriaName, systemName: i.mappedName }));
@@ -225,9 +295,9 @@ export function useTestResultAIIntegration({
     ];
 
     handleDataExtracted({ ...result, testResults: mergedResults });
-  };
+  }, [handleDataExtracted]);
 
-  const handleMappingConfirmed = (confirmedMappings: ConfirmedMapping[], rememberMappings: boolean) => {
+  const handleMappingConfirmed = useCallback((confirmedMappings: ConfirmedMapping[], rememberMappings: boolean) => {
     setIsMappingModalOpen(false);
     if (!pendingAiRawData) return;
 
@@ -240,9 +310,9 @@ export function useTestResultAIIntegration({
     }
 
     finalizeAiMapping(pendingAiRawData, pendingHighItems, confirmedMappings);
-  };
+  }, [pendingAiRawData, pendingHighItems, addAiLearnedMapping, finalizeAiMapping]);
 
-  const handleAiFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleAiFileSelect = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     if (files.length === 0) return;
 
@@ -431,9 +501,12 @@ export function useTestResultAIIntegration({
         }
 
         if (extraFromDuplicates.length > 0) {
-          extraFromDuplicates.forEach((r: any) => {
+          extraFromDuplicates.forEach((r: any, idx: number) => {
             addToArray('extraCriteria', {
-              id: 'extra_dup_' + Math.random().toString(36).substring(2, 9),
+              id:
+                typeof crypto !== 'undefined' && 'randomUUID' in crypto
+                  ? `extra_dup_${crypto.randomUUID()}`
+                  : `extra_dup_${Date.now()}_${idx}`,
               name: r.criteriaName,
               value: r.value,
               unit: r.unit || '',
@@ -445,21 +518,29 @@ export function useTestResultAIIntegration({
           });
         }
       } catch (error: any) {
+        if (!mountedRef.current) return;
         toast.error(formatGeminiError(error), { duration: 6000 });
       } finally {
-        setIsAiProcessing(false);
-        e.target.value = '';
+        if (mountedRef.current) {
+          setIsAiProcessing(false);
+          e.target.value = '';
+        }
       }
     }
-  };
+  }, [
+    allActiveTccsNames,
+    aiLearnedMappings,
+    finalizeAiMapping,
+    addToArray,
+  ]);
 
-  const handleApplyVoiceCriteria = (entries: ParsedVoiceCriteria[]) => {
+  const handleApplyVoiceCriteria = useCallback((entries: ParsedVoiceCriteria[]) => {
     if (!entries || entries.length === 0) return;
     const newAiFilled = new Set(aiFilledFields);
     let matchedCount = 0;
     let extraCount = 0;
 
-    entries.forEach((entry) => {
+    entries.forEach((entry, index) => {
       const matchCrit = allCriteria.find((c) =>
         isCriteriaMatch(entry.criteriaName, c.name, aiLearnedMappings)
       );
@@ -470,7 +551,10 @@ export function useTestResultAIIntegration({
         matchedCount++;
       } else {
         addToArray('extraCriteria', {
-          id: 'extra_voice_' + Math.random().toString(36).substring(2, 9),
+          id:
+            typeof crypto !== 'undefined' && 'randomUUID' in crypto
+              ? `extra_voice_${crypto.randomUUID()}`
+              : `extra_voice_${Date.now()}_${index}`,
           name: entry.criteriaName,
           value: entry.value,
           unit: '',
@@ -485,9 +569,41 @@ export function useTestResultAIIntegration({
       `Giọng nói: Đã điền ${matchedCount} chỉ tiêu TCCS` +
         (extraCount > 0 ? `, ${extraCount} chỉ tiêu bổ sung.` : '.')
     );
-  };
+  }, [allCriteria, aiLearnedMappings, aiFilledFields, setMapValue, addToArray, setAiFilledFields]);
 
-  const handleGDScanClick = () => {
+  const fetchFilesFromGD = useCallback(async (token: string) => {
+    setIsLoadingGDFiles(true);
+    try {
+      const q = `'${googleDriveFolderId}' in parents and trashed = false`;
+      const url = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(
+        q
+      )}&fields=files(id,name,mimeType,createdTime,size)&orderBy=createdTime+desc`;
+      const response = await fetch(url, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Không thể tải danh sách file.');
+      }
+
+      const data = await response.json();
+      if (!mountedRef.current) return;
+      setGDFiles(data.files || []);
+    } catch (err: any) {
+      if (!mountedRef.current) return;
+      console.error(err);
+      toast.error('Lỗi khi tải file từ Google Drive: ' + err.message);
+      setGdToken(null);
+    } finally {
+      if (mountedRef.current) {
+        setIsLoadingGDFiles(false);
+      }
+    }
+  }, [googleDriveFolderId]);
+
+  const handleGDScanClick = useCallback(() => {
     if (!googleDriveClientId || !googleDriveFolderId) {
       toast.error('Vui lòng cấu hình Google Client ID và Đường dẫn thư mục Google Drive trong phần Cài đặt hệ thống!');
       return;
@@ -502,6 +618,7 @@ export function useTestResultAIIntegration({
         client_id: googleDriveClientId,
         scope: 'https://www.googleapis.com/auth/drive.readonly',
         callback: (tokenResponse: any) => {
+          if (!mountedRef.current) return;
           if (tokenResponse.error) {
             setIsGDModalOpen(false);
             setIsLoadingGDFiles(false);
@@ -522,37 +639,9 @@ export function useTestResultAIIntegration({
         gClient.requestAccessToken();
       }
     }
-  };
+  }, [googleDriveClientId, googleDriveFolderId, gdToken, fetchFilesFromGD]);
 
-  const fetchFilesFromGD = async (token: string) => {
-    setIsLoadingGDFiles(true);
-    try {
-      const q = `'${googleDriveFolderId}' in parents and trashed = false`;
-      const url = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(
-        q
-      )}&fields=files(id,name,mimeType,createdTime,size)&orderBy=createdTime+desc`;
-      const response = await fetch(url, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error('Không thể tải danh sách file.');
-      }
-
-      const data = await response.json();
-      setGDFiles(data.files || []);
-    } catch (err: any) {
-      console.error(err);
-      toast.error('Lỗi khi tải file từ Google Drive: ' + err.message);
-      setGdToken(null);
-    } finally {
-      setIsLoadingGDFiles(false);
-    }
-  };
-
-  const handleSelectGoogleDriveFile = async (file: GDFile) => {
+  const handleSelectGoogleDriveFile = useCallback(async (file: GDFile) => {
     setIsGDModalOpen(false);
     setIsAiProcessing(true);
     try {
@@ -575,6 +664,7 @@ export function useTestResultAIIntegration({
       const prompt = buildExtractionPrompt(allActiveTccsNames);
       const result = await geminiService.extractDataFromDocument(fileObject, prompt);
 
+      if (!mountedRef.current) return;
       setAiScanInfo({
         documentType: result.documentType,
         pageCount: result.pageCount,
@@ -626,13 +716,23 @@ export function useTestResultAIIntegration({
       setFieldValue('attachments', [...(formValues.attachments || []), newAttachment]);
       toast.success(`Đã tự động đính kèm file quét từ Google Drive: ${file.name}`);
     } catch (error: any) {
+      if (!mountedRef.current) return;
       toast.error(formatGeminiError(error), { duration: 6000 });
     } finally {
-      setIsAiProcessing(false);
+      if (mountedRef.current) {
+        setIsAiProcessing(false);
+      }
     }
-  };
+  }, [
+    gdToken,
+    allActiveTccsNames,
+    aiLearnedMappings,
+    finalizeAiMapping,
+    setFieldValue,
+    formValues.attachments,
+  ]);
 
-  return {
+  return useMemo(() => ({
     fileInputRef,
     isAiProcessing,
     aiScanInfo,
@@ -660,5 +760,27 @@ export function useTestResultAIIntegration({
     handleApplyVoiceCriteria,
     handleGDScanClick,
     handleSelectGoogleDriveFile,
-  };
+  }), [
+    fileInputRef,
+    isAiProcessing,
+    aiScanInfo,
+    isMappingModalOpen,
+    pendingHighItems,
+    pendingLowItems,
+    isBatchProgressOpen,
+    batchScanFiles,
+    isAutoCreateModalOpen,
+    pendingAutoCreateData,
+    isGDModalOpen,
+    gdFiles,
+    isLoadingGDFiles,
+    googleDriveFolderUrl,
+    handleDataExtracted,
+    handleAutoCreateBatchConfirm,
+    handleMappingConfirmed,
+    handleAiFileSelect,
+    handleApplyVoiceCriteria,
+    handleGDScanClick,
+    handleSelectGoogleDriveFile,
+  ]);
 }

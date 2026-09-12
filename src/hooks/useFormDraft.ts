@@ -1,13 +1,14 @@
 import React, { useEffect, useCallback, useMemo } from 'react';
 import { getConsentStatus } from './useCookieConsent';
 
-interface UseFormDraftOptions<T> {
+export interface UseFormDraftOptions<T> {
   key: string;
   formValues: T;
   setFormValues: React.Dispatch<React.SetStateAction<T>>;
   isEnabled?: boolean;
   onDraftLoaded?: (data: T) => void;
   skipSave?: (values: T) => boolean;
+  shouldRestoreDraft?: () => boolean;
 }
 
 export function useFormDraft<T>({
@@ -16,7 +17,8 @@ export function useFormDraft<T>({
   setFormValues,
   isEnabled = true,
   onDraftLoaded,
-  skipSave
+  skipSave,
+  shouldRestoreDraft = () => true,
 }: UseFormDraftOptions<T>) {
   
   // Tự động lưu nháp sau mỗi 500ms khi form thay đổi
@@ -24,7 +26,9 @@ export function useFormDraft<T>({
     if (isEnabled && getConsentStatus() !== 'DECLINED') {
       // Nếu form rỗng (thỏa mãn skipSave) -> Xóa nháp hiện tại và hủy lưu
       if (skipSave && skipSave(formValues)) {
-        try { localStorage.removeItem(key); } catch {}
+        try {
+          localStorage.removeItem(key);
+        } catch {}
         return;
       }
 
@@ -42,18 +46,27 @@ export function useFormDraft<T>({
   // Hàm kiểm tra và khôi phục bản nháp
   const checkDraft = useCallback(() => {
     if (getConsentStatus() === 'DECLINED') return false;
+    if (!shouldRestoreDraft()) return false;
+
     let draft = null;
     try {
       draft = localStorage.getItem(key);
     } catch (e) {
       console.warn("Không thể đọc bản nháp:", e);
+      return false;
     }
 
     if (draft) {
       try {
         const parsed = JSON.parse(draft);
-        // Kiểm tra sơ bộ xem object có dữ liệu không
-        if (parsed && typeof parsed === 'object' && Object.keys(parsed).length > 0) {
+
+        // Kiểm tra hợp lệ: phải là object, không phải array, có ít nhất 1 key
+        if (
+          parsed &&
+          typeof parsed === 'object' &&
+          !Array.isArray(parsed) &&
+          Object.keys(parsed).length > 0
+        ) {
           // Tự động dọn dẹp nháp rác từ các phiên cũ mà không cần hỏi người dùng
           if (skipSave && skipSave(parsed)) {
             try { localStorage.removeItem(key); } catch {}
@@ -69,6 +82,9 @@ export function useFormDraft<T>({
           } else {
             try { localStorage.removeItem(key); } catch {}
           }
+        } else {
+          // Xóa dữ liệu nháp không hợp lệ (mảng hoặc dữ liệu rỗng)
+          try { localStorage.removeItem(key); } catch {}
         }
       } catch (e) {
         console.error("Lỗi khôi phục bản nháp:", e);
@@ -76,7 +92,7 @@ export function useFormDraft<T>({
       }
     }
     return false;
-  }, [key, setFormValues, onDraftLoaded, skipSave]);
+  }, [key, setFormValues, onDraftLoaded, skipSave, shouldRestoreDraft]);
 
   // Hàm xóa bản nháp (gọi khi lưu thành công)
   const clearDraft = useCallback(() => {

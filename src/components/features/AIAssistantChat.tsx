@@ -13,6 +13,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { geminiService, validateOCRFile, formatGeminiError, AVAILABLE_GEMINI_MODELS, DEFAULT_GEMINI_MODEL } from '../../services/ai/geminiService';
 import { buildExtractionPrompt } from '../../services/ai/prompts';
+import { writeAIDraft } from '../../services/ai/aiDraftManager';
 import { useAppStore } from '../../store/useAppStore';
 import { useDataGraph } from '../../hooks/useDataGraph';
 import { BATCH_STATUS, generateId } from '../../utils';
@@ -255,11 +256,27 @@ export const AIAssistantChat: React.FC = () => {
 
   const handleRedirect = (metadata: any) => {
     setIsOpen(false);
+
     if (metadata?.path) {
       navigate(metadata.path);
-    } else {
-      navigate('/test-results/new', { state: { aiData: metadata?.extractedData } });
+      return;
     }
+
+    const extractedData = metadata?.extractedData;
+
+    if (extractedData) {
+      const draftId = writeAIDraft(extractedData);
+
+      if (!draftId) {
+        console.error('[AI] Không thể tạo AI draft trước khi điều hướng.');
+        toast.error(
+          'Không thể chuyển dữ liệu AI sang biểu mẫu. Vui lòng thử lại.'
+        );
+        return;
+      }
+    }
+
+    navigate('/test-results/new');
   };
 
   const handleMessageClick = (e: React.MouseEvent<HTMLDivElement>) => {

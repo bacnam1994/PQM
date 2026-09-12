@@ -24,6 +24,7 @@ import { calculateOverallStatus, TEST_RESULT_STATUS, BATCH_STATUS, CRITERION_TYP
 import { ref, query, orderByChild, equalTo, get } from 'firebase/database';
 import { db } from '../../firebase';
 import { buildAliasLookupMap, resolveCriteriaName, normalizeName } from '../../services/criteriaAliasService';
+import { hasAIDraft } from '../../services/ai/aiDraftManager';
 interface ExtraTestResultEntry extends TestResultEntry {
   limit?: string;
 }
@@ -34,7 +35,7 @@ const getLocalISODate = () => {
   return new Date(Date.now() - tzOffset).toISOString().split('T')[0];
 };
 
-const initialTestResultFormState = {
+export const initialTestResultFormState = {
   batchId: '',
   labName: '',
   testDate: getLocalISODate(),
@@ -43,6 +44,8 @@ const initialTestResultFormState = {
   extraCriteria: [] as {id: string, name: string, value: string, unit: string, limit: string}[],
   attachments: [] as { name: string; url: string; source: 'google_drive' | 'firebase'; uploadedAt: string }[],
 };
+
+export type TestResultFormState = typeof initialTestResultFormState;
 
 export const useTestResultForm = (onInitialBatchSelect?: (batchNo: string) => void) => {
   const tccsList = useAppStore(state => state.tccsList);
@@ -96,6 +99,18 @@ export const useTestResultForm = (onInitialBatchSelect?: (batchNo: string) => vo
     updateInArray,
   } = useForm(initialTestResultFormState);
 
+  const [isFormInitialized, setIsFormInitialized] = useState(false);
+
+  const applyAIFormPatch = useCallback(
+    (patch: Partial<typeof initialTestResultFormState>) => {
+      setFormValues(prev => ({
+        ...prev,
+        ...patch,
+      }));
+    },
+    [setFormValues]
+  );
+
   useEffect(() => {
     if (!formValues.batchId) {
       setFetchedResultsForBatch([]);
@@ -124,9 +139,10 @@ export const useTestResultForm = (onInitialBatchSelect?: (batchNo: string) => vo
     key: 'TEST_RESULT_DRAFT',
     formValues,
     setFormValues,
-    isEnabled: crud.mode === 'ADD',
+    isEnabled: crud.mode === 'ADD' && isFormInitialized && !hasAIDraft(),
     skipSave,
-    onDraftLoaded
+    onDraftLoaded,
+    shouldRestoreDraft: () => !hasAIDraft(),
   });
 
   const {
@@ -219,6 +235,7 @@ export const useTestResultForm = (onInitialBatchSelect?: (batchNo: string) => vo
 
   // Handle URL params for initial batch selection
   useEffect(() => {
+    let isMounted = true;
     const batchIdParam = searchParams.get('batchId');
     if (batchIdParam) {
       const batch = hydratedBatches.find(b => b.id === batchIdParam);
@@ -239,13 +256,21 @@ export const useTestResultForm = (onInitialBatchSelect?: (batchNo: string) => vo
         navigate('/test-results/new', { replace: true });
       }
     }
+    if (isMounted) {
+      setIsFormInitialized(true);
+    }
+    return () => {
+      isMounted = false;
+    };
   }, [searchParams, hydratedBatches, navigate, updateBatchStatus, setFieldValue, resetHookForm]);
 
 
-  const handleBatchSelect = useCallback((batchId: string) => {
+  const handleBatchSelect = useCallback((batchId: string, preserveResults: boolean = false) => {
     setFieldValue('batchId', batchId);
-    setFieldValue('testResultsMap', {});
-    setFieldValue('extraCriteria', []);
+    if (!preserveResults) {
+      setFieldValue('testResultsMap', {});
+      setFieldValue('extraCriteria', []);
+    }
 
     if (batchId) {
       const batch = batches.find(b => b.id === batchId);
@@ -394,6 +419,12 @@ export const useTestResultForm = (onInitialBatchSelect?: (batchNo: string) => vo
     closeFormModal: () => { closeFormModal(); }, // Wrap to match interface if needed
     switchToEditMode,
     handlePrintConsolidatedCoa,
-    fetchTestResultsByBatchId // Export hàm này để gọi chủ đích ở các component khác
+    fetchTestResultsByBatchId, // Export hàm này để gọi chủ đích ở các component khác
+    isFormInitialized,
+    setIsFormInitialized,
+    setFormValues,
+    applyAIFormPatch,
+    checkDraft,
+    clearDraft,
   };
 };

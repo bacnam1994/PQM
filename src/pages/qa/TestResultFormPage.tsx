@@ -1,11 +1,13 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { ArrowPathIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
+import toast from 'react-hot-toast';
 import { useTestResultForm } from '../../hooks/test-results/useTestResultForm';
 import { useAppStore } from '../../store/useAppStore';
 import { useDataGraph } from '../../hooks/useDataGraph';
 import { fetchTestResultById } from '../../services/testResultService';
 import { normalizeSearch, BATCH_STATUS } from '../../utils';
+import { consumeAIDraft, peekAIDraft } from '../../services/ai/aiDraftManager';
 
 // Specialized Form Subcomponents & Hooks
 import { TestResultHeader } from './test-result-form/components/TestResultHeader';
@@ -63,6 +65,8 @@ const TestResultFormPage: React.FC = () => {
   // Track AI-filled field badges
   const [aiFilledFields, setAiFilledFields] = useState<Set<string>>(new Set());
   const [isComparisonModalOpen, setIsComparisonModalOpen] = useState(false);
+  const aiDraftAppliedRef = useRef(false);
+  const [isApplyingAIDraft, setIsApplyingAIDraft] = useState(false);
 
   // Criteria list from active TCCS for matching
   const allCriteria = useMemo(() => {
@@ -102,6 +106,7 @@ const TestResultFormPage: React.FC = () => {
     aiFilledFields,
     setAiFilledFields,
     addBatch,
+    setFormValues: logic.setFormValues,
   });
 
   // State when loading existing record for Edit mode
@@ -135,7 +140,10 @@ const TestResultFormPage: React.FC = () => {
           console.error('Lỗi nạp dữ liệu phiếu kiểm nghiệm:', error);
           if (isMounted) setEditItemNotFound(true);
         } finally {
-          if (isMounted) setIsLoadingEditItem(false);
+          if (isMounted) {
+            setIsLoadingEditItem(false);
+            logic.setIsFormInitialized(true);
+          }
         }
       };
 
@@ -144,11 +152,12 @@ const TestResultFormPage: React.FC = () => {
       logic.crud.openAdd();
       setIsLoadingEditItem(false);
       setEditItemNotFound(false);
+      logic.setIsFormInitialized(true);
     }
     return () => {
       isMounted = false;
     };
-  }, [id, allTestResults, testResults, logic.crud.openEdit, logic.crud.openAdd, logic.populateFormForEdit]);
+  }, [id, allTestResults, testResults, logic.crud.openEdit, logic.crud.openAdd, logic.populateFormForEdit, logic.setIsFormInitialized]);
 
   // Sync batch name into search input when batch data loads
   useEffect(() => {
@@ -164,13 +173,31 @@ const TestResultFormPage: React.FC = () => {
     }
   }, [formValues.batchId, batchSearch, hydratedBatches, setBatchSearch]);
 
-  // Listen for AI data passed from Global Chat Widget
+  // Consume AI draft passed outside Router location.state
+  const isFormInitialized = logic.isFormInitialized;
+
   useEffect(() => {
-    if (location.state?.aiData && !id) {
-      ai.handleDataExtracted(location.state.aiData);
-      navigate(location.pathname, { replace: true, state: {} });
+    if (id) return;
+    if (!isFormInitialized) return;
+    if (aiDraftAppliedRef.current) return;
+
+    const draft = consumeAIDraft();
+    if (!draft) return;
+
+    aiDraftAppliedRef.current = true;
+    setIsApplyingAIDraft(true);
+
+    try {
+      ai.handleDataExtracted(draft.data);
+    } catch (error) {
+      console.error('[AI] Lỗi áp dụng AI draft vào form:', error);
+      toast.error(
+        'Dữ liệu AI không thể áp dụng hoàn chỉnh. Bạn có thể tiếp tục nhập thủ công.'
+      );
+    } finally {
+      setIsApplyingAIDraft(false);
     }
-  }, [location.state?.aiData, location.pathname, navigate, id, ai]);
+  }, [id, isFormInitialized, ai.handleDataExtracted]);
 
   // Dropdown list for batch selector
   const availableBatchesForDropdown = useMemo(() => {
@@ -259,6 +286,12 @@ const TestResultFormPage: React.FC = () => {
         <Surface variant="subtle" padding="sm" className="bg-surface-2/60 backdrop-blur-xs">
           <WorkflowSteps steps={workflowSteps} activeStep={currentWorkflowStep} />
         </Surface>
+
+        {isApplyingAIDraft && (
+          <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-3 py-2 text-xs text-emerald-700 dark:text-emerald-400">
+            Đang áp dụng dữ liệu từ AI...
+          </div>
+        )}
 
         <form id="test-result-form" onSubmit={handleSaveResult} className="space-y-6">
           <SpecialCharToolbar className="-mx-2 px-2" />

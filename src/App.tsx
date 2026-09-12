@@ -8,66 +8,48 @@ import { Layout, ErrorBoundary, Skeleton, CookieConsentBanner } from './componen
 import { useAppStore } from './store/useAppStore';
 import { useShallow } from 'zustand/react/shallow';
 import { useUIStore, loadUserPreferences, resetToSharedKey } from './store/useUIStore';
-const lazyWithRetry = (componentImport: () => Promise<any>) => {
-  return lazy(async () => {
-    const hasReloaded = sessionStorage.getItem('page-has-reloaded-for-chunk');
-    try {
-      const result = await componentImport();
-      sessionStorage.removeItem('page-has-reloaded-for-chunk');
-      return result;
-    } catch (error) {
-      if (!hasReloaded) {
-        sessionStorage.setItem('page-has-reloaded-for-chunk', 'true');
-        console.error('Lỗi tải module động, đang làm mới cache...', error);
-        window.location.reload();
-      } else {
-        console.error('Không thể tải module động (đã thử reload):', error);
-        throw error;
-      }
-      return new Promise(() => {});
-    }
-  });
-};
+import { lazyWithRetry } from './utils/lazyWithRetry';
 
-const Dashboard = lazyWithRetry(() => import('./pages/system/Dashboard'));
-const ProductList = lazyWithRetry(() => import('./pages/products/ProductList'));
-const ProductDetail = lazyWithRetry(() => import('./pages/products/ProductDetail'));
-const TCCSList = lazyWithRetry(() => import('./pages/qa/TCCSList'));
-const ProductFormulaList = lazyWithRetry(() => import('./pages/qa/ProductFormulaList'));
-const MaterialList = lazyWithRetry(() => import('./pages/products/MaterialList'));
-const BatchList = lazyWithRetry(() => import('./pages/batches/BatchList'));
-const TestResultList = lazyWithRetry(() => import('./pages/qa/TestResultList'));
-const CriteriaList = lazyWithRetry(() => import('./pages/qa/CriteriaList'));
-const SettingsPage = lazyWithRetry(() => import('./pages/system/SettingsPage'));
-const AccountPage = lazyWithRetry(() => import('./pages/system/AccountPage'));
-const SearchPage = lazyWithRetry(() => import('./pages/system/SearchPage'));
-const LoginPage = lazyWithRetry(() => import('./pages/auth/LoginPage'));
-const SignupPage = lazyWithRetry(() => import('./pages/auth/SignupPage'));
-const ForgotPasswordPage = lazyWithRetry(() => import('./pages/auth/ForgotPasswordPage'));
-const UserManagement = lazyWithRetry(() => import('./pages/system/UserManagement'));
-const TestResultFormPage = lazyWithRetry(() => import('./pages/qa/TestResultFormPage'));
-const CoAReportPage = lazyWithRetry(() => import('./pages/qa/CoAReportPage'));
-const ProductFormPage = lazyWithRetry(() => import('./pages/products/ProductFormPage'));
-const BatchFormPage = lazyWithRetry(() => import('./pages/batches/BatchFormPage'));
-const BatchDetailPage = lazyWithRetry(() => import('./pages/batches/BatchDetailPage'));
-const TCCSFormPage = lazyWithRetry(() => import('./pages/qa/TCCSFormPage'));
-const TccsDetailPage = lazyWithRetry(() => import('./pages/qa/TccsDetailPage'));
-const ProductFormulaFormPage = lazyWithRetry(() => import('./pages/qa/ProductFormulaFormPage'));
-const MaterialFormPage = lazyWithRetry(() => import('./pages/products/MaterialFormPage'));
-const CriteriaFormPage = lazyWithRetry(() => import('./pages/qa/CriteriaFormPage'));
-const NotFoundPage = lazyWithRetry(() => import('./pages/system/NotFoundPage'));
-const AlertsPage = lazyWithRetry(() => import('./pages/quality/AlertsPage'));
-const QualitySummaryReport = lazyWithRetry(() => import('./pages/quality/QualitySummaryReport'));
-const TrendAnalysisPage = lazyWithRetry(() => import('./pages/quality/TrendAnalysisPage'));
-const UnauthorizedPage = lazyWithRetry(() => import('./pages/auth/UnauthorizedPage'));
-const WelcomePage = lazyWithRetry(() => import('./pages/auth/WelcomePage'));
-const CriteriaAliasManager = lazyWithRetry(() => import('./pages/system/CriteriaAliasManager'));
-const AuditLogPage = lazyWithRetry(() => import('./pages/system/AuditLogPage'));
-const CoAVerifyPage = lazyWithRetry(() => import('./pages/public/CoAVerifyPage'));
-const DeviationListPage = lazyWithRetry(() => import('./pages/qa/DeviationListPage'));
-const ChangeControlListPage = lazyWithRetry(() => import('./pages/quality/change-control/ChangeControlListPage'));
-const Batch360Page = lazyWithRetry(() => import('./pages/batches/batch-360/Batch360Page').then(m => ({ default: m.Batch360Page })));
-const Product360Page = lazyWithRetry(() => import('./pages/products/product-360/Product360Page').then(m => ({ default: m.Product360Page })));
+const Dashboard = lazyWithRetry(() => import('./pages/system/Dashboard'), 'Dashboard');
+const ProductList = lazyWithRetry(() => import('./pages/products/ProductList'), 'ProductList');
+const ProductDetail = lazyWithRetry(() => import('./pages/products/ProductDetail'), 'ProductDetail');
+const TCCSList = lazyWithRetry(() => import('./pages/qa/TCCSList'), 'TCCSList');
+const ProductFormulaList = lazyWithRetry(() => import('./pages/qa/ProductFormulaList'), 'ProductFormulaList');
+const MaterialList = lazyWithRetry(() => import('./pages/products/MaterialList'), 'MaterialList');
+const BatchList = lazyWithRetry(() => import('./pages/batches/BatchList'), 'BatchList');
+const TestResultList = lazyWithRetry(() => import('./pages/qa/TestResultList'), 'TestResultList');
+const CriteriaList = lazyWithRetry(() => import('./pages/qa/CriteriaList'), 'CriteriaList');
+const SettingsPage = lazyWithRetry(() => import('./pages/system/SettingsPage'), 'SettingsPage');
+const AccountPage = lazyWithRetry(() => import('./pages/system/AccountPage'), 'AccountPage');
+const SearchPage = lazyWithRetry(() => import('./pages/system/SearchPage'), 'SearchPage');
+const LoginPage = lazyWithRetry(() => import('./pages/auth/LoginPage'), 'LoginPage');
+const SignupPage = lazyWithRetry(() => import('./pages/auth/SignupPage'), 'SignupPage');
+const ForgotPasswordPage = lazyWithRetry(() => import('./pages/auth/ForgotPasswordPage'), 'ForgotPasswordPage');
+const UserManagement = lazyWithRetry(() => import('./pages/system/UserManagement'), 'UserManagement');
+const TestResultFormPage = lazyWithRetry(() => import('./pages/qa/TestResultFormPage'), 'TestResultFormPage');
+const CoAReportPage = lazyWithRetry(() => import('./pages/qa/CoAReportPage'), 'CoAReportPage');
+const ProductFormPage = lazyWithRetry(() => import('./pages/products/ProductFormPage'), 'ProductFormPage');
+const BatchFormPage = lazyWithRetry(() => import('./pages/batches/BatchFormPage'), 'BatchFormPage');
+const BatchDetailPage = lazyWithRetry(() => import('./pages/batches/BatchDetailPage'), 'BatchDetailPage');
+const TCCSFormPage = lazyWithRetry(() => import('./pages/qa/TCCSFormPage'), 'TCCSFormPage');
+const TccsDetailPage = lazyWithRetry(() => import('./pages/qa/TccsDetailPage'), 'TccsDetailPage');
+const ProductFormulaFormPage = lazyWithRetry(() => import('./pages/qa/ProductFormulaFormPage'), 'ProductFormulaFormPage');
+const MaterialFormPage = lazyWithRetry(() => import('./pages/products/MaterialFormPage'), 'MaterialFormPage');
+const CriteriaFormPage = lazyWithRetry(() => import('./pages/qa/CriteriaFormPage'), 'CriteriaFormPage');
+const NotFoundPage = lazyWithRetry(() => import('./pages/system/NotFoundPage'), 'NotFoundPage');
+const AlertsPage = lazyWithRetry(() => import('./pages/quality/AlertsPage'), 'AlertsPage');
+const QualitySummaryReport = lazyWithRetry(() => import('./pages/quality/QualitySummaryReport'), 'QualitySummaryReport');
+const TrendAnalysisPage = lazyWithRetry(() => import('./pages/quality/TrendAnalysisPage'), 'TrendAnalysisPage');
+const UnauthorizedPage = lazyWithRetry(() => import('./pages/auth/UnauthorizedPage'), 'UnauthorizedPage');
+const WelcomePage = lazyWithRetry(() => import('./pages/auth/WelcomePage'), 'WelcomePage');
+const CriteriaAliasManager = lazyWithRetry(() => import('./pages/system/CriteriaAliasManager'), 'CriteriaAliasManager');
+const AuditLogPage = lazyWithRetry(() => import('./pages/system/AuditLogPage'), 'AuditLogPage');
+const CoAVerifyPage = lazyWithRetry(() => import('./pages/public/CoAVerifyPage'), 'CoAVerifyPage');
+const DeviationListPage = lazyWithRetry(() => import('./pages/qa/DeviationListPage'), 'DeviationListPage');
+const ChangeControlListPage = lazyWithRetry(() => import('./pages/quality/change-control/ChangeControlListPage'), 'ChangeControlListPage');
+const Batch360Page = lazyWithRetry(() => import('./pages/batches/batch-360/Batch360Page').then(m => ({ default: m.Batch360Page })), 'Batch360Page');
+const Product360Page = lazyWithRetry(() => import('./pages/products/product-360/Product360Page').then(m => ({ default: m.Product360Page })), 'Product360Page');
+
 
 const LoadingFallback = () => (
   <div className="flex items-center justify-center h-screen w-full bg-transparent transition-colors duration-300">
