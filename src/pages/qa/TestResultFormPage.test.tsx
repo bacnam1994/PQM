@@ -123,10 +123,14 @@ describe('TestResultFormPage AI Draft & Hardening Integration', () => {
       const labInput = document.querySelector('input[name="labName"]') as HTMLInputElement;
       expect(labInput).not.toBeNull();
       expect(labInput.value).toBe('QUATEST 3');
+      // Known TCCS criteria should be filled in the testResultsMap inputs
+      expect(screen.getByDisplayValue('5.2')).toBeDefined();
+      expect(screen.getByDisplayValue('6.8')).toBeDefined();
     });
 
-    // Extra criteria section should have the unmatched criterion
+    // Extra criteria section should have ONLY the unmatched criterion
     expect(screen.getByDisplayValue('Chỉ tiêu lạ chưa có')).toBeDefined();
+    expect(screen.queryByDisplayValue('Độ ẩm')).toBeNull(); // name input in extra criteria should not exist for known criteria
   });
 
   it('refresh/remount after consumption does not reapply or duplicate AI data', async () => {

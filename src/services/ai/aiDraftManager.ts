@@ -20,6 +20,7 @@ export interface NormalizedAIData {
   labName?: string;
   testDate?: string;
   batchNo?: string;
+  batchId?: string;
   productName?: string;
   productCode?: string;
   mfgDate?: string;
@@ -145,6 +146,11 @@ export function normalizeAIData(input: any): NormalizedAIData | null {
     batchNo:
       typeof input.batchNo === 'string'
         ? input.batchNo.trim()
+        : undefined,
+
+    batchId:
+      typeof input.batchId === 'string'
+        ? input.batchId.trim()
         : undefined,
 
     productName:

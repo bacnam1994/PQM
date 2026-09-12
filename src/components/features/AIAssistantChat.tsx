@@ -16,7 +16,7 @@ import { buildExtractionPrompt } from '../../services/ai/prompts';
 import { writeAIDraft } from '../../services/ai/aiDraftManager';
 import { useAppStore } from '../../store/useAppStore';
 import { useDataGraph } from '../../hooks/useDataGraph';
-import { BATCH_STATUS, generateId } from '../../utils';
+import { BATCH_STATUS, generateId, parseDateToISO } from '../../utils';
 import { useNavigate, useLocation } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { MappingConfirmModal, AIExtractedItem, ConfirmedMapping } from './MappingConfirmModal';
@@ -345,7 +345,12 @@ export const AIAssistantChat: React.FC = () => {
          return;
       }
 
-      const matchedBatch = hydratedBatches.find(b => b.batchNo.toLowerCase().includes(batchNo.toLowerCase()));
+      const cleanNo = batchNo.trim().toLowerCase();
+      const matchedBatch = hydratedBatches.find(b => {
+        if (!b.batchNo) return false;
+        const bNo = b.batchNo.trim().toLowerCase();
+        return bNo === cleanNo || bNo.includes(cleanNo) || cleanNo.includes(bNo);
+      });
       
       openMappingStep(result, { batchNo, matchedBatch });
 
@@ -514,14 +519,14 @@ export const AIAssistantChat: React.FC = () => {
     // Merge tất cả kết quả đã map thành chuẩn để truyền vào form
     const mergedResults = [
       ...highItems.map(i => ({
-        criteriaName: i.mappedName, // Dùng tên chuẩn TCCS
+        criteriaName: i.mappedName || i.criteriaName, // Dùng tên chuẩn TCCS hoặc giữ tên gốc
         aiOriginalName: i.criteriaName,
         value: i.value,
         unit: i.unit,
         limit: i.limit,
       })),
       ...confirmedLowItems.map(m => ({
-        criteriaName: m.systemName,
+        criteriaName: m.systemName || m.originalName,
         aiOriginalName: m.originalName,
         value: m.value,
         unit: m.unit,
@@ -529,8 +534,12 @@ export const AIAssistantChat: React.FC = () => {
       })),
     ];
 
-    const enrichedResult = { ...result, testResults: mergedResults };
     const { batchNo, matchedBatch } = context;
+    const enrichedResult = {
+      ...result,
+      batchId: matchedBatch ? matchedBatch.id : undefined,
+      testResults: mergedResults
+    };
 
     // Nếu AI đọc được LabName, giữ lại trong enrichedResult
     if (result.labName) {
@@ -544,9 +553,14 @@ export const AIAssistantChat: React.FC = () => {
     }
 
     if (matchedBatch) {
+      if (fromModal) {
+        // Sau khi người dùng xác nhận modal mapping, chuyển thẳng sang form mượt mà
+        handleRedirect({ extractedData: enrichedResult });
+        return;
+      }
       addMessage({
         sender: 'ai',
-        text: `Tuyệt vời! Đã tìm thấy lô **${batchNo}** của sản phẩm **${matchedBatch.product?.name || ''}**.${fromModal ? ' Mapping chỉ tiêu đã được xác nhận.' : ''} Bấm vào nút bên dưới để mở form nhập liệu.`,
+        text: `Tuyệt vời! Đã tìm thấy lô **${batchNo}** của sản phẩm **${matchedBatch.product?.name || ''}**. Bấm vào nút bên dưới để mở form nhập liệu.`,
         isActionable: true,
         actionType: 'REDIRECT',
         metadata: { extractedData: enrichedResult }
@@ -591,13 +605,15 @@ export const AIAssistantChat: React.FC = () => {
     try {
       const newBatchId = generateId('batch');
       const product = products.find(p => p.id === selectedProductId);
-      const mfgDate = extractedData.mfgDate ? extractedData.mfgDate.split('/').reverse().join('-') : '';
-      const expDate = extractedData.expDate ? extractedData.expDate.split('/').reverse().join('-') : '';
+      const mfgDate = parseDateToISO(extractedData.mfgDate || '') || '';
+      const expDate = parseDateToISO(extractedData.expDate || '') || '';
+      const activeTccs = tccsList.find(t => t.productId === selectedProductId && t.isActive)
+        || tccsList.find(t => t.productId === selectedProductId);
 
       await addBatch({
         id: newBatchId,
         productId: selectedProductId,
-        batchNo: extractedData.batchNo,
+        batchNo: (extractedData.batchNo || '').trim(),
         mfgDate,
         expDate,
         status: BATCH_STATUS.TESTING,
@@ -605,7 +621,7 @@ export const AIAssistantChat: React.FC = () => {
         actualYield: 0,
         yieldUnit: 'kg',
         createdAt: new Date().toISOString(),
-        tccsId: ''
+        tccsId: activeTccs?.id || ''
       });
 
       setMessages(prev => prev.map(m => m.id === messageId ? { ...m, isActionable: false } : m));
@@ -615,7 +631,7 @@ export const AIAssistantChat: React.FC = () => {
         text: `Đã tạo lô **${extractedData.batchNo}** cho sản phẩm **${product?.name}**. Bấm nút bên dưới để đi tới form.`,
         isActionable: true,
         actionType: 'REDIRECT',
-        metadata: { extractedData: { ...extractedData } }
+        metadata: { extractedData: { ...extractedData, batchId: newBatchId } }
       });
 
     } catch (error) {

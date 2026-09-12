@@ -14,6 +14,7 @@ import { useAppStore } from '../../../../store/useAppStore';
 import { HydratedBatch } from '../../../../hooks/useDataGraph';
 import { Criterion, TCCS, Product, AILearnedMapping } from '../../../../types';
 import { normalizeAIData } from '../../../../services/ai/aiDraftManager';
+import { generateId, BATCH_STATUS } from '../../../../utils';
 
 interface UseTestResultAIIntegrationProps {
   allActiveTccsNames: string[];
@@ -70,6 +71,8 @@ export function useTestResultAIIntegration({
   }, []);
 
   const addAiLearnedMapping = useAppStore((state) => state.addAiLearnedMapping);
+  const tccsList = useAppStore((state) => state.tccsList);
+  const products = useAppStore((state) => state.products);
 
   // Mapping modal states
   const [isMappingModalOpen, setIsMappingModalOpen] = useState(false);
@@ -131,7 +134,10 @@ export function useTestResultAIIntegration({
     }
 
     let matchedBatch: HydratedBatch | undefined;
-    if (normalized.batchNo) {
+    if (normalized.batchId) {
+      matchedBatch = hydratedBatches.find((b) => b.id === normalized.batchId);
+    }
+    if (!matchedBatch && normalized.batchNo) {
       const cleanNo = normalized.batchNo.trim().toUpperCase();
       matchedBatch = hydratedBatches.find((b) => b.batchNo?.trim().toUpperCase() === cleanNo);
 
@@ -144,6 +150,66 @@ export function useTestResultAIIntegration({
       }
     }
 
+    // Resolve criteria to match against
+    let criteriaToMatch: any[] = allCriteria;
+    if (criteriaToMatch.length === 0 && matchedBatch) {
+      const batchTccs = (matchedBatch.tccsId ? tccsList.find((t: any) => t.id === matchedBatch.tccsId) : null)
+        || (matchedBatch.mfgDate
+            ? tccsList
+                .filter((t: any) => t.productId === matchedBatch.productId)
+                .sort((a: any, b: any) => new Date(b.issueDate).getTime() - new Date(a.issueDate).getTime())
+                .find((t: any) => new Date(t.issueDate).getTime() <= new Date(matchedBatch.mfgDate!).getTime())
+            : null)
+        || tccsList.find((t: any) => t.productId === matchedBatch.productId && t.isActive)
+        || tccsList.find((t: any) => t.productId === matchedBatch.productId);
+
+      if (batchTccs) {
+        criteriaToMatch = [
+          ...(batchTccs.mainQualityCriteria || []),
+          ...(batchTccs.safetyCriteria || []),
+        ];
+      }
+    }
+
+    if (criteriaToMatch.length === 0) {
+      let targetProduct = null;
+      if (normalized.productCode) {
+        targetProduct = products.find((p: any) => p.code?.trim().toLowerCase() === normalized.productCode?.trim().toLowerCase());
+      }
+      if (!targetProduct && normalized.productName) {
+        targetProduct = products.find((p: any) => p.name?.trim().toLowerCase() === normalized.productName?.trim().toLowerCase());
+      }
+      if (targetProduct) {
+        const prodTccs = tccsList.find((t: any) => t.productId === targetProduct.id && t.isActive)
+          || tccsList.find((t: any) => t.productId === targetProduct.id);
+        if (prodTccs) {
+          criteriaToMatch = [
+            ...(prodTccs.mainQualityCriteria || []),
+            ...(prodTccs.safetyCriteria || []),
+          ];
+        }
+      }
+    }
+
+    if (criteriaToMatch.length === 0) {
+      const activeCriteriaMap = new Map<string, any>();
+      tccsList
+        .filter((t: any) => t.isActive)
+        .forEach((tccs: any) => {
+          (tccs.mainQualityCriteria || []).forEach((c: any) => {
+            if (c?.name && !activeCriteriaMap.has(c.name.trim().toLowerCase())) {
+              activeCriteriaMap.set(c.name.trim().toLowerCase(), c);
+            }
+          });
+          (tccs.safetyCriteria || []).forEach((c: any) => {
+            if (c?.name && !activeCriteriaMap.has(c.name.trim().toLowerCase())) {
+              activeCriteriaMap.set(c.name.trim().toLowerCase(), c);
+            }
+          });
+        });
+      criteriaToMatch = Array.from(activeCriteriaMap.values());
+    }
+
     const nextTestResultsMap: Record<string, string | number> = {};
     const nextExtraCriteria: any[] = [];
     const newAiFilled = new Set(aiFilledFields);
@@ -152,7 +218,7 @@ export function useTestResultAIIntegration({
 
     if (normalized.testResults && Array.isArray(normalized.testResults)) {
       normalized.testResults.forEach((r: any, index: number) => {
-        const matchCrit = allCriteria.find((c) =>
+        const matchCrit = criteriaToMatch.find((c) =>
           isCriteriaMatch(r.criteriaName, c.name, aiLearnedMappings)
         );
 
@@ -243,33 +309,92 @@ export function useTestResultAIIntegration({
     handleBatchSelect,
     setBatchSearch,
     setAiFilledFields,
+    tccsList,
+    products,
   ]);
 
   const handleAutoCreateBatchConfirm = useCallback(async (newBatchData: {
     batchNo: string;
     productId: string;
+    tccsId?: string;
     mfgDate?: string;
     expDate?: string;
     initialQuantity?: number;
     notes?: string;
   }) => {
     try {
-      const createdBatch = await addBatch(newBatchData);
+      const newBatchId = generateId('batch');
+      const activeTccs = newBatchData.tccsId
+        ? tccsList.find((t: any) => t.id === newBatchData.tccsId)
+        : tccsList.find((t: any) => t.productId === newBatchData.productId && t.isActive)
+          || tccsList.find((t: any) => t.productId === newBatchData.productId);
+
+      const batchToCreate: any = {
+        id: newBatchId,
+        batchNo: newBatchData.batchNo.trim(),
+        productId: newBatchData.productId,
+        tccsId: activeTccs?.id || '',
+        mfgDate: newBatchData.mfgDate || '',
+        expDate: newBatchData.expDate || '',
+        status: BATCH_STATUS.TESTING,
+        theoreticalYield: 0,
+        actualYield: 0,
+        yieldUnit: 'kg',
+        createdAt: new Date().toISOString(),
+      };
+
+      await addBatch(batchToCreate);
       if (!mountedRef.current) return;
       toast.success(`Đã tạo lô mới ${newBatchData.batchNo} thành công!`);
       setIsAutoCreateModalOpen(false);
       setPendingAutoCreateData(null);
-      if (createdBatch && createdBatch.id) {
-        handleBatchSelect(createdBatch.id, true);
-        const prod = hydratedBatches.find((b) => b.id === createdBatch.id)?.product;
-        setBatchSearch(`${createdBatch.batchNo}${prod ? ' - ' + prod.name : ''}`);
+
+      // Select newly created batch
+      handleBatchSelect(newBatchId, true);
+      const prod = products.find((p: any) => p.id === newBatchData.productId);
+      setBatchSearch(`${newBatchData.batchNo}${prod ? ' - ' + prod.name : ''}`);
+
+      // Migrate extra criteria that match the newly assigned TCCS
+      if (activeTccs) {
+        const batchCriteria = [
+          ...(activeTccs.mainQualityCriteria || []),
+          ...(activeTccs.safetyCriteria || []),
+        ];
+        if (batchCriteria.length > 0 && setFormValues) {
+          setFormValues((prev: any) => {
+            const currentExtras = prev?.extraCriteria || [];
+            const remainingExtras: any[] = [];
+            const additionalMap: Record<string, any> = {};
+
+            currentExtras.forEach((extra: any) => {
+              const matched = batchCriteria.find((c: any) =>
+                isCriteriaMatch(extra.name, c.name, aiLearnedMappings)
+              );
+              if (matched) {
+                additionalMap[matched.name] = extra.value;
+              } else {
+                remainingExtras.push(extra);
+              }
+            });
+
+            return {
+              ...prev,
+              batchId: newBatchId,
+              testResultsMap: {
+                ...(prev?.testResultsMap || {}),
+                ...additionalMap,
+              },
+              extraCriteria: remainingExtras,
+            };
+          });
+        }
       }
     } catch (err: any) {
       if (!mountedRef.current) return;
       console.error(err);
       toast.error('Lỗi khi tạo lô mới: ' + (err.message || 'Thất bại'));
     }
-  }, [addBatch, handleBatchSelect, hydratedBatches, setBatchSearch]);
+  }, [addBatch, handleBatchSelect, products, tccsList, setBatchSearch, setFormValues, aiLearnedMappings]);
 
   const finalizeAiMapping = useCallback((result: any, highItems: AIExtractedItem[], confirmedLowItems: ConfirmedMapping[]) => {
     const autoMappings = highItems
@@ -279,14 +404,14 @@ export function useTestResultAIIntegration({
 
     const mergedResults = [
       ...highItems.map((i) => ({
-        criteriaName: i.mappedName,
+        criteriaName: i.mappedName || i.criteriaName,
         aiOriginalName: i.criteriaName,
         value: i.value,
         unit: i.unit,
         limit: i.limit,
       })),
       ...confirmedLowItems.map((m) => ({
-        criteriaName: m.systemName,
+        criteriaName: m.systemName || m.originalName,
         aiOriginalName: m.originalName,
         value: m.value,
         unit: m.unit,
