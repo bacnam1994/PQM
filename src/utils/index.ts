@@ -13,4 +13,5 @@ export * from './offlineCache';
 export * from './testResultEvaluation';
 export * from './urlUtils';
 export * from './basisCalculation';
-export * from './lazyWithRetry';
+export * from './lazyWithRetry';
+export * from './excelExporter';

@@ -10,7 +10,7 @@ import {
   LinkIcon,
   CubeIcon,
   CheckIcon,
-  ChevronDownIcon
+  ChevronDownIcon,
 } from '@heroicons/react/24/outline';
 import { useAppStore } from '../../store/useAppStore';
 import { generateId, normalizeSearch, autoFormatInput, parseNumberFromText } from '../../utils';
@@ -18,13 +18,22 @@ import { ProductFormula, FormulaIngredient, RawMaterial } from '../../types';
 import { DSFormInput, SpecialCharToolbar } from '../../components';
 import { COMMON_CRITERIA_UNITS } from './TCCSFormPage';
 import { normalizeName } from '../../services/criteriaAliasService';
+import { productFormulaFormSchema } from '../../schemas';
 
 const ProductFormulaFormPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  
+
   // 1. Khởi tạo Hook & State
-  const { productFormulas, products, rawMaterials, addProductFormula, updateProductFormula, addRawMaterial, notify } = useAppStore();
+  const {
+    productFormulas,
+    products,
+    rawMaterials,
+    addProductFormula,
+    updateProductFormula,
+    addRawMaterial,
+    notify,
+  } = useAppStore();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formulaToEdit, setFormulaToEdit] = useState<ProductFormula | null>(null);
   const [ingredients, setIngredients] = useState<FormulaIngredient[]>([]);
@@ -36,16 +45,19 @@ const ProductFormulaFormPage = () => {
   const [showProductDropdown, setShowProductDropdown] = useState(false);
 
   // Active Dropdown cho Ingredient/Excipient row
-  const [activeMaterialDropdown, setActiveMaterialDropdown] = useState<{ type: 'ingredient' | 'excipient'; index: number } | null>(null);
-  
+  const [activeMaterialDropdown, setActiveMaterialDropdown] = useState<{
+    type: 'ingredient' | 'excipient';
+    index: number;
+  } | null>(null);
+
   // 2. Load dữ liệu
   useEffect(() => {
     if (id) {
-      const formula = productFormulas.find(f => f.id === id);
+      const formula = productFormulas.find((f) => f.id === id);
       if (formula) {
         setFormulaToEdit(formula);
         setSelectedProductId(formula.productId);
-        const p = products.find(prod => prod.id === formula.productId);
+        const p = products.find((prod) => prod.id === formula.productId);
         setProductSearch(p ? `${p.code} - ${p.name}` : '');
         setIngredients(formula.ingredients || []);
         setExcipients(formula.excipients || []);
@@ -57,24 +69,29 @@ const ProductFormulaFormPage = () => {
   }, [id, productFormulas, products, navigate, notify]);
 
   // Map tra cứu RawMaterial
-  const materialMap = useMemo(() => new Map(rawMaterials.map(m => [m.id, m])), [rawMaterials]);
+  const materialMap = useMemo(() => new Map(rawMaterials.map((m) => [m.id, m])), [rawMaterials]);
 
   const handleIngredientChange = (index: number, field: keyof FormulaIngredient, value: any) => {
     const newIngredients = [...ingredients];
-    const formatted = (field === 'declaredContent' || field === 'elementalContent') ? autoFormatInput(String(value)) : value;
+    const formatted =
+      field === 'declaredContent' || field === 'elementalContent'
+        ? autoFormatInput(String(value))
+        : value;
     (newIngredients[index] as any)[field] = formatted;
-    
+
     // Nếu sửa tên -> Thử tìm kiếm khớp với RawMaterial
     if (field === 'name') {
       const normVal = normalizeName(String(value));
-      const matched = rawMaterials.find(m => 
-        normalizeName(m.name) === normVal || (Array.isArray(m.aliases) && m.aliases.some(a => normalizeName(a) === normVal))
+      const matched = rawMaterials.find(
+        (m) =>
+          normalizeName(m.name) === normVal ||
+          (Array.isArray(m.aliases) && m.aliases.some((a) => normalizeName(a) === normVal))
       );
       if (matched) {
         newIngredients[index].materialId = matched.id;
       }
     }
-    
+
     setIngredients(newIngredients);
   };
 
@@ -109,20 +126,25 @@ const ProductFormulaFormPage = () => {
 
   const handleExcipientChange = (index: number, field: keyof FormulaIngredient, value: any) => {
     const newExcipients = [...excipients];
-    const formatted = (field === 'declaredContent' || field === 'elementalContent') ? autoFormatInput(String(value)) : value;
+    const formatted =
+      field === 'declaredContent' || field === 'elementalContent'
+        ? autoFormatInput(String(value))
+        : value;
     (newExcipients[index] as any)[field] = formatted;
-    
+
     // Nếu sửa tên -> Thử tìm kiếm khớp với RawMaterial
     if (field === 'name') {
       const normVal = normalizeName(String(value));
-      const matched = rawMaterials.find(m => 
-        normalizeName(m.name) === normVal || (Array.isArray(m.aliases) && m.aliases.some(a => normalizeName(a) === normVal))
+      const matched = rawMaterials.find(
+        (m) =>
+          normalizeName(m.name) === normVal ||
+          (Array.isArray(m.aliases) && m.aliases.some((a) => normalizeName(a) === normVal))
       );
       if (matched) {
         newExcipients[index].materialId = matched.id;
       }
     }
-    
+
     setExcipients(newExcipients);
   };
 
@@ -166,6 +188,39 @@ const ProductFormulaFormPage = () => {
     setIsSubmitting(true);
     try {
       const formData = new FormData(e.currentTarget);
+
+      // Zod Validation: Đảm bảo Type-safe trước khi gửi lên Firebase
+      const zodValidation = productFormulaFormSchema.safeParse({
+        productId: selectedProductId,
+        ingredients: ingredients.map((i) => ({
+          ...i,
+          name: i.name || '',
+          declaredContent: String(i.declaredContent ?? ''),
+          elementalContent: i.elementalContent !== undefined ? String(i.elementalContent) : '',
+          unit: i.unit || '',
+        })),
+        excipients: excipients.map((e) => ({
+          ...e,
+          name: e.name || '',
+          declaredContent: String(e.declaredContent ?? ''),
+          elementalContent: e.elementalContent !== undefined ? String(e.elementalContent) : '',
+          unit: e.unit || '',
+        })),
+        packaging: formData.get('packaging')?.toString() || '',
+        storage: formData.get('storage')?.toString() || '',
+        shelfLife: formData.get('shelfLife')?.toString() || '',
+      });
+
+      if (!zodValidation.success) {
+        const firstIssue = zodValidation.error.issues[0];
+        notify({
+          type: 'WARNING',
+          title: 'Kiểm tra thất bại',
+          message: firstIssue?.message || 'Dữ liệu công thức không hợp lệ',
+        });
+        setIsSubmitting(false);
+        return;
+      }
       const sanitizeIngredient = (item: FormulaIngredient) => {
         let dc = item.declaredContent;
         if (typeof dc === 'string') {
@@ -196,8 +251,8 @@ const ProductFormulaFormPage = () => {
 
       const formulaData = {
         productId: selectedProductId,
-        ingredients: ingredients.filter(i => i.name).map(sanitizeIngredient),
-        excipients: excipients.filter(e => e.name).map(sanitizeIngredient),
+        ingredients: ingredients.filter((i) => i.name).map(sanitizeIngredient),
+        excipients: excipients.filter((e) => e.name).map(sanitizeIngredient),
         sensory: {
           dosageForm: formData.get('dosageForm')?.toString() || '',
           appearance: formData.get('appearance')?.toString() || '',
@@ -210,15 +265,28 @@ const ProductFormulaFormPage = () => {
       };
 
       if (id && formulaToEdit) {
-        await updateProductFormula({ ...formulaToEdit, ...formulaData, updatedAt: new Date().toISOString() });
-        notify({ type: 'SUCCESS', title: 'Đã cập nhật', message: 'Cập nhật công thức thành công.' });
+        await updateProductFormula({
+          ...formulaToEdit,
+          ...formulaData,
+          updatedAt: new Date().toISOString(),
+        });
+        notify({
+          type: 'SUCCESS',
+          title: 'Đã cập nhật',
+          message: 'Cập nhật công thức thành công.',
+        });
       } else {
-        await addProductFormula({ id: generateId('form'), ...formulaData, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() });
+        await addProductFormula({
+          id: generateId('form'),
+          ...formulaData,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        });
         notify({ type: 'SUCCESS', title: 'Thành công', message: 'Đã tạo công thức mới.' });
       }
       navigate('/product-formulas');
     } catch (error) {
-      console.error("Lỗi khi lưu công thức:", error);
+      console.error('Lỗi khi lưu công thức:', error);
     } finally {
       setIsSubmitting(false);
     }
@@ -250,10 +318,12 @@ const ProductFormulaFormPage = () => {
         {(!id || formulaToEdit) && (
           <form onSubmit={handleSave} className="space-y-6">
             <datalist id="formula-unit-suggestions">
-              {COMMON_CRITERIA_UNITS.map(unit => <option key={unit} value={unit} />)}
+              {COMMON_CRITERIA_UNITS.map((unit) => (
+                <option key={unit} value={unit} />
+              ))}
             </datalist>
             <SpecialCharToolbar />
-            
+
             {/* Product Selection */}
             <div className="relative">
               <label className="text-xs font-semibold text-ink-muted uppercase tracking-wider mb-1.5 block">
@@ -261,13 +331,13 @@ const ProductFormulaFormPage = () => {
               </label>
               <div className="relative">
                 <MagnifyingGlassIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-muted h-4 w-4" />
-                <input 
-                  type="text" 
+                <input
+                  type="text"
                   value={productSearch}
-                  onChange={(e) => { 
-                    setProductSearch(e.target.value); 
-                    setShowProductDropdown(true); 
-                    if (!e.target.value) setSelectedProductId(''); 
+                  onChange={(e) => {
+                    setProductSearch(e.target.value);
+                    setShowProductDropdown(true);
+                    if (!e.target.value) setSelectedProductId('');
                   }}
                   onFocus={() => setShowProductDropdown(true)}
                   onBlur={() => setTimeout(() => setShowProductDropdown(false), 250)}
@@ -282,21 +352,30 @@ const ProductFormulaFormPage = () => {
 
               {showProductDropdown && !id && (
                 <div className="absolute z-30 w-full mt-1.5 bg-surface rounded-xl shadow-xl border border-border max-h-60 overflow-y-auto">
-                  {products.filter(p => !productSearch || normalizeSearch(p.name).includes(normalizeSearch(productSearch)) || normalizeSearch(p.code).includes(normalizeSearch(productSearch))).map(p => (
-                    <div 
-                      key={p.id} 
-                      onMouseDown={(e) => e.preventDefault()} 
-                      onClick={() => { 
-                        setSelectedProductId(p.id); 
-                        setProductSearch(`${p.code} - ${p.name}`); 
-                        setShowProductDropdown(false); 
-                      }}
-                      className={`px-4 py-3 hover:bg-surface-2 cursor-pointer border-b border-border last:border-none transition-colors ${selectedProductId === p.id ? 'bg-surface-2' : ''}`}
-                    >
-                      <p className="text-sm font-semibold text-ink">{p.name}</p>
-                      <p className="text-[10px] font-mono font-medium text-ink-muted uppercase">{p.code}</p>
-                    </div>
-                  ))}
+                  {products
+                    .filter(
+                      (p) =>
+                        !productSearch ||
+                        normalizeSearch(p.name).includes(normalizeSearch(productSearch)) ||
+                        normalizeSearch(p.code).includes(normalizeSearch(productSearch))
+                    )
+                    .map((p) => (
+                      <div
+                        key={p.id}
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => {
+                          setSelectedProductId(p.id);
+                          setProductSearch(`${p.code} - ${p.name}`);
+                          setShowProductDropdown(false);
+                        }}
+                        className={`px-4 py-3 hover:bg-surface-2 cursor-pointer border-b border-border last:border-none transition-colors ${selectedProductId === p.id ? 'bg-surface-2' : ''}`}
+                      >
+                        <p className="text-sm font-semibold text-ink">{p.name}</p>
+                        <p className="text-[10px] font-mono font-medium text-ink-muted uppercase">
+                          {p.code}
+                        </p>
+                      </div>
+                    ))}
                 </div>
               )}
             </div>
@@ -305,14 +384,21 @@ const ProductFormulaFormPage = () => {
             <div className="space-y-3 pt-4 border-t border-border">
               <div className="flex justify-between items-center">
                 <div className="flex items-center gap-2">
-                  <h4 className="text-xs font-semibold text-ink uppercase tracking-wider">Thành phần Hoạt chất</h4>
+                  <h4 className="text-xs font-semibold text-ink uppercase tracking-wider">
+                    Thành phần Hoạt chất
+                  </h4>
                   <span className="text-[10px] bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 px-2.5 py-0.5 rounded-full font-medium border border-emerald-500/20">
                     {ingredients.length} hoạt chất
                   </span>
                 </div>
-                <button 
-                  type="button" 
-                  onClick={() => setIngredients([...ingredients, { id: generateId('ing'), name: '', declaredContent: 0, unit: 'mg/viên' }])} 
+                <button
+                  type="button"
+                  onClick={() =>
+                    setIngredients([
+                      ...ingredients,
+                      { id: generateId('ing'), name: '', declaredContent: 0, unit: 'mg/viên' },
+                    ])
+                  }
                   className="px-3 py-1.5 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 rounded-lg hover:bg-emerald-500/15 transition-colors text-xs font-medium flex items-center gap-1.5 border border-emerald-500/20 active:scale-[0.98]"
                 >
                   <PlusIcon className="h-3.5 w-3.5" /> Thêm hoạt chất
@@ -331,98 +417,129 @@ const ProductFormulaFormPage = () => {
 
               <div className="space-y-2">
                 {ingredients.map((ing, index) => {
-                  const linkedMaterial = ing.materialId ? materialMap.get(ing.materialId) : undefined;
-                  const matchingMaterials = rawMaterials.filter(m => 
-                    !ing.name || normalizeSearch(m.name).includes(normalizeSearch(ing.name)) || 
-                    (Array.isArray(m.aliases) && m.aliases.some(a => normalizeSearch(a).includes(normalizeSearch(ing.name))))
+                  const linkedMaterial = ing.materialId
+                    ? materialMap.get(ing.materialId)
+                    : undefined;
+                  const matchingMaterials = rawMaterials.filter(
+                    (m) =>
+                      !ing.name ||
+                      normalizeSearch(m.name).includes(normalizeSearch(ing.name)) ||
+                      (Array.isArray(m.aliases) &&
+                        m.aliases.some((a) =>
+                          normalizeSearch(a).includes(normalizeSearch(ing.name))
+                        ))
                   );
 
                   return (
-                    <div key={ing.id} className="grid grid-cols-12 gap-2 items-center bg-surface-2/60 hover:bg-surface-2 p-2 rounded-xl border border-border transition-all relative">
+                    <div
+                      key={ing.id}
+                      className="grid grid-cols-12 gap-2 items-center bg-surface-2/60 hover:bg-surface-2 p-2 rounded-xl border border-border transition-all relative"
+                    >
                       <div className="col-span-5 relative">
                         <div className="relative flex items-center">
-                          <input 
-                            placeholder="Nhập hoặc chọn tên hoạt chất..." 
-                            value={ing.name} 
-                            onChange={e => {
+                          <input
+                            placeholder="Nhập hoặc chọn tên hoạt chất..."
+                            value={ing.name}
+                            onChange={(e) => {
                               handleIngredientChange(index, 'name', e.target.value);
                               setActiveMaterialDropdown({ type: 'ingredient', index });
-                            }} 
+                            }}
                             onFocus={() => setActiveMaterialDropdown({ type: 'ingredient', index })}
                             onBlur={() => setTimeout(() => setActiveMaterialDropdown(null), 250)}
-                            className={`w-full pl-3 pr-8 py-2 bg-surface border rounded-lg text-xs font-medium text-ink outline-none focus:ring-2 focus:ring-emerald-500/15 focus:border-emerald-500 ${linkedMaterial ? 'border-emerald-300 dark:border-emerald-700' : 'border-border'}`} 
+                            className={`w-full pl-3 pr-8 py-2 bg-surface border rounded-lg text-xs font-medium text-ink outline-none focus:ring-2 focus:ring-emerald-500/15 focus:border-emerald-500 ${linkedMaterial ? 'border-emerald-300 dark:border-emerald-700' : 'border-border'}`}
                           />
                           {linkedMaterial ? (
-                            <span title={`Đã liên kết: ${linkedMaterial.name} (${linkedMaterial.code || 'RM'})`} className="absolute right-2 text-emerald-600 dark:text-emerald-400 flex items-center gap-0.5">
+                            <span
+                              title={`Đã liên kết: ${linkedMaterial.name} (${linkedMaterial.code || 'RM'})`}
+                              className="absolute right-2 text-emerald-600 dark:text-emerald-400 flex items-center gap-0.5"
+                            >
                               <LinkIcon className="h-3.5 w-3.5" />
                             </span>
                           ) : (
-                            <span title="Chưa liên kết kho nguyên liệu" className="absolute right-2 text-ink-muted opacity-40">
+                            <span
+                              title="Chưa liên kết kho nguyên liệu"
+                              className="absolute right-2 text-ink-muted opacity-40"
+                            >
                               <LinkIcon className="h-3.5 w-3.5" />
                             </span>
                           )}
                         </div>
 
                         {/* Dropdown gợi ý từ Kho nguyên liệu */}
-                        {activeMaterialDropdown?.type === 'ingredient' && activeMaterialDropdown.index === index && (matchingMaterials.length > 0 || ing.name.trim()) && (
-                          <div className="absolute z-40 w-full mt-1 bg-surface rounded-xl shadow-xl border border-border max-h-56 overflow-y-auto">
-                            <div className="p-1.5 bg-surface-2 border-b border-border text-[9px] font-semibold text-ink-muted uppercase tracking-wider">
-                              Gợi ý từ Danh mục Nguyên liệu ({matchingMaterials.length})
-                            </div>
-                            {matchingMaterials.map(m => (
-                              <div 
-                                key={m.id} 
-                                onMouseDown={(e) => e.preventDefault()}
-                                onClick={() => handleSelectMaterialForIngredient(index, m)}
-                                className="p-2 hover:bg-surface-2 cursor-pointer border-b border-border last:border-none flex items-center justify-between text-xs transition-colors"
-                              >
-                                <div>
-                                  <span className="font-semibold text-ink">{m.name}</span>
-                                  {m.aliases && m.aliases.length > 0 && (
-                                    <span className="text-[10px] text-ink-muted ml-1.5">({m.aliases.join(', ')})</span>
-                                  )}
+                        {activeMaterialDropdown?.type === 'ingredient' &&
+                          activeMaterialDropdown.index === index &&
+                          (matchingMaterials.length > 0 || ing.name.trim()) && (
+                            <div className="absolute z-40 w-full mt-1 bg-surface rounded-xl shadow-xl border border-border max-h-56 overflow-y-auto">
+                              <div className="p-1.5 bg-surface-2 border-b border-border text-[9px] font-semibold text-ink-muted uppercase tracking-wider">
+                                Gợi ý từ Danh mục Nguyên liệu ({matchingMaterials.length})
+                              </div>
+                              {matchingMaterials.map((m) => (
+                                <div
+                                  key={m.id}
+                                  onMouseDown={(e) => e.preventDefault()}
+                                  onClick={() => handleSelectMaterialForIngredient(index, m)}
+                                  className="p-2 hover:bg-surface-2 cursor-pointer border-b border-border last:border-none flex items-center justify-between text-xs transition-colors"
+                                >
+                                  <div>
+                                    <span className="font-semibold text-ink">{m.name}</span>
+                                    {m.aliases && m.aliases.length > 0 && (
+                                      <span className="text-[10px] text-ink-muted ml-1.5">
+                                        ({m.aliases.join(', ')})
+                                      </span>
+                                    )}
+                                  </div>
+                                  <span
+                                    className={`text-[9px] font-medium px-1.5 py-0.5 rounded ${m.category === 'ACTIVE' ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400' : 'bg-surface-3 text-ink-muted'}`}
+                                  >
+                                    {m.category === 'ACTIVE' ? 'Hoạt chất' : 'Tá dược'}
+                                  </span>
                                 </div>
-                                <span className={`text-[9px] font-medium px-1.5 py-0.5 rounded ${m.category === 'ACTIVE' ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400' : 'bg-surface-3 text-ink-muted'}`}>
-                                  {m.category === 'ACTIVE' ? 'Hoạt chất' : 'Tá dược'}
-                                </span>
-                              </div>
-                            ))}
-                            {ing.name.trim() && !matchingMaterials.some(m => m.name.toLowerCase() === ing.name.trim().toLowerCase()) && (
-                              <div
-                                onMouseDown={(e) => e.preventDefault()}
-                                onClick={() => handleQuickCreateMaterialForIngredient(index, ing.name)}
-                                className="p-2.5 bg-emerald-500/10 hover:bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 font-medium text-xs cursor-pointer flex items-center gap-1.5 border-t border-emerald-500/20 transition-colors"
-                              >
-                                <PlusIcon className="h-3.5 w-3.5" />
-                                <span>+ Thêm nhanh "{ing.name}" vào Danh mục chuẩn</span>
-                              </div>
-                            )}
-                          </div>
-                        )}
+                              ))}
+                              {ing.name.trim() &&
+                                !matchingMaterials.some(
+                                  (m) => m.name.toLowerCase() === ing.name.trim().toLowerCase()
+                                ) && (
+                                  <div
+                                    onMouseDown={(e) => e.preventDefault()}
+                                    onClick={() =>
+                                      handleQuickCreateMaterialForIngredient(index, ing.name)
+                                    }
+                                    className="p-2.5 bg-emerald-500/10 hover:bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 font-medium text-xs cursor-pointer flex items-center gap-1.5 border-t border-emerald-500/20 transition-colors"
+                                  >
+                                    <PlusIcon className="h-3.5 w-3.5" />
+                                    <span>+ Thêm nhanh "{ing.name}" vào Danh mục chuẩn</span>
+                                  </div>
+                                )}
+                            </div>
+                          )}
                       </div>
 
-                      <input 
-                        placeholder="0" 
-                        value={ing.declaredContent} 
-                        onChange={e => handleIngredientChange(index, 'declaredContent', e.target.value)} 
-                        className="col-span-2 px-3 py-2 bg-surface border border-border rounded-lg text-xs font-medium text-ink outline-none text-right focus:ring-2 focus:ring-emerald-500/15 focus:border-emerald-500" 
+                      <input
+                        placeholder="0"
+                        value={ing.declaredContent}
+                        onChange={(e) =>
+                          handleIngredientChange(index, 'declaredContent', e.target.value)
+                        }
+                        className="col-span-2 px-3 py-2 bg-surface border border-border rounded-lg text-xs font-medium text-ink outline-none text-right focus:ring-2 focus:ring-emerald-500/15 focus:border-emerald-500"
                       />
-                      <input 
-                        placeholder="ĐVT" 
-                        value={ing.unit} 
-                        onChange={e => handleIngredientChange(index, 'unit', e.target.value)} 
-                        className="col-span-2 px-3 py-2 bg-surface border border-border rounded-lg text-xs font-medium text-ink outline-none text-center focus:ring-2 focus:ring-emerald-500/15 focus:border-emerald-500" 
-                        list="formula-unit-suggestions" 
+                      <input
+                        placeholder="ĐVT"
+                        value={ing.unit}
+                        onChange={(e) => handleIngredientChange(index, 'unit', e.target.value)}
+                        className="col-span-2 px-3 py-2 bg-surface border border-border rounded-lg text-xs font-medium text-ink outline-none text-center focus:ring-2 focus:ring-emerald-500/15 focus:border-emerald-500"
+                        list="formula-unit-suggestions"
                       />
-                      <input 
-                        placeholder="(Tùy chọn)" 
-                        value={ing.elementalContent || ''} 
-                        onChange={e => handleIngredientChange(index, 'elementalContent', e.target.value)} 
-                        className="col-span-2 px-3 py-2 bg-surface border border-border rounded-lg text-xs font-medium text-ink outline-none text-right focus:ring-2 focus:ring-emerald-500/15 focus:border-emerald-500" 
+                      <input
+                        placeholder="(Tùy chọn)"
+                        value={ing.elementalContent || ''}
+                        onChange={(e) =>
+                          handleIngredientChange(index, 'elementalContent', e.target.value)
+                        }
+                        className="col-span-2 px-3 py-2 bg-surface border border-border rounded-lg text-xs font-medium text-ink outline-none text-right focus:ring-2 focus:ring-emerald-500/15 focus:border-emerald-500"
                       />
-                      <button 
-                        type="button" 
-                        onClick={() => setIngredients(ingredients.filter((_, i) => i !== index))} 
+                      <button
+                        type="button"
+                        onClick={() => setIngredients(ingredients.filter((_, i) => i !== index))}
                         className="col-span-1 p-2 text-ink-muted hover:text-rose-600 transition-colors flex justify-center"
                         title="Xóa hoạt chất"
                       >
@@ -438,14 +555,21 @@ const ProductFormulaFormPage = () => {
             <div className="space-y-3 pt-4 border-t border-border">
               <div className="flex justify-between items-center">
                 <div className="flex items-center gap-2">
-                  <h4 className="text-xs font-semibold text-ink uppercase tracking-wider">Thành phần Tá dược</h4>
+                  <h4 className="text-xs font-semibold text-ink uppercase tracking-wider">
+                    Thành phần Tá dược
+                  </h4>
                   <span className="text-[10px] bg-surface-2 text-ink-muted px-2.5 py-0.5 rounded-full font-medium border border-border">
                     {excipients.length} tá dược
                   </span>
                 </div>
-                <button 
-                  type="button" 
-                  onClick={() => setExcipients([...excipients, { id: generateId('exc'), name: '', declaredContent: 0, unit: 'mg/viên' }])} 
+                <button
+                  type="button"
+                  onClick={() =>
+                    setExcipients([
+                      ...excipients,
+                      { id: generateId('exc'), name: '', declaredContent: 0, unit: 'mg/viên' },
+                    ])
+                  }
                   className="px-3 py-1.5 bg-surface-2 hover:bg-surface-3 text-ink rounded-lg transition-colors text-xs font-medium flex items-center gap-1.5 border border-border active:scale-[0.98]"
                 >
                   <PlusIcon className="h-3.5 w-3.5" /> Thêm tá dược
@@ -463,92 +587,121 @@ const ProductFormulaFormPage = () => {
 
               <div className="space-y-2">
                 {excipients.map((exc, index) => {
-                  const linkedMaterial = exc.materialId ? materialMap.get(exc.materialId) : undefined;
-                  const matchingMaterials = rawMaterials.filter(m => 
-                    !exc.name || normalizeSearch(m.name).includes(normalizeSearch(exc.name)) || 
-                    (Array.isArray(m.aliases) && m.aliases.some(a => normalizeSearch(a).includes(normalizeSearch(exc.name))))
+                  const linkedMaterial = exc.materialId
+                    ? materialMap.get(exc.materialId)
+                    : undefined;
+                  const matchingMaterials = rawMaterials.filter(
+                    (m) =>
+                      !exc.name ||
+                      normalizeSearch(m.name).includes(normalizeSearch(exc.name)) ||
+                      (Array.isArray(m.aliases) &&
+                        m.aliases.some((a) =>
+                          normalizeSearch(a).includes(normalizeSearch(exc.name))
+                        ))
                   );
 
                   return (
-                    <div key={exc.id} className="grid grid-cols-12 gap-2 items-center bg-surface-2/60 hover:bg-surface-2 p-2 rounded-xl border border-border transition-all relative">
+                    <div
+                      key={exc.id}
+                      className="grid grid-cols-12 gap-2 items-center bg-surface-2/60 hover:bg-surface-2 p-2 rounded-xl border border-border transition-all relative"
+                    >
                       <div className="col-span-7 relative">
                         <div className="relative flex items-center">
-                          <input 
-                            placeholder="Nhập hoặc chọn tên tá dược..." 
-                            value={exc.name} 
-                            onChange={e => {
+                          <input
+                            placeholder="Nhập hoặc chọn tên tá dược..."
+                            value={exc.name}
+                            onChange={(e) => {
                               handleExcipientChange(index, 'name', e.target.value);
                               setActiveMaterialDropdown({ type: 'excipient', index });
-                            }} 
+                            }}
                             onFocus={() => setActiveMaterialDropdown({ type: 'excipient', index })}
                             onBlur={() => setTimeout(() => setActiveMaterialDropdown(null), 250)}
-                            className={`w-full pl-3 pr-8 py-2 bg-surface border rounded-lg text-xs font-medium text-ink outline-none focus:ring-2 focus:ring-emerald-500/15 focus:border-emerald-500 ${linkedMaterial ? 'border-emerald-300 dark:border-emerald-700' : 'border-border'}`} 
+                            className={`w-full pl-3 pr-8 py-2 bg-surface border rounded-lg text-xs font-medium text-ink outline-none focus:ring-2 focus:ring-emerald-500/15 focus:border-emerald-500 ${linkedMaterial ? 'border-emerald-300 dark:border-emerald-700' : 'border-border'}`}
                           />
                           {linkedMaterial ? (
-                            <span title={`Đã liên kết: ${linkedMaterial.name}`} className="absolute right-2 text-emerald-600 dark:text-emerald-400 flex items-center gap-0.5">
+                            <span
+                              title={`Đã liên kết: ${linkedMaterial.name}`}
+                              className="absolute right-2 text-emerald-600 dark:text-emerald-400 flex items-center gap-0.5"
+                            >
                               <LinkIcon className="h-3.5 w-3.5" />
                             </span>
                           ) : (
-                            <span title="Chưa liên kết kho nguyên liệu" className="absolute right-2 text-ink-muted opacity-40">
+                            <span
+                              title="Chưa liên kết kho nguyên liệu"
+                              className="absolute right-2 text-ink-muted opacity-40"
+                            >
                               <LinkIcon className="h-3.5 w-3.5" />
                             </span>
                           )}
                         </div>
 
                         {/* Dropdown gợi ý từ Kho nguyên liệu */}
-                        {activeMaterialDropdown?.type === 'excipient' && activeMaterialDropdown.index === index && (matchingMaterials.length > 0 || exc.name.trim()) && (
-                          <div className="absolute z-40 w-full mt-1 bg-surface rounded-xl shadow-xl border border-border max-h-56 overflow-y-auto">
-                            <div className="p-1.5 bg-surface-2 border-b border-border text-[9px] font-semibold text-ink-muted uppercase tracking-wider">
-                              Gợi ý từ Danh mục Nguyên liệu ({matchingMaterials.length})
-                            </div>
-                            {matchingMaterials.map(m => (
-                              <div 
-                                key={m.id} 
-                                onMouseDown={(e) => e.preventDefault()}
-                                onClick={() => handleSelectMaterialForExcipient(index, m)}
-                                className="p-2 hover:bg-surface-2 cursor-pointer border-b border-border last:border-none flex items-center justify-between text-xs transition-colors"
-                              >
-                                <div>
-                                  <span className="font-semibold text-ink">{m.name}</span>
-                                  {m.aliases && m.aliases.length > 0 && (
-                                    <span className="text-[10px] text-ink-muted ml-1.5">({m.aliases.join(', ')})</span>
-                                  )}
+                        {activeMaterialDropdown?.type === 'excipient' &&
+                          activeMaterialDropdown.index === index &&
+                          (matchingMaterials.length > 0 || exc.name.trim()) && (
+                            <div className="absolute z-40 w-full mt-1 bg-surface rounded-xl shadow-xl border border-border max-h-56 overflow-y-auto">
+                              <div className="p-1.5 bg-surface-2 border-b border-border text-[9px] font-semibold text-ink-muted uppercase tracking-wider">
+                                Gợi ý từ Danh mục Nguyên liệu ({matchingMaterials.length})
+                              </div>
+                              {matchingMaterials.map((m) => (
+                                <div
+                                  key={m.id}
+                                  onMouseDown={(e) => e.preventDefault()}
+                                  onClick={() => handleSelectMaterialForExcipient(index, m)}
+                                  className="p-2 hover:bg-surface-2 cursor-pointer border-b border-border last:border-none flex items-center justify-between text-xs transition-colors"
+                                >
+                                  <div>
+                                    <span className="font-semibold text-ink">{m.name}</span>
+                                    {m.aliases && m.aliases.length > 0 && (
+                                      <span className="text-[10px] text-ink-muted ml-1.5">
+                                        ({m.aliases.join(', ')})
+                                      </span>
+                                    )}
+                                  </div>
+                                  <span
+                                    className={`text-[9px] font-medium px-1.5 py-0.5 rounded ${m.category === 'ACTIVE' ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400' : 'bg-surface-3 text-ink-muted'}`}
+                                  >
+                                    {m.category === 'ACTIVE' ? 'Hoạt chất' : 'Tá dược'}
+                                  </span>
                                 </div>
-                                <span className={`text-[9px] font-medium px-1.5 py-0.5 rounded ${m.category === 'ACTIVE' ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400' : 'bg-surface-3 text-ink-muted'}`}>
-                                  {m.category === 'ACTIVE' ? 'Hoạt chất' : 'Tá dược'}
-                                </span>
-                              </div>
-                            ))}
-                            {exc.name.trim() && !matchingMaterials.some(m => m.name.toLowerCase() === exc.name.trim().toLowerCase()) && (
-                              <div
-                                onMouseDown={(e) => e.preventDefault()}
-                                onClick={() => handleQuickCreateMaterialForExcipient(index, exc.name)}
-                                className="p-2.5 bg-emerald-500/10 hover:bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 font-medium text-xs cursor-pointer flex items-center gap-1.5 border-t border-emerald-500/20 transition-colors"
-                              >
-                                <PlusIcon className="h-3.5 w-3.5" />
-                                <span>+ Thêm nhanh "{exc.name}" vào Danh mục chuẩn</span>
-                              </div>
-                            )}
-                          </div>
-                        )}
+                              ))}
+                              {exc.name.trim() &&
+                                !matchingMaterials.some(
+                                  (m) => m.name.toLowerCase() === exc.name.trim().toLowerCase()
+                                ) && (
+                                  <div
+                                    onMouseDown={(e) => e.preventDefault()}
+                                    onClick={() =>
+                                      handleQuickCreateMaterialForExcipient(index, exc.name)
+                                    }
+                                    className="p-2.5 bg-emerald-500/10 hover:bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 font-medium text-xs cursor-pointer flex items-center gap-1.5 border-t border-emerald-500/20 transition-colors"
+                                  >
+                                    <PlusIcon className="h-3.5 w-3.5" />
+                                    <span>+ Thêm nhanh "{exc.name}" vào Danh mục chuẩn</span>
+                                  </div>
+                                )}
+                            </div>
+                          )}
                       </div>
 
-                      <input 
-                        placeholder="0" 
-                        value={exc.declaredContent} 
-                        onChange={e => handleExcipientChange(index, 'declaredContent', e.target.value)} 
-                        className="col-span-2 px-3 py-2 bg-surface border border-border rounded-lg text-xs font-medium text-ink outline-none text-right focus:ring-2 focus:ring-emerald-500/15 focus:border-emerald-500" 
+                      <input
+                        placeholder="0"
+                        value={exc.declaredContent}
+                        onChange={(e) =>
+                          handleExcipientChange(index, 'declaredContent', e.target.value)
+                        }
+                        className="col-span-2 px-3 py-2 bg-surface border border-border rounded-lg text-xs font-medium text-ink outline-none text-right focus:ring-2 focus:ring-emerald-500/15 focus:border-emerald-500"
                       />
-                      <input 
-                        placeholder="ĐVT" 
-                        value={exc.unit} 
-                        onChange={e => handleExcipientChange(index, 'unit', e.target.value)} 
-                        className="col-span-2 px-3 py-2 bg-surface border border-border rounded-lg text-xs font-medium text-ink outline-none text-center focus:ring-2 focus:ring-emerald-500/15 focus:border-emerald-500" 
-                        list="formula-unit-suggestions" 
+                      <input
+                        placeholder="ĐVT"
+                        value={exc.unit}
+                        onChange={(e) => handleExcipientChange(index, 'unit', e.target.value)}
+                        className="col-span-2 px-3 py-2 bg-surface border border-border rounded-lg text-xs font-medium text-ink outline-none text-center focus:ring-2 focus:ring-emerald-500/15 focus:border-emerald-500"
+                        list="formula-unit-suggestions"
                       />
-                      <button 
-                        type="button" 
-                        onClick={() => setExcipients(excipients.filter((_, i) => i !== index))} 
+                      <button
+                        type="button"
+                        onClick={() => setExcipients(excipients.filter((_, i) => i !== index))}
                         className="col-span-1 p-2 text-ink-muted hover:text-rose-600 transition-colors flex justify-center"
                         title="Xóa tá dược"
                       >
@@ -563,36 +716,69 @@ const ProductFormulaFormPage = () => {
             {/* Sensory & Other Info */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-6 border-t border-border">
               <div>
-                <h4 className="text-xs font-semibold text-ink uppercase tracking-wider mb-3">Thông tin Cảm quan</h4>
+                <h4 className="text-xs font-semibold text-ink uppercase tracking-wider mb-3">
+                  Thông tin Cảm quan
+                </h4>
                 <div className="space-y-3">
-                  <DSFormInput label="Dạng bào chế" name="dosageForm" defaultValue={formulaToEdit?.sensory?.dosageForm} placeholder="VD: Viên nang, dung dịch..." />
-                  <DSFormInput label="Màu sắc" name="color" defaultValue={formulaToEdit?.sensory?.color} />
-                  <DSFormInput label="Mùi vị" name="smellTaste" defaultValue={formulaToEdit?.sensory?.smellTaste} />
-                  <DSFormInput label="Trạng thái / Ngoại quan" name="appearance" defaultValue={formulaToEdit?.sensory?.appearance} />
+                  <DSFormInput
+                    label="Dạng bào chế"
+                    name="dosageForm"
+                    defaultValue={formulaToEdit?.sensory?.dosageForm}
+                    placeholder="VD: Viên nang, dung dịch..."
+                  />
+                  <DSFormInput
+                    label="Màu sắc"
+                    name="color"
+                    defaultValue={formulaToEdit?.sensory?.color}
+                  />
+                  <DSFormInput
+                    label="Mùi vị"
+                    name="smellTaste"
+                    defaultValue={formulaToEdit?.sensory?.smellTaste}
+                  />
+                  <DSFormInput
+                    label="Trạng thái / Ngoại quan"
+                    name="appearance"
+                    defaultValue={formulaToEdit?.sensory?.appearance}
+                  />
                 </div>
               </div>
               <div>
-                <h4 className="text-xs font-semibold text-ink uppercase tracking-wider mb-3">Thông tin khác</h4>
+                <h4 className="text-xs font-semibold text-ink uppercase tracking-wider mb-3">
+                  Thông tin khác
+                </h4>
                 <div className="space-y-3">
-                  <DSFormInput label="Quy cách đóng gói" name="packaging" defaultValue={formulaToEdit?.packaging} />
-                  <DSFormInput label="Điều kiện bảo quản" name="storage" defaultValue={formulaToEdit?.storage} />
-                  <DSFormInput label="Hạn dùng" name="shelfLife" defaultValue={formulaToEdit?.shelfLife} />
+                  <DSFormInput
+                    label="Quy cách đóng gói"
+                    name="packaging"
+                    defaultValue={formulaToEdit?.packaging}
+                  />
+                  <DSFormInput
+                    label="Điều kiện bảo quản"
+                    name="storage"
+                    defaultValue={formulaToEdit?.storage}
+                  />
+                  <DSFormInput
+                    label="Hạn dùng"
+                    name="shelfLife"
+                    defaultValue={formulaToEdit?.shelfLife}
+                  />
                 </div>
               </div>
             </div>
 
             {/* Actions */}
             <div className="flex justify-end gap-3 pt-6 border-t border-border">
-              <button 
-                type="button" 
-                onClick={() => navigate('/product-formulas')} 
+              <button
+                type="button"
+                onClick={() => navigate('/product-formulas')}
                 className="px-4 py-2 text-ink-muted hover:text-ink font-medium text-xs hover:bg-surface-2 rounded-lg border border-border transition-colors active:scale-[0.98]"
               >
                 Hủy
               </button>
-              <button 
-                type="submit" 
-                disabled={isSubmitting} 
+              <button
+                type="submit"
+                disabled={isSubmitting}
                 className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-xs rounded-lg shadow-xs transition-all flex items-center gap-1.5 active:scale-[0.98] disabled:opacity-50"
               >
                 {isSubmitting ? (

@@ -1,14 +1,25 @@
-import * as pdfjsLib from 'pdfjs-dist';
-import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
+let pdfjsLibInstance: any = null;
 
-// Thiết lập Worker cho PDF.js trong Vite
-if (typeof window !== 'undefined') {
-  try {
-    pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
-  } catch (e) {
-    // Fallback CDN nếu worker URL nội bộ gặp vấn đề
-    pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjsLib.version || '6.2.108'}/build/pdf.worker.min.mjs`;
+/**
+ * Lazy loader cho pdfjs-dist và worker của nó.
+ * Giúp cô lập thư viện ~3MB khỏi main bundle, chỉ tải khi người dùng xử lý file PDF.
+ */
+async function getPdfJs() {
+  if (!pdfjsLibInstance) {
+    const [pdfjsLib, workerModule] = await Promise.all([
+      import('pdfjs-dist'),
+      import('pdfjs-dist/build/pdf.worker.min.mjs?url'),
+    ]);
+    if (typeof window !== 'undefined') {
+      try {
+        pdfjsLib.GlobalWorkerOptions.workerSrc = workerModule.default;
+      } catch {
+        pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjsLib.version || '6.2.108'}/build/pdf.worker.min.mjs`;
+      }
+    }
+    pdfjsLibInstance = pdfjsLib;
   }
+  return pdfjsLibInstance;
 }
 
 export interface RenderedPdfPage {
@@ -38,14 +49,9 @@ export async function convertPdfToImages(
   file: File | Blob,
   options: PdfConversionOptions = {}
 ): Promise<RenderedPdfPage[]> {
-  const {
-    targetWidth = 1600,
-    quality = 0.85,
-    maxPages = 50,
-    onProgress,
-  } = options;
+  const { targetWidth = 1600, quality = 0.85, maxPages = 50, onProgress } = options;
 
-  const arrayBuffer = await file.arrayBuffer();
+  const [pdfjsLib, arrayBuffer] = await Promise.all([getPdfJs(), file.arrayBuffer()]);
   const loadingTask = pdfjsLib.getDocument({
     data: new Uint8Array(arrayBuffer),
     cMapUrl: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@6.2.108/cmaps/',

@@ -12,14 +12,27 @@ export default defineConfig(({ mode }) => ({
     environment: 'jsdom',
     setupFiles: './src/setupTests.ts',
   },
-  plugins: [
-    react()
-  ],
+  plugins: [react()],
   build: {
     minify: 'esbuild',
-    chunkSizeWarningLimit: 1000, // Tăng giới hạn cảnh báo dung lượng (Firebase khá nặng)
+    chunkSizeWarningLimit: 1000,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'vendor-react': ['react', 'react-dom', 'react-router-dom'],
+          'vendor-ui': ['@headlessui/react', '@heroicons/react'],
+          'vendor-charts': ['recharts'],
+          'vendor-firebase': [
+            'firebase/app',
+            'firebase/auth',
+            'firebase/database',
+            'firebase/storage',
+          ],
+        },
+      },
+    },
   },
   esbuild: {
     drop: mode === 'production' ? ['console', 'debugger'] : [],
-  }
+  },
 }));

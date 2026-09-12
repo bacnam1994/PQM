@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useMemo } from 'react';
+import { ZodSchema } from 'zod';
 
-type Validator<T> = (values: T) => Partial<Record<keyof T, string>>;
+export type Validator<T> = ((values: T) => Partial<Record<keyof T, string>>) | ZodSchema<any>;
 
 export function useForm<T>(initialValues: T, validator?: Validator<T>) {
   const [values, setValues] = useState<T>(initialValues);
@@ -13,81 +14,112 @@ export function useForm<T>(initialValues: T, validator?: Validator<T>) {
 
   const validate = useCallback(() => {
     if (!validator) return true;
-    const newErrors = validator(values);
+    if (typeof validator === 'function') {
+      const newErrors = validator(values);
+      setErrors(newErrors);
+      return Object.keys(newErrors).length === 0;
+    }
+
+    // Xử lý Schema Zod
+    const result = validator.safeParse(values);
+    if (result.success) {
+      setErrors({});
+      return true;
+    }
+
+    const newErrors: Partial<Record<keyof T, string>> = {};
+    for (const issue of result.error.issues) {
+      const field = issue.path[0] as keyof T;
+      if (field && !newErrors[field]) {
+        newErrors[field] = issue.message;
+      }
+    }
     setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    return false;
   }, [validator, values]);
 
-  const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-    const { name, value } = e.target;
-    setValues(prev => ({ ...prev, [name]: value }));
-    // Xóa lỗi của trường đang nhập khi người dùng thay đổi giá trị
-    if (validator) {
-        setErrors(prev => ({ ...prev, [name]: undefined }));
-    }
-  }, [validator]);
+  const handleChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+      const { name, value } = e.target;
+      setValues((prev) => ({ ...prev, [name]: value }));
+      // Xóa lỗi của trường đang nhập khi người dùng thay đổi giá trị
+      if (validator) {
+        setErrors((prev) => ({ ...prev, [name]: undefined }));
+      }
+    },
+    [validator]
+  );
 
-  const setFieldValue = useCallback((name: keyof T, value: any) => {
-    setValues(prev => ({ ...prev, [name]: value }));
-    if (validator) {
-        setErrors(prev => ({ ...prev, [name]: undefined }));
-    }
-  }, [validator]);
+  const setFieldValue = useCallback(
+    (name: keyof T, value: any) => {
+      setValues((prev) => ({ ...prev, [name]: value }));
+      if (validator) {
+        setErrors((prev) => ({ ...prev, [name]: undefined }));
+      }
+    },
+    [validator]
+  );
 
   const setMapValue = useCallback((mapName: keyof T, key: string, value: any) => {
     setValues((prev: any) => ({
-        ...prev,
-        [mapName]: { ...(prev[mapName] || {}), [key]: value }
+      ...prev,
+      [mapName]: { ...(prev[mapName] || {}), [key]: value },
     }));
   }, []);
 
   const addToArray = useCallback((arrayName: keyof T, item: any) => {
     setValues((prev: any) => ({
-        ...prev,
-        [arrayName]: [...(prev[arrayName] || []), item]
+      ...prev,
+      [arrayName]: [...(prev[arrayName] || []), item],
     }));
   }, []);
 
   const removeFromArray = useCallback((arrayName: keyof T, index: number) => {
     setValues((prev: any) => ({
-        ...prev,
-        [arrayName]: (prev[arrayName] || []).filter((_: any, i: number) => i !== index)
+      ...prev,
+      [arrayName]: (prev[arrayName] || []).filter((_: any, i: number) => i !== index),
     }));
   }, []);
 
-  const updateInArray = useCallback((arrayName: keyof T, index: number, field: string, value: any) => {
-    setValues((prev: any) => {
+  const updateInArray = useCallback(
+    (arrayName: keyof T, index: number, field: string, value: any) => {
+      setValues((prev: any) => {
         const newArray = [...(prev[arrayName] || [])];
         if (newArray[index]) {
-            newArray[index] = { ...newArray[index], [field]: value };
+          newArray[index] = { ...newArray[index], [field]: value };
         }
         return { ...prev, [arrayName]: newArray };
-    });
-  }, []);
+      });
+    },
+    []
+  );
 
-  return useMemo(() => ({
-    values,
-    errors,
-    setValues,
-    setErrors,
-    resetForm,
-    validate,
-    handleChange,
-    setFieldValue,
-    setMapValue,
-    addToArray,
-    removeFromArray,
-    updateInArray,
-  }), [
-    values, 
-    errors, 
-    resetForm, 
-    validate, 
-    handleChange, 
-    setFieldValue, 
-    setMapValue, 
-    addToArray, 
-    removeFromArray, 
-    updateInArray
-  ]);
+  return useMemo(
+    () => ({
+      values,
+      errors,
+      setValues,
+      setErrors,
+      resetForm,
+      validate,
+      handleChange,
+      setFieldValue,
+      setMapValue,
+      addToArray,
+      removeFromArray,
+      updateInArray,
+    }),
+    [
+      values,
+      errors,
+      resetForm,
+      validate,
+      handleChange,
+      setFieldValue,
+      setMapValue,
+      addToArray,
+      removeFromArray,
+      updateInArray,
+    ]
+  );
 }

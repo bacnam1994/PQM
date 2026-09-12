@@ -8,10 +8,11 @@
  * 4. Cơ chế chuyển đổi mô hình dự phòng (Automatic Model Fallback: 2.5 Flash -> 2.0 Flash) khi gặp lỗi 429/503.
  */
 
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { createGoogleGenerativeAI } from './geminiClientLoader';
 import { getApiKey, getGeminiModel, formatGeminiError } from './geminiService';
 import { promptRegistry, PromptIdentifier, PromptDefinition } from './promptRegistry';
 import { logAuditAction } from '../auditService';
+import { semanticCache } from './semanticCacheService';
 
 export interface AIGatewayRequest<TInput = any> {
   promptId: PromptIdentifier;
@@ -25,6 +26,8 @@ export interface AIGatewayRequest<TInput = any> {
     documentType?: string;
     documentId?: string;
     responseSchema?: any;
+    bypassCache?: boolean;
+    ttlMinutes?: number;
   };
 }
 
@@ -40,6 +43,8 @@ export interface AIGatewayResponse<TOutput = any> {
     confidenceScore: number; // Thang điểm 0.0 -> 1.0
     confidenceLevel: 'HIGH' | 'MEDIUM' | 'LOW';
     executedAt: string;
+    isCached?: boolean;
+    similarity?: number;
   };
 }
 
@@ -57,7 +62,7 @@ export class AIGatewayService {
       const score = Math.max(0, Math.min(1, data.confidence));
       return {
         score,
-        level: score >= 0.85 ? 'HIGH' : score >= 0.65 ? 'MEDIUM' : 'LOW'
+        level: score >= 0.85 ? 'HIGH' : score >= 0.65 ? 'MEDIUM' : 'LOW',
       };
     }
 
@@ -65,7 +70,7 @@ export class AIGatewayService {
       const upper = data.confidence.toUpperCase();
       if (upper === 'HIGH') return { score: 0.95, level: 'HIGH' };
       if (upper === 'MEDIUM') return { score: 0.75, level: 'MEDIUM' };
-      if (upper === 'LOW') return { score: 0.50, level: 'LOW' };
+      if (upper === 'LOW') return { score: 0.5, level: 'LOW' };
     }
 
     // 2. Nếu có danh sách items/criteria có confidence
@@ -77,7 +82,7 @@ export class AIGatewayService {
         for (const item of list) {
           if (typeof item.confidence === 'string') {
             const u = item.confidence.toUpperCase();
-            totalScore += (u === 'HIGH' ? 0.95 : u === 'LOW' ? 0.5 : 0.75);
+            totalScore += u === 'HIGH' ? 0.95 : u === 'LOW' ? 0.5 : 0.75;
             count++;
           } else if (typeof item.confidence === 'number') {
             totalScore += item.confidence;
@@ -88,14 +93,14 @@ export class AIGatewayService {
           const avg = totalScore / count;
           return {
             score: Number(avg.toFixed(2)),
-            level: avg >= 0.85 ? 'HIGH' : avg >= 0.65 ? 'MEDIUM' : 'LOW'
+            level: avg >= 0.85 ? 'HIGH' : avg >= 0.65 ? 'MEDIUM' : 'LOW',
           };
         }
       }
     }
 
     // Mặc định cho suy luận thành công
-    return { score: 0.90, level: 'HIGH' };
+    return { score: 0.9, level: 'HIGH' };
   }
 
   /**
@@ -119,6 +124,39 @@ export class AIGatewayService {
     let parsedData: TOutput | undefined;
     let errorMessage: string | undefined;
 
+    // 2. Tra cứu Semantic Cache (Phản hồi tức thì < 50ms & Tiết kiệm token)
+    const cached = semanticCache.get<TOutput>(request);
+    if (cached) {
+      const cacheLatencyMs = Math.round(performance.now() - startTime);
+      try {
+        logAuditAction({
+          action: 'UPDATE',
+          collection: 'AI_GATEWAY',
+          documentId: `${promptDef.id}@${promptDef.version}`,
+          details: `[AI Cache Hit] Prompt: ${promptDef.id} (v${promptDef.version}) | Mode: ${cached.isExactMatch ? 'EXACT' : 'SEMANTIC'} (${Math.round(cached.similarity * 100)}%) | Latency: ${cacheLatencyMs}ms`,
+          performedBy: request.options?.userEmail || 'AI_GATEWAY',
+        });
+      } catch (auditErr) {
+        console.warn('[AIGateway] Ghi audit trail cache hit thất bại:', auditErr);
+      }
+
+      return {
+        success: true,
+        data: cached.data,
+        metadata: {
+          promptId: promptDef.id,
+          promptVersion: promptDef.version,
+          modelUsed: `${primaryModel} (cached)`,
+          latencyMs: cacheLatencyMs,
+          confidenceScore: cached.confidenceScore,
+          confidenceLevel: 'HIGH',
+          executedAt,
+          isCached: true,
+          similarity: cached.similarity,
+        },
+      };
+    }
+
     const apiKey = getApiKey();
     if (!apiKey) {
       errorMessage = 'Chưa cấu hình Gemini API Key.';
@@ -132,12 +170,12 @@ export class AIGatewayService {
           latencyMs: Math.round(performance.now() - startTime),
           confidenceScore: 0,
           confidenceLevel: 'LOW',
-          executedAt
-        }
+          executedAt,
+        },
       };
     }
 
-    const genAI = new GoogleGenerativeAI(apiKey);
+    const genAI = await createGoogleGenerativeAI(apiKey);
 
     // 2. Gọi model với cơ chế Fallback
     const maxRetries = 2;
@@ -157,14 +195,10 @@ export class AIGatewayService {
           generationConfig,
         });
 
-        const promptInput = typeof request.input === 'string'
-          ? request.input
-          : JSON.stringify(request.input);
+        const promptInput =
+          typeof request.input === 'string' ? request.input : JSON.stringify(request.input);
 
-        const result = await model.generateContent([
-          promptDef.systemPrompt,
-          promptInput,
-        ]);
+        const result = await model.generateContent([promptDef.systemPrompt, promptInput]);
 
         rawText = result.response.text();
         parsedData = JSON.parse(rawText) as TOutput;
@@ -172,7 +206,9 @@ export class AIGatewayService {
       } catch (err: any) {
         const msg = String(err?.message || '');
         if ((msg.includes('429') || msg.includes('503')) && currentModel !== this.fallbackModel) {
-          console.warn(`[AIGateway] Model ${currentModel} quá tải. Chuyển sang fallback ${this.fallbackModel}...`);
+          console.warn(
+            `[AIGateway] Model ${currentModel} quá tải. Chuyển sang fallback ${this.fallbackModel}...`
+          );
           currentModel = this.fallbackModel;
           continue;
         }
@@ -193,7 +229,7 @@ export class AIGatewayService {
         collection: 'AI_GATEWAY',
         documentId: `${promptDef.id}@${promptDef.version}`,
         details: `[AI Inference] Prompt: ${promptDef.id} (v${promptDef.version}) | Model: ${currentModel} | Latency: ${latencyMs}ms | Confidence: ${score} (${level}) | Status: ${parsedData ? 'SUCCESS' : 'FAILED'}${request.options?.documentId ? ` | DocId: ${request.options.documentId}` : ''}`,
-        performedBy: request.options?.userEmail || 'AI_GATEWAY'
+        performedBy: request.options?.userEmail || 'AI_GATEWAY',
       });
     } catch (auditErr) {
       console.warn('[AIGateway] Ghi audit trail thất bại:', auditErr);
@@ -210,9 +246,19 @@ export class AIGatewayService {
           latencyMs,
           confidenceScore: 0,
           confidenceLevel: 'LOW',
-          executedAt
-        }
+          executedAt,
+        },
       };
+    }
+
+    // 4. Lưu kết quả suy luận vào Semantic Cache
+    try {
+      const ttlMs = request.options?.ttlMinutes
+        ? request.options.ttlMinutes * 60 * 1000
+        : undefined;
+      semanticCache.set(request, parsedData, score, ttlMs);
+    } catch (cacheErr) {
+      console.warn('[AIGateway] Lưu semantic cache thất bại:', cacheErr);
     }
 
     return {
@@ -225,8 +271,8 @@ export class AIGatewayService {
         latencyMs,
         confidenceScore: score,
         confidenceLevel: level,
-        executedAt
-      }
+        executedAt,
+      },
     };
   }
 }

@@ -3,10 +3,10 @@
  * Service xuất báo cáo Excel chất lượng sử dụng SheetJS (xlsx).
  * Hỗ trợ báo cáo tháng/quý với định dạng chuyên nghiệp, nhiều sheet, màu sắc chuẩn.
  */
-import * as XLSX from 'xlsx';
 import { QualityAnomaly } from '../types';
 import { lookupPharmaTerm } from '../utils/aiMapping';
 import { detectOOTForCriterion, BatchCriterionDataPoint } from '../utils/ootDetection';
+import { getXLSX } from '../utils';
 
 /**
  * Định dạng ngày tháng sang DD/MM/YYYY
@@ -64,17 +64,18 @@ interface ReportRow {
  * Sheet 3: Danh sách phiếu KHÔNG ĐẠT (nền đỏ nhạt)
  * Sheet 4: Toàn bộ danh sách
  */
-export const generateQualityReport = (
+export const generateQualityReport = async (
   appContext: any,
   options: QualityReportOptions = { period: 'all' }
-): QualityReportResult => {
+): Promise<QualityReportResult> => {
+  const XLSX = await getXLSX();
   const batches = appContext.batches || [];
   const testResults = appContext.testResults || [];
   const products = appContext.products || [];
 
   const now = new Date();
   const year = options.year || now.getFullYear();
-  const month = options.month || (now.getMonth() + 1);
+  const month = options.month || now.getMonth() + 1;
   const quarter = options.quarter || Math.ceil((now.getMonth() + 1) / 3);
 
   // ─── Tính nhãn kỳ báo cáo ───────────────────────────────────────────
@@ -86,10 +87,15 @@ export const generateQualityReport = (
     filterFn = (tr: any) => {
       if (!tr.testDate) return false;
       const d = new Date(tr.testDate);
-      return d.getFullYear() === year && (d.getMonth() + 1) === month;
+      return d.getFullYear() === year && d.getMonth() + 1 === month;
     };
   } else if (options.period === 'quarter') {
-    const qMonths: Record<number, number[]> = { 1: [1, 2, 3], 2: [4, 5, 6], 3: [7, 8, 9], 4: [10, 11, 12] };
+    const qMonths: Record<number, number[]> = {
+      1: [1, 2, 3],
+      2: [4, 5, 6],
+      3: [7, 8, 9],
+      4: [10, 11, 12],
+    };
     periodLabel = `Quý ${quarter}/${year}`;
     filterFn = (tr: any) => {
       if (!tr.testDate) return false;
@@ -160,7 +166,11 @@ export const generateQualityReport = (
 
   // Style cho tiêu đề chính
   if (wsSummary['A1']) {
-    wsSummary['A1'].s = { font: { bold: true, sz: 14 }, fill: { fgColor: { rgb: '1E3A5F' } }, font2: { color: { rgb: 'FFFFFF' } } };
+    wsSummary['A1'].s = {
+      font: { bold: true, sz: 14 },
+      fill: { fgColor: { rgb: '1E3A5F' } },
+      font2: { color: { rgb: 'FFFFFF' } },
+    };
   }
   XLSX.utils.book_append_sheet(wb, wsSummary, 'Tóm tắt');
 
@@ -172,7 +182,7 @@ export const generateQualityReport = (
   }
 
   // === Sheet 3: Chỉ phiếu ĐẠT ===
-  const passRows = rows.filter(r => r['Kết quả tổng'] === 'ĐẠT');
+  const passRows = rows.filter((r) => r['Kết quả tổng'] === 'ĐẠT');
   if (passRows.length > 0) {
     const wsPass = XLSX.utils.json_to_sheet(passRows);
     applyColumnWidths(wsPass);
@@ -180,7 +190,7 @@ export const generateQualityReport = (
   }
 
   // === Sheet 4: Chỉ phiếu KHÔNG ĐẠT ===
-  const failRows = rows.filter(r => r['Kết quả tổng'] === 'KHÔNG ĐẠT');
+  const failRows = rows.filter((r) => r['Kết quả tổng'] === 'KHÔNG ĐẠT');
   if (failRows.length > 0) {
     const wsFail = XLSX.utils.json_to_sheet(failRows);
     applyColumnWidths(wsFail);
@@ -189,9 +199,12 @@ export const generateQualityReport = (
 
   // ─── Tạo tên file và tải về ─────────────────────────────────────────
   const timestamp = new Date().toISOString().slice(0, 10);
-  const periodSlug = options.period === 'month' ? `thang${month}_${year}`
-    : options.period === 'quarter' ? `quy${quarter}_${year}`
-    : 'toan_bo';
+  const periodSlug =
+    options.period === 'month'
+      ? `thang${month}_${year}`
+      : options.period === 'quarter'
+        ? `quy${quarter}_${year}`
+        : 'toan_bo';
   const filename = `baocao_chatluong_${periodSlug}_${timestamp}.xlsx`;
 
   // Tải file về máy
@@ -200,26 +213,26 @@ export const generateQualityReport = (
   return {
     filename,
     rowCount: filteredResults.length,
-    summary: { total, pass, fail, passRate, periodLabel }
+    summary: { total, pass, fail, passRate, periodLabel },
   };
 };
 
 /**
  * Căn chỉnh độ rộng cột tự động dựa trên nội dung
  */
-function applyColumnWidths(ws: XLSX.WorkSheet) {
+function applyColumnWidths(ws: any) {
   ws['!cols'] = [
-    { wch: 12 },  // Ngày KN
-    { wch: 15 },  // Số lô
-    { wch: 28 },  // Tên sản phẩm
-    { wch: 12 },  // Mã SP
-    { wch: 20 },  // Đơn vị KN
-    { wch: 14 },  // Kết quả tổng
-    { wch: 10 },  // Số CT đạt
-    { wch: 14 },  // Số CT không đạt
-    { wch: 12 },  // Ngày SX
-    { wch: 12 },  // Hạn dùng
-    { wch: 30 },  // Ghi chú
+    { wch: 12 }, // Ngày KN
+    { wch: 15 }, // Số lô
+    { wch: 28 }, // Tên sản phẩm
+    { wch: 12 }, // Mã SP
+    { wch: 20 }, // Đơn vị KN
+    { wch: 14 }, // Kết quả tổng
+    { wch: 10 }, // Số CT đạt
+    { wch: 14 }, // Số CT không đạt
+    { wch: 12 }, // Ngày SX
+    { wch: 12 }, // Hạn dùng
+    { wch: 30 }, // Ghi chú
   ];
 }
 
@@ -275,23 +288,35 @@ export const detectQualityAnomalies = (appContext: any, daysAhead = 30): Quality
     const productTccs = tccsList.find((t: any) => t.productId === pid);
     const allTccsCriteria = [
       ...(productTccs?.mainQualityCriteria || []),
-      ...(productTccs?.safetyCriteria || [])
+      ...(productTccs?.safetyCriteria || []),
     ];
 
     // Gom dữ liệu điểm đo theo từng chỉ tiêu
     const criteriaDataPointsMap: Record<string, BatchCriterionDataPoint[]> = {};
 
-    results.forEach(tr => {
+    results.forEach((tr) => {
       const b = tr.batch;
       (tr.results || []).forEach((entry: any) => {
-        if (!entry.criteriaName || entry.value === undefined || entry.value === null || entry.value === '') return;
+        if (
+          !entry.criteriaName ||
+          entry.value === undefined ||
+          entry.value === null ||
+          entry.value === ''
+        )
+          return;
         const canonicalName = lookupPharmaTerm(entry.criteriaName) || entry.criteriaName;
         if (!criteriaDataPointsMap[canonicalName]) {
           criteriaDataPointsMap[canonicalName] = [];
         }
 
         // Tìm limit trong TCCS nếu có
-        const matchedTccs = allTccsCriteria.find(c => c && c.name && (c.name.trim().toLowerCase() === entry.criteriaName.trim().toLowerCase() || lookupPharmaTerm(c.name) === canonicalName));
+        const matchedTccs = allTccsCriteria.find(
+          (c) =>
+            c &&
+            c.name &&
+            (c.name.trim().toLowerCase() === entry.criteriaName.trim().toLowerCase() ||
+              lookupPharmaTerm(c.name) === canonicalName)
+        );
 
         criteriaDataPointsMap[canonicalName].push({
           batchId: b.id || tr.batchId,
@@ -332,7 +357,7 @@ export const detectQualityAnomalies = (appContext: any, daysAhead = 30): Quality
   // ─── 3. Sản phẩm có tỷ lệ thất bại cao ─────────────────────────────
   Object.entries(productGroups).forEach(([pid, results]) => {
     if (results.length < 3) return;
-    const failCount = results.filter(tr => tr.overallStatus === 'FAIL').length;
+    const failCount = results.filter((tr) => tr.overallStatus === 'FAIL').length;
     const failRate = failCount / results.length;
     if (failRate >= 0.3) {
       const product = products.find((p: any) => p.id === pid);
