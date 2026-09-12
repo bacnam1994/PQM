@@ -9,7 +9,6 @@ import { db } from '../../firebase';
 import { TCCS } from '../../types';
 import { ITCCSRepository } from '../TCCSRepository';
 import { BaseFirebaseRepository } from './BaseFirebaseRepository';
-import { enqueueOfflineMutation } from '../../utils/offlineMutationQueue';
 
 export class FirebaseTCCSRepository
   extends BaseFirebaseRepository<TCCS>
@@ -23,7 +22,7 @@ export class FirebaseTCCSRepository
 
   async findActiveByProductId(productId: string): Promise<TCCS | null> {
     const list = await this.findByProductId(productId);
-    return list.find(t => t.isActive) || null;
+    return list.find((t) => t.isActive) || null;
   }
 
   async findByCode(code: string): Promise<TCCS | null> {
@@ -35,30 +34,12 @@ export class FirebaseTCCSRepository
   async delete(id: string): Promise<void> {
     if (!id) throw new Error('Yêu cầu ID TCCS để xóa.');
     const targetPath = `${this.collectionPath}/${id}`;
-    try {
-      await remove(ref(db, targetPath));
-    } catch (e: any) {
-      if (typeof navigator !== 'undefined' && (!navigator.onLine || e?.code === 'unavailable')) {
-        await enqueueOfflineMutation({ path: targetPath, operation: 'REMOVE' });
-        return;
-      }
-      throw e;
-    }
+    await remove(ref(db, targetPath));
   }
 
   async batchUpdate(updates: Record<string, any>): Promise<void> {
     if (!Object.keys(updates).length) return;
-    try {
-      await update(ref(db), updates);
-    } catch (e: any) {
-      if (typeof navigator !== 'undefined' && (!navigator.onLine || e?.code === 'unavailable')) {
-        for (const [path, data] of Object.entries(updates)) {
-          await enqueueOfflineMutation({ path, operation: 'SET', data });
-        }
-        return;
-      }
-      throw e;
-    }
+    await update(ref(db), updates);
   }
 }
 

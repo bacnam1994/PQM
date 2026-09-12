@@ -26,41 +26,94 @@ vi.mock('firebase/auth', () => ({
   signOut: vi.fn(),
 }));
 
+// Mock testResultService
+vi.mock('../../services/testResultService', () => ({
+  fetchTestResultsByBatchId: vi.fn(() => Promise.resolve([])),
+  fetchTestResultById: vi.fn((id: string) => {
+    if (id === 'res_existing_1') {
+      return Promise.resolve({
+        id: 'res_existing_1',
+        batchId: 'batch_1',
+        labName: 'Lab Cũ',
+        testDate: '2026-02-01',
+        overallStatus: 'PASS',
+        results: [{ criteriaName: 'Độ ẩm', value: 4.5, isPass: true }],
+      });
+    }
+    return Promise.resolve(null);
+  }),
+}));
+
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { PRODUCT_QUERY_KEYS } from '../../hooks/queries/useProductQueries';
+import { BATCH_QUERY_KEYS } from '../../hooks/queries/useBatchQueries';
+import { TCCS_QUERY_KEYS } from '../../hooks/queries/useTCCSQueries';
+import { TEST_RESULT_QUERY_KEYS } from '../../hooks/queries/useTestResultQueries';
+
 describe('TestResultFormPage AI Draft & Hardening Integration', () => {
+  let queryClient: QueryClient;
+
+  const mockProducts = [
+    {
+      id: 'prod_1',
+      code: 'SP-001',
+      name: 'Ginkgo Biloba 120mg',
+      group: 'TPBVSK',
+      status: 'ACTIVE',
+    } as any,
+  ];
+
+  const mockBatches = [
+    {
+      id: 'batch_1',
+      batchNo: 'L260101',
+      productId: 'prod_1',
+      tccsId: 'tccs_1',
+      status: 'TESTING',
+      mfgDate: '2026-01-01',
+      expDate: '2029-01-01',
+    } as any,
+  ];
+
+  const mockTccs = [
+    {
+      id: 'tccs_1',
+      productId: 'prod_1',
+      code: 'TCCS-01',
+      isActive: true,
+      issueDate: '2026-01-01',
+      mainQualityCriteria: [
+        { name: 'Độ ẩm', unit: '%', min: 0, max: 9.0, type: 'NUMBER' as any },
+        { name: 'pH', unit: '', min: 6.0, max: 7.5, type: 'NUMBER' as any },
+      ],
+      safetyCriteria: [],
+    } as any,
+  ];
+
   beforeEach(() => {
     sessionStorage.clear();
     localStorage.clear();
     vi.clearAllMocks();
 
+    queryClient = new QueryClient({
+      defaultOptions: {
+        queries: {
+          retry: false,
+          staleTime: Infinity,
+          gcTime: Infinity,
+        },
+      },
+    });
+
+    queryClient.setQueryData(PRODUCT_QUERY_KEYS.all, mockProducts);
+    queryClient.setQueryData(BATCH_QUERY_KEYS.all, mockBatches);
+    queryClient.setQueryData(TCCS_QUERY_KEYS.all, mockTccs);
+    queryClient.setQueryData(TEST_RESULT_QUERY_KEYS.all, []);
+
     useAppStore.setState({
-      products: [
-        { id: 'prod_1', code: 'SP-001', name: 'Ginkgo Biloba 120mg', group: 'TPBVSK', status: 'ACTIVE' } as any,
-      ],
-      batches: [
-        {
-          id: 'batch_1',
-          batchNo: 'L260101',
-          productId: 'prod_1',
-          tccsId: 'tccs_1',
-          status: 'TESTING',
-          mfgDate: '2026-01-01',
-          expDate: '2029-01-01',
-        } as any,
-      ],
-      tccsList: [
-        {
-          id: 'tccs_1',
-          productId: 'prod_1',
-          code: 'TCCS-01',
-          isActive: true,
-          issueDate: '2026-01-01',
-          mainQualityCriteria: [
-            { name: 'Độ ẩm', unit: '%', min: 0, max: 9.0, type: 'NUMBER' as any },
-            { name: 'pH', unit: '', min: 6.0, max: 7.5, type: 'NUMBER' as any },
-          ],
-          safetyCriteria: [],
-        } as any,
-      ],
+      products: mockProducts,
+      batches: mockBatches,
+      tccsList: mockTccs,
       testResults: [],
       allTestResults: [],
       aiLearnedMappings: [],
@@ -76,14 +129,21 @@ describe('TestResultFormPage AI Draft & Hardening Integration', () => {
     localStorage.clear();
   });
 
-  it('renders form in ADD mode without AI draft normally without errors', async () => {
-    render(
-      <MemoryRouter initialEntries={['/test-results/new']}>
-        <Routes>
-          <Route path="/test-results/new" element={<TestResultFormPage />} />
-        </Routes>
-      </MemoryRouter>
+  const renderWithProviders = (initialEntry: string) => {
+    return render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={[initialEntry]}>
+          <Routes>
+            <Route path="/test-results/new" element={<TestResultFormPage />} />
+            <Route path="/test-results/:id/edit" element={<TestResultFormPage />} />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>
     );
+  };
+
+  it('renders form in ADD mode without AI draft normally without errors', async () => {
+    renderWithProviders('/test-results/new');
 
     // Header and sections render properly
     expect(await screen.findByText('1. Thông tin Lô & Phòng Kiểm nghiệm')).toBeDefined();
@@ -105,13 +165,7 @@ describe('TestResultFormPage AI Draft & Hardening Integration', () => {
     writeAIDraft(aiData);
     expect(peekAIDraft()).not.toBeNull();
 
-    render(
-      <MemoryRouter initialEntries={['/test-results/new']}>
-        <Routes>
-          <Route path="/test-results/new" element={<TestResultFormPage />} />
-        </Routes>
-      </MemoryRouter>
-    );
+    renderWithProviders('/test-results/new');
 
     await waitFor(() => {
       // Draft must be consumed from sessionStorage
@@ -142,13 +196,7 @@ describe('TestResultFormPage AI Draft & Hardening Integration', () => {
 
     writeAIDraft(aiData);
 
-    const { unmount } = render(
-      <MemoryRouter initialEntries={['/test-results/new']}>
-        <Routes>
-          <Route path="/test-results/new" element={<TestResultFormPage />} />
-        </Routes>
-      </MemoryRouter>
-    );
+    const { unmount } = renderWithProviders('/test-results/new');
 
     await waitFor(() => {
       expect(peekAIDraft()).toBeNull();
@@ -157,13 +205,7 @@ describe('TestResultFormPage AI Draft & Hardening Integration', () => {
     unmount();
 
     // Remount to simulate navigation/refresh after draft is consumed
-    render(
-      <MemoryRouter initialEntries={['/test-results/new']}>
-        <Routes>
-          <Route path="/test-results/new" element={<TestResultFormPage />} />
-        </Routes>
-      </MemoryRouter>
-    );
+    renderWithProviders('/test-results/new');
 
     // Form should render clean ADD mode without crashing
     expect(await screen.findByText('1. Thông tin Lô & Phòng Kiểm nghiệm')).toBeDefined();
@@ -172,13 +214,7 @@ describe('TestResultFormPage AI Draft & Hardening Integration', () => {
   it('handles malformed AI storage payload safely without crashing the page', async () => {
     sessionStorage.setItem('pqm:ai-draft:test-result', JSON.stringify({ corrupted: true }));
 
-    render(
-      <MemoryRouter initialEntries={['/test-results/new']}>
-        <Routes>
-          <Route path="/test-results/new" element={<TestResultFormPage />} />
-        </Routes>
-      </MemoryRouter>
-    );
+    renderWithProviders('/test-results/new');
 
     expect(await screen.findByText('1. Thông tin Lô & Phòng Kiểm nghiệm')).toBeDefined();
     // Malformed storage should be purged
@@ -186,29 +222,27 @@ describe('TestResultFormPage AI Draft & Hardening Integration', () => {
   });
 
   it('does NOT consume AI draft when opening EDIT route (/test-results/:id/edit)', async () => {
+    const existingResult = {
+      id: 'res_existing_1',
+      batchId: 'batch_1',
+      labName: 'Lab Cũ',
+      testDate: '2026-02-01',
+      overallStatus: 'PASS',
+      results: [{ criteriaName: 'Độ ẩm', value: 4.5, isPass: true }],
+    } as any;
+
+    queryClient.setQueryData(TEST_RESULT_QUERY_KEYS.all, [existingResult]);
+    queryClient.setQueryData(TEST_RESULT_QUERY_KEYS.detail('res_existing_1'), existingResult);
+
     useAppStore.setState({
-      testResults: [
-        {
-          id: 'res_existing_1',
-          batchId: 'batch_1',
-          labName: 'Lab Cũ',
-          testDate: '2026-02-01',
-          overallStatus: 'PASS',
-          results: [{ criteriaName: 'Độ ẩm', value: 4.5, isPass: true }],
-        } as any,
-      ],
+      testResults: [existingResult],
+      allTestResults: [existingResult],
     });
 
     writeAIDraft({ labName: 'LAB AI TRANSIENT', batchNo: 'L260101' });
     expect(peekAIDraft()).not.toBeNull();
 
-    render(
-      <MemoryRouter initialEntries={['/test-results/res_existing_1/edit']}>
-        <Routes>
-          <Route path="/test-results/:id/edit" element={<TestResultFormPage />} />
-        </Routes>
-      </MemoryRouter>
-    );
+    renderWithProviders('/test-results/res_existing_1/edit');
 
     await screen.findByText('1. Thông tin Lô & Phòng Kiểm nghiệm');
 
@@ -238,13 +272,7 @@ describe('TestResultFormPage AI Draft & Hardening Integration', () => {
       testResults: [{ criteriaName: 'Độ ẩm', value: '4.2' }],
     });
 
-    render(
-      <MemoryRouter initialEntries={['/test-results/new']}>
-        <Routes>
-          <Route path="/test-results/new" element={<TestResultFormPage />} />
-        </Routes>
-      </MemoryRouter>
-    );
+    renderWithProviders('/test-results/new');
 
     // AI data should win
     await waitFor(() => {

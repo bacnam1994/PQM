@@ -9,7 +9,6 @@ import { ITestResultRepository } from '../TestResultRepository';
 import { deleteTestResultService } from '../../services/databaseService';
 import { BaseFirebaseRepository } from './BaseFirebaseRepository';
 import { removeUndefined } from '../../utils';
-import { enqueueOfflineMutation } from '../../utils/offlineMutationQueue';
 
 export class FirebaseTestResultRepository
   extends BaseFirebaseRepository<TestResult>
@@ -35,24 +34,14 @@ export class FirebaseTestResultRepository
     const result = await this.findPaginated({
       pageSize: limitCount,
       orderBy: 'testDate',
-      orderDirection: 'desc'
+      orderDirection: 'desc',
     });
     return result.items;
   }
 
   async delete(id: string): Promise<void> {
     if (!id) throw new Error('Yêu cầu ID phiếu kiểm nghiệm để xóa.');
-    const targetPath = `${this.collectionPath}/${id}`;
-
-    try {
-      await deleteTestResultService(id);
-    } catch (e: any) {
-      if (typeof navigator !== 'undefined' && (!navigator.onLine || e?.code === 'unavailable')) {
-        await enqueueOfflineMutation({ path: targetPath, operation: 'REMOVE' });
-        return;
-      }
-      throw e;
-    }
+    await deleteTestResultService(id);
   }
 }
 

@@ -10,7 +10,6 @@ import { Product } from '../../types';
 import { IProductRepository } from '../ProductRepository';
 import { BaseFirebaseRepository } from './BaseFirebaseRepository';
 import { removeUndefined } from '../../utils';
-import { enqueueOfflineMutation } from '../../utils/offlineMutationQueue';
 import { deleteProductService } from '../../services/databaseService';
 
 export class FirebaseProductRepository
@@ -29,41 +28,22 @@ export class FirebaseProductRepository
     const query = nameQuery.trim().toLowerCase();
     const all = await this.findAll();
     return all.filter(
-      p => p.name?.toLowerCase().includes(query) || p.code?.toLowerCase().includes(query)
+      (p) => p.name?.toLowerCase().includes(query) || p.code?.toLowerCase().includes(query)
     );
   }
 
   async delete(id: string): Promise<void> {
     if (!id) throw new Error('Yêu cầu ID sản phẩm để xóa.');
-    const targetPath = `${this.collectionPath}/${id}`;
-    try {
-      await deleteProductService(id);
-    } catch (e: any) {
-      if (typeof navigator !== 'undefined' && (!navigator.onLine || e?.code === 'unavailable')) {
-        await enqueueOfflineMutation({ path: targetPath, operation: 'REMOVE' });
-        return;
-      }
-      throw e;
-    }
+    await deleteProductService(id);
   }
 
   async bulkSave(products: Product[]): Promise<void> {
     if (!products.length) return;
     const updates: Record<string, any> = {};
-    products.forEach(p => {
+    products.forEach((p) => {
       updates[`${this.collectionPath}/${p.id}`] = removeUndefined(p);
     });
-    try {
-      await update(ref(db), updates);
-    } catch (e: any) {
-      if (typeof navigator !== 'undefined' && (!navigator.onLine || e?.code === 'unavailable')) {
-        for (const [path, data] of Object.entries(updates)) {
-          await enqueueOfflineMutation({ path, operation: 'SET', data });
-        }
-        return;
-      }
-      throw e;
-    }
+    await update(ref(db), updates);
   }
 }
 

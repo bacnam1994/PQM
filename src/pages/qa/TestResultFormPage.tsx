@@ -71,10 +71,7 @@ const TestResultFormPage: React.FC = () => {
   // Criteria list from active TCCS for matching
   const allCriteria = useMemo(() => {
     if (!activeTCCS) return [];
-    return [
-      ...(activeTCCS.mainQualityCriteria || []),
-      ...(activeTCCS.safetyCriteria || []),
-    ];
+    return [...(activeTCCS.mainQualityCriteria || []), ...(activeTCCS.safetyCriteria || [])];
   }, [activeTCCS]);
 
   // Unique criteria names across all active TCCS for OCR prompt
@@ -113,6 +110,9 @@ const TestResultFormPage: React.FC = () => {
   const [isLoadingEditItem, setIsLoadingEditItem] = useState(false);
   const [editItemNotFound, setEditItemNotFound] = useState(false);
 
+  const logicRef = useRef(logic);
+  logicRef.current = logic;
+
   useEffect(() => {
     let isMounted = true;
     if (id) {
@@ -121,7 +121,11 @@ const TestResultFormPage: React.FC = () => {
 
       const loadItem = async () => {
         try {
-          const sourceResults = allTestResults.length > 0 ? allTestResults : testResults;
+          const appState = useAppStore.getState();
+          const sourceResults =
+            appState.allTestResults && appState.allTestResults.length > 0
+              ? appState.allTestResults
+              : appState.testResults || [];
           let resToEdit = sourceResults.find((r) => r && (r.id === id || r.id.endsWith(id)));
 
           if (!resToEdit) {
@@ -131,8 +135,8 @@ const TestResultFormPage: React.FC = () => {
           if (!isMounted) return;
 
           if (resToEdit) {
-            logic.crud.openEdit(resToEdit);
-            logic.populateFormForEdit(resToEdit as any);
+            logicRef.current.crud.openEdit(resToEdit);
+            logicRef.current.populateFormForEdit(resToEdit as any);
           } else {
             setEditItemNotFound(true);
           }
@@ -142,22 +146,22 @@ const TestResultFormPage: React.FC = () => {
         } finally {
           if (isMounted) {
             setIsLoadingEditItem(false);
-            logic.setIsFormInitialized(true);
+            logicRef.current.setIsFormInitialized(true);
           }
         }
       };
 
       loadItem();
     } else {
-      logic.crud.openAdd();
+      logicRef.current.crud.openAdd();
       setIsLoadingEditItem(false);
       setEditItemNotFound(false);
-      logic.setIsFormInitialized(true);
+      logicRef.current.setIsFormInitialized(true);
     }
     return () => {
       isMounted = false;
     };
-  }, [id, allTestResults, testResults, logic.crud.openEdit, logic.crud.openAdd, logic.populateFormForEdit, logic.setIsFormInitialized]);
+  }, [id]);
 
   // Sync batch name into search input when batch data loads
   useEffect(() => {
@@ -191,9 +195,7 @@ const TestResultFormPage: React.FC = () => {
       ai.handleDataExtracted(draft.data);
     } catch (error) {
       console.error('[AI] Lỗi áp dụng AI draft vào form:', error);
-      toast.error(
-        'Dữ liệu AI không thể áp dụng hoàn chỉnh. Bạn có thể tiếp tục nhập thủ công.'
-      );
+      toast.error('Dữ liệu AI không thể áp dụng hoàn chỉnh. Bạn có thể tiếp tục nhập thủ công.');
     } finally {
       setIsApplyingAIDraft(false);
     }
@@ -243,7 +245,8 @@ const TestResultFormPage: React.FC = () => {
     return (
       <div className="min-h-[70vh] flex items-center justify-center p-4">
         <div className="bg-surface p-8 rounded-xl shadow-xs border border-border flex items-center gap-3 text-ink font-medium text-sm">
-          <ArrowPathIcon className="animate-spin text-emerald-600 dark:text-emerald-400 h-5 w-5" /> Đang tải dữ liệu phiếu kiểm nghiệm...
+          <ArrowPathIcon className="animate-spin text-emerald-600 dark:text-emerald-400 h-5 w-5" />{' '}
+          Đang tải dữ liệu phiếu kiểm nghiệm...
         </div>
       </div>
     );
@@ -254,15 +257,32 @@ const TestResultFormPage: React.FC = () => {
     if (!formValues.batchId) return 0;
     const hasResults = Object.keys(formValues.testResultsMap || {}).length > 0;
     if (!hasResults) return 1;
-    if (!formValues.notes && (!formValues.attachments || formValues.attachments.length === 0)) return 2;
+    if (!formValues.notes && (!formValues.attachments || formValues.attachments.length === 0))
+      return 2;
     return 3;
   }, [formValues.batchId, formValues.testResultsMap, formValues.notes, formValues.attachments]);
 
   const workflowSteps: WorkflowStep[] = [
-    { id: 'step-batch', label: '1. Lô & Phòng Lab', description: 'Chọn lô sản xuất và phòng thử nghiệm' },
-    { id: 'step-criteria', label: '2. Chỉ tiêu kiểm nghiệm', description: 'Đánh giá chỉ tiêu theo TCCS' },
-    { id: 'step-attachments', label: '3. Minh chứng & Ghi chú', description: 'Tải tài liệu và kết luận' },
-    { id: 'step-submit', label: '4. Ký duyệt & Hoàn tất', description: 'Xác nhận kết quả vào hệ thống' },
+    {
+      id: 'step-batch',
+      label: '1. Lô & Phòng Lab',
+      description: 'Chọn lô sản xuất và phòng thử nghiệm',
+    },
+    {
+      id: 'step-criteria',
+      label: '2. Chỉ tiêu kiểm nghiệm',
+      description: 'Đánh giá chỉ tiêu theo TCCS',
+    },
+    {
+      id: 'step-attachments',
+      label: '3. Minh chứng & Ghi chú',
+      description: 'Tải tài liệu và kết luận',
+    },
+    {
+      id: 'step-submit',
+      label: '4. Ký duyệt & Hoàn tất',
+      description: 'Xác nhận kết quả vào hệ thống',
+    },
   ];
 
   return (
@@ -297,7 +317,12 @@ const TestResultFormPage: React.FC = () => {
           <SpecialCharToolbar className="-mx-2 px-2" />
 
           {/* Section 1: Batch & Lab Information */}
-          <Surface variant="flat" padding="lg" title="1. Thông tin Lô & Phòng Kiểm nghiệm" subtitle="Lựa chọn lô thành phẩm và phòng thí nghiệm thực hiện phép thử">
+          <Surface
+            variant="flat"
+            padding="lg"
+            title="1. Thông tin Lô & Phòng Kiểm nghiệm"
+            subtitle="Lựa chọn lô thành phẩm và phòng thí nghiệm thực hiện phép thử"
+          >
             <BatchLabSelector
               batchSearch={batchSearch}
               setBatchSearch={setBatchSearch}
@@ -317,7 +342,12 @@ const TestResultFormPage: React.FC = () => {
           </Surface>
 
           {/* Section 2: Specifications & Criteria Evaluation */}
-          <Surface variant="flat" padding="lg" title="2. Đánh giá Chỉ tiêu Chất lượng" subtitle="Chỉ tiêu chính, an toàn theo TCCS và các chỉ tiêu bổ sung nếu có">
+          <Surface
+            variant="flat"
+            padding="lg"
+            title="2. Đánh giá Chỉ tiêu Chất lượng"
+            subtitle="Chỉ tiêu chính, an toàn theo TCCS và các chỉ tiêu bổ sung nếu có"
+          >
             <div className="space-y-6">
               <TccsCriteriaSection
                 activeTCCS={activeTCCS}
@@ -340,7 +370,12 @@ const TestResultFormPage: React.FC = () => {
           </Surface>
 
           {/* Section 3: Notes & Evidence Attachments */}
-          <Surface variant="flat" padding="lg" title="3. Hồ sơ Minh chứng & Kết luận" subtitle="Ghi nhận đánh giá cảm quan, lưu ý kiểm nghiệm và tệp đính kèm CoA/Spectra">
+          <Surface
+            variant="flat"
+            padding="lg"
+            title="3. Hồ sơ Minh chứng & Kết luận"
+            subtitle="Ghi nhận đánh giá cảm quan, lưu ý kiểm nghiệm và tệp đính kèm CoA/Spectra"
+          >
             <div className="space-y-6">
               <div className="space-y-2">
                 <label className="text-xs font-semibold text-ink-muted pl-1">
@@ -422,7 +457,9 @@ const TestResultFormPage: React.FC = () => {
       <BatchScanProgressModal
         isOpen={ai.isBatchProgressOpen}
         files={ai.batchScanFiles}
-        totalDone={ai.batchScanFiles.filter((f) => f.status === 'done' || f.status === 'error').length}
+        totalDone={
+          ai.batchScanFiles.filter((f) => f.status === 'done' || f.status === 'error').length
+        }
         onClose={() => ai.setIsBatchProgressOpen(false)}
       />
 

@@ -9,7 +9,6 @@ import { db } from '../../firebase';
 import { QualityDeviation, DeviationStatus } from '../../types/deviation';
 import { IDeviationRepository } from '../IDeviationRepository';
 import { BaseFirebaseRepository } from './BaseFirebaseRepository';
-import { enqueueOfflineMutation } from '../../utils/offlineMutationQueue';
 
 export class FirebaseDeviationRepository
   extends BaseFirebaseRepository<QualityDeviation>
@@ -25,7 +24,7 @@ export class FirebaseDeviationRepository
     const targetPath = `${this.collectionPath}/${id}`;
     const updates: Record<string, any> = {
       status,
-      updatedAt: new Date().toISOString()
+      updatedAt: new Date().toISOString(),
     };
     if (notes) {
       updates.closureNotes = notes;
@@ -34,28 +33,12 @@ export class FirebaseDeviationRepository
       updates.closedAt = new Date().toISOString();
     }
 
-    try {
-      await fbUpdate(ref(db, targetPath), updates);
-    } catch (e: any) {
-      if (typeof navigator !== 'undefined' && (!navigator.onLine || e?.code === 'unavailable')) {
-        await enqueueOfflineMutation({ path: targetPath, operation: 'UPDATE', data: updates });
-        return;
-      }
-      throw e;
-    }
+    await fbUpdate(ref(db, targetPath), updates);
   }
 
   async delete(id: string): Promise<void> {
     const targetPath = `${this.collectionPath}/${id}`;
-    try {
-      await remove(ref(db, targetPath));
-    } catch (e: any) {
-      if (typeof navigator !== 'undefined' && (!navigator.onLine || e?.code === 'unavailable')) {
-        await enqueueOfflineMutation({ path: targetPath, operation: 'REMOVE' });
-        return;
-      }
-      throw e;
-    }
+    await remove(ref(db, targetPath));
   }
 }
 

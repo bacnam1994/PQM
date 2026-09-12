@@ -3,11 +3,15 @@ import { ref, onValue, query, limitToLast, orderByChild, goOnline } from 'fireba
 import { db } from '../firebase';
 import { useAppStore } from '../store/useAppStore';
 import { getFromCache, saveToCache } from '../utils';
-import { replayOfflineMutations } from '../utils/offlineMutationQueue';
+import { queryClient } from '../lib/queryClient';
+import { PRODUCT_QUERY_KEYS } from './queries/useProductQueries';
+import { BATCH_QUERY_KEYS } from './queries/useBatchQueries';
+import { TCCS_QUERY_KEYS } from './queries/useTCCSQueries';
+import { TEST_RESULT_QUERY_KEYS } from './queries/useTestResultQueries';
 
 export const useFirebaseSync = () => {
-  const user = useAppStore(state => state.user);
-  const testResultLimit = useAppStore(state => state.testResultLimit);
+  const user = useAppStore((state) => state.user);
+  const testResultLimit = useAppStore((state) => state.testResultLimit);
 
   // 1. Lắng nghe dữ liệu cơ bản từ Firebase Realtime Database
   useEffect(() => {
@@ -18,7 +22,6 @@ export const useFirebaseSync = () => {
 
     const handleOnline = () => {
       goOnline(db);
-      replayOfflineMutations().catch(err => console.warn('[Sync] Replay offline mutations error:', err));
     };
     const handleOffline = () => useAppStore.getState().setSyncStatus('OFFLINE');
     window.addEventListener('online', handleOnline);
@@ -27,27 +30,73 @@ export const useFirebaseSync = () => {
     const initializeData = async () => {
       // Tải cache từ IndexedDB trước
       try {
-        const [cachedProducts, cachedBatches, cachedTccs, cachedFormulas, cachedMaterials, cachedTestResults, cachedAiMappings, cachedQualityAlerts, cachedCriteriaAliases] = await Promise.all([
-          getFromCache('products'), getFromCache('batches'), getFromCache('tccs'), getFromCache('productFormulas'),
-          getFromCache('rawMaterials'), getFromCache('testResults'), getFromCache('aiLearnedMappings'), getFromCache('qualityAlerts'),
-          getFromCache('criteriaAliases')
+        const [
+          cachedProducts,
+          cachedBatches,
+          cachedTccs,
+          cachedFormulas,
+          cachedMaterials,
+          cachedTestResults,
+          cachedAiMappings,
+          cachedQualityAlerts,
+          cachedCriteriaAliases,
+        ] = await Promise.all([
+          getFromCache('products'),
+          getFromCache('batches'),
+          getFromCache('tccs'),
+          getFromCache('productFormulas'),
+          getFromCache('rawMaterials'),
+          getFromCache('testResults'),
+          getFromCache('aiLearnedMappings'),
+          getFromCache('qualityAlerts'),
+          getFromCache('criteriaAliases'),
         ]);
 
         if (!isMounted) return;
+
+        // Nạp cache vào TanStack Query Cache (Single Source of Truth)
+        if (cachedProducts?.length > 0)
+          queryClient.setQueryData(PRODUCT_QUERY_KEYS.all, cachedProducts);
+        if (cachedBatches?.length > 0)
+          queryClient.setQueryData(BATCH_QUERY_KEYS.all, cachedBatches);
+        if (cachedTccs?.length > 0) queryClient.setQueryData(TCCS_QUERY_KEYS.all, cachedTccs);
+        if (cachedFormulas?.length > 0)
+          queryClient.setQueryData(PRODUCT_QUERY_KEYS.formulas, cachedFormulas);
+        if (cachedMaterials?.length > 0)
+          queryClient.setQueryData(PRODUCT_QUERY_KEYS.materials, cachedMaterials);
+        if (cachedTestResults?.length > 0)
+          queryClient.setQueryData(TEST_RESULT_QUERY_KEYS.all, cachedTestResults);
+        if (cachedCriteriaAliases?.length > 0)
+          queryClient.setQueryData(TCCS_QUERY_KEYS.aliases, cachedCriteriaAliases);
+        if (cachedAiMappings?.length > 0)
+          queryClient.setQueryData(TCCS_QUERY_KEYS.aiMappings, cachedAiMappings);
+
         const currentState = useAppStore.getState();
         useAppStore.getState().setAppState({
-          products: cachedProducts.length > 0 ? cachedProducts : currentState.products,
-          batches: cachedBatches.length > 0 ? cachedBatches : currentState.batches,
-          tccsList: cachedTccs.length > 0 ? cachedTccs : currentState.tccsList,
-          productFormulas: cachedFormulas.length > 0 ? cachedFormulas : currentState.productFormulas,
-          rawMaterials: cachedMaterials.length > 0 ? cachedMaterials : currentState.rawMaterials,
-          testResults: cachedTestResults.length > 0 ? cachedTestResults.sort((a: any, b: any) => new Date(b.testDate).getTime() - new Date(a.testDate).getTime()) : currentState.testResults,
-          aiLearnedMappings: cachedAiMappings?.length > 0 ? cachedAiMappings : currentState.aiLearnedMappings,
-          qualityAlerts: cachedQualityAlerts?.length > 0 ? cachedQualityAlerts : currentState.qualityAlerts,
-          criteriaAliases: cachedCriteriaAliases?.length > 0 ? cachedCriteriaAliases : currentState.criteriaAliases,
+          products: cachedProducts?.length > 0 ? cachedProducts : currentState.products,
+          batches: cachedBatches?.length > 0 ? cachedBatches : currentState.batches,
+          tccsList: cachedTccs?.length > 0 ? cachedTccs : currentState.tccsList,
+          productFormulas:
+            cachedFormulas?.length > 0 ? cachedFormulas : currentState.productFormulas,
+          rawMaterials: cachedMaterials?.length > 0 ? cachedMaterials : currentState.rawMaterials,
+          testResults:
+            cachedTestResults?.length > 0
+              ? cachedTestResults.sort(
+                  (a: any, b: any) =>
+                    new Date(b.testDate).getTime() - new Date(a.testDate).getTime()
+                )
+              : currentState.testResults,
+          aiLearnedMappings:
+            cachedAiMappings?.length > 0 ? cachedAiMappings : currentState.aiLearnedMappings,
+          qualityAlerts:
+            cachedQualityAlerts?.length > 0 ? cachedQualityAlerts : currentState.qualityAlerts,
+          criteriaAliases:
+            cachedCriteriaAliases?.length > 0
+              ? cachedCriteriaAliases
+              : currentState.criteriaAliases,
         });
       } catch (error) {
-        console.error("Lỗi nạp cache:", error);
+        console.error('Lỗi nạp cache:', error);
       }
 
       if (!isMounted) return;
@@ -65,70 +114,106 @@ export const useFirebaseSync = () => {
       };
 
       Object.entries(standardRefs).forEach(([key, reference]) => {
-        const unsubscribe = onValue(reference, (snapshot) => {
-          const data = snapshot.val();
-          let list = data ? Object.values(data) : [];
-          if (key === 'testResults') {
-            list = list.sort((a: any, b: any) => new Date(b.testDate || b.createdAt || 0).getTime() - new Date(a.testDate || a.createdAt || 0).getTime());
-          }
-          useAppStore.getState().setAppState({ [key]: list, lastSync: new Date().toISOString() });
-
-          if (list.length > 0) {
-            const storeName = key === 'tccsList' ? 'tccs'
-              : key === 'aiLearnedMappings' ? 'aiLearnedMappings'
-              : key === 'criteriaAliases' ? 'criteriaAliases'
-              : key;
-            const saveTask = () => saveToCache(storeName, list);
-            if ('requestIdleCallback' in window) {
-              window.requestIdleCallback(saveTask);
-            } else {
-              setTimeout(saveTask, 500);
+        const unsubscribe = onValue(
+          reference,
+          (snapshot) => {
+            const data = snapshot.val();
+            let list = data ? Object.values(data) : [];
+            if (key === 'testResults') {
+              list = list.sort(
+                (a: any, b: any) =>
+                  new Date(b.testDate || b.createdAt || 0).getTime() -
+                  new Date(a.testDate || a.createdAt || 0).getTime()
+              );
             }
+
+            // Cập nhật trực tiếp TanStack Query Cache (Single Source of Truth)
+            if (key === 'products') queryClient.setQueryData(PRODUCT_QUERY_KEYS.all, list);
+            else if (key === 'batches') queryClient.setQueryData(BATCH_QUERY_KEYS.all, list);
+            else if (key === 'tccsList') queryClient.setQueryData(TCCS_QUERY_KEYS.all, list);
+            else if (key === 'productFormulas')
+              queryClient.setQueryData(PRODUCT_QUERY_KEYS.formulas, list);
+            else if (key === 'rawMaterials')
+              queryClient.setQueryData(PRODUCT_QUERY_KEYS.materials, list);
+            else if (key === 'testResults')
+              queryClient.setQueryData(TEST_RESULT_QUERY_KEYS.all, list);
+            else if (key === 'criteriaAliases')
+              queryClient.setQueryData(TCCS_QUERY_KEYS.aliases, list);
+            else if (key === 'aiLearnedMappings')
+              queryClient.setQueryData(TCCS_QUERY_KEYS.aiMappings, list);
+
+            useAppStore.getState().setAppState({ [key]: list, lastSync: new Date().toISOString() });
+
+            if (list.length > 0) {
+              const storeName =
+                key === 'tccsList'
+                  ? 'tccs'
+                  : key === 'aiLearnedMappings'
+                    ? 'aiLearnedMappings'
+                    : key === 'criteriaAliases'
+                      ? 'criteriaAliases'
+                      : key;
+              const saveTask = () => saveToCache(storeName, list);
+              if ('requestIdleCallback' in window) {
+                window.requestIdleCallback(saveTask);
+              } else {
+                setTimeout(saveTask, 500);
+              }
+            }
+          },
+          (error) => {
+            console.error(`Lỗi đồng bộ Firebase cho danh mục [${key}]:`, error);
           }
-        }, (error) => {
-          console.error(`Lỗi đồng bộ Firebase cho danh mục [${key}]:`, error);
-        });
+        );
         unsubscribes.push(unsubscribe);
       });
 
       // [FIX] Đọc quality_alerts/latest.alerts theo cấu trúc mới
       // (Hỗ trợ cả định dạng cũ là mảng trực tiếp nếu có)
-      const alertsUnsubscribe = onValue(ref(db, 'quality_alerts/latest'), (snapshot) => {
-        const data = snapshot.val();
-        if (data && data.alerts && Array.isArray(data.alerts)) {
-          useAppStore.getState().setAppState({ qualityAlerts: data.alerts });
-          saveToCache('qualityAlerts', data.alerts);
-        } else if (Array.isArray(data)) {
-          // Backward compat: định dạng cũ là mảng trực tiếp
-          useAppStore.getState().setAppState({ qualityAlerts: data });
-        } else {
-          useAppStore.getState().setAppState({ qualityAlerts: [] });
+      const alertsUnsubscribe = onValue(
+        ref(db, 'quality_alerts/latest'),
+        (snapshot) => {
+          const data = snapshot.val();
+          if (data && data.alerts && Array.isArray(data.alerts)) {
+            useAppStore.getState().setAppState({ qualityAlerts: data.alerts });
+            saveToCache('qualityAlerts', data.alerts);
+          } else if (Array.isArray(data)) {
+            // Backward compat: định dạng cũ là mảng trực tiếp
+            useAppStore.getState().setAppState({ qualityAlerts: data });
+          } else {
+            useAppStore.getState().setAppState({ qualityAlerts: [] });
+          }
+        },
+        (error) => {
+          console.error('Lỗi đọc quality_alerts:', error);
         }
-      }, (error) => {
-        console.error('Lỗi đọc quality_alerts:', error);
-      });
+      );
       unsubscribes.push(alertsUnsubscribe);
     };
 
     initializeData();
 
     const connectedRef = ref(db, '.info/connected');
-    const unsubConnected = onValue(connectedRef, (snap) => {
-      if (snap.val() === true) {
-        const currentStatus = useAppStore.getState().syncStatus;
-        if (currentStatus === 'ERROR' || currentStatus === 'OFFLINE') useAppStore.getState().setSyncStatus('IDLE');
-        replayOfflineMutations().catch(() => {});
-      } else {
-        useAppStore.getState().setSyncStatus('OFFLINE');
+    const unsubConnected = onValue(
+      connectedRef,
+      (snap) => {
+        if (snap.val() === true) {
+          const currentStatus = useAppStore.getState().syncStatus;
+          if (currentStatus === 'ERROR' || currentStatus === 'OFFLINE')
+            useAppStore.getState().setSyncStatus('IDLE');
+        } else {
+          useAppStore.getState().setSyncStatus('OFFLINE');
+        }
+      },
+      (error) => {
+        console.warn('Lỗi đồng bộ trạng thái kết nối Firebase:', error);
       }
-    }, (error) => {
-      console.warn("Lỗi đồng bộ trạng thái kết nối Firebase:", error);
-    });
+    );
     unsubscribes.push(unsubConnected);
 
     return () => {
       isMounted = false;
-      unsubscribes.forEach(fn => fn());
+      unsubscribes.forEach((fn) => fn());
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };

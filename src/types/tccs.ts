@@ -4,7 +4,7 @@
 
 export enum CriterionType {
   NUMBER = 'NUMBER',
-  TEXT = 'TEXT'
+  TEXT = 'TEXT',
 }
 
 export interface Criterion {
@@ -27,6 +27,13 @@ export interface SensoryCharacteristics {
   smellTaste: string;
 }
 
+export interface AlternateRule {
+  main: string;
+  alt: string;
+  type?: 'FAIL_RETRY' | 'CONDITIONAL_CHECK';
+  conditionValue?: string;
+}
+
 export interface TCCS {
   id: string;
   productId: string;
@@ -40,9 +47,9 @@ export interface TCCS {
   storage?: string;
   shelfLife?: string;
   standardRefs?: string;
-  mainQualityCriteria: Criterion[]; 
+  mainQualityCriteria: Criterion[];
   safetyCriteria: Criterion[];
-  alternateRules?: { main: string; alt: string; type?: 'FAIL_RETRY' | 'CONDITIONAL_CHECK'; conditionValue?: string }[];
+  alternateRules?: AlternateRule[];
   version?: number;
   createdAt: string;
   updatedAt?: string;
@@ -55,10 +62,10 @@ export interface TCCS {
  */
 export interface CriteriaAlias {
   id: string;
-  tccsId: string;           // ID của TCCS chứa chỉ tiêu chuẩn
-  canonicalName: string;    // Tên chuẩn HIỆN TẠI trong TCCS
-  aliases: string[];        // Các tên cũ / biến thể (đã lowercase-trim)
-  autoDetected: boolean;    // true nếu do hệ thống tự phát hiện khi updateTCCS
+  tccsId: string; // ID của TCCS chứa chỉ tiêu chuẩn
+  canonicalName: string; // Tên chuẩn HIỆN TẠI trong TCCS
+  aliases: string[]; // Các tên cũ / biến thể (đã lowercase-trim)
+  autoDetected: boolean; // true nếu do hệ thống tự phát hiện khi updateTCCS
   confirmedByAdmin: boolean; // true nếu Admin đã xác nhận ánh xạ
   createdAt: string;
   updatedAt: string;

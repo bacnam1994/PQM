@@ -9,7 +9,6 @@ import { db } from '../../firebase';
 import { ProductFormula } from '../../types';
 import { IFormulaRepository } from '../FormulaRepository';
 import { BaseFirebaseRepository } from './BaseFirebaseRepository';
-import { enqueueOfflineMutation } from '../../utils/offlineMutationQueue';
 
 export class FirebaseFormulaRepository
   extends BaseFirebaseRepository<ProductFormula>
@@ -25,15 +24,7 @@ export class FirebaseFormulaRepository
   async delete(id: string): Promise<void> {
     if (!id) throw new Error('Yêu cầu ID công thức để xóa.');
     const targetPath = `${this.collectionPath}/${id}`;
-    try {
-      await remove(ref(db, targetPath));
-    } catch (e: any) {
-      if (typeof navigator !== 'undefined' && (!navigator.onLine || e?.code === 'unavailable')) {
-        await enqueueOfflineMutation({ path: targetPath, operation: 'REMOVE' });
-        return;
-      }
-      throw e;
-    }
+    await remove(ref(db, targetPath));
   }
 }
 

@@ -2,15 +2,14 @@ import { ref, set as firebaseSet, remove as firebaseRemove } from 'firebase/data
 import { db } from '../../firebase';
 import { parseNumberFromText } from '../../utils';
 import { ProductFormula } from '../../types';
-import { enqueueOfflineMutation } from '../../utils/offlineMutationQueue';
 
-// --- LOGIC CHỐNG MẤT DỮ LIỆU KHI OFFLINE ---
+// --- QUẢN LÝ TIẾN TRÌNH GHI ---
 let pendingWritesCount = 0;
 if (typeof window !== 'undefined') {
   window.addEventListener('beforeunload', (e) => {
     if (pendingWritesCount > 0) {
       e.preventDefault();
-      e.returnValue = 'Dữ liệu chưa được đồng bộ lên máy chủ. Bạn có chắc chắn muốn thoát?';
+      e.returnValue = 'Dữ liệu đang được đồng bộ lên máy chủ. Bạn có chắc chắn muốn thoát?';
       return e.returnValue;
     }
   });
@@ -27,37 +26,22 @@ export const getPendingWritesCount = () => pendingWritesCount;
 export const executeOfflineOptimistic = async (
   task: Promise<any>,
   get: () => any,
-  meta?: MutationMeta
+  _meta?: MutationMeta
 ) => {
   get().setSyncStatus('SAVING');
   pendingWritesCount++;
   try {
-    await Promise.race([
-      task,
-      new Promise((_, reject) => setTimeout(() => reject(new Error('TIMEOUT_OFFLINE')), 5000))
-    ]);
+    await task;
     pendingWritesCount--;
     get().setSyncStatus('SAVED');
-    setTimeout(() => get().setSyncStatus('IDLE'), 2000);
+    setTimeout(() => get().setSyncStatus('IDLE'), 1500);
   } catch (e: any) {
-    if (e.message === 'TIMEOUT_OFFLINE' || e.code === 'unavailable' || !navigator.onLine) {
-      get().setSyncStatus('OFFLINE');
-      if (meta) {
-        enqueueOfflineMutation(meta).catch(err => {
-          console.warn('[Store] Lỗi đưa mutation vào hàng đợi ngoại tuyến:', err);
-        });
-      }
-      task.then(() => {
-        pendingWritesCount--;
-        get().setSyncStatus('SAVED');
-        setTimeout(() => get().setSyncStatus('IDLE'), 2000);
-      }).catch(() => {
-        pendingWritesCount--;
-        get().setSyncStatus('ERROR');
-      });
-      return; // Trả về ngay để UI không bị treo
-    }
     pendingWritesCount--;
+    if (e?.code === 'unavailable' || (typeof navigator !== 'undefined' && !navigator.onLine)) {
+      get().setSyncStatus('OFFLINE');
+      return;
+    }
+    get().setSyncStatus('ERROR');
     throw e;
   }
 };
@@ -70,7 +54,7 @@ export const removeUndefined = (obj: any): any => {
   }
   if (obj === null || typeof obj !== 'object') return obj;
   if (Array.isArray(obj)) return obj.map(removeUndefined);
-  
+
   const result: any = {};
   for (const key in obj) {
     if (Object.prototype.hasOwnProperty.call(obj, key) && obj[key] !== undefined) {
@@ -86,18 +70,26 @@ export const removeUndefined = (obj: any): any => {
 };
 
 export const handleSaveRecord = async (path: string, item: any, get: () => any) => {
-  if (!item || !item.id) throw new Error("Dữ liệu không hợp lệ (Thiếu ID)");
+  if (!item || !item.id) throw new Error('Dữ liệu không hợp lệ (Thiếu ID)');
   try {
     const cleanItem = removeUndefined(item);
     const targetPath = `${path}/${item.id}`;
-    await executeOfflineOptimistic(
-      firebaseSet(ref(db, targetPath), cleanItem),
-      get,
-      { path: targetPath, operation: 'SET', data: cleanItem }
-    );
+    await executeOfflineOptimistic(firebaseSet(ref(db, targetPath), cleanItem), get, {
+      path: targetPath,
+      operation: 'SET',
+      data: cleanItem,
+    });
   } catch (error: any) {
-    if (error.message && (error.message.toLowerCase().includes("permission denied") || error.code === "PERMISSION_DENIED")) {
-      get().notify({ type: 'ERROR', title: 'Lỗi phân quyền', message: `Lưu thất bại! Bạn không có quyền thực hiện hoặc dữ liệu vi phạm bảo mật.` });
+    if (
+      error.message &&
+      (error.message.toLowerCase().includes('permission denied') ||
+        error.code === 'PERMISSION_DENIED')
+    ) {
+      get().notify({
+        type: 'ERROR',
+        title: 'Lỗi phân quyền',
+        message: `Lưu thất bại! Bạn không có quyền thực hiện hoặc dữ liệu vi phạm bảo mật.`,
+      });
       get().setSyncStatus('IDLE');
     } else {
       get().notify({ type: 'ERROR', title: 'Lỗi lưu dữ liệu', message: error.message });
@@ -114,9 +106,10 @@ export const handleSaveRecord = async (path: string, item: any, get: () => any) 
 export const resolveCurrentIdentity = (state: any) => {
   if (!state) return null;
   const user = state.user;
-  const isAdmin = !!state.isAdmin || state.role === 'ADMIN' || !!user?.isAdmin || user?.role === 'ADMIN';
-  const role = isAdmin ? 'ADMIN' : (user?.role || state.role || 'GUEST');
-  
+  const isAdmin =
+    !!state.isAdmin || state.role === 'ADMIN' || !!user?.isAdmin || user?.role === 'ADMIN';
+  const role = isAdmin ? 'ADMIN' : user?.role || state.role || 'GUEST';
+
   if (!user) {
     if (isAdmin) {
       return {
@@ -129,7 +122,7 @@ export const resolveCurrentIdentity = (state: any) => {
     }
     return null;
   }
-  
+
   return {
     ...user,
     role,
@@ -137,21 +130,37 @@ export const resolveCurrentIdentity = (state: any) => {
   };
 };
 
-export const handleDeleteRecord = async (path: string, id: string, get: () => any, requireAdmin: boolean = false) => {
+export const handleDeleteRecord = async (
+  path: string,
+  id: string,
+  get: () => any,
+  requireAdmin: boolean = false
+) => {
   if (requireAdmin && !(get().isAdmin || get().role === 'ADMIN')) {
-    get().notify({ type: 'ERROR', title: 'Từ chối truy cập', message: 'Chỉ Quản trị viên mới có quyền xóa dữ liệu này.' });
-    throw new Error("Permission denied");
+    get().notify({
+      type: 'ERROR',
+      title: 'Từ chối truy cập',
+      message: 'Chỉ Quản trị viên mới có quyền xóa dữ liệu này.',
+    });
+    throw new Error('Permission denied');
   }
   try {
     const targetPath = `${path}/${id}`;
-    await executeOfflineOptimistic(
-      firebaseRemove(ref(db, targetPath)),
-      get,
-      { path: targetPath, operation: 'REMOVE' }
-    );
+    await executeOfflineOptimistic(firebaseRemove(ref(db, targetPath)), get, {
+      path: targetPath,
+      operation: 'REMOVE',
+    });
   } catch (error: any) {
-    if (error.message && (error.message.toLowerCase().includes("permission denied") || error.code === "PERMISSION_DENIED")) {
-      get().notify({ type: 'ERROR', title: 'Xóa thất bại', message: 'Bạn không có quyền xóa dữ liệu này.' });
+    if (
+      error.message &&
+      (error.message.toLowerCase().includes('permission denied') ||
+        error.code === 'PERMISSION_DENIED')
+    ) {
+      get().notify({
+        type: 'ERROR',
+        title: 'Xóa thất bại',
+        message: 'Bạn không có quyền xóa dữ liệu này.',
+      });
       get().setSyncStatus('IDLE');
     } else {
       get().setSyncStatus('ERROR');
@@ -166,7 +175,7 @@ export const processFormulaBeforeSave = (formula: ProductFormula): ProductFormul
   const sanitizeFormulaItem = (item: any) => {
     if (!item) return item;
     const newItem = { ...item };
-    
+
     // 1. Xử lý declaredContent: nếu là string, parse ra số; nếu NaN / không hợp lệ thì gán 0
     let dc = newItem.declaredContent;
     if (typeof dc === 'string') {

@@ -10,9 +10,13 @@ import { ITCCSRepository } from '../../repositories/TCCSRepository';
 import { tccsRepository as defaultTccsRepo } from '../../repositories/firebase/FirebaseTCCSRepository';
 import { can } from '../permissionService';
 import { logAuditAction } from '../auditService';
-import { detectCriteriaChanges, normalizeName, mergeAliases, createAliasRecord } from '../criteriaAliasService';
+import {
+  detectCriteriaChanges,
+  normalizeName,
+  mergeAliases,
+  createAliasRecord,
+} from '../criteriaAliasService';
 import { removeUndefined } from '../../utils';
-import { enqueueOfflineMutation } from '../../utils/offlineMutationQueue';
 
 export class TCCSAppService {
   constructor(private repo: ITCCSRepository = defaultTccsRepo) {}
@@ -29,8 +33,12 @@ export class TCCSAppService {
       throw new Error('TCCS phải liên kết với một sản phẩm cụ thể.');
     }
 
-    const otherTCCS = existingTCCSList.filter(item => item.productId === tccs.productId && item.id !== tccs.id);
-    const allTCCS = [...otherTCCS, tccs].sort((a, b) => (b.issueDate || '').localeCompare(a.issueDate || ''));
+    const otherTCCS = existingTCCSList.filter(
+      (item) => item.productId === tccs.productId && item.id !== tccs.id
+    );
+    const allTCCS = [...otherTCCS, tccs].sort((a, b) =>
+      (b.issueDate || '').localeCompare(a.issueDate || '')
+    );
 
     if (allTCCS.length <= 1) {
       await this.repo.save({ ...tccs, isActive: true });
@@ -38,7 +46,7 @@ export class TCCSAppService {
       const latestId = allTCCS[0].id;
       const updates: Record<string, any> = {};
 
-      allTCCS.forEach(item => {
+      allTCCS.forEach((item) => {
         const shouldBeActive = item.id === latestId;
         if (item.id === tccs.id) {
           updates[`tccs/${item.id}`] = removeUndefined({ ...tccs, isActive: shouldBeActive });
@@ -59,13 +67,13 @@ export class TCCSAppService {
       collection: 'TCCS',
       documentId: tccs.id,
       details: `Tạo TCCS: ${tccs.code} (Sản phẩm: ${tccs.productId})`,
-      performedBy: currentUser?.email || 'unknown'
+      performedBy: currentUser?.email || 'unknown',
     });
   }
 
   async updateTCCS(
-    tccs: TCCS, 
-    oldTCCS?: TCCS, 
+    tccs: TCCS,
+    oldTCCS?: TCCS,
     existingAliases: CriteriaAlias[] = [],
     currentUser?: any
   ): Promise<{ aliasUpdates: Record<string, any> }> {
@@ -81,21 +89,20 @@ export class TCCSAppService {
 
     // Tự động phát hiện thay đổi tên chỉ tiêu để cập nhật bảng Alias
     if (oldTCCS) {
-      const oldNames = [
-        ...(oldTCCS.mainQualityCriteria || []),
-        ...(oldTCCS.safetyCriteria || []),
-      ].filter(c => c?.name).map(c => c.name);
+      const oldNames = [...(oldTCCS.mainQualityCriteria || []), ...(oldTCCS.safetyCriteria || [])]
+        .filter((c) => c?.name)
+        .map((c) => c.name);
 
-      const newNames = [
-        ...(tccs.mainQualityCriteria || []),
-        ...(tccs.safetyCriteria || []),
-      ].filter(c => c?.name).map(c => c.name);
+      const newNames = [...(tccs.mainQualityCriteria || []), ...(tccs.safetyCriteria || [])]
+        .filter((c) => c?.name)
+        .map((c) => c.name);
 
       const changes = detectCriteriaChanges(oldNames, newNames);
 
       for (const change of changes) {
         const existing = existingAliases.find(
-          a => a.tccsId === tccs.id && normalizeName(a.canonicalName) === normalizeName(change.newName)
+          (a) =>
+            a.tccsId === tccs.id && normalizeName(a.canonicalName) === normalizeName(change.newName)
         );
 
         if (existing) {
@@ -106,7 +113,13 @@ export class TCCSAppService {
           const newId = `ca_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
           const newAlias: CriteriaAlias = {
             id: newId,
-            ...createAliasRecord(tccs.id, change.newName, [change.oldName], true, change.autoConfirm),
+            ...createAliasRecord(
+              tccs.id,
+              change.newName,
+              [change.oldName],
+              true,
+              change.autoConfirm
+            ),
           };
           aliasUpdates[`criteria_aliases/${newId}`] = removeUndefined(newAlias);
         }
@@ -117,13 +130,7 @@ export class TCCSAppService {
       try {
         await update(ref(db), aliasUpdates);
       } catch (e: any) {
-        if (typeof navigator !== 'undefined' && (!navigator.onLine || e?.code === 'unavailable')) {
-          for (const [path, data] of Object.entries(aliasUpdates)) {
-            await enqueueOfflineMutation({ path, operation: 'SET', data });
-          }
-        } else {
-          console.warn('Lỗi cập nhật alias khi cập nhật TCCS:', e);
-        }
+        console.warn('Lỗi cập nhật alias khi cập nhật TCCS:', e);
       }
     }
 
@@ -134,16 +141,16 @@ export class TCCSAppService {
       collection: 'TCCS',
       documentId: tccs.id,
       details: `Cập nhật TCCS: ${tccs.code}`,
-      performedBy: currentUser?.email || 'unknown'
+      performedBy: currentUser?.email || 'unknown',
     });
 
     return { aliasUpdates };
   }
 
   async deleteTCCS(
-    id: string, 
-    batches: Batch[] = [], 
-    currentUser: any, 
+    id: string,
+    batches: Batch[] = [],
+    currentUser: any,
     tccsCode?: string,
     existingAliases: CriteriaAlias[] = []
   ): Promise<void> {
@@ -152,7 +159,7 @@ export class TCCSAppService {
     }
 
     // Ràng buộc toàn vẹn: Không xóa TCCS đang được lô sản xuất tham chiếu
-    const isBoundToBatch = batches.some(b => b.tccsId === id);
+    const isBoundToBatch = batches.some((b) => b.tccsId === id);
     if (isBoundToBatch) {
       throw new Error('TCCS này đang liên kết với ít nhất một lô sản xuất. Không thể xóa.');
     }
@@ -160,22 +167,16 @@ export class TCCSAppService {
     await this.repo.delete(id);
 
     // Tự động dọn dẹp các Criteria Alias gắn liền với TCCS này để tránh orphan records
-    const relatedAliases = existingAliases.filter(a => a.tccsId === id);
+    const relatedAliases = existingAliases.filter((a) => a.tccsId === id);
     if (relatedAliases.length > 0) {
       const aliasUpdates: Record<string, any> = {};
-      relatedAliases.forEach(a => {
+      relatedAliases.forEach((a) => {
         aliasUpdates[`criteria_aliases/${a.id}`] = null;
       });
       try {
         await update(ref(db), aliasUpdates);
       } catch (e: any) {
-        if (typeof navigator !== 'undefined' && (!navigator.onLine || e?.code === 'unavailable')) {
-          for (const a of relatedAliases) {
-            await enqueueOfflineMutation({ path: `criteria_aliases/${a.id}`, operation: 'REMOVE' });
-          }
-        } else {
-          console.warn('Lỗi dọn dẹp alias khi xóa TCCS:', e);
-        }
+        console.warn('Lỗi dọn dẹp alias khi xóa TCCS:', e);
       }
     }
 
@@ -184,19 +185,19 @@ export class TCCSAppService {
       collection: 'TCCS',
       documentId: id,
       details: `Xóa TCCS: ${tccsCode || id}`,
-      performedBy: currentUser?.email || 'unknown'
+      performedBy: currentUser?.email || 'unknown',
     });
   }
 
   // --- AI LEARNED MAPPING OPERATIONS ---
   async addAiLearnedMapping(
-    originalName: string, 
-    systemName: string, 
+    originalName: string,
+    systemName: string,
     existingMappings: AILearnedMapping[] = [],
     currentUser?: any
   ): Promise<void> {
     const existing = existingMappings.find(
-      m => m.originalName === originalName && m.systemName === systemName
+      (m) => m.originalName === originalName && m.systemName === systemName
     );
     const now = new Date().toISOString();
 
@@ -204,17 +205,9 @@ export class TCCSAppService {
       const targetPath = `ai_learned_mappings/${existing.id}`;
       const updates = {
         frequency: existing.frequency + 1,
-        updatedAt: now
+        updatedAt: now,
       };
-      try {
-        await update(ref(db, targetPath), updates);
-      } catch (e: any) {
-        if (typeof navigator !== 'undefined' && (!navigator.onLine || e?.code === 'unavailable')) {
-          await enqueueOfflineMutation({ path: targetPath, operation: 'UPDATE', data: updates });
-        } else {
-          throw e;
-        }
-      }
+      await update(ref(db, targetPath), updates);
     } else {
       const newId = `aim_${Date.now()}`;
       const newMapping: AILearnedMapping = {
@@ -223,18 +216,10 @@ export class TCCSAppService {
         systemName,
         frequency: 1,
         createdAt: now,
-        updatedAt: now
+        updatedAt: now,
       };
       const targetPath = `ai_learned_mappings/${newId}`;
-      try {
-        await set(ref(db, targetPath), newMapping);
-      } catch (e: any) {
-        if (typeof navigator !== 'undefined' && (!navigator.onLine || e?.code === 'unavailable')) {
-          await enqueueOfflineMutation({ path: targetPath, operation: 'SET', data: newMapping });
-        } else {
-          throw e;
-        }
-      }
+      await set(ref(db, targetPath), newMapping);
     }
 
     logAuditAction({
@@ -242,7 +227,7 @@ export class TCCSAppService {
       collection: 'SYSTEM',
       documentId: existing ? existing.id : originalName,
       details: `Học ánh xạ chỉ tiêu: "${originalName}" → "${systemName}"`,
-      performedBy: currentUser?.email || 'unknown'
+      performedBy: currentUser?.email || 'unknown',
     });
   }
 
@@ -254,22 +239,14 @@ export class TCCSAppService {
 
     const cleanAlias = removeUndefined(alias);
     const targetPath = `criteria_aliases/${alias.id}`;
-    try {
-      await set(ref(db, targetPath), cleanAlias);
-    } catch (e: any) {
-      if (typeof navigator !== 'undefined' && (!navigator.onLine || e?.code === 'unavailable')) {
-        await enqueueOfflineMutation({ path: targetPath, operation: 'SET', data: cleanAlias });
-      } else {
-        throw e;
-      }
-    }
+    await set(ref(db, targetPath), cleanAlias);
 
     logAuditAction({
       action: 'CREATE',
       collection: 'CRITERIA_ALIASES',
       documentId: alias.id,
       details: `Tạo alias: "${alias.aliases.join(', ')}" → "${alias.canonicalName}" (TCCS: ${alias.tccsId})`,
-      performedBy: currentUser?.email || 'unknown'
+      performedBy: currentUser?.email || 'unknown',
     });
   }
 
@@ -280,22 +257,14 @@ export class TCCSAppService {
 
     const updated = removeUndefined({ ...alias, updatedAt: new Date().toISOString() });
     const targetPath = `criteria_aliases/${alias.id}`;
-    try {
-      await update(ref(db, targetPath), updated);
-    } catch (e: any) {
-      if (typeof navigator !== 'undefined' && (!navigator.onLine || e?.code === 'unavailable')) {
-        await enqueueOfflineMutation({ path: targetPath, operation: 'UPDATE', data: updated });
-      } else {
-        throw e;
-      }
-    }
+    await update(ref(db, targetPath), updated);
 
     logAuditAction({
       action: 'UPDATE',
       collection: 'CRITERIA_ALIASES',
       documentId: alias.id,
       details: `Cập nhật alias cho "${alias.canonicalName}"`,
-      performedBy: currentUser?.email || 'unknown'
+      performedBy: currentUser?.email || 'unknown',
     });
   }
 
@@ -305,22 +274,14 @@ export class TCCSAppService {
     }
 
     const targetPath = `criteria_aliases/${id}`;
-    try {
-      await remove(ref(db, targetPath));
-    } catch (e: any) {
-      if (typeof navigator !== 'undefined' && (!navigator.onLine || e?.code === 'unavailable')) {
-        await enqueueOfflineMutation({ path: targetPath, operation: 'REMOVE' });
-      } else {
-        throw e;
-      }
-    }
+    await remove(ref(db, targetPath));
 
     logAuditAction({
       action: 'DELETE',
       collection: 'CRITERIA_ALIASES',
       documentId: id,
       details: `Xóa alias cho "${canonicalName || id}"`,
-      performedBy: currentUser?.email || 'unknown'
+      performedBy: currentUser?.email || 'unknown',
     });
   }
 
@@ -332,12 +293,16 @@ export class TCCSAppService {
     const updated = {
       ...alias,
       confirmedByAdmin: true,
-      updatedAt: new Date().toISOString()
+      updatedAt: new Date().toISOString(),
     };
     await this.updateCriteriaAlias(updated, currentUser);
   }
 
-  async addAliasToExisting(alias: CriteriaAlias, newAlias: string, currentUser: any): Promise<void> {
+  async addAliasToExisting(
+    alias: CriteriaAlias,
+    newAlias: string,
+    currentUser: any
+  ): Promise<void> {
     if (!can(currentUser, 'tccs:update')) {
       throw new Error('Từ chối quyền: Bạn không có quyền thêm alias mới.');
     }

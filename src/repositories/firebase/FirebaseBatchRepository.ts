@@ -9,7 +9,6 @@ import { db } from '../../firebase';
 import { Batch } from '../../types';
 import { IBatchRepository } from '../BatchRepository';
 import { BaseFirebaseRepository } from './BaseFirebaseRepository';
-import { enqueueOfflineMutation } from '../../utils/offlineMutationQueue';
 import { deleteBatchService } from '../../services/databaseService';
 
 export class FirebaseBatchRepository
@@ -37,50 +36,22 @@ export class FirebaseBatchRepository
     const updates: Record<string, any> = {
       status,
       updatedAt: new Date().toISOString(),
-      rejectReason: status === 'REJECTED' ? (reason || null) : null
+      rejectReason: status === 'REJECTED' ? reason || null : null,
     };
     const targetPath = `${this.collectionPath}/${batchId}`;
-
-    try {
-      await update(ref(db, targetPath), updates);
-    } catch (e: any) {
-      if (typeof navigator !== 'undefined' && (!navigator.onLine || e?.code === 'unavailable')) {
-        await enqueueOfflineMutation({ path: targetPath, operation: 'UPDATE', data: updates });
-        return;
-      }
-      throw e;
-    }
+    await update(ref(db, targetPath), updates);
   }
 
   async updateProgress(batchId: string, progressPercent: number): Promise<void> {
     if (!batchId) throw new Error('Yêu cầu ID lô sản xuất');
     const updates = { progressPercent };
     const targetPath = `${this.collectionPath}/${batchId}`;
-
-    try {
-      await update(ref(db, targetPath), updates);
-    } catch (e: any) {
-      if (typeof navigator !== 'undefined' && (!navigator.onLine || e?.code === 'unavailable')) {
-        await enqueueOfflineMutation({ path: targetPath, operation: 'UPDATE', data: updates });
-        return;
-      }
-      throw e;
-    }
+    await update(ref(db, targetPath), updates);
   }
 
   async delete(id: string): Promise<void> {
     if (!id) throw new Error('Yêu cầu ID lô sản xuất để xóa.');
-    const targetPath = `${this.collectionPath}/${id}`;
-
-    try {
-      await deleteBatchService(id);
-    } catch (e: any) {
-      if (typeof navigator !== 'undefined' && (!navigator.onLine || e?.code === 'unavailable')) {
-        await enqueueOfflineMutation({ path: targetPath, operation: 'REMOVE' });
-        return;
-      }
-      throw e;
-    }
+    await deleteBatchService(id);
   }
 }
 

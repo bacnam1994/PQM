@@ -9,7 +9,6 @@ import { db } from '../../firebase';
 import { RawMaterial } from '../../types';
 import { IMaterialRepository } from '../MaterialRepository';
 import { BaseFirebaseRepository } from './BaseFirebaseRepository';
-import { enqueueOfflineMutation } from '../../utils/offlineMutationQueue';
 
 export class FirebaseMaterialRepository
   extends BaseFirebaseRepository<RawMaterial>
@@ -32,10 +31,10 @@ export class FirebaseMaterialRepository
   async searchByNameOrAlias(query: string): Promise<RawMaterial[]> {
     const all = await this.findAll();
     const q = query.trim().toLowerCase();
-    return all.filter(m => {
+    return all.filter((m) => {
       const matchName = m.name?.toLowerCase().includes(q);
       const matchCode = m.code?.toLowerCase().includes(q);
-      const matchAlias = (m.aliases || []).some(a => a.toLowerCase().includes(q));
+      const matchAlias = (m.aliases || []).some((a) => a.toLowerCase().includes(q));
       return matchName || matchCode || matchAlias;
     });
   }
@@ -43,15 +42,7 @@ export class FirebaseMaterialRepository
   async delete(id: string): Promise<void> {
     if (!id) throw new Error('Yêu cầu ID nguyên liệu để xóa.');
     const targetPath = `${this.collectionPath}/${id}`;
-    try {
-      await remove(ref(db, targetPath));
-    } catch (e: any) {
-      if (typeof navigator !== 'undefined' && (!navigator.onLine || e?.code === 'unavailable')) {
-        await enqueueOfflineMutation({ path: targetPath, operation: 'REMOVE' });
-        return;
-      }
-      throw e;
-    }
+    await remove(ref(db, targetPath));
   }
 }
 
