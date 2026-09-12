@@ -42,9 +42,58 @@ export const createAuthSlice: StoreSlice<AuthSlice> = (set, get) => ({
       : true,
 
   // --- ACTIONS ---
-  setUser: (user) => set({ user }, false, 'setUser'),
-  setIsAdmin: (isAdmin) => set({ isAdmin }, false, 'setIsAdmin'),
-  setRole: (role) => set({ role }, false, 'setRole'),
+  setUser: (user) =>
+    set(
+      (state) => {
+        if (!user) return { user: null };
+        const u = user as any;
+        const role = u.role || state.role || (state.isAdmin ? 'ADMIN' : null);
+        const isAdmin = u.isAdmin !== undefined ? u.isAdmin : (state.isAdmin || role === 'ADMIN');
+        return {
+          user: {
+            ...user,
+            role: role || 'GUEST',
+            isAdmin: !!isAdmin,
+          },
+        };
+      },
+      false,
+      'setUser'
+    ),
+  setIsAdmin: (isAdmin) =>
+    set(
+      (state) => ({
+        isAdmin,
+        user: state.user
+          ? {
+              ...state.user,
+              isAdmin,
+              role: isAdmin ? 'ADMIN' : (state.user.role || state.role || 'GUEST'),
+            }
+          : null,
+      }),
+      false,
+      'setIsAdmin'
+    ),
+  setRole: (role) =>
+    set(
+      (state) => {
+        const isAdmin = role === 'ADMIN' ? true : (state.user?.isAdmin ?? state.isAdmin);
+        return {
+          role,
+          isAdmin: !!isAdmin,
+          user: state.user
+            ? {
+                ...state.user,
+                role,
+                isAdmin: !!isAdmin,
+              }
+            : null,
+        };
+      },
+      false,
+      'setRole'
+    ),
   setAuthLoading: (loading) => set({ authLoading: loading }, false, 'setAuthLoading'),
 
   login: async (email, password) => {

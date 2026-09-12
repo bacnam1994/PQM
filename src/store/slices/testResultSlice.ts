@@ -3,6 +3,7 @@ import { db } from '../../firebase';
 import { testResultAppService } from '../../services/app/TestResultAppService';
 import { TestResultSlice, StoreSlice } from './types';
 import { TestResult } from '../../types';
+import { resolveCurrentIdentity } from '../utils/storeHelpers';
 
 export const createTestResultSlice: StoreSlice<TestResultSlice> = (set, get) => ({
   // --- INITIAL TEST RESULT STATE ---
@@ -15,7 +16,8 @@ export const createTestResultSlice: StoreSlice<TestResultSlice> = (set, get) => 
     try {
       const state = get();
       const batch = state.batches.find((b: any) => b.id === r.batchId);
-      await testResultAppService.createTestResult(r, state.user, { batch });
+      const currentUser = resolveCurrentIdentity(state);
+      await testResultAppService.createTestResult(r, currentUser, { batch });
       await get().syncQualityAlerts();
     } catch (error: any) {
       get().notify({ type: 'ERROR', title: 'Lỗi lưu phiếu kiểm nghiệm', message: error.message });
@@ -27,7 +29,8 @@ export const createTestResultSlice: StoreSlice<TestResultSlice> = (set, get) => 
     try {
       const state = get();
       const oldResult = state.testResults.find((item: TestResult) => item.id === r.id);
-      await testResultAppService.updateTestResult(r, state.user, oldResult);
+      const currentUser = resolveCurrentIdentity(state);
+      await testResultAppService.updateTestResult(r, currentUser, oldResult);
       await get().syncQualityAlerts();
     } catch (error: any) {
       get().notify({ type: 'ERROR', title: 'Lỗi cập nhật phiếu kiểm nghiệm', message: error.message });
@@ -39,7 +42,8 @@ export const createTestResultSlice: StoreSlice<TestResultSlice> = (set, get) => 
     try {
       const state = get();
       const oldResult = state.testResults.find((item: TestResult) => item.id === id);
-      await testResultAppService.deleteTestResult(id, state.user, oldResult);
+      const currentUser = resolveCurrentIdentity(state);
+      await testResultAppService.deleteTestResult(id, currentUser, oldResult);
       await get().syncQualityAlerts();
     } catch (error: any) {
       get().notify({ type: 'ERROR', title: 'Lỗi xóa phiếu kiểm nghiệm', message: error.message });

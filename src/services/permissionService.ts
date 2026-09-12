@@ -16,11 +16,43 @@ import {
  * Chuẩn hóa đối tượng người dùng thành UserIdentity
  */
 export function normalizeUser(user: any): UserIdentity | null {
+  if (!user) {
+    if (typeof window !== 'undefined' && typeof (window as any).__PQM_GET_CURRENT_USER__ === 'function') {
+      user = (window as any).__PQM_GET_CURRENT_USER__();
+    }
+  }
   if (!user) return null;
   
-  // Nếu là Firebase User hoặc custom user
-  const isAdminFlag = user.role === 'ADMIN' || !!user.isAdmin;
-  const role: Role = isAdminFlag ? 'ADMIN' : (user.role || 'GUEST');
+  // 1. Kiểm tra cờ trực tiếp trên user
+  let isAdminFlag = user.role === 'ADMIN' || !!user.isAdmin;
+  let role: Role = isAdminFlag ? 'ADMIN' : (user.role || 'GUEST');
+  
+  // 2. Fallback nếu user object thiếu role/isAdmin nhưng store đang có phiên đăng nhập Admin
+  if (!isAdminFlag && typeof window !== 'undefined') {
+    try {
+      if (typeof (window as any).__PQM_GET_CURRENT_USER__ === 'function') {
+        const storeUser = (window as any).__PQM_GET_CURRENT_USER__();
+        if (storeUser && (storeUser.uid === user.uid || storeUser.email === user.email || !user.uid)) {
+          if (storeUser.isAdmin || storeUser.role === 'ADMIN') {
+            isAdminFlag = true;
+            role = 'ADMIN';
+          } else if (storeUser.role && role === 'GUEST') {
+            role = storeUser.role;
+          }
+        }
+      }
+    } catch {}
+  }
+
+  // 3. Fallback dev mock auth
+  if (!isAdminFlag && typeof window !== 'undefined') {
+    try {
+      if (localStorage.getItem('pqm_dev_mock_auth') === 'admin@example.com' && (user.email === 'admin@example.com' || !user.email)) {
+        isAdminFlag = true;
+        role = 'ADMIN';
+      }
+    } catch {}
+  }
   
   return {
     uid: user.uid || '',
@@ -123,6 +155,10 @@ export function hasRole(
 ): boolean {
   const identity = normalizeUser(user);
   if (!identity) return false;
+  // Quản trị viên (ADMIN) có đầy đủ mọi vai trò và thẩm quyền
+  if (identity.isAdmin || identity.role === 'ADMIN') {
+    return true;
+  }
   const targetRoles = Array.isArray(roles) ? roles : [roles];
   return targetRoles.includes(identity.role);
 }

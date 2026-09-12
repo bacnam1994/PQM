@@ -1,6 +1,7 @@
 import { batchAppService } from '../../services/app/BatchAppService';
 import { BatchSlice, StoreSlice } from './types';
 import { Batch, ElectronicSignature } from '../../types';
+import { resolveCurrentIdentity } from '../utils/storeHelpers';
 
 export const createBatchSlice: StoreSlice<BatchSlice> = (set, get) => ({
   // --- INITIAL BATCH STATE ---
@@ -10,7 +11,8 @@ export const createBatchSlice: StoreSlice<BatchSlice> = (set, get) => ({
   addBatch: async (b: Batch) => {
     try {
       const state = get();
-      await batchAppService.createBatch(b, state.user, state.batches, {
+      const currentUser = resolveCurrentIdentity(state);
+      await batchAppService.createBatch(b, currentUser, state.batches, {
         activeTCCS: state.tccsList.find((t: any) => t.id === b.tccsId),
         tccsList: state.tccsList,
         productFormula: state.productFormulas.find((f: any) => f.productId === b.productId),
@@ -27,7 +29,8 @@ export const createBatchSlice: StoreSlice<BatchSlice> = (set, get) => ({
     try {
       const state = get();
       const oldBatch = state.batches.find((item: Batch) => item.id === b.id);
-      await batchAppService.updateBatch(b, state.user, oldBatch);
+      const currentUser = resolveCurrentIdentity(state);
+      await batchAppService.updateBatch(b, currentUser, oldBatch);
       await get().syncQualityAlerts();
     } catch (error: any) {
       get().notify({ type: 'ERROR', title: 'Lỗi cập nhật lô sản xuất', message: error.message });
@@ -39,7 +42,8 @@ export const createBatchSlice: StoreSlice<BatchSlice> = (set, get) => ({
     try {
       const state = get();
       const batch = state.batches.find((b: Batch) => b.id === id);
-      await batchAppService.deleteBatch(id, state.user, batch?.batchNo);
+      const currentUser = resolveCurrentIdentity(state);
+      await batchAppService.deleteBatch(id, currentUser, batch?.batchNo);
       await get().syncQualityAlerts();
     } catch (error: any) {
       get().notify({ type: 'ERROR', title: 'Lỗi xóa lô sản xuất', message: error.message });
@@ -57,7 +61,8 @@ export const createBatchSlice: StoreSlice<BatchSlice> = (set, get) => ({
       const state = get();
       const currentBatch = state.batches.find((b: Batch) => b.id === id);
       const batchTestResults = state.testResults.filter((r: any) => r.batchId === id);
-      await batchAppService.updateStatus(id, status as Batch['status'], state.user, {
+      const currentUser = resolveCurrentIdentity(state);
+      await batchAppService.updateStatus(id, status as Batch['status'], currentUser, {
         reason: rejectReason,
         currentBatch,
         batchTestResults,

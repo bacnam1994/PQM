@@ -46,6 +46,38 @@ describe('permissionService - PQM 3.0 RBAC Engine', () => {
       expect(can(adminUser, 'test_result:update', { status: 'LOCKED' })).toBe(true);
       expect(can(adminUser, 'test_result:delete', { status: 'APPROVED' })).toBe(true);
     });
+
+    it('should allow ADMIN full permissions including test result creation and entry', () => {
+      expect(can(adminUser, 'test_result:create')).toBe(true);
+      expect(can(adminUser, 'test_result:update')).toBe(true);
+      expect(can(adminUser, 'test_result:delete')).toBe(true);
+      expect(can(adminUser, 'test_result:submit')).toBe(true);
+      expect(can(adminUser, 'test_result:review')).toBe(true);
+      expect(can(adminUser, 'test_result:approve')).toBe(true);
+    });
+
+    it('should resolve ADMIN as fulfilling any specific role in hasRole', () => {
+      expect(hasRole(adminUser, 'ADMIN')).toBe(true);
+      expect(hasRole(adminUser, 'QA')).toBe(true);
+      expect(hasRole(adminUser, 'QC')).toBe(true);
+      expect(hasRole(adminUser, 'LAB')).toBe(true);
+      expect(hasRole(adminUser, 'PRODUCTION')).toBe(true);
+      expect(hasRole(adminUser, ['LAB', 'QC'])).toBe(true);
+    });
+
+    it('should fallback to window.__PQM_GET_CURRENT_USER__ if raw user has no role or isAdmin', () => {
+      const rawFirebaseUser = { uid: 'u-admin-raw', email: 'admin@vbiotech.vn' };
+      (window as any).__PQM_GET_CURRENT_USER__ = () => ({
+        uid: 'u-admin-raw',
+        email: 'admin@vbiotech.vn',
+        role: 'ADMIN',
+        isAdmin: true,
+      });
+
+      expect(can(rawFirebaseUser, 'test_result:create')).toBe(true);
+      expect(isAdmin(rawFirebaseUser)).toBe(true);
+      delete (window as any).__PQM_GET_CURRENT_USER__;
+    });
   });
 
   describe('2. QA (Quality Assurance) Capabilities', () => {

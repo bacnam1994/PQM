@@ -1,6 +1,7 @@
 import { tccsAppService } from '../../services/app/TCCSAppService';
 import { TCCSSlice, StoreSlice } from './types';
 import { TCCS, CriteriaAlias } from '../../types';
+import { resolveCurrentIdentity } from '../utils/storeHelpers';
 
 export const createTCCSSlice: StoreSlice<TCCSSlice> = (set, get) => ({
   // --- INITIAL TCCS STATE ---
@@ -12,7 +13,7 @@ export const createTCCSSlice: StoreSlice<TCCSSlice> = (set, get) => ({
   addTCCS: async (t: TCCS) => {
     try {
       const state = get();
-      await tccsAppService.createTCCS(t, state.tccsList, state.user);
+      await tccsAppService.createTCCS(t, state.tccsList, resolveCurrentIdentity(state));
     } catch (error: any) {
       get().notify({ type: 'ERROR', title: 'Lỗi lưu TCCS', message: error.message });
       throw error;
@@ -27,7 +28,7 @@ export const createTCCSSlice: StoreSlice<TCCSSlice> = (set, get) => ({
         t,
         oldTCCS,
         state.criteriaAliases,
-        state.user
+        resolveCurrentIdentity(state)
       );
     } catch (error: any) {
       get().notify({ type: 'ERROR', title: 'Lỗi cập nhật TCCS', message: error.message });
@@ -42,7 +43,7 @@ export const createTCCSSlice: StoreSlice<TCCSSlice> = (set, get) => ({
       await tccsAppService.deleteTCCS(
         id, 
         state.batches, 
-        state.user, 
+        resolveCurrentIdentity(state), 
         tccs?.code,
         state.criteriaAliases
       );
@@ -60,7 +61,7 @@ export const createTCCSSlice: StoreSlice<TCCSSlice> = (set, get) => ({
         originalName, 
         systemName, 
         state.aiLearnedMappings, 
-        state.user
+        resolveCurrentIdentity(state)
       );
     } catch (e: any) {
       console.error('Lỗi cập nhật AI Learned Mapping:', e);
@@ -70,7 +71,7 @@ export const createTCCSSlice: StoreSlice<TCCSSlice> = (set, get) => ({
   // --- CRITERIA ALIAS ACTIONS ---
   addCriteriaAlias: async (alias: CriteriaAlias) => {
     try {
-      await tccsAppService.addCriteriaAlias(alias, get().user);
+      await tccsAppService.addCriteriaAlias(alias, resolveCurrentIdentity(get()));
     } catch (error: any) {
       get().notify({ type: 'ERROR', title: 'Lỗi tạo Criteria Alias', message: error.message });
       throw error;

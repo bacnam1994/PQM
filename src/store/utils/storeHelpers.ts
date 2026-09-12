@@ -107,8 +107,38 @@ export const handleSaveRecord = async (path: string, item: any, get: () => any) 
   }
 };
 
+/**
+ * Phân giải danh tính người dùng hiện tại từ Zustand State
+ * Đảm bảo luôn đính kèm vai trò (role) và cờ Admin đầy đủ cho các Application Services
+ */
+export const resolveCurrentIdentity = (state: any) => {
+  if (!state) return null;
+  const user = state.user;
+  const isAdmin = !!state.isAdmin || state.role === 'ADMIN' || !!user?.isAdmin || user?.role === 'ADMIN';
+  const role = isAdmin ? 'ADMIN' : (user?.role || state.role || 'GUEST');
+  
+  if (!user) {
+    if (isAdmin) {
+      return {
+        uid: 'admin-system',
+        email: 'admin@v-biotech.local',
+        displayName: 'Quản trị viên',
+        role: 'ADMIN',
+        isAdmin: true,
+      };
+    }
+    return null;
+  }
+  
+  return {
+    ...user,
+    role,
+    isAdmin,
+  };
+};
+
 export const handleDeleteRecord = async (path: string, id: string, get: () => any, requireAdmin: boolean = false) => {
-  if (requireAdmin && !get().isAdmin) {
+  if (requireAdmin && !(get().isAdmin || get().role === 'ADMIN')) {
     get().notify({ type: 'ERROR', title: 'Từ chối truy cập', message: 'Chỉ Quản trị viên mới có quyền xóa dữ liệu này.' });
     throw new Error("Permission denied");
   }

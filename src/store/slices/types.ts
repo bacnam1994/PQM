@@ -25,16 +25,21 @@ export interface ToastMessage {
   message: string;
 }
 
+export type AuthUser = User & {
+  role?: Role | null;
+  isAdmin?: boolean;
+};
+
 // 1. AUTH SLICE
 export interface AuthSliceState {
-  user: User | null;
+  user: AuthUser | null;
   isAdmin: boolean;
   role: Role | null;
   authLoading: boolean;
 }
 
 export interface AuthSliceActions {
-  setUser: (user: User | null) => void;
+  setUser: (user: AuthUser | any | null) => void;
   setIsAdmin: (isAdmin: boolean) => void;
   setRole: (role: Role | null) => void;
   setAuthLoading: (loading: boolean) => void;

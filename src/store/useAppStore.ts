@@ -7,7 +7,7 @@ import {
   AppStoreActions,
   AppStore
 } from './slices/types';
-import { MutationMeta, executeOfflineOptimistic, processFormulaBeforeSave, handleSaveRecord, handleDeleteRecord } from './utils/storeHelpers';
+import { MutationMeta, executeOfflineOptimistic, processFormulaBeforeSave, handleSaveRecord, handleDeleteRecord, resolveCurrentIdentity } from './utils/storeHelpers';
 import { createAuthSlice } from './slices/authSlice';
 import { createSystemSlice } from './slices/systemSlice';
 import { createProductSlice } from './slices/productSlice';
@@ -17,7 +17,7 @@ import { createTCCSSlice } from './slices/tccsSlice';
 
 // Re-export types for backward compatibility across the entire app
 export type { ToastType, ToastMessage, MutationMeta, AppStoreState, AppStoreActions, AppStore };
-export { executeOfflineOptimistic, processFormulaBeforeSave, handleSaveRecord, handleDeleteRecord };
+export { executeOfflineOptimistic, processFormulaBeforeSave, handleSaveRecord, handleDeleteRecord, resolveCurrentIdentity };
 
 /**
  * useAppStore — Central Zustand Store (V4 Modular Slice Pattern)
@@ -146,3 +146,12 @@ export const useAppTCCS = () => {
     addAliasToExisting: state.addAliasToExisting
   }));
 };
+
+/** Lấy đối tượng định danh người dùng hiện tại có đầy đủ vai trò và quyền hạn */
+export const getStoreCurrentUser = () => {
+  return resolveCurrentIdentity(useAppStore.getState());
+};
+
+if (typeof window !== 'undefined') {
+  (window as any).__PQM_GET_CURRENT_USER__ = getStoreCurrentUser;
+}

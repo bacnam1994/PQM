@@ -50,6 +50,11 @@ export const useAuthSync = () => {
           
           useAppStore.getState().setIsAdmin(isUserAdmin);
           useAppStore.getState().setRole(role);
+          useAppStore.getState().setUser({
+            ...currentUser,
+            role,
+            isAdmin: isUserAdmin
+          } as any);
         } catch (e) {
           console.warn("Đang thử kết nối lại để xác thực quyền hạn:", e);
           try {
@@ -63,10 +68,20 @@ export const useAuthSync = () => {
             const role: Role = isUserAdmin ? 'ADMIN' : (rawRole && validRoles.includes(rawRole) ? rawRole : 'GUEST');
             useAppStore.getState().setIsAdmin(isUserAdmin);
             useAppStore.getState().setRole(role);
+            useAppStore.getState().setUser({
+              ...currentUser,
+              role,
+              isAdmin: isUserAdmin
+            } as any);
           } catch (retryErr) {
             console.error("Lỗi xác thực quyền hạn:", retryErr);
             useAppStore.getState().setIsAdmin(false);
             useAppStore.getState().setRole('GUEST');
+            useAppStore.getState().setUser({
+              ...currentUser,
+              role: 'GUEST',
+              isAdmin: false
+            } as any);
           }
         }
       } else {
