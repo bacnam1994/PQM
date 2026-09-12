@@ -420,3 +420,41 @@ export function detectNelsonRules(
 
   return violations;
 }
+
+export function calculateSPCParameters(values: number[]): SPCParameters {
+  const mean = calcMean(values);
+  const stdDevOverall = calcStdDev(values, mean);
+  const stdDevWithin = calcWithinStdDev(values);
+  const sigma = stdDevWithin > 0 ? stdDevWithin : stdDevOverall;
+
+  return {
+    mean: Number(mean.toFixed(3)),
+    stdDevOverall: Number(stdDevOverall.toFixed(4)),
+    stdDevWithin: Number(stdDevWithin.toFixed(4)),
+    ucl: Number((mean + 3 * sigma).toFixed(3)),
+    lcl: Number(Math.max(0, mean - 3 * sigma).toFixed(3)),
+    sigma1Upper: Number((mean + sigma).toFixed(3)),
+    sigma1Lower: Number(Math.max(0, mean - sigma).toFixed(3)),
+    sigma2Upper: Number((mean + 2 * sigma).toFixed(3)),
+    sigma2Lower: Number(Math.max(0, mean - 2 * sigma).toFixed(3))
+  };
+}
+
+export interface SPCResult {
+  parameters: SPCParameters;
+  capability: ProcessCapabilityResult;
+  nelsonViolations: NelsonViolation[];
+}
+
+export function runComprehensiveSPC(
+  values: number[],
+  usl?: number,
+  lsl?: number,
+  target?: number
+): SPCResult {
+  const parameters = calculateSPCParameters(values);
+  const capability = calcProcessCapability(values, usl, lsl, target);
+  const sigma = parameters.stdDevWithin > 0 ? parameters.stdDevWithin : parameters.stdDevOverall;
+  const nelsonViolations = detectNelsonRules(values, parameters.mean, sigma);
+  return { parameters, capability, nelsonViolations };
+}

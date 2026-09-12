@@ -39,6 +39,7 @@ const CookieIcon = ({ className = "w-4 h-4" }: { className?: string }) => (
 );
 import { ConfirmationModal } from '../../components';
 import { DataConsistencyCenter } from '../../components/features/DataConsistencyCenter';
+import { PharmacopoeiaManager } from './components/PharmacopoeiaManager';
 import { generateId } from '../../utils';
 import { ProductFormula, FormulaIngredient } from '../../types';
 import { useUIStore } from '../../store/useUIStore';
@@ -812,6 +813,9 @@ const SettingsPage: React.FC = () => {
             )}
           </div>
         </section>
+
+        {/* Pharmacopoeia Standards & Dynamic AI Context */}
+        <PharmacopoeiaManager />
 
         {/* Data Consistency & Linkage Center */}
         <div className="lg:col-span-2">
