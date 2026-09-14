@@ -6,6 +6,7 @@ import {
   calcProcessCapability,
   detectNelsonRules,
   aggregateBatchSPC,
+  groupRecordsByLabSPC,
 } from './spcEngine';
 
 describe('Advanced SPC Engine (ISO 22514 / AIAG)', () => {
@@ -109,6 +110,37 @@ describe('Advanced SPC Engine (ISO 22514 / AIAG)', () => {
       expect(summary.parameters.mean).toBeCloseTo(101.02, 1);
       expect(summary.capability.status).toBeDefined();
       expect(summary.executionDurationMs).toBeLessThan(100);
+    });
+  });
+
+  describe('groupRecordsByLabSPC (Lab Normalization & Grouping)', () => {
+    it('gom nhóm các bản ghi theo labId hoặc canonicalName, chuẩn hóa alias thành 1 nhóm duy nhất', () => {
+      const records = [
+        { batchNo: 'B01', value: 100.2, labId: 'lab_quatest3', labName: 'Quatest 3' },
+        { batchNo: 'B02', value: 100.8, labName: 'KT3' }, // Alias của Quatest 3
+        { batchNo: 'B03', value: 99.5, labName: 'Trung tâm Kỹ thuật 3' }, // Alias của Quatest 3
+        { batchNo: 'B04', value: 101.0, labName: 'CASE' },
+        { batchNo: 'B05', value: 101.4, labName: 'Trung tâm Dịch vụ Phân tích Thí nghiệm' }, // Alias của CASE
+      ];
+
+      const grouped = groupRecordsByLabSPC(records, { usl: 105, lsl: 95, target: 100 });
+
+      expect(Object.keys(grouped)).toContain('lab_quatest3');
+      expect(Object.keys(grouped)).toContain('lab_case');
+
+      // Cả 3 bản ghi Quatest 3, KT3, Trung tâm Kỹ thuật 3 đều được gom vào nhóm lab_quatest3
+      const quatestGroup = grouped['lab_quatest3'];
+      expect(quatestGroup.records.length).toBe(3);
+      expect(quatestGroup.canonicalLabName).toBe(
+        'Trung tâm Kỹ thuật Tiêu chuẩn Đo lường Chất lượng 3'
+      );
+      expect(quatestGroup.summary.sampleSize).toBe(3);
+
+      // Cả 2 bản ghi CASE đều được gom vào nhóm lab_case
+      const caseGroup = grouped['lab_case'];
+      expect(caseGroup.records.length).toBe(2);
+      expect(caseGroup.canonicalLabName).toBe('Trung tâm Dịch vụ Phân tích Thí nghiệm TP.HCM');
+      expect(caseGroup.summary.sampleSize).toBe(2);
     });
   });
 });

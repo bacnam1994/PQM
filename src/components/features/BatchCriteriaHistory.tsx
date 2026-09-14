@@ -13,6 +13,7 @@ import {
 import { fetchTestResultsByBatchId } from '../../services/testResultService';
 import { useCriteriaResolver } from '../../hooks/useCriteriaResolver';
 import { normalizeName } from '../../services/criteriaAliasService';
+import { resolveDeclaredBasis, calculateRelativePercentage } from '../../utils/basisCalculation';
 
 interface BatchCriteriaHistoryProps {
   batchId: string;
@@ -192,71 +193,19 @@ const BatchCriteriaHistory: React.FC<BatchCriteriaHistoryProps> = ({ batchId }) 
     return { allCriteriaMap: criteriaMap, formulaItemMap: fMap };
   }, [batchId, batches, tccs, productFormulas]);
 
-  // Helper: tính % hàm lượng
-  // - Chỉ tiêu trong TCCS mainQualityCriteria: dùng declaredContent TCCS hoặc công thức
-  // - Chỉ tiêu ngoài TCCS nhưng tên khớp với thành phần công thức: vẫn tính %
+  // Helper: tính % hàm lượng chuẩn hóa theo Domain Basis Engine
   const getContentPercent = (criteriaName: string, value: string | number): string | null => {
-    // [ALIAS FIX] Resolve criteriaName sang tên chuẩn trước khi tra cứu
-    const resolvedName = resolver.resolve(criteriaName);
-    const rName = normalizeName(resolvedName);
-    const isMainCriteria = ensureArray(tccs?.mainQualityCriteria).some(
-      (c: any) => c && c.name && normalizeName(c.name) === rName
-    );
+    const criterion = resolver.lookupCriterion(criteriaName, allCriteriaMap) ||
+      allCriteriaMap.get(normalizeName(criteriaName)) ||
+      allCriteriaMap.get(criteriaName.trim().toLowerCase()) || { name: criteriaName };
+    const formula = batch
+      ? productFormulas.find((f: any) => f.productId === batch.productId)
+      : undefined;
 
-    const criterion = resolver.lookupCriterion(criteriaName, allCriteriaMap);
-    let basis: number | undefined;
+    const basisInfo = resolveDeclaredBasis(criterion, formula, resolver);
+    if (!basisInfo.basis || basisInfo.basis <= 0) return null;
 
-    if (isMainCriteria) {
-      // Chỉ tiêu trong TCCS: ưu tiên declaredContent khai báo trong TCCS
-      if (criterion?.declaredContent != null) {
-        basis =
-          typeof criterion.declaredContent === 'string'
-            ? parseNumberFromText(criterion.declaredContent as any)
-            : criterion.declaredContent;
-      } else {
-        let formulaItem =
-          formulaItemMap.get(rName) || formulaItemMap.get(normalizeName(criteriaName));
-        if (criterion?.formulaIngredientId) {
-          const linked = formulaItemMap.get(normalizeName(criterion.formulaIngredientId));
-          if (linked) formulaItem = linked;
-        }
-        if (!formulaItem) return null;
-
-        let declaredContent: number | undefined = formulaItem.declaredContent;
-        if (typeof declaredContent === 'string')
-          declaredContent = parseNumberFromText(declaredContent as any);
-        let elementalContent: number | undefined = formulaItem.elementalContent;
-        if (typeof elementalContent === 'string')
-          elementalContent = parseNumberFromText(elementalContent as any);
-
-        if (criterion?.formulaIngredientId) {
-          basis =
-            criterion.calculationBasis === 'ELEMENTAL' && elementalContent && elementalContent > 0
-              ? elementalContent
-              : declaredContent;
-        } else {
-          basis = elementalContent && elementalContent > 0 ? elementalContent : declaredContent;
-        }
-      }
-    } else {
-      // Chỉ tiêu ngoài TCCS: tìm theo tên trong công thức, nếu có thì vẫn tính %
-      const formulaItem = formulaItemMap.get(rName);
-      if (!formulaItem) return null;
-
-      let declaredContent: number | undefined = formulaItem.declaredContent;
-      if (typeof declaredContent === 'string')
-        declaredContent = parseNumberFromText(declaredContent as any);
-      let elementalContent: number | undefined = formulaItem.elementalContent;
-      if (typeof elementalContent === 'string')
-        elementalContent = parseNumberFromText(elementalContent as any);
-
-      basis = elementalContent && elementalContent > 0 ? elementalContent : declaredContent;
-    }
-
-    const actual = parseNumberFromText(String(value));
-    if (!basis || basis <= 0 || !actual || actual <= 0) return null;
-    const pct = (actual / basis) * 100;
-    return pct.toLocaleString(getActiveLocale(), { maximumFractionDigits: 2 }) + '%';
+    return calculateRelativePercentage(value, basisInfo.basis);
   };
 
   if (isLoading) {
@@ -318,7 +267,7 @@ const BatchCriteriaHistory: React.FC<BatchCriteriaHistoryProps> = ({ batchId }) 
           </div>
           {pct && (
             <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold">
-              ({pct})
+              {pct.startsWith('(') ? pct : `(${pct})`}
             </span>
           )}
         </div>

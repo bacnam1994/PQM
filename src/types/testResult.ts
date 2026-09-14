@@ -52,6 +52,7 @@ export interface TestResult {
    * KHÔNG được lưu trực tiếp vào cơ sở dữ liệu Firebase.
    */
   batch?: Batch;
+  labId?: string; // Khóa ngoại liên kết với TestingLaboratory (nếu đã chuẩn hóa)
   labName: string;
   testDate: string;
   results: TestResultEntry[];

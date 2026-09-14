@@ -8,7 +8,9 @@ import {
   BATCH_QUERY_KEYS,
   TCCS_QUERY_KEYS,
   TEST_RESULT_QUERY_KEYS,
+  LABORATORY_QUERY_KEYS,
 } from '../../constants/queryKeys';
+import { DEFAULT_TESTING_LABORATORIES } from '../../services/laboratoryService';
 import { SystemSlice, StoreSlice, ToastMessage } from './types';
 
 export const createSystemSlice: StoreSlice<SystemSlice> = (set, get) => ({
@@ -19,6 +21,7 @@ export const createSystemSlice: StoreSlice<SystemSlice> = (set, get) => ({
     typeof window !== 'undefined' && localStorage.getItem('theme') === 'dark' ? 'dark' : 'light',
   lastSync: null,
   qualityAlerts: [],
+  testingLaboratories: DEFAULT_TESTING_LABORATORIES,
   navigate: () => console.warn('Hàm navigate chưa được khởi tạo!'),
 
   // --- ACTIONS ---
@@ -41,6 +44,8 @@ export const createSystemSlice: StoreSlice<SystemSlice> = (set, get) => ({
         queryClient.setQueryData(TCCS_QUERY_KEYS.aliases, partialState.criteriaAliases);
       if (partialState.aiLearnedMappings)
         queryClient.setQueryData(TCCS_QUERY_KEYS.aiMappings, partialState.aiLearnedMappings);
+      if (partialState.testingLaboratories)
+        queryClient.setQueryData(LABORATORY_QUERY_KEYS.all, partialState.testingLaboratories);
     } catch (e) {
       // Bỏ qua lỗi đồng bộ trong môi trường test nếu queryClient chưa khởi tạo đầy đủ
     }
@@ -152,6 +157,7 @@ export const createSystemSlice: StoreSlice<SystemSlice> = (set, get) => ({
         raw_materials: toMap(data.rawMaterials),
         ai_learned_mappings: toMap(data.aiLearnedMappings || (data as any).ai_learned_mappings),
         criteria_aliases: toMap(data.criteriaAliases || (data as any).criteria_aliases),
+        testing_laboratories: toMap(data.testingLaboratories || (data as any).testing_laboratories),
       };
       await executeOfflineOptimistic(firebaseSet(ref(db), restoreData), get);
       get().notify({
@@ -187,5 +193,26 @@ export const createSystemSlice: StoreSlice<SystemSlice> = (set, get) => ({
     } catch (e) {
       console.error('Lỗi đồng bộ cảnh báo chất lượng:', e);
     }
+  },
+
+  addTestingLaboratory: async (lab) => {
+    await executeOfflineOptimistic(
+      firebaseSet(ref(db, `testing_laboratories/${lab.id}`), lab),
+      get
+    );
+    queryClient.invalidateQueries({ queryKey: LABORATORY_QUERY_KEYS.all });
+  },
+
+  updateTestingLaboratory: async (lab) => {
+    await executeOfflineOptimistic(
+      firebaseUpdate(ref(db, `testing_laboratories/${lab.id}`), lab),
+      get
+    );
+    queryClient.invalidateQueries({ queryKey: LABORATORY_QUERY_KEYS.all });
+  },
+
+  deleteTestingLaboratory: async (id) => {
+    await executeOfflineOptimistic(firebaseSet(ref(db, `testing_laboratories/${id}`), null), get);
+    queryClient.invalidateQueries({ queryKey: LABORATORY_QUERY_KEYS.all });
   },
 });

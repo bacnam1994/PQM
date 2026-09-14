@@ -19,7 +19,9 @@ import {
   BATCH_QUERY_KEYS,
   TCCS_QUERY_KEYS,
   TEST_RESULT_QUERY_KEYS,
+  LABORATORY_QUERY_KEYS,
 } from '../constants/queryKeys';
+import { DEFAULT_TESTING_LABORATORIES } from '../services/laboratoryService';
 
 interface CollectionConfig {
   key: string;
@@ -118,6 +120,12 @@ const COLLECTION_CONFIGS: Record<string, CollectionConfig> = {
     firebasePath: 'criteria_aliases',
     queryKey: TCCS_QUERY_KEYS.aliases,
   },
+  testingLaboratories: {
+    key: 'testingLaboratories',
+    storeName: 'testingLaboratories',
+    firebasePath: 'testing_laboratories',
+    queryKey: LABORATORY_QUERY_KEYS.all,
+  },
 };
 
 /**
@@ -161,6 +169,7 @@ export const useFirebaseSync = () => {
           cachedAiMappings,
           cachedQualityAlerts,
           cachedCriteriaAliases,
+          cachedTestingLaboratories,
         ] = await Promise.all([
           getFromCache('products'),
           getFromCache('batches'),
@@ -171,6 +180,7 @@ export const useFirebaseSync = () => {
           getFromCache('aiLearnedMappings'),
           getFromCache('qualityAlerts'),
           getFromCache('criteriaAliases'),
+          getFromCache('testingLaboratories'),
         ]);
 
         if (!isMounted) return;
@@ -191,6 +201,11 @@ export const useFirebaseSync = () => {
           queryClient.setQueryData(TCCS_QUERY_KEYS.aliases, cachedCriteriaAliases);
         if (cachedAiMappings?.length > 0)
           queryClient.setQueryData(TCCS_QUERY_KEYS.aiMappings, cachedAiMappings);
+        if (cachedTestingLaboratories?.length > 0) {
+          queryClient.setQueryData(LABORATORY_QUERY_KEYS.all, cachedTestingLaboratories);
+        } else {
+          queryClient.setQueryData(LABORATORY_QUERY_KEYS.all, DEFAULT_TESTING_LABORATORIES);
+        }
 
         // Đánh dấu trạng thái đã đồng bộ dữ liệu ngoại tuyến
         useAppStore.getState().setSyncStatus('SAVED');

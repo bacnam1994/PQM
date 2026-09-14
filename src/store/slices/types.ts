@@ -13,7 +13,8 @@ import {
   CriteriaAlias,
   Role,
   ElectronicSignature,
-  QualityAnomaly
+  QualityAnomaly,
+  TestingLaboratory,
 } from '../../types';
 
 export type ToastType = 'SUCCESS' | 'ERROR' | 'INFO' | 'WARNING';
@@ -59,6 +60,7 @@ export interface SystemSliceState {
   theme: 'light' | 'dark';
   lastSync: string | null;
   qualityAlerts: QualityAnomaly[];
+  testingLaboratories: TestingLaboratory[];
   navigate: (path: string, options?: any) => void;
 }
 
@@ -72,6 +74,9 @@ export interface SystemSliceActions {
   clearAllData: () => Promise<void>;
   loadBackup: (data: AppState) => Promise<void>;
   syncQualityAlerts: () => Promise<void>;
+  addTestingLaboratory: (lab: TestingLaboratory) => Promise<void>;
+  updateTestingLaboratory: (lab: TestingLaboratory) => Promise<void>;
+  deleteTestingLaboratory: (id: string) => Promise<void>;
 }
 
 export type SystemSlice = SystemSliceState & SystemSliceActions;
@@ -109,7 +114,12 @@ export interface BatchSliceActions {
   addBatch: (b: Batch) => Promise<void>;
   updateBatch: (b: Batch) => Promise<void>;
   deleteBatch: (id: string) => Promise<void>;
-  updateBatchStatus: (id: string, status: string, rejectReason?: string, signature?: ElectronicSignature) => Promise<void>;
+  updateBatchStatus: (
+    id: string,
+    status: string,
+    rejectReason?: string,
+    signature?: ElectronicSignature
+  ) => Promise<void>;
   updateBatchProgress: (id: string, progressPercent: number) => Promise<void>;
 }
 
@@ -173,9 +183,4 @@ export type AppStoreActions = AuthSliceActions &
 
 export type AppStore = AppStoreState & AppStoreActions;
 
-export type StoreSlice<T> = StateCreator<
-  AppStore,
-  [['zustand/devtools', never]],
-  [],
-  T
->;
+export type StoreSlice<T> = StateCreator<AppStore, [['zustand/devtools', never]], [], T>;

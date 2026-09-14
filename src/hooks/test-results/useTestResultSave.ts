@@ -20,6 +20,10 @@ import {
   normalizeOperationalError,
 } from '../../types';
 import { testResultFormSchema } from '../../schemas';
+import {
+  resolveCanonicalLab,
+  DEFAULT_TESTING_LABORATORIES,
+} from '../../services/laboratoryService';
 
 interface ExtraTestResultEntry extends TestResultEntry {
   limit?: string;
@@ -59,10 +63,16 @@ export const useTestResultSave = ({
       setIsSubmitting(true);
       try {
         const formData = new FormData(e.currentTarget);
-        const labName = formData.get('labName')?.toString() || formValues.labName || '';
+        const rawLabName = formData.get('labName')?.toString() || formValues.labName || '';
+        const rawLabId = formData.get('labId')?.toString() || (formValues as any).labId || '';
+        const testingLaboratories =
+          useAppStore.getState().testingLaboratories || DEFAULT_TESTING_LABORATORIES;
+        const resolvedLab = resolveCanonicalLab(rawLabId || rawLabName, testingLaboratories);
+        const finalLabName = resolvedLab.labName || rawLabName;
+        const finalLabId = resolvedLab.labId || rawLabId || undefined;
         const testDate = formData.get('testDate')?.toString() || formValues.testDate || '';
 
-        if (!labName.trim()) {
+        if (!finalLabName.trim()) {
           setIsSubmitting(false);
           return notify({
             type: 'WARNING',
@@ -337,15 +347,18 @@ export const useTestResultSave = ({
           }
         }
 
-        const resultData = {
+        const resultData: any = {
           batchId: formValues.batchId,
-          labName: formData.get('labName') as string,
-          testDate: formData.get('testDate') as string,
+          labName: finalLabName,
+          testDate: (formData.get('testDate') as string) || formValues.testDate,
           results: results,
           overallStatus: overallStatus,
           notes: formValues.notes,
           attachments: formValues.attachments || [],
         };
+        if (finalLabId) {
+          resultData.labId = finalLabId;
+        }
 
         if (crud.mode === 'EDIT' && crud.selectedItem) {
           const { batch, product, ...cleanResult } = crud.selectedItem as any;

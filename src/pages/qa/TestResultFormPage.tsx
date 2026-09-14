@@ -392,6 +392,7 @@ const TestResultFormPage: React.FC = () => {
               availableBatchesForDropdown={availableBatchesForDropdown}
               handleBatchSelect={handleBatchSelect}
               setFieldValue={setFieldValue}
+              labId={(formValues as any).labId}
               labName={formValues.labName}
               testDate={formValues.testDate}
               hydratedBatches={hydratedBatches}

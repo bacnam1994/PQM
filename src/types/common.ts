@@ -6,15 +6,16 @@ import { Product, ProductFormula, RawMaterial } from './product';
 import { TCCS, CriteriaAlias } from './tccs';
 import { Batch } from './batch';
 import { TestResult } from './testResult';
+import { TestingLaboratory } from './laboratory';
 
 export type SyncStatus = 'IDLE' | 'SAVED' | 'SAVING' | 'ERROR' | 'OFFLINE';
 
 export interface AILearnedMapping {
   id: string;
-  originalName: string;   // Tên gốc do AI trích xuất (ví dụ: Moisture)
-  systemName: string;     // Tên tiêu chuẩn trong hệ thống (ví dụ: Độ ẩm)
-  frequency: number;      // Số lần ánh xạ này được người dùng xác nhận
-  autoLearned?: boolean;  // true nếu do AI tự học (OCR high-confidence), không phải user xác nhận
+  originalName: string; // Tên gốc do AI trích xuất (ví dụ: Moisture)
+  systemName: string; // Tên tiêu chuẩn trong hệ thống (ví dụ: Độ ẩm)
+  frequency: number; // Số lần ánh xạ này được người dùng xác nhận
+  autoLearned?: boolean; // true nếu do AI tự học (OCR high-confidence), không phải user xác nhận
   createdAt?: string;
   updatedAt?: string;
 }
@@ -25,14 +26,20 @@ export interface AILearnedMapping {
  */
 export interface AIInsight {
   id: string;
-  type: 'DRIFT_RISK' | 'HIGH_FAIL_RATE' | 'EXPIRY_RISK' | 'OCR_PATTERN' | 'QUALITY_TREND' | 'DATA_COMPLETENESS';
+  type:
+    | 'DRIFT_RISK'
+    | 'HIGH_FAIL_RATE'
+    | 'EXPIRY_RISK'
+    | 'OCR_PATTERN'
+    | 'QUALITY_TREND'
+    | 'DATA_COMPLETENESS';
   severity: 'HIGH' | 'MEDIUM' | 'LOW';
-  title: string;          // Tiêu đề ngắn gọn (hiển thị đậm)
-  detail: string;         // Nội dung chi tiết (markdown)
+  title: string; // Tiêu đề ngắn gọn (hiển thị đậm)
+  detail: string; // Nội dung chi tiết (markdown)
   productId?: string;
   productName?: string;
   criteriaName?: string;
-  generatedAt: string;    // ISO timestamp
+  generatedAt: string; // ISO timestamp
   isRead?: boolean;
 }
 
@@ -41,14 +48,20 @@ export interface AIInsight {
  * Lưu tóm tắt các cuộc trò chuyện gần nhất trong localStorage.
  */
 export interface AISessionSummary {
-  summary: string;        // Tóm tắt nội dung phiên (tối đa 300 token)
-  timestamp: string;      // ISO timestamp khi tóm tắt
-  modelUsed?: string;     // Model đã dùng
+  summary: string; // Tóm tắt nội dung phiên (tối đa 300 token)
+  timestamp: string; // ISO timestamp khi tóm tắt
+  modelUsed?: string; // Model đã dùng
 }
 
 export interface QualityAnomaly {
   id?: string;
-  type: 'DRIFT' | 'EXPIRY' | 'HIGH_FAIL_RATE' | 'MISSING_DATA' | 'OOT_NEAR_LIMIT' | 'OOT_SIGMA_SHIFT';
+  type:
+    | 'DRIFT'
+    | 'EXPIRY'
+    | 'HIGH_FAIL_RATE'
+    | 'MISSING_DATA'
+    | 'OOT_NEAR_LIMIT'
+    | 'OOT_SIGMA_SHIFT';
   severity: 'HIGH' | 'MEDIUM' | 'LOW';
   title: string;
   detail: string;
@@ -72,4 +85,5 @@ export interface AppState {
   aiLearnedMappings: AILearnedMapping[];
   qualityAlerts: QualityAnomaly[];
   criteriaAliases: CriteriaAlias[];
+  testingLaboratories?: TestingLaboratory[];
 }

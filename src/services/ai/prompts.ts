@@ -212,11 +212,27 @@ XỬ LÝ WATERMARK, CON DẤU VÀ NỘI DUNG NHIỄU:
 `;
 
 import { buildExternalLabPromptSection, RecognizedLab } from './externalLabTemplates';
+import { TestingLaboratory } from '../../types/laboratory';
+import { DEFAULT_TESTING_LABORATORIES } from '../laboratoryService';
 
 /**
- * Tên loại phiếu và viết tắt phổ biến trong ngành kiểm nghiệm VN.
+ * Tạo hướng dẫn thuật ngữ và danh mục đơn vị kiểm nghiệm chuẩn hóa động từ Master Data
  */
-const VN_LAB_TERMINOLOGY = `
+export const buildVNLabTerminologySection = (
+  laboratories: TestingLaboratory[] = DEFAULT_TESTING_LABORATORIES
+): string => {
+  const activeLabs = (
+    laboratories && laboratories.length > 0 ? laboratories : DEFAULT_TESTING_LABORATORIES
+  ).filter((l) => l.isActive !== false);
+
+  const labLines = activeLabs
+    .map((l) => {
+      const aliasStr = (l.aliases || []).slice(0, 3).join(', ');
+      return `- ${l.code} (${aliasStr ? aliasStr + '...' : ''}) → điền chính xác: "${l.canonicalName}"`;
+    })
+    .join('\n');
+
+  return `
 THUẬT NGỮ VÀ TÊN PHIẾU KIỂM NGHIỆM VIỆT NAM:
 
 Tên phiếu thường gặp (KHÔNG trích xuất làm chỉ tiêu):
@@ -228,13 +244,10 @@ Tên phiếu thường gặp (KHÔNG trích xuất làm chỉ tiêu):
 - TTKT = Thử nghiệm kết thúc | PKN = Phiếu kiểm nghiệm
 - HSKN = Hồ sơ kiểm nghiệm | KQKN = Kết quả kiểm nghiệm
 
-Tên đơn vị kiểm nghiệm → điền vào field "labName":
-- Quatest 3 → "Trung tâm Kỹ thuật Tiêu chuẩn Đo lường Chất lượng 3 (QUATEST 3)"
-- CASE → "Trung tâm Dịch vụ Phân tích Thí nghiệm TP.HCM (CASE)"
-- NIFC → "Viện Kiểm nghiệm An toàn Vệ sinh Thực phẩm Quốc gia (NIFC)"
-- Eurofins → "Eurofins Sắc Ký Hải Đăng / Eurofins Vietnam"
-- Sắc Ký Hải Đăng / Sắc Ký Hà Nội → "Công ty TNHH Eurofins Sắc Ký Hải Đăng"
-- Nếu có "Phòng QC" hoặc "Phòng kiểm nghiệm nội bộ" → điền theo tên công ty trên phiếu
+Tên đơn vị kiểm nghiệm chuẩn hóa → BẮT BUỘC điền vào field "labName" theo đúng tên chuẩn:
+${labLines}
+- Nếu có "Phòng QC" hoặc "Phòng kiểm nghiệm nội bộ" → điền "Phòng Kiểm nghiệm Nội bộ V-BIOTECH"
+- Nếu là phòng kiểm nghiệm ngoài danh mục trên: điền tên đầy đủ chuẩn hóa của phòng thử nghiệm trên con dấu/tiêu đề.
 
 Phân loại phiếu → điền vào field "documentType":
 - Phiếu từ cơ quan kiểm nghiệm bên ngoài (Quatest, CASE, NIFC, Eurofins...) → "External_Lab"
@@ -242,16 +255,23 @@ Phân loại phiếu → điền vào field "documentType":
 - CoA từ nhà sản xuất nguyên liệu/thành phẩm → "CoA"
 - Phiếu phân tích từ nhà cung cấp → "Supplier_CoA"
 `;
+};
 
 /**
  * Tạo prompt động cho việc trích xuất dữ liệu từ Phiếu Kiểm Nghiệm.
  * Nếu có danh sách tên chỉ tiêu chuẩn từ TCCS, AI sẽ cố gắng map thẳng về tên chuẩn.
  * @param tccsNames Danh sách tên chỉ tiêu chuẩn từ TCCS hiệu lực (tùy chọn)
  * @param detectedLab Đơn vị phòng lab nhận diện được nếu có (QUATEST3, CASE, NIFC, EUROFINS...)
+ * @param laboratories Danh mục đơn vị kiểm nghiệm Master Data (tùy chọn)
  */
-export const buildExtractionPrompt = (tccsNames: string[] = [], detectedLab?: RecognizedLab): string => {
+export const buildExtractionPrompt = (
+  tccsNames: string[] = [],
+  detectedLab?: RecognizedLab,
+  laboratories?: TestingLaboratory[]
+): string => {
   const hasTccsContext = tccsNames.length > 0;
   const externalLabSection = buildExternalLabPromptSection(detectedLab);
+  const labTerminologySection = buildVNLabTerminologySection(laboratories);
 
   const tccsSection = hasTccsContext
     ? `
@@ -327,7 +347,7 @@ ${MULTI_COLUMN_GUIDE}
 
 ${WATERMARK_STAMP_GUIDE}
 
-${VN_LAB_TERMINOLOGY}
+${labTerminologySection}
 
 ${externalLabSection}
 

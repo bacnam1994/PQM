@@ -12,7 +12,9 @@ export function calculateRelativePercentage(
   declaredContent?: string | number,
   limitText?: string
 ): string | null {
-  if (!actualValue) return null;
+  if (actualValue === undefined || actualValue === null || String(actualValue).trim() === '') {
+    return null;
+  }
 
   // 1. Đọc chính xác số thực tế, xử lý trọn vẹn định dạng khoa học (VD: 1.5 x 10⁸ -> 150000000)
   const actualNum = parseNumberFromText(actualValue);
@@ -39,8 +41,8 @@ export function calculateRelativePercentage(
     }
   }
 
-  // Nếu không tìm được cơ sở tính toán nào hợp lệ, hoặc base = 0 -> Bỏ qua
-  if (isNaN(baseNum) || baseNum === 0) return null;
+  // Nếu không tìm được cơ sở tính toán nào hợp lệ, hoặc base <= 0 -> Bỏ qua
+  if (isNaN(baseNum) || baseNum <= 0) return null;
 
   // 4. Tính toán % và làm tròn 2 chữ số thập phân
   const percentage = (actualNum / baseNum) * 100;

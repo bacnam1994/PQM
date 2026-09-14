@@ -5,6 +5,7 @@ import {
   calculateRelativePercentage,
 } from './basisCalculation';
 import { Criterion, CriterionType, ProductFormula } from '../types';
+import { getContentPercent } from './testResultEvaluation';
 
 describe('basisCalculation - resolveDeclaredBasis', () => {
   const sampleFormula: ProductFormula = {
@@ -162,5 +163,67 @@ describe('basisCalculation - calculateRelativePercentage', () => {
     expect(calculateRelativePercentage(15, undefined, undefined)).toBeNull();
     expect(calculateRelativePercentage(15, undefined, 'Không được có')).toBeNull();
     expect(calculateRelativePercentage(15, 'abc')).toBeNull();
+  });
+
+  it('7. Xử lý giá trị 0% cho vi sinh và tạp chất (Zero Value Handling)', () => {
+    expect(calculateRelativePercentage(0, 100)).toBe('(0%)');
+    expect(calculateRelativePercentage('0', 100)).toBe('(0%)');
+    expect(calculateRelativePercentage('0.0', 100)).toBe('(0%)');
+    expect(calculateRelativePercentage('0%', 100)).toBe('(0%)');
+  });
+
+  it('8. Trả về null khi base <= 0', () => {
+    expect(calculateRelativePercentage(15, -10)).toBeNull();
+  });
+});
+
+describe('basisCalculation - Bacillus Priority & getContentPercent Regression Test', () => {
+  it('Khắc phục hồi quy lỗi Bacillus: Ưu tiên formulaItem.declaredContent trước TCCS declaredContent (150% thay vì 15%)', () => {
+    const formulaWithBacillus: ProductFormula = {
+      id: 'f_bacillus',
+      productId: 'p_bacillus',
+      ingredients: [
+        {
+          id: 'ing_bacillus',
+          name: 'Bacillus clausii',
+          declaredContent: '10^8' as any, // 100,000,000 CFU/mL trong công thức
+          unit: 'CFU/mL',
+        },
+      ],
+      excipients: [],
+      createdAt: '2026-09-14',
+      updatedAt: '2026-09-14',
+    };
+
+    const tccsCriterionBacillus: Criterion = {
+      name: 'Tổng số vi sinh vật hiếu khí (Bacillus)',
+      type: CriterionType.NUMBER,
+      formulaIngredientId: 'ing_bacillus',
+      declaredContent: '10^9', // Giới hạn tối thiểu TCCS vô tình bị gán 10^9
+      min: 1000000000,
+      unit: 'CFU/mL',
+    };
+
+    // 1. Phân giải basis qua resolveDeclaredBasis phải ra 10^8 (100,000,000), KHÔNG PHẢI 10^9
+    const basisInfo = resolveDeclaredBasis(tccsCriterionBacillus, formulaWithBacillus);
+    expect(basisInfo.basis).toBe(100000000);
+
+    // 2. Kết quả kiểm nghiệm 1.5 x 10⁸ phải tính ra 150%, không phải 15%
+    const pct = getContentPercent(
+      'Tổng số vi sinh vật hiếu khí (Bacillus)',
+      '1.5 x 10⁸',
+      tccsCriterionBacillus,
+      formulaWithBacillus
+    );
+    expect(pct).toBe('(150%)');
+
+    // 3. Kết quả 0 phải hiển thị (0%)
+    const pctZero = getContentPercent(
+      'Tổng số vi sinh vật hiếu khí (Bacillus)',
+      0,
+      tccsCriterionBacillus,
+      formulaWithBacillus
+    );
+    expect(pctZero).toBe('(0%)');
   });
 });

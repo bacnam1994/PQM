@@ -1,26 +1,28 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { 
-  ArrowLeftIcon, 
-  ArrowPathIcon, 
-  BeakerIcon, 
-  ClipboardDocumentCheckIcon, 
-  Square3Stack3DIcon, 
-  PrinterIcon, 
-  CheckCircleIcon, 
-  XMarkIcon, 
-  ExclamationTriangleIcon, 
-  ShieldExclamationIcon, 
-  SparklesIcon, 
-  ShareIcon, 
-  DocumentTextIcon, 
-  ShieldCheckIcon, 
+import {
+  ArrowLeftIcon,
+  ArrowPathIcon,
+  BeakerIcon,
+  ClipboardDocumentCheckIcon,
+  Square3Stack3DIcon,
+  PrinterIcon,
+  CheckCircleIcon,
+  XMarkIcon,
+  ExclamationTriangleIcon,
+  ShieldExclamationIcon,
+  SparklesIcon,
+  ShareIcon,
+  DocumentTextIcon,
+  ShieldCheckIcon,
   ChartBarSquareIcon,
-  PencilSquareIcon 
+  PencilSquareIcon,
 } from '@heroicons/react/24/outline';
 import { useDataGraph } from '../../hooks/useDataGraph';
 import { useAppStore } from '../../store/useAppStore';
 import { formatDateStandard, ensureArray, parseNumberFromText } from '../../utils';
+import { resolveDeclaredBasis, calculateRelativePercentage } from '../../utils/basisCalculation';
+import { useCriteriaResolver } from '../../hooks/useCriteriaResolver';
 import { fetchTestResultsByBatchId } from '../../services/testResultService';
 import { TestResult, Criterion, FormulaIngredient } from '../../types';
 import { CircularProgress, BatchCriteriaHistory } from '../../components';
@@ -37,27 +39,42 @@ import { Surface, PageHeader, StatusBadge } from '../../components/ui';
 // Helper tính tiến độ lô
 const calculateBatchProgress = (batch: any, batchResults: TestResult[]) => {
   const tccs = batch.tccs;
-  const requiredCriteria = tccs ? [...ensureArray(tccs.mainQualityCriteria), ...ensureArray(tccs.safetyCriteria)].filter(c => c && c.name && c.name.trim() !== '') : [];
-  if (requiredCriteria.length === 0) return { progressPercent: 0, missingCriteria: [], requiredCriteria: [] };
+  const requiredCriteria = tccs
+    ? [...ensureArray(tccs.mainQualityCriteria), ...ensureArray(tccs.safetyCriteria)].filter(
+        (c) => c && c.name && c.name.trim() !== ''
+      )
+    : [];
+  if (requiredCriteria.length === 0)
+    return { progressPercent: 0, missingCriteria: [], requiredCriteria: [] };
 
   const testedCriteriaNames = new Set<string>();
-  const latestResultsMap = new Map<string, { value: any, isPass: boolean }>();
+  const latestResultsMap = new Map<string, { value: any; isPass: boolean }>();
   if (batchResults.length > 0) {
-    const sortedBatchResults = [...batchResults].filter(r => r.batchId === batch.id).sort((a, b) => {
-      const dateCmp = a.testDate.localeCompare(b.testDate);
-      return dateCmp !== 0 ? dateCmp : (a.createdAt || '').localeCompare(b.createdAt || '');
-    });
-    sortedBatchResults.forEach(r => ensureArray(r.results).forEach(res => {
-      if (res && res.criteriaName) {
-        testedCriteriaNames.add(res.criteriaName.trim().toLowerCase());
-        latestResultsMap.set(res.criteriaName.trim().toLowerCase(), { value: res.value, isPass: res.isPass });
-      }
-    }));
+    const sortedBatchResults = [...batchResults]
+      .filter((r) => r.batchId === batch.id)
+      .sort((a, b) => {
+        const dateCmp = a.testDate.localeCompare(b.testDate);
+        return dateCmp !== 0 ? dateCmp : (a.createdAt || '').localeCompare(b.createdAt || '');
+      });
+    sortedBatchResults.forEach((r) =>
+      ensureArray(r.results).forEach((res) => {
+        if (res && res.criteriaName) {
+          testedCriteriaNames.add(res.criteriaName.trim().toLowerCase());
+          latestResultsMap.set(res.criteriaName.trim().toLowerCase(), {
+            value: res.value,
+            isPass: res.isPass,
+          });
+        }
+      })
+    );
   }
   const rulesMap = new Map<string, any>();
-  if (tccs && tccs.alternateRules) tccs.alternateRules.forEach((r: any) => { if (r && r.alt) rulesMap.set(r.alt.trim().toLowerCase(), r); });
+  if (tccs && tccs.alternateRules)
+    tccs.alternateRules.forEach((r: any) => {
+      if (r && r.alt) rulesMap.set(r.alt.trim().toLowerCase(), r);
+    });
 
-  const missingCriteria = requiredCriteria.filter(c => {
+  const missingCriteria = requiredCriteria.filter((c) => {
     const cName = c.name.trim().toLowerCase();
     if (testedCriteriaNames.has(cName)) return false;
     const rule = rulesMap.get(cName);
@@ -66,12 +83,27 @@ const calculateBatchProgress = (batch: any, batchResults: TestResult[]) => {
       if (mainRes !== undefined) {
         if (rule.type === 'CONDITIONAL_CHECK') {
           const extractNum = (val: any) => {
-            const str = String(val || '').trim().toUpperCase();
-            if (['ND', 'KPH', 'K.P.H', 'KHÔNG PHÁT HIỆN', 'NOT DETECTED', 'ÂM TÍNH', 'NEGATIVE', 'KHÔNG CÓ'].some(kw => str.includes(kw))) return 0;
+            const str = String(val || '')
+              .trim()
+              .toUpperCase();
+            if (
+              [
+                'ND',
+                'KPH',
+                'K.P.H',
+                'KHÔNG PHÁT HIỆN',
+                'NOT DETECTED',
+                'ÂM TÍNH',
+                'NEGATIVE',
+                'KHÔNG CÓ',
+              ].some((kw) => str.includes(kw))
+            )
+              return 0;
             const match = str.match(/[-+]?[0-9]*[.,]?[0-9]+/);
             return match ? Number(match[0].replace(',', '.')) : parseNumberFromText(str);
           };
-          if (mainRes.isPass && extractNum(mainRes.value) <= extractNum(rule.conditionValue)) return false;
+          if (mainRes.isPass && extractNum(mainRes.value) <= extractNum(rule.conditionValue))
+            return false;
         } else {
           if (mainRes.isPass) return false;
         }
@@ -80,19 +112,25 @@ const calculateBatchProgress = (batch: any, batchResults: TestResult[]) => {
     return true;
   });
 
-  return { progressPercent: Math.round(((requiredCriteria.length - missingCriteria.length) / requiredCriteria.length) * 100), missingCriteria, requiredCriteria };
+  return {
+    progressPercent: Math.round(
+      ((requiredCriteria.length - missingCriteria.length) / requiredCriteria.length) * 100
+    ),
+    missingCriteria,
+    requiredCriteria,
+  };
 };
 
 const BatchDetailPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { batches } = useDataGraph();
-  const tccsList = useAppStore(state => state.tccsList);
-  const productFormulas = useAppStore(state => (state as any).productFormulas || []);
-  const updateBatchStatus = useAppStore(state => state.updateBatchStatus);
-  const notify = useAppStore(state => state.notify);
-  const role = useAppStore(state => state.role);
-  const isAdmin = useAppStore(state => state.isAdmin);
+  const tccsList = useAppStore((state) => state.tccsList);
+  const productFormulas = useAppStore((state) => (state as any).productFormulas || []);
+  const updateBatchStatus = useAppStore((state) => state.updateBatchStatus);
+  const notify = useAppStore((state) => state.notify);
+  const role = useAppStore((state) => state.role);
+  const isAdmin = useAppStore((state) => state.isAdmin);
 
   const [viewBatchResults, setViewBatchResults] = useState<TestResult[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
@@ -106,29 +144,31 @@ const BatchDetailPage = () => {
   const [isSignReleaseOpen, setIsSignReleaseOpen] = useState(false);
   const [batchDeviations, setBatchDeviations] = useState<QualityDeviation[]>([]);
 
-  const batch = useMemo(() => batches.find(b => b.id === id), [batches, id]);
+  const batch = useMemo(() => batches.find((b) => b.id === id), [batches, id]);
+  const resolver = useCriteriaResolver((batch as any)?.tccs);
   const canSignRelease = isAdmin || role === 'ADMIN' || role === 'QA';
 
   const handleOpenSignRelease = () => {
     if (!batch) return;
     const hasFailed = viewBatchResults.some(
-      r => r.overallStatus === 'FAIL' || r.results?.some(entry => !entry.isPass)
+      (r) => r.overallStatus === 'FAIL' || r.results?.some((entry) => !entry.isPass)
     );
     if (hasFailed) {
       notify({
         type: 'ERROR',
         title: 'Quy chuẩn GMP & Release Guard',
-        message: 'Không thể duyệt xuất xưởng lô có kết quả kiểm nghiệm KHÔNG ĐẠT (OOS).'
+        message: 'Không thể duyệt xuất xưởng lô có kết quả kiểm nghiệm KHÔNG ĐẠT (OOS).',
       });
       return;
     }
 
-    const hasOpenDeviations = batchDeviations.some(d => d.status !== 'CLOSED');
+    const hasOpenDeviations = batchDeviations.some((d) => d.status !== 'CLOSED');
     if (hasOpenDeviations) {
       notify({
         type: 'ERROR',
         title: 'Quy chuẩn GMP & Deviation Guard',
-        message: 'Lô sản xuất đang có hồ sơ Sai lệch/CAPA chưa đóng (Open Deviation). Yêu cầu hoàn tất điều tra và đóng hồ sơ trước khi ký duyệt xuất xưởng.'
+        message:
+          'Lô sản xuất đang có hồ sơ Sai lệch/CAPA chưa đóng (Open Deviation). Yêu cầu hoàn tất điều tra và đóng hồ sơ trước khi ký duyệt xuất xưởng.',
       });
       return;
     }
@@ -143,27 +183,44 @@ const BatchDetailPage = () => {
       notify({
         type: 'SUCCESS',
         title: 'Xuất xưởng Lô thành công',
-        message: `Đã phê duyệt xuất xưởng Lô ${batch.batchNo} với chữ ký điện tử hợp lệ (FDA 21 CFR Part 11).`
+        message: `Đã phê duyệt xuất xưởng Lô ${batch.batchNo} với chữ ký điện tử hợp lệ (FDA 21 CFR Part 11).`,
       });
     } catch (error: any) {
-      console.error("Lỗi xuất xưởng Lô:", error);
-      notify({ type: 'ERROR', title: 'Lỗi xuất xưởng', message: error.message || 'Không thể xuất xưởng Lô' });
+      console.error('Lỗi xuất xưởng Lô:', error);
+      notify({
+        type: 'ERROR',
+        title: 'Lỗi xuất xưởng',
+        message: error.message || 'Không thể xuất xưởng Lô',
+      });
     }
   };
 
   const handleOpenOOS = (res?: TestResult) => {
     if (!batch) return;
-    const targetResults = res ? ensureArray(res.results) : viewBatchResults.flatMap(r => ensureArray(r.results));
-    const failedCriteria: { criteriaName: string; actualValue: string | number; specification: string; unit?: string }[] = [];
+    const targetResults = res
+      ? ensureArray(res.results)
+      : viewBatchResults.flatMap((r) => ensureArray(r.results));
+    const failedCriteria: {
+      criteriaName: string;
+      actualValue: string | number;
+      specification: string;
+      unit?: string;
+    }[] = [];
     const passedCriteria: { criteriaName: string; actualValue: string | number }[] = [];
 
-    targetResults.forEach(item => {
+    targetResults.forEach((item) => {
       if (!item || !item.criteriaName) return;
       const cDef = allCriteriaMap.get(item.criteriaName.trim().toLowerCase());
       const reqText = cDef
         ? cDef.type === 'NUMBER'
-          ? (cDef.min != null && cDef.max != null ? `${cDef.min} ~ ${cDef.max}` : cDef.min != null ? `≥ ${cDef.min}` : cDef.max != null ? `≤ ${cDef.max}` : '')
-          : (cDef.expectedText || '')
+          ? cDef.min != null && cDef.max != null
+            ? `${cDef.min} ~ ${cDef.max}`
+            : cDef.min != null
+              ? `≥ ${cDef.min}`
+              : cDef.max != null
+                ? `≤ ${cDef.max}`
+                : ''
+          : cDef.expectedText || ''
         : '';
 
       if (item.isPass === false) {
@@ -188,7 +245,16 @@ const BatchDetailPage = () => {
       batchNo: batch.batchNo,
       mfgDate: batch.mfgDate,
       expDate: batch.expDate,
-      failedCriteria: failedCriteria.length > 0 ? failedCriteria : [{ criteriaName: 'Chỉ tiêu chất lượng', actualValue: 'Không đạt', specification: 'TCCS' }],
+      failedCriteria:
+        failedCriteria.length > 0
+          ? failedCriteria
+          : [
+              {
+                criteriaName: 'Chỉ tiêu chất lượng',
+                actualValue: 'Không đạt',
+                specification: 'TCCS',
+              },
+            ],
       passedCriteria,
       formulaIngredients: formula?.ingredients || [],
     });
@@ -200,87 +266,56 @@ const BatchDetailPage = () => {
     const tccs = (batch as any)?.tccs;
     const criteriaMap = new Map<string, Criterion>();
     if (tccs) {
-      [...ensureArray(tccs.mainQualityCriteria), ...ensureArray(tccs.safetyCriteria)]
-        .forEach((c: Criterion) => c && c.name && criteriaMap.set(c.name.trim().toLowerCase(), c));
+      [...ensureArray(tccs.mainQualityCriteria), ...ensureArray(tccs.safetyCriteria)].forEach(
+        (c: Criterion) => c && c.name && criteriaMap.set(c.name.trim().toLowerCase(), c)
+      );
     }
     const formula = productFormulas.find((f: any) => f.productId === batch?.productId);
     const fMap = new Map<string, FormulaIngredient>();
     if (formula) {
-      [...ensureArray(formula.ingredients), ...ensureArray(formula.excipients)]
-        .forEach((ing: FormulaIngredient) => ing && ing.name && fMap.set(ing.name.trim().toLowerCase(), ing));
+      [...ensureArray(formula.ingredients), ...ensureArray(formula.excipients)].forEach(
+        (ing: FormulaIngredient) => ing && ing.name && fMap.set(ing.name.trim().toLowerCase(), ing)
+      );
     }
     return { allCriteriaMap: criteriaMap, formulaItemMap: fMap };
   }, [batch, productFormulas]);
 
-  // Helper: tính % hàm lượng cho 1 chỉ tiêu
-  // - Chỉ tiêu trong TCCS mainQualityCriteria: dùng declaredContent TCCS hoặc công thức
-  // - Chỉ tiêu ngoài TCCS nhưng tên khớp với thành phần công thức: vẫn tính % theo công thức
+  // Helper: tính % hàm lượng cho 1 chỉ tiêu chuẩn hóa theo Domain Basis Engine
   const getContentPercent = (criteriaName: string, value: string | number): string | null => {
     const rName = criteriaName.trim().toLowerCase();
-    const tccs = (batch as any)?.tccs;
-    const isMainCriteria = ensureArray(tccs?.mainQualityCriteria).some((c: any) => c && c.name && c.name.trim().toLowerCase() === rName);
+    const criterion = allCriteriaMap.get(rName) ||
+      (resolver ? resolver.lookupCriterion(criteriaName, allCriteriaMap) : undefined) || {
+        name: criteriaName,
+      };
+    const formula = productFormulas.find((f: any) => f.productId === batch?.productId);
 
-    const criterion = allCriteriaMap.get(rName);
-    let basis: number | undefined;
+    const basisInfo = resolveDeclaredBasis(criterion, formula, resolver);
+    if (!basisInfo.basis || basisInfo.basis <= 0) return null;
 
-    if (isMainCriteria) {
-      // Chỉ tiêu trong TCCS: ưu tiên declaredContent khai báo trong TCCS
-      if (criterion?.declaredContent != null) {
-        basis = typeof criterion.declaredContent === 'string' ? parseNumberFromText(criterion.declaredContent as any) : criterion.declaredContent;
-      } else {
-        let formulaItem = formulaItemMap.get(rName);
-        if (criterion?.formulaIngredientId) {
-          const linked = formulaItemMap.get(criterion.formulaIngredientId.trim().toLowerCase());
-          if (linked) formulaItem = linked;
-        }
-        if (!formulaItem) return null;
-
-        let declaredContent: number | undefined = formulaItem.declaredContent;
-        if (typeof declaredContent === 'string') declaredContent = parseNumberFromText(declaredContent as any);
-        let elementalContent: number | undefined = formulaItem.elementalContent;
-        if (typeof elementalContent === 'string') elementalContent = parseNumberFromText(elementalContent as any);
-
-        if (criterion?.formulaIngredientId) {
-          basis = criterion.calculationBasis === 'ELEMENTAL' && elementalContent && elementalContent > 0
-            ? elementalContent : declaredContent;
-        } else {
-          basis = (elementalContent && elementalContent > 0) ? elementalContent : declaredContent;
-        }
-      }
-    } else {
-      // Chỉ tiêu ngoài TCCS: tìm theo tên trong công thức, nếu có thì vẫn tính %
-      const formulaItem = formulaItemMap.get(rName);
-      if (!formulaItem) return null;
-
-      let declaredContent: number | undefined = formulaItem.declaredContent;
-      if (typeof declaredContent === 'string') declaredContent = parseNumberFromText(declaredContent as any);
-      let elementalContent: number | undefined = formulaItem.elementalContent;
-      if (typeof elementalContent === 'string') elementalContent = parseNumberFromText(elementalContent as any);
-
-      basis = (elementalContent && elementalContent > 0) ? elementalContent : declaredContent;
-    }
-
-    const actual = parseNumberFromText(String(value));
-    if (!basis || basis <= 0 || !actual || actual <= 0) return null;
-    const pct = (actual / basis) * 100;
-    return pct.toLocaleString('en-US', { maximumFractionDigits: 2 }) + '%';
+    return calculateRelativePercentage(value, basisInfo.basis);
   };
 
   useEffect(() => {
     if (id) {
       setIsLoadingHistory(true);
       fetchTestResultsByBatchId(id)
-        .then(res => setViewBatchResults(res))
-        .catch(err => console.error(err))
+        .then((res) => setViewBatchResults(res))
+        .catch((err) => console.error(err))
         .finally(() => setIsLoadingHistory(false));
 
-      firebaseDeviationRepository.findByBatchId(id)
-        .then(devs => setBatchDeviations(devs || []))
-        .catch(err => console.error('Lỗi nạp sai lệch của lô:', err));
+      firebaseDeviationRepository
+        .findByBatchId(id)
+        .then((devs) => setBatchDeviations(devs || []))
+        .catch((err) => console.error('Lỗi nạp sai lệch của lô:', err));
     }
   }, [id]);
 
-  if (!batch) return <div className="p-8 text-center text-slate-500 dark:text-slate-400 font-bold bg-white dark:bg-slate-800 rounded-xl shadow-sm max-w-4xl mx-auto mt-8 border border-slate-100 dark:border-slate-700">Không tìm thấy thông tin Lô hàng hoặc dữ liệu đang tải...</div>;
+  if (!batch)
+    return (
+      <div className="p-8 text-center text-slate-500 dark:text-slate-400 font-bold bg-white dark:bg-slate-800 rounded-xl shadow-sm max-w-4xl mx-auto mt-8 border border-slate-100 dark:border-slate-700">
+        Không tìm thấy thông tin Lô hàng hoặc dữ liệu đang tải...
+      </div>
+    );
 
   const { progressPercent, missingCriteria } = calculateBatchProgress(batch, viewBatchResults);
 
@@ -335,14 +370,17 @@ const BatchDetailPage = () => {
             >
               <ShareIcon className="h-4 w-4" /> Truy vết
             </button>
-            <button 
+            <button
               type="button"
               onClick={() => setIsClearanceModalOpen(true)}
               className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-500/10 text-purple-700 dark:text-purple-400 hover:bg-purple-500/20 border border-purple-500/20 rounded-lg font-medium text-xs cursor-pointer transition-colors"
             >
               <SparklesIcon className="h-4 w-4" /> Thẩm định AI
             </button>
-            <button onClick={() => navigate(`/test-results/coa/${batch.id}`)} className="flex items-center gap-1.5 px-3 py-1.5 bg-surface-2 hover:bg-surface-3 text-ink-soft rounded-lg font-medium text-xs cursor-pointer transition-colors border border-border shadow-xs">
+            <button
+              onClick={() => navigate(`/test-results/coa/${batch.id}`)}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-surface-2 hover:bg-surface-3 text-ink-soft rounded-lg font-medium text-xs cursor-pointer transition-colors border border-border shadow-xs"
+            >
               <PrinterIcon className="h-4 w-4" /> In CoA
             </button>
           </div>
@@ -354,22 +392,32 @@ const BatchDetailPage = () => {
           <Surface variant="flat" padding="lg">
             <div className="mb-4 pb-4 border-b border-border">
               <p className="text-xs font-semibold text-ink-muted mb-1">Sản phẩm</p>
-              <h4 
+              <h4
                 onClick={() => batch.productId && navigate(`/products/${batch.productId}`)}
                 className="font-bold text-ink text-base leading-tight mb-1 hover:text-emerald-600 dark:hover:text-emerald-400 cursor-pointer transition-colors"
                 title="Nhấn để xem chi tiết hồ sơ sản phẩm"
               >
                 {batch.product?.name}
               </h4>
-              <p className="text-xs font-mono font-medium text-emerald-700 dark:text-emerald-400">{batch.product?.code}</p>
+              <p className="text-xs font-mono font-medium text-emerald-700 dark:text-emerald-400">
+                {batch.product?.code}
+              </p>
             </div>
             <div className="mb-4 pb-4 border-b border-border">
               <p className="text-xs font-semibold text-ink-muted mb-1">Số Lô</p>
               <h4 className="font-mono font-bold text-ink text-xl">{batch.batchNo}</h4>
             </div>
             <div className="space-y-2.5 text-xs">
-              <div className="flex justify-between"><span className="font-medium text-ink-muted">NSX:</span> <span className="font-semibold text-ink">{formatDateStandard(batch.mfgDate)}</span></div>
-              <div className="flex justify-between"><span className="font-medium text-ink-muted">HSD:</span> <span className="font-semibold text-rose-600 dark:text-rose-400">{formatDateStandard(batch.expDate)}</span></div>
+              <div className="flex justify-between">
+                <span className="font-medium text-ink-muted">NSX:</span>{' '}
+                <span className="font-semibold text-ink">{formatDateStandard(batch.mfgDate)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="font-medium text-ink-muted">HSD:</span>{' '}
+                <span className="font-semibold text-rose-600 dark:text-rose-400">
+                  {formatDateStandard(batch.expDate)}
+                </span>
+              </div>
 
               <div className="pt-3 border-t border-border">
                 <span className="font-medium text-ink-muted block mb-1">Tiêu chuẩn áp dụng:</span>
@@ -379,7 +427,8 @@ const BatchDetailPage = () => {
                     className="font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 px-2 py-1 rounded inline-flex items-center gap-1 transition-colors border border-emerald-500/20"
                     title="Nhấn để xem chi tiết TCCS"
                   >
-                    <DocumentTextIcon className="h-3.5 w-3.5" /> {(batch as any).tccs?.code || 'Không xác định'}
+                    <DocumentTextIcon className="h-3.5 w-3.5" />{' '}
+                    {(batch as any).tccs?.code || 'Không xác định'}
                   </Link>
                 ) : (
                   <span className="font-medium text-ink-muted">Không xác định</span>
@@ -406,21 +455,37 @@ const BatchDetailPage = () => {
             <div className="flex items-center gap-4 mb-4">
               <CircularProgress progress={progressPercent} />
               <div>
-                <h4 className="text-xs font-semibold text-ink-muted flex items-center gap-1.5"><BeakerIcon className="h-3.5 w-3.5" /> Tiến độ kiểm nghiệm</h4>
-                <p className="text-sm text-ink font-semibold mt-0.5">Hoàn thành {progressPercent}%</p>
+                <h4 className="text-xs font-semibold text-ink-muted flex items-center gap-1.5">
+                  <BeakerIcon className="h-3.5 w-3.5" /> Tiến độ kiểm nghiệm
+                </h4>
+                <p className="text-sm text-ink font-semibold mt-0.5">
+                  Hoàn thành {progressPercent}%
+                </p>
               </div>
             </div>
             {missingCriteria.length > 0 ? (
               <div className="bg-amber-500/10 border border-amber-500/20 p-3 rounded-xl">
-                <p className="text-xs font-semibold text-amber-800 dark:text-amber-300 flex items-center gap-1 mb-2"><ExclamationTriangleIcon className="h-3.5 w-3.5 text-amber-600" /> Còn thiếu {missingCriteria.length} chỉ tiêu:</p>
+                <p className="text-xs font-semibold text-amber-800 dark:text-amber-300 flex items-center gap-1 mb-2">
+                  <ExclamationTriangleIcon className="h-3.5 w-3.5 text-amber-600" /> Còn thiếu{' '}
+                  {missingCriteria.length} chỉ tiêu:
+                </p>
                 <div className="flex flex-wrap gap-1.5">
-                  {missingCriteria.map((c: any, idx: number) => <span key={idx} className="px-2 py-0.5 bg-surface text-amber-800 dark:text-amber-300 text-[11px] font-medium rounded border border-amber-500/20">{c.name}</span>)}
+                  {missingCriteria.map((c: any, idx: number) => (
+                    <span
+                      key={idx}
+                      className="px-2 py-0.5 bg-surface text-amber-800 dark:text-amber-300 text-[11px] font-medium rounded border border-amber-500/20"
+                    >
+                      {c.name}
+                    </span>
+                  ))}
                 </div>
               </div>
             ) : (
               <div className="bg-emerald-500/10 p-3 rounded-xl border border-emerald-500/20 flex items-center gap-2">
                 <CheckCircleIcon className="h-4 w-4 text-emerald-600" />
-                <span className="text-xs font-medium text-emerald-800 dark:text-emerald-300">Đã kiểm đủ tất cả chỉ tiêu.</span>
+                <span className="text-xs font-medium text-emerald-800 dark:text-emerald-300">
+                  Đã kiểm đủ tất cả chỉ tiêu.
+                </span>
               </div>
             )}
           </Surface>
@@ -429,42 +494,52 @@ const BatchDetailPage = () => {
           <Surface variant="flat" padding="md" className="space-y-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <ShieldExclamationIcon className={`h-4 w-4 ${batchDeviations.some(d => d.status !== 'CLOSED') ? 'text-rose-500' : 'text-ink-muted'}`} />
-                <h4 className="text-xs font-semibold text-ink">
-                  Hồ sơ Sai lệch (CAPA)
-                </h4>
+                <ShieldExclamationIcon
+                  className={`h-4 w-4 ${batchDeviations.some((d) => d.status !== 'CLOSED') ? 'text-rose-500' : 'text-ink-muted'}`}
+                />
+                <h4 className="text-xs font-semibold text-ink">Hồ sơ Sai lệch (CAPA)</h4>
               </div>
-              <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${
-                batchDeviations.length === 0 
-                  ? 'bg-surface-2 text-ink-muted border border-border' 
-                  : batchDeviations.some(d => d.status !== 'CLOSED')
-                    ? 'bg-rose-500/10 text-rose-700 dark:text-rose-400 border border-rose-500/20'
-                    : 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20'
-              }`}>
+              <span
+                className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${
+                  batchDeviations.length === 0
+                    ? 'bg-surface-2 text-ink-muted border border-border'
+                    : batchDeviations.some((d) => d.status !== 'CLOSED')
+                      ? 'bg-rose-500/10 text-rose-700 dark:text-rose-400 border border-rose-500/20'
+                      : 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20'
+                }`}
+              >
                 {batchDeviations.length} hồ sơ
               </span>
             </div>
 
             {batchDeviations.length === 0 ? (
-              <p className="text-xs text-ink-muted italic">Không có hồ sơ sai lệch nào cho lô này.</p>
+              <p className="text-xs text-ink-muted italic">
+                Không có hồ sơ sai lệch nào cho lô này.
+              </p>
             ) : (
               <div className="space-y-2">
-                {batchDeviations.map(dev => (
-                  <div key={dev.id} className="p-2.5 rounded-xl bg-surface-2 border border-border text-xs space-y-1">
+                {batchDeviations.map((dev) => (
+                  <div
+                    key={dev.id}
+                    className="p-2.5 rounded-xl bg-surface-2 border border-border text-xs space-y-1"
+                  >
                     <div className="flex items-center justify-between">
                       <span className="font-mono font-medium text-ink">{dev.deviationNo}</span>
-                      <span className={`text-[10px] font-medium px-2 py-0.5 rounded ${
-                        dev.status === 'CLOSED'
-                          ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20'
-                          : 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20'
-                      }`}>
+                      <span
+                        className={`text-[10px] font-medium px-2 py-0.5 rounded ${
+                          dev.status === 'CLOSED'
+                            ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20'
+                            : 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20'
+                        }`}
+                      >
                         {dev.status === 'CLOSED' ? 'Đã đóng' : 'Đang xử lý'}
                       </span>
                     </div>
                     <p className="text-ink-soft font-medium truncate">{dev.title}</p>
                     {dev.failedCriteria && dev.failedCriteria.length > 0 && (
                       <p className="text-[11px] text-rose-600 dark:text-rose-400 font-medium">
-                        {dev.failedCriteria.length} chỉ tiêu OOS ({dev.failedCriteria.map(c => c.name).join(', ')})
+                        {dev.failedCriteria.length} chỉ tiêu OOS (
+                        {dev.failedCriteria.map((c) => c.name).join(', ')})
                       </p>
                     )}
                   </div>
@@ -483,14 +558,14 @@ const BatchDetailPage = () => {
 
         <div className="xl:col-span-2 space-y-6">
           <div className="flex p-1 bg-surface-2/80 rounded-xl border border-border gap-1">
-            <button 
-              onClick={() => setShowHistoryTable(false)} 
+            <button
+              onClick={() => setShowHistoryTable(false)}
               className={`flex-1 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${!showHistoryTable ? 'bg-surface text-ink font-semibold shadow-xs border border-border' : 'text-ink-muted hover:text-ink'}`}
             >
               Phiếu Kiểm Nghiệm ({viewBatchResults.length})
             </button>
-            <button 
-              onClick={() => setShowHistoryTable(true)} 
+            <button
+              onClick={() => setShowHistoryTable(true)}
               className={`flex-1 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center justify-center gap-1.5 cursor-pointer ${showHistoryTable ? 'bg-surface text-ink font-semibold shadow-xs border border-border' : 'text-ink-muted hover:text-ink'}`}
             >
               <Square3Stack3DIcon className="h-4 w-4" /> Bảng Tổng hợp
@@ -498,42 +573,70 @@ const BatchDetailPage = () => {
           </div>
 
           {showHistoryTable ? (
-            <Surface variant="flat" padding="lg" className="overflow-hidden"><BatchCriteriaHistory batchId={batch.id} /></Surface>
+            <Surface variant="flat" padding="lg" className="overflow-hidden">
+              <BatchCriteriaHistory batchId={batch.id} />
+            </Surface>
           ) : (
             <div className="space-y-4">
               {isLoadingHistory ? (
-                <div className="p-10 text-center text-ink-muted italic text-sm flex justify-center items-center gap-3 bg-surface rounded-xl border border-border shadow-xs"><ArrowPathIcon className="animate-spin h-5 w-5 text-emerald-600" /> Đang tải dữ liệu kiểm nghiệm...</div>
+                <div className="p-10 text-center text-ink-muted italic text-sm flex justify-center items-center gap-3 bg-surface rounded-xl border border-border shadow-xs">
+                  <ArrowPathIcon className="animate-spin h-5 w-5 text-emerald-600" /> Đang tải dữ
+                  liệu kiểm nghiệm...
+                </div>
               ) : viewBatchResults.length === 0 ? (
-                <div className="p-10 text-center border border-border rounded-xl bg-surface shadow-xs text-ink-muted italic text-sm">Chưa có kết quả kiểm nghiệm nào.</div>
+                <div className="p-10 text-center border border-border rounded-xl bg-surface shadow-xs text-ink-muted italic text-sm">
+                  Chưa có kết quả kiểm nghiệm nào.
+                </div>
               ) : (
-                viewBatchResults.map(res => (
-                  <div key={res.id} className="bg-surface border border-border rounded-xl overflow-hidden shadow-xs">
+                viewBatchResults.map((res) => (
+                  <div
+                    key={res.id}
+                    className="bg-surface border border-border rounded-xl overflow-hidden shadow-xs"
+                  >
                     <div className="bg-surface-2/60 px-4 py-3 flex justify-between items-center border-b border-border">
                       <div className="flex items-center gap-3">
                         <StatusBadge status={res.overallStatus === 'PASS' ? 'PASS' : 'FAIL'} />
                         <div>
                           <p className="text-sm font-semibold text-ink">{res.labName}</p>
-                          <p className="text-xs text-ink-muted mt-0.5">Ngày thử: {formatDateStandard(res.testDate)}</p>
+                          <p className="text-xs text-ink-muted mt-0.5">
+                            Ngày thử: {formatDateStandard(res.testDate)}
+                          </p>
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
                         {res.overallStatus !== 'PASS' && (
                           <>
-                            <button 
-                              onClick={() => handleOpenOOS(res)} 
+                            <button
+                              onClick={() => handleOpenOOS(res)}
                               className="text-xs font-medium text-rose-700 dark:text-rose-400 bg-rose-500/10 border border-rose-500/20 px-2.5 py-1.5 rounded-lg hover:bg-rose-500/20 transition-all flex items-center gap-1.5 cursor-pointer"
                             >
-                              <ShieldExclamationIcon className="h-3.5 w-3.5 text-rose-500" /> Điều tra OOS (AI)
+                              <ShieldExclamationIcon className="h-3.5 w-3.5 text-rose-500" /> Điều
+                              tra OOS (AI)
                             </button>
                             <button
                               onClick={() => {
-                                const formula = productFormulas.find((f: any) => f.productId === batch.productId);
-                                const failed = ensureArray(res.results).filter((r: any) => !r.isPass).map((r: any) => ({
-                                  name: r.criteriaName,
-                                  actualValue: r.value,
-                                  unit: r.unit,
-                                  specification: (() => { const c = allCriteriaMap.get(r.criteriaName?.toLowerCase()); return c ? c.type === 'NUMBER' ? (c.min != null && c.max != null ? `${c.min}~${c.max}` : c.min != null ? `≥${c.min}` : `≤${c.max}`) : (c.expectedText || '') : ''; })(),
-                                }));
+                                const formula = productFormulas.find(
+                                  (f: any) => f.productId === batch.productId
+                                );
+                                const failed = ensureArray(res.results)
+                                  .filter((r: any) => !r.isPass)
+                                  .map((r: any) => ({
+                                    name: r.criteriaName,
+                                    actualValue: r.value,
+                                    unit: r.unit,
+                                    specification: (() => {
+                                      const c = allCriteriaMap.get(r.criteriaName?.toLowerCase());
+                                      return c
+                                        ? c.type === 'NUMBER'
+                                          ? c.min != null && c.max != null
+                                            ? `${c.min}~${c.max}`
+                                            : c.min != null
+                                              ? `≥${c.min}`
+                                              : `≤${c.max}`
+                                          : c.expectedText || ''
+                                        : '';
+                                    })(),
+                                  }));
                                 setDeviationData({
                                   productName: batch.product?.name || '',
                                   batchNo: batch.batchNo,
@@ -552,32 +655,66 @@ const BatchDetailPage = () => {
                             </button>
                           </>
                         )}
-                        <button onClick={() => navigate(`/test-results/print/${res.id}`)} className="text-xs font-medium text-ink-soft bg-surface border border-border px-3 py-1.5 rounded-lg hover:bg-surface-2 transition-all flex items-center gap-1.5 cursor-pointer shadow-xs">
+                        <button
+                          onClick={() => navigate(`/test-results/print/${res.id}`)}
+                          className="text-xs font-medium text-ink-soft bg-surface border border-border px-3 py-1.5 rounded-lg hover:bg-surface-2 transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
+                        >
                           <PrinterIcon className="h-3.5 w-3.5" /> In phiếu
                         </button>
                       </div>
                     </div>
                     <div className="overflow-x-auto">
-                      <table className="w-full text-xs text-left"><thead className="bg-surface-2/60 text-ink-muted font-semibold text-xs border-b border-border"><tr><th className="px-4 py-2.5">Chỉ tiêu</th><th className="px-3 py-2.5 text-center">Mức Y/C</th><th className="px-4 py-2.5 text-right">Kết quả</th><th className="px-3 py-2.5 text-center">ĐVT</th><th className="px-3 py-2.5 text-center">Đánh giá</th></tr></thead>
+                      <table className="w-full text-xs text-left">
+                        <thead className="bg-surface-2/60 text-ink-muted font-semibold text-xs border-b border-border">
+                          <tr>
+                            <th className="px-4 py-2.5">Chỉ tiêu</th>
+                            <th className="px-3 py-2.5 text-center">Mức Y/C</th>
+                            <th className="px-4 py-2.5 text-right">Kết quả</th>
+                            <th className="px-3 py-2.5 text-center">ĐVT</th>
+                            <th className="px-3 py-2.5 text-center">Đánh giá</th>
+                          </tr>
+                        </thead>
                         <tbody className="divide-y divide-border">
                           {res.results.map((item, idx) => {
                             const pct = getContentPercent(item.criteriaName, item.value);
                             const cDef = allCriteriaMap.get(item.criteriaName.trim().toLowerCase());
                             const reqText = cDef
                               ? cDef.type === 'NUMBER'
-                                ? (cDef.min != null && cDef.max != null ? `${cDef.min} ~ ${cDef.max}` : cDef.min != null ? `≥ ${cDef.min}` : cDef.max != null ? `≤ ${cDef.max}` : '')
-                                : (cDef.expectedText || '')
+                                ? cDef.min != null && cDef.max != null
+                                  ? `${cDef.min} ~ ${cDef.max}`
+                                  : cDef.min != null
+                                    ? `≥ ${cDef.min}`
+                                    : cDef.max != null
+                                      ? `≤ ${cDef.max}`
+                                      : ''
+                                : cDef.expectedText || ''
                               : '';
                             return (
                               <tr key={idx} className="hover:bg-surface-2/60 transition-colors">
-                                <td className="px-4 py-2.5 font-medium text-ink">{item.criteriaName}</td>
-                                <td className="px-3 py-2.5 text-center text-ink-muted font-mono text-[11px] whitespace-nowrap">{reqText || '—'}</td>
+                                <td className="px-4 py-2.5 font-medium text-ink">
+                                  {item.criteriaName}
+                                </td>
+                                <td className="px-3 py-2.5 text-center text-ink-muted font-mono text-[11px] whitespace-nowrap">
+                                  {reqText || '—'}
+                                </td>
                                 <td className="px-4 py-2.5 text-right font-semibold text-ink">
                                   {item.value}
-                                  {pct && <span className="block text-[11px] font-normal text-emerald-700 dark:text-emerald-400">({pct})</span>}
+                                  {pct && (
+                                    <span className="block text-[11px] font-normal text-emerald-700 dark:text-emerald-400">
+                                      {pct.startsWith('(') ? pct : `(${pct})`}
+                                    </span>
+                                  )}
                                 </td>
-                                <td className="px-3 py-2.5 text-center text-ink-muted">{item.unit}</td>
-                                <td className="px-3 py-2.5 text-center">{item.isPass ? <CheckCircleIcon className="h-4 w-4 mx-auto text-emerald-600" /> : <XMarkIcon className="h-4 w-4 mx-auto text-rose-600" />}</td>
+                                <td className="px-3 py-2.5 text-center text-ink-muted">
+                                  {item.unit}
+                                </td>
+                                <td className="px-3 py-2.5 text-center">
+                                  {item.isPass ? (
+                                    <CheckCircleIcon className="h-4 w-4 mx-auto text-emerald-600" />
+                                  ) : (
+                                    <XMarkIcon className="h-4 w-4 mx-auto text-rose-600" />
+                                  )}
+                                </td>
                               </tr>
                             );
                           })}

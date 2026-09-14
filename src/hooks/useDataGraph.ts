@@ -17,8 +17,11 @@ import {
   RawMaterial,
   CriteriaAlias,
   FormulaIngredient,
+  TestingLaboratory,
 } from '../types';
 import { calculateOverallStatus } from '../utils/evaluation';
+import { useAppStore } from '../store/useAppStore';
+import { resolveCanonicalLab, DEFAULT_TESTING_LABORATORIES } from '../services/laboratoryService';
 
 export interface HydratedFormulaIngredient extends FormulaIngredient {
   rawMaterial?: RawMaterial;
@@ -66,6 +69,8 @@ export interface HydratedTestResult extends TestResult {
   batch?: HydratedBatch;
   product?: Product;
   tccs?: TCCS;
+  laboratory?: TestingLaboratory;
+  canonicalLabName?: string;
 }
 
 export interface HydratedCriteriaAlias extends CriteriaAlias {
@@ -95,6 +100,8 @@ export const useDataGraph = () => {
   const { data: rawRawMaterials = EMPTY_ARRAY } = useRawMaterialsQuery();
   const { data: rawCriteriaAliases = EMPTY_ARRAY } = useCriteriaAliasesQuery();
   const rawAllTestResults = rawTestResults;
+  const testingLaboratories =
+    useAppStore((state) => state.testingLaboratories) || DEFAULT_TESTING_LABORATORIES;
 
   // ==========================================
   // 1. PRIMARY MAPS (By ID & Unique Keys) - O(N)
@@ -268,10 +275,13 @@ export const useDataGraph = () => {
         res.results && res.results.length > 0
           ? calculateOverallStatus(res.results, tccs || null)
           : res.overallStatus || 'PASS';
+      const labInfo = resolveCanonicalLab(res.labId || res.labName, testingLaboratories);
 
       return {
         ...res,
         overallStatus,
+        laboratory: labInfo.lab,
+        canonicalLabName: labInfo.labName,
         batch: rawBatch
           ? (() => {
               const bTests = testResultsByBatchId.get(rawBatch.id) || [];
@@ -299,6 +309,7 @@ export const useDataGraph = () => {
     tccsById,
     formulasByProductId,
     testResultsByBatchId,
+    testingLaboratories,
   ]);
 
   const allTestResultsHydrated = useMemo<HydratedTestResult[]>(() => {
@@ -552,6 +563,7 @@ export const useDataGraph = () => {
     productFormulas,
     rawMaterials,
     criteriaAliases,
+    testingLaboratories,
 
     // High-Performance Data Graph Index Maps (Phase 5)
     productsById,

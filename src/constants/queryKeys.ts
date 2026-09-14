@@ -34,3 +34,8 @@ export const TEST_RESULT_QUERY_KEYS = {
   byBatch: (batchId: string) => ['testResults', 'batch', batchId] as const,
   recent: (limit: number) => ['testResults', 'recent', limit] as const,
 };
+
+export const LABORATORY_QUERY_KEYS = {
+  all: ['testingLaboratories'] as const,
+  detail: (id: string) => ['testingLaboratories', id] as const,
+};

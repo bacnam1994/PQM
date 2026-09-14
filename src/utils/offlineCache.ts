@@ -22,6 +22,7 @@ export const initDB = (): Promise<IDBDatabase> => {
         'aiLearnedMappings',
         'qualityAlerts',
         'criteriaAliases',
+        'testingLaboratories',
         'offlineMutations',
       ];
       stores.forEach((storeName) => {
@@ -142,6 +143,7 @@ export const clearEntireCache = async (): Promise<void> => {
       'aiLearnedMappings',
       'qualityAlerts',
       'criteriaAliases',
+      'testingLaboratories',
     ];
     const tx = db.transaction(stores, 'readwrite');
 

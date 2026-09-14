@@ -2,7 +2,7 @@
  * dataConsistencyService.ts
  * =========================
  * Dịch vụ cốt lõi Kiểm soát & Hàn gắn Toàn vẹn Mối liên kết Dữ liệu (Data Consistency & Auto-Healing Engine).
- * 
+ *
  * Rà soát toàn bộ 8 thực thể dữ liệu trong hệ thống:
  * 1. Product (Sản phẩm)
  * 2. ProductFormula (Công thức sản phẩm)
@@ -14,11 +14,21 @@
  * 8. AILearnedMapping (Học máy AI)
  */
 
-import { Product, Batch, TCCS, TestResult, ProductFormula, RawMaterial, CriteriaAlias } from '../types';
+import {
+  Product,
+  Batch,
+  TCCS,
+  TestResult,
+  ProductFormula,
+  RawMaterial,
+  CriteriaAlias,
+  TestingLaboratory,
+} from '../types';
 import { normalizeName } from './criteriaAliasService';
 import { calculateOverallStatus } from '../utils/evaluation';
+import { matchLaboratory, DEFAULT_TESTING_LABORATORIES } from './laboratoryService';
 
-export type ConsistencyIssueType = 
+export type ConsistencyIssueType =
   | 'ORPHAN_BATCH'
   | 'ORPHAN_TEST_RESULT'
   | 'ORPHAN_TCCS'
@@ -36,9 +46,10 @@ export type ConsistencyIssueType =
   | 'FORMULA_TCCS_CONTENT_MISMATCH'
   | 'DUPLICATE_PRODUCT_CODE'
   | 'DUPLICATE_BATCH_NO'
-  | 'DUPLICATE_TCCS_CODE';
+  | 'DUPLICATE_TCCS_CODE'
+  | 'UNNORMALIZED_TEST_LAB';
 
-export type ConsistencyCategory = 
+export type ConsistencyCategory =
   | 'ORPHAN_RECORDS'
   | 'CROSS_ENTITY_MISMATCH'
   | 'LOGICAL_STATUS_INCONSISTENCY'
@@ -62,7 +73,12 @@ export interface ConsistencyIssue {
   relatedEntityName?: string;
   suggestedAction: string;
   autoHealable: boolean;
-  autoHealAction?: 'LINK_MATERIAL' | 'FIX_TEST_STATUS' | 'FIX_ACTIVE_TCCS' | 'CLEAN_ORPHAN_ALIAS';
+  autoHealAction?:
+    | 'LINK_MATERIAL'
+    | 'FIX_TEST_STATUS'
+    | 'FIX_ACTIVE_TCCS'
+    | 'CLEAN_ORPHAN_ALIAS'
+    | 'NORMALIZE_TEST_LAB';
   healPayload?: any;
 }
 
@@ -95,6 +111,7 @@ export interface SystemDataSnapshot {
   rawMaterials: RawMaterial[];
   testResults: TestResult[];
   criteriaAliases?: CriteriaAlias[];
+  testingLaboratories?: TestingLaboratory[];
 }
 
 /**
@@ -122,11 +139,11 @@ export const auditDataConsistency = (data: SystemDataSnapshot): ConsistencyRepor
   const criteriaAliases = data.criteriaAliases || [];
 
   // Tạo các Map tra cứu O(1)
-  const productMap = new Map(products.map(p => [p.id, p]));
-  const tccsMap = new Map(tccsList.map(t => [t.id, t]));
-  const batchMap = new Map(batches.map(b => [b.id, b]));
-  const batchNoMap = new Map(batches.map(b => [b.batchNo, b]));
-  const materialMap = new Map(rawMaterials.map(m => [m.id, m]));
+  const productMap = new Map(products.map((p) => [p.id, p]));
+  const tccsMap = new Map(tccsList.map((t) => [t.id, t]));
+  const batchMap = new Map(batches.map((b) => [b.id, b]));
+  const batchNoMap = new Map(batches.map((b) => [b.batchNo, b]));
+  const materialMap = new Map(rawMaterials.map((m) => [m.id, m]));
   const materialNameMap = new Map<string, RawMaterial>();
 
   // Hàm tra cứu Lô linh hoạt (hỗ trợ cả ID, Số lô batchNo hoặc suffix)
@@ -134,17 +151,18 @@ export const auditDataConsistency = (data: SystemDataSnapshot): ConsistencyRepor
     if (!batchId) return undefined;
     if (batchMap.has(batchId)) return batchMap.get(batchId);
     if (batchNoMap.has(batchId)) return batchNoMap.get(batchId);
-    return batches.find(b => 
-      (b.id && batchId.endsWith(b.id)) || 
-      (batchId && b.id.endsWith(batchId)) || 
-      (b.batchNo && b.batchNo.toLowerCase() === batchId.toLowerCase())
+    return batches.find(
+      (b) =>
+        (b.id && batchId.endsWith(b.id)) ||
+        (batchId && b.id.endsWith(batchId)) ||
+        (b.batchNo && b.batchNo.toLowerCase() === batchId.toLowerCase())
     );
   };
 
-  rawMaterials.forEach(m => {
+  rawMaterials.forEach((m) => {
     if (m.name) materialNameMap.set(normalizeName(m.name), m);
     if (Array.isArray(m.aliases)) {
-      m.aliases.forEach(alias => {
+      m.aliases.forEach((alias) => {
         if (alias) materialNameMap.set(normalizeName(alias), m);
       });
     }
@@ -152,28 +170,28 @@ export const auditDataConsistency = (data: SystemDataSnapshot): ConsistencyRepor
 
   // Gom nhóm dữ liệu theo Product ID
   const tccsByProduct = new Map<string, TCCS[]>();
-  tccsList.forEach(t => {
+  tccsList.forEach((t) => {
     const list = tccsByProduct.get(t.productId) || [];
     list.push(t);
     tccsByProduct.set(t.productId, list);
   });
 
   const formulasByProduct = new Map<string, ProductFormula[]>();
-  productFormulas.forEach(f => {
+  productFormulas.forEach((f) => {
     const list = formulasByProduct.get(f.productId) || [];
     list.push(f);
     formulasByProduct.set(f.productId, list);
   });
 
   const batchesByProduct = new Map<string, Batch[]>();
-  batches.forEach(b => {
+  batches.forEach((b) => {
     const list = batchesByProduct.get(b.productId) || [];
     list.push(b);
     batchesByProduct.set(b.productId, list);
   });
 
   const testResultsByBatch = new Map<string, TestResult[]>();
-  testResults.forEach(r => {
+  testResults.forEach((r) => {
     const matchedBatch = getBatchForTestResult(r.batchId);
     const key = matchedBatch ? matchedBatch.id : r.batchId;
     const list = testResultsByBatch.get(key) || [];
@@ -186,7 +204,7 @@ export const auditDataConsistency = (data: SystemDataSnapshot): ConsistencyRepor
   // =========================================================================
 
   // 1.1 Lô hàng không có Sản phẩm tương ứng
-  batches.forEach(b => {
+  batches.forEach((b) => {
     if (!productMap.has(b.productId)) {
       issues.push({
         id: `orphan_batch_${b.id}`,
@@ -205,7 +223,7 @@ export const auditDataConsistency = (data: SystemDataSnapshot): ConsistencyRepor
   });
 
   // 1.2 Phiếu kiểm nghiệm không có Lô tương ứng
-  testResults.forEach(r => {
+  testResults.forEach((r) => {
     const matchedBatch = getBatchForTestResult(r.batchId);
     if (!matchedBatch) {
       issues.push({
@@ -218,14 +236,15 @@ export const auditDataConsistency = (data: SystemDataSnapshot): ConsistencyRepor
         entityType: 'TEST_RESULT',
         entityId: r.id,
         entityName: `${r.labName} (${r.testDate})`,
-        suggestedAction: 'Xác minh số lô của phiếu kiểm nghiệm hoặc dọn dẹp bản ghi không còn hợp lệ.',
+        suggestedAction:
+          'Xác minh số lô của phiếu kiểm nghiệm hoặc dọn dẹp bản ghi không còn hợp lệ.',
         autoHealable: false,
       });
     }
   });
 
   // 1.3 TCCS không có Sản phẩm tương ứng
-  tccsList.forEach(t => {
+  tccsList.forEach((t) => {
     if (!productMap.has(t.productId)) {
       issues.push({
         id: `orphan_tccs_${t.id}`,
@@ -244,7 +263,7 @@ export const auditDataConsistency = (data: SystemDataSnapshot): ConsistencyRepor
   });
 
   // 1.4 Công thức không có Sản phẩm tương ứng
-  productFormulas.forEach(f => {
+  productFormulas.forEach((f) => {
     if (!productMap.has(f.productId)) {
       issues.push({
         id: `orphan_formula_${f.id}`,
@@ -263,7 +282,7 @@ export const auditDataConsistency = (data: SystemDataSnapshot): ConsistencyRepor
   });
 
   // 1.5 Alias không có TCCS tương ứng
-  criteriaAliases.forEach(a => {
+  criteriaAliases.forEach((a) => {
     if (!tccsMap.has(a.tccsId)) {
       issues.push({
         id: `orphan_alias_${a.id}`,
@@ -288,7 +307,7 @@ export const auditDataConsistency = (data: SystemDataSnapshot): ConsistencyRepor
   // =========================================================================
 
   // 2.1 Lô hàng gắn TCCS của một Sản phẩm KHÁC
-  batches.forEach(b => {
+  batches.forEach((b) => {
     if (b.tccsId && tccsMap.has(b.tccsId)) {
       const boundTccs = tccsMap.get(b.tccsId)!;
       if (boundTccs.productId !== b.productId) {
@@ -314,10 +333,10 @@ export const auditDataConsistency = (data: SystemDataSnapshot): ConsistencyRepor
   });
 
   // 2.2 Kiểm tra trạng thái isActive của TCCS theo từng Sản phẩm
-  products.forEach(p => {
+  products.forEach((p) => {
     const pTccs = tccsByProduct.get(p.id) || [];
     if (pTccs.length > 0) {
-      const activeList = pTccs.filter(t => t.isActive);
+      const activeList = pTccs.filter((t) => t.isActive);
       if (activeList.length === 0) {
         // Không có TCCS nào active
         const sorted = [...pTccs].sort((a, b) => b.issueDate.localeCompare(a.issueDate));
@@ -345,11 +364,12 @@ export const auditDataConsistency = (data: SystemDataSnapshot): ConsistencyRepor
           category: 'CROSS_ENTITY_MISMATCH',
           severity: 'WARNING',
           title: `Trùng lặp TCCS hiện hành: ${p.name}`,
-          description: `Sản phẩm "${p.name}" (${p.code}) đang có ${activeList.length} TCCS cùng đặt isActive = true (${activeList.map(t => t.code).join(', ')}).`,
+          description: `Sản phẩm "${p.name}" (${p.code}) đang có ${activeList.length} TCCS cùng đặt isActive = true (${activeList.map((t) => t.code).join(', ')}).`,
           entityType: 'PRODUCT',
           entityId: p.id,
           entityName: p.name,
-          suggestedAction: 'Chỉ giữ 1 TCCS mới nhất làm Hiện hành, chuyển các bản còn lại về Lưu trữ.',
+          suggestedAction:
+            'Chỉ giữ 1 TCCS mới nhất làm Hiện hành, chuyển các bản còn lại về Lưu trữ.',
           autoHealable: true,
           autoHealAction: 'FIX_ACTIVE_TCCS',
           healPayload: { productId: p.id, targetTccsId: sorted[0].id },
@@ -363,12 +383,12 @@ export const auditDataConsistency = (data: SystemDataSnapshot): ConsistencyRepor
   // =========================================================================
 
   // 3.1 Trạng thái Phiếu kiểm nghiệm không khớp với kết quả đánh giá chỉ tiêu
-  testResults.forEach(r => {
+  testResults.forEach((r) => {
     if (r.results && r.results.length > 0) {
       const rawBatch = getBatchForTestResult(r.batchId);
       const boundTccs = rawBatch?.tccsId ? tccsMap.get(rawBatch.tccsId) : undefined;
       const computedStatus = calculateOverallStatus(r.results, boundTccs || null);
-      
+
       if (r.overallStatus !== computedStatus) {
         issues.push({
           id: `status_mismatch_test_${r.id}`,
@@ -390,7 +410,7 @@ export const auditDataConsistency = (data: SystemDataSnapshot): ConsistencyRepor
   });
 
   // 3.2 Lô hàng RELEASED nhưng không có phiếu kiểm nghiệm PASS
-  batches.forEach(b => {
+  batches.forEach((b) => {
     if (b.status === 'RELEASED') {
       const batchTests = testResultsByBatch.get(b.id) || [];
 
@@ -405,18 +425,21 @@ export const auditDataConsistency = (data: SystemDataSnapshot): ConsistencyRepor
           entityType: 'BATCH',
           entityId: b.id,
           entityName: b.batchNo,
-          suggestedAction: 'Xem xét lại quyết định duyệt lô hoặc chuyển trạng thái sang ĐANG KIỂM TRA (TESTING).',
+          suggestedAction:
+            'Xem xét lại quyết định duyệt lô hoặc chuyển trạng thái sang ĐANG KIỂM TRA (TESTING).',
           autoHealable: false,
         });
       } else {
         // Sắp xếp các phiếu kiểm nghiệm theo ngày thử nghiệm tăng dần (phiếu mới nhất ở cuối)
-        const sortedTests = [...batchTests].sort((t1, t2) => (t1.testDate || '').localeCompare(t2.testDate || ''));
+        const sortedTests = [...batchTests].sort((t1, t2) =>
+          (t1.testDate || '').localeCompare(t2.testDate || '')
+        );
         const latestTest = sortedTests[sortedTests.length - 1];
 
         // Hợp nhất các chỉ tiêu kiểm nghiệm (kết quả kiểm tra lại lần sau sẽ cập nhật/ghi đè chỉ tiêu lần trước)
         const consolidatedMap = new Map<string, any>();
-        sortedTests.forEach(t => {
-          (t.results || []).forEach(r => {
+        sortedTests.forEach((t) => {
+          (t.results || []).forEach((r) => {
             if (r && r.criteriaName) {
               consolidatedMap.set(r.criteriaName.trim().toLowerCase(), r);
             }
@@ -424,11 +447,12 @@ export const auditDataConsistency = (data: SystemDataSnapshot): ConsistencyRepor
         });
         const consolidatedResults = Array.from(consolidatedMap.values());
         const boundTccs = b.tccsId ? tccsMap.get(b.tccsId) : undefined;
-        const consolidatedStatus = consolidatedResults.length > 0 
-          ? calculateOverallStatus(consolidatedResults, boundTccs || null)
-          : undefined;
+        const consolidatedStatus =
+          consolidatedResults.length > 0
+            ? calculateOverallStatus(consolidatedResults, boundTccs || null)
+            : undefined;
 
-        const hasPassTest = batchTests.some(t => t.overallStatus === 'PASS');
+        const hasPassTest = batchTests.some((t) => t.overallStatus === 'PASS');
         const isLatestPass = latestTest.overallStatus === 'PASS' || consolidatedStatus === 'PASS';
 
         // Lô chỉ bị xem là lỗi xuất xưởng nếu:
@@ -445,7 +469,8 @@ export const auditDataConsistency = (data: SystemDataSnapshot): ConsistencyRepor
             entityType: 'BATCH',
             entityId: b.id,
             entityName: b.batchNo,
-            suggestedAction: 'Xem xét lại quyết định duyệt lô, thực hiện kiểm nghiệm lại hoặc chuyển trạng thái sang BỊ LOẠI (REJECTED) / ĐANG KIỂM TRA (TESTING).',
+            suggestedAction:
+              'Xem xét lại quyết định duyệt lô, thực hiện kiểm nghiệm lại hoặc chuyển trạng thái sang BỊ LOẠI (REJECTED) / ĐANG KIỂM TRA (TESTING).',
             autoHealable: false,
           });
         }
@@ -462,7 +487,8 @@ export const auditDataConsistency = (data: SystemDataSnapshot): ConsistencyRepor
         entityType: 'BATCH',
         entityId: b.id,
         entityName: b.batchNo,
-        suggestedAction: 'Bổ sung lý do loại lô để phục vụ hồ sơ điều tra OOS và báo cáo chất lượng.',
+        suggestedAction:
+          'Bổ sung lý do loại lô để phục vụ hồ sơ điều tra OOS và báo cáo chất lượng.',
         autoHealable: false,
       });
     }
@@ -512,7 +538,7 @@ export const auditDataConsistency = (data: SystemDataSnapshot): ConsistencyRepor
   });
 
   // 3.5 Logic thời gian Phiếu kiểm nghiệm: testDate < mfgDate
-  testResults.forEach(r => {
+  testResults.forEach((r) => {
     const rawBatch = getBatchForTestResult(r.batchId);
     if (rawBatch && rawBatch.mfgDate && r.testDate) {
       const diff = compareDates(rawBatch.mfgDate, r.testDate);
@@ -534,13 +560,55 @@ export const auditDataConsistency = (data: SystemDataSnapshot): ConsistencyRepor
     }
   });
 
+  // 3.6 Rà soát chuẩn hóa Đơn vị kiểm nghiệm (Testing Laboratory Normalization)
+  const activeTestingLabs =
+    data.testingLaboratories && data.testingLaboratories.length > 0
+      ? data.testingLaboratories
+      : DEFAULT_TESTING_LABORATORIES;
+
+  testResults.forEach((r) => {
+    if (!r.labName || !r.labName.trim()) return;
+
+    const matched = matchLaboratory(r.labName, activeTestingLabs);
+    if (matched) {
+      const isAlreadyCanonical =
+        r.labId === matched.lab.id && r.labName === matched.lab.canonicalName;
+      if (!isAlreadyCanonical) {
+        issues.push({
+          id: `unnormalized_lab_${r.id}`,
+          type: 'UNNORMALIZED_TEST_LAB',
+          category: 'CROSS_ENTITY_MISMATCH',
+          severity: 'INFO',
+          title: `Đơn vị kiểm nghiệm chưa chuẩn hóa: ${r.labName}`,
+          description: `Phiếu kiểm nghiệm có tên đơn vị "${r.labName}" tương đồng với "${matched.lab.canonicalName}" (${Math.round(matched.similarity * 100)}%). Cần gán mã chuẩn "${matched.lab.code}" để đồng bộ biểu đồ SPC.`,
+          entityType: 'TEST_RESULT',
+          entityId: r.id,
+          entityName: `${r.labName} (${r.testDate || 'N/A'})`,
+          suggestedAction: `Chuẩn hóa về "${matched.lab.canonicalName}" (Mã: ${matched.lab.code})`,
+          autoHealable: true,
+          autoHealAction: 'NORMALIZE_TEST_LAB',
+          healPayload: {
+            testResultId: r.id,
+            targetLabId: matched.lab.id,
+            canonicalLabName: matched.lab.canonicalName,
+          },
+        });
+      }
+    }
+  });
+
   // =========================================================================
   // 4. MẤT LIÊN KẾT NGUYÊN LIỆU <-> CÔNG THỨC (RAW MATERIAL LINKAGE GAPS)
   // =========================================================================
 
-  productFormulas.forEach(f => {
+  productFormulas.forEach((f) => {
     const prod = productMap.get(f.productId);
-    const unlinkedItems: { name: string; isIngredient: boolean; index: number; suggestedMaterialId?: string }[] = [];
+    const unlinkedItems: {
+      name: string;
+      isIngredient: boolean;
+      index: number;
+      suggestedMaterialId?: string;
+    }[] = [];
 
     // Kiểm tra hoạt chất
     (f.ingredients || []).forEach((ing, idx) => {
@@ -569,7 +637,7 @@ export const auditDataConsistency = (data: SystemDataSnapshot): ConsistencyRepor
     });
 
     if (unlinkedItems.length > 0) {
-      const matchableCount = unlinkedItems.filter(u => u.suggestedMaterialId).length;
+      const matchableCount = unlinkedItems.filter((u) => u.suggestedMaterialId).length;
       issues.push({
         id: `unlinked_material_formula_${f.id}`,
         type: 'UNLINKED_FORMULA_MATERIAL',
@@ -592,43 +660,65 @@ export const auditDataConsistency = (data: SystemDataSnapshot): ConsistencyRepor
   // 5. ĐỐI SOÁT CÔNG THỨC <-> TCCS (FORMULA <-> TCCS ALIGNMENT)
   // =========================================================================
 
-  products.forEach(p => {
+  products.forEach((p) => {
     const pFormulas = formulasByProduct.get(p.id) || [];
     const pTccs = tccsByProduct.get(p.id) || [];
-    const activeTccs = pTccs.find(t => t.isActive) || pTccs[0];
+    const activeTccs = pTccs.find((t) => t.isActive) || pTccs[0];
     const formula = pFormulas[0];
 
     if (formula && activeTccs && Array.isArray(formula.ingredients)) {
       const tccsCriteriaNames = [
         ...(activeTccs.mainQualityCriteria || []),
         ...(activeTccs.safetyCriteria || []),
-      ].map(c => normalizeName(c.name));
+      ].map((c) => normalizeName(c.name));
 
       // Helper trích xuất từ khóa cốt lõi của hoạt chất/chỉ tiêu
       const extractCoreTokens = (str: string): string[] => {
-        const stopWords = new Set(['cao', 'chiet', 'xuat', 'tinh', 'chat', 'bot', 'dau', 'dinh', 'luong', 'ham', 'tong', 'so', 'cac', 'chuan', 'hoa', 'extract', 'content', 'total']);
+        const stopWords = new Set([
+          'cao',
+          'chiet',
+          'xuat',
+          'tinh',
+          'chat',
+          'bot',
+          'dau',
+          'dinh',
+          'luong',
+          'ham',
+          'tong',
+          'so',
+          'cac',
+          'chuan',
+          'hoa',
+          'extract',
+          'content',
+          'total',
+        ]);
         return normalizeName(str)
-          .replace(/[^a-z0-9àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ\s]/g, ' ')
+          .replace(
+            /[^a-z0-9àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ\s]/g,
+            ' '
+          )
           .split(/\s+/)
-          .filter(t => t.length >= 2 && !stopWords.has(t));
+          .filter((t) => t.length >= 2 && !stopWords.has(t));
       };
 
-      formula.ingredients.forEach(ing => {
+      formula.ingredients.forEach((ing) => {
         if (ing.name && ing.name.trim()) {
           const normIngName = normalizeName(ing.name);
           const ingTokens = extractCoreTokens(normIngName);
-          
-          const isPresent = tccsCriteriaNames.some(tcName => {
+
+          const isPresent = tccsCriteriaNames.some((tcName) => {
             if (tcName.includes(normIngName) || normIngName.includes(tcName)) return true;
             const tcTokens = extractCoreTokens(tcName);
             if (ingTokens.length > 0 && tcTokens.length > 0) {
-              const commonCount = ingTokens.filter(t => tcTokens.includes(t)).length;
+              const commonCount = ingTokens.filter((t) => tcTokens.includes(t)).length;
               if (commonCount >= Math.min(2, ingTokens.length)) return true;
               if (ingTokens.length === 1 && tcTokens.includes(ingTokens[0])) return true;
             }
             return false;
           });
-          
+
           if (!isPresent) {
             issues.push({
               id: `missing_criteria_formula_${p.id}_${ing.id || normIngName}`,
@@ -642,7 +732,8 @@ export const auditDataConsistency = (data: SystemDataSnapshot): ConsistencyRepor
               entityName: activeTccs.code,
               relatedEntityId: p.id,
               relatedEntityName: p.name,
-              suggestedAction: 'Bổ sung chỉ tiêu định lượng hoạt chất vào TCCS hoặc cập nhật lại công thức.',
+              suggestedAction:
+                'Bổ sung chỉ tiêu định lượng hoạt chất vào TCCS hoặc cập nhật lại công thức.',
               autoHealable: false,
             });
           }
@@ -657,7 +748,7 @@ export const auditDataConsistency = (data: SystemDataSnapshot): ConsistencyRepor
 
   // 6.1 Trùng mã sản phẩm
   const productCodeMap = new Map<string, string[]>();
-  products.forEach(p => {
+  products.forEach((p) => {
     if (p.code) {
       const norm = p.code.trim().toUpperCase();
       const list = productCodeMap.get(norm) || [];
@@ -687,7 +778,7 @@ export const auditDataConsistency = (data: SystemDataSnapshot): ConsistencyRepor
   // 6.2 Trùng số lô trong cùng 1 sản phẩm
   batchesByProduct.forEach((pBatches, prodId) => {
     const batchNoMap = new Map<string, string[]>();
-    pBatches.forEach(b => {
+    pBatches.forEach((b) => {
       if (b.batchNo) {
         const norm = b.batchNo.trim().toUpperCase();
         const list = batchNoMap.get(norm) || [];
@@ -720,15 +811,23 @@ export const auditDataConsistency = (data: SystemDataSnapshot): ConsistencyRepor
   // TỔNG HỢP VÀ TÍNH ĐIỂM SỨC KHỎE DỮ LIỆU
   // =========================================================================
 
-  const criticalCount = issues.filter(i => i.severity === 'CRITICAL').length;
-  const warningCount = issues.filter(i => i.severity === 'WARNING').length;
-  const infoCount = issues.filter(i => i.severity === 'INFO').length;
-  const autoHealableCount = issues.filter(i => i.autoHealable).length;
+  const criticalCount = issues.filter((i) => i.severity === 'CRITICAL').length;
+  const warningCount = issues.filter((i) => i.severity === 'WARNING').length;
+  const infoCount = issues.filter((i) => i.severity === 'INFO').length;
+  const autoHealableCount = issues.filter((i) => i.autoHealable).length;
 
-  const totalEntitiesScanned = products.length + batches.length + tccsList.length + productFormulas.length + rawMaterials.length + testResults.length + criteriaAliases.length;
+  const totalEntitiesScanned =
+    products.length +
+    batches.length +
+    tccsList.length +
+    productFormulas.length +
+    rawMaterials.length +
+    testResults.length +
+    criteriaAliases.length +
+    (data.testingLaboratories || []).length;
 
   // Điểm sức khỏe = 100 - (critical * 12) - (warning * 3) - (info * 1)
-  const penalty = (criticalCount * 12) + (warningCount * 3) + (infoCount * 1);
+  const penalty = criticalCount * 12 + warningCount * 3 + infoCount * 1;
   const overallScore = Math.max(0, Math.min(100, Math.round(100 - penalty)));
 
   let grade: ConsistencyReport['grade'] = 'EXCELLENT';
@@ -747,12 +846,14 @@ export const auditDataConsistency = (data: SystemDataSnapshot): ConsistencyRepor
     infoCount,
     autoHealableCount,
     categoryBreakdown: {
-      orphanRecords: issues.filter(i => i.category === 'ORPHAN_RECORDS').length,
-      crossEntityMismatch: issues.filter(i => i.category === 'CROSS_ENTITY_MISMATCH').length,
-      logicalStatusInconsistency: issues.filter(i => i.category === 'LOGICAL_STATUS_INCONSISTENCY').length,
-      rawMaterialLinkage: issues.filter(i => i.category === 'RAW_MATERIAL_LINKAGE').length,
-      formulaTccsAlignment: issues.filter(i => i.category === 'FORMULA_TCCS_ALIGNMENT').length,
-      duplicateIdentifiers: issues.filter(i => i.category === 'DUPLICATE_IDENTIFIERS').length,
+      orphanRecords: issues.filter((i) => i.category === 'ORPHAN_RECORDS').length,
+      crossEntityMismatch: issues.filter((i) => i.category === 'CROSS_ENTITY_MISMATCH').length,
+      logicalStatusInconsistency: issues.filter(
+        (i) => i.category === 'LOGICAL_STATUS_INCONSISTENCY'
+      ).length,
+      rawMaterialLinkage: issues.filter((i) => i.category === 'RAW_MATERIAL_LINKAGE').length,
+      formulaTccsAlignment: issues.filter((i) => i.category === 'FORMULA_TCCS_ALIGNMENT').length,
+      duplicateIdentifiers: issues.filter((i) => i.category === 'DUPLICATE_IDENTIFIERS').length,
     },
     issues,
     scannedAt: new Date().toISOString(),
@@ -765,27 +866,30 @@ export const auditDataConsistency = (data: SystemDataSnapshot): ConsistencyRepor
 export const generateAutoHealPlan = (report: ConsistencyReport, data: SystemDataSnapshot) => {
   const formulaUpdates: Record<string, ProductFormula> = {};
   const testResultStatusUpdates: Record<string, 'PASS' | 'FAIL'> = {};
+  const testResultLabUpdates: Record<string, { labId: string; labName: string }> = {};
   const tccsActiveUpdates: Record<string, { tccsId: string; isActive: boolean }[]> = {};
   const orphanAliasIdsToDelete: string[] = [];
 
   const rawMaterials = data.rawMaterials || [];
   const materialNameMap = new Map<string, RawMaterial>();
-  rawMaterials.forEach(m => {
+  rawMaterials.forEach((m) => {
     if (m.name) materialNameMap.set(normalizeName(m.name), m);
     if (Array.isArray(m.aliases)) {
-      m.aliases.forEach(a => { if (a) materialNameMap.set(normalizeName(a), m); });
+      m.aliases.forEach((a) => {
+        if (a) materialNameMap.set(normalizeName(a), m);
+      });
     }
   });
 
-  const healableIssues = report.issues.filter(i => i.autoHealable);
+  const healableIssues = report.issues.filter((i) => i.autoHealable);
 
-  healableIssues.forEach(issue => {
+  healableIssues.forEach((issue) => {
     if (issue.autoHealAction === 'LINK_MATERIAL' && issue.healPayload) {
       const { formulaId } = issue.healPayload;
-      const formula = data.productFormulas.find(f => f.id === formulaId);
+      const formula = data.productFormulas.find((f) => f.id === formulaId);
       if (formula) {
         const updated = formulaUpdates[formulaId] || JSON.parse(JSON.stringify(formula));
-        
+
         // Link ingredients
         if (Array.isArray(updated.ingredients)) {
           updated.ingredients.forEach((ing: any) => {
@@ -812,23 +916,35 @@ export const generateAutoHealPlan = (report: ConsistencyReport, data: SystemData
       testResultStatusUpdates[testResultId] = correctStatus;
     } else if (issue.autoHealAction === 'FIX_ACTIVE_TCCS' && issue.healPayload) {
       const { productId, targetTccsId } = issue.healPayload;
-      const pTccs = data.tccsList.filter(t => t.productId === productId);
-      const updates = pTccs.map(t => ({
+      const pTccs = data.tccsList.filter((t) => t.productId === productId);
+      const updates = pTccs.map((t) => ({
         tccsId: t.id,
         isActive: t.id === targetTccsId,
       }));
       tccsActiveUpdates[productId] = updates;
     } else if (issue.autoHealAction === 'CLEAN_ORPHAN_ALIAS' && issue.healPayload) {
       orphanAliasIdsToDelete.push(issue.healPayload.aliasId);
+    } else if (issue.autoHealAction === 'NORMALIZE_TEST_LAB' && issue.healPayload) {
+      const { testResultId, targetLabId, canonicalLabName } = issue.healPayload;
+      testResultLabUpdates[testResultId] = {
+        labId: targetLabId,
+        labName: canonicalLabName,
+      };
     }
   });
 
   return {
     formulaUpdates,
     testResultStatusUpdates,
+    testResultLabUpdates,
     tccsActiveUpdates,
     orphanAliasIdsToDelete,
-    totalActionsCount: Object.keys(formulaUpdates).length + Object.keys(testResultStatusUpdates).length + Object.keys(tccsActiveUpdates).length + orphanAliasIdsToDelete.length,
+    totalActionsCount:
+      Object.keys(formulaUpdates).length +
+      Object.keys(testResultStatusUpdates).length +
+      Object.keys(testResultLabUpdates).length +
+      Object.keys(tccsActiveUpdates).length +
+      orphanAliasIdsToDelete.length,
   };
 };
 
@@ -856,7 +972,7 @@ export const executeAutoHealPlan = async (
 
   // 2. Cập nhật Test Result Statuses
   for (const trId of Object.keys(plan.testResultStatusUpdates)) {
-    const tr = actions.testResults.find(t => t.id === trId);
+    const tr = actions.testResults.find((t) => t.id === trId);
     if (tr) {
       await actions.updateTestResult({ ...tr, overallStatus: plan.testResultStatusUpdates[trId] });
       successCount++;
@@ -867,7 +983,7 @@ export const executeAutoHealPlan = async (
   for (const pId of Object.keys(plan.tccsActiveUpdates)) {
     const updates = plan.tccsActiveUpdates[pId];
     for (const u of updates) {
-      const tccsItem = actions.tccsList.find(t => t.id === u.tccsId);
+      const tccsItem = actions.tccsList.find((t) => t.id === u.tccsId);
       if (tccsItem && tccsItem.isActive !== u.isActive) {
         await actions.updateTCCS({ ...tccsItem, isActive: u.isActive });
       }
@@ -881,15 +997,27 @@ export const executeAutoHealPlan = async (
     successCount++;
   }
 
+  // 5. Chuẩn hóa Đơn vị kiểm nghiệm cho Test Results
+  for (const trId of Object.keys(plan.testResultLabUpdates)) {
+    const tr = actions.testResults.find((t) => t.id === trId);
+    if (tr) {
+      const update = plan.testResultLabUpdates[trId];
+      await actions.updateTestResult({
+        ...tr,
+        labId: update.labId,
+        labName: update.labName,
+      });
+      successCount++;
+    }
+  }
+
   return successCount;
 };
 
 /**
  * Hàm gọi Auto-Heal toàn diện dành cho AI Chatbot và automation
  */
-export const autoHealAllWithAI = async (
-  storeGetState: () => any
-) => {
+export const autoHealAllWithAI = async (storeGetState: () => any) => {
   const state = storeGetState();
   const snapshot: SystemDataSnapshot = {
     products: state.products || [],
@@ -899,6 +1027,7 @@ export const autoHealAllWithAI = async (
     rawMaterials: state.rawMaterials || [],
     testResults: state.testResults || [],
     criteriaAliases: state.criteriaAliases || [],
+    testingLaboratories: state.testingLaboratories || [],
   };
 
   const report = auditDataConsistency(snapshot);
@@ -909,7 +1038,7 @@ export const autoHealAllWithAI = async (
       success: true,
       message: `✅ Hệ thống đã được kiểm tra: Đạt ${report.overallScore}/100 điểm (${report.grade}). Không phát hiện liên kết nào cần tự động sửa chữa.`,
       healedCount: 0,
-      score: report.overallScore
+      score: report.overallScore,
     };
   }
 
@@ -926,6 +1055,6 @@ export const autoHealAllWithAI = async (
     success: true,
     message: `🛠️ Đã tự động hàn gắn và chuẩn hóa thành công **${healedCount} liên kết dữ liệu** trên hệ thống!\n- Điểm chất lượng dữ liệu: **${report.overallScore}/100**\n- Các tác vụ hoàn tất: Liên kết nguyên liệu vào công thức, đồng bộ trạng thái phiếu kiểm nghiệm, sửa cờ hiệu lực TCCS và dọn dẹp ánh xạ mồ côi.`,
     healedCount,
-    score: report.overallScore
+    score: report.overallScore,
   };
 };

@@ -172,11 +172,11 @@ describe('TestResultFormPage AI Draft & Hardening Integration', () => {
       expect(peekAIDraft()).toBeNull();
     });
 
-    // Form inputs should contain AI values
+    // Form inputs should contain AI values (with labName normalized to canonical lab)
     await waitFor(() => {
       const labInput = document.querySelector('input[name="labName"]') as HTMLInputElement;
       expect(labInput).not.toBeNull();
-      expect(labInput.value).toBe('QUATEST 3');
+      expect(labInput.value).toBe('Trung tâm Kỹ thuật Tiêu chuẩn Đo lường Chất lượng 3');
       // Known TCCS criteria should be filled in the testResultsMap inputs
       expect(screen.getByDisplayValue('5.2')).toBeDefined();
       expect(screen.getByDisplayValue('6.8')).toBeDefined();

@@ -54,6 +54,7 @@ const getLocalISODate = () => {
 
 export const initialTestResultFormState = {
   batchId: '',
+  labId: '',
   labName: '',
   testDate: getLocalISODate(),
   notes: '',
@@ -430,6 +431,7 @@ export const useTestResultForm = (onInitialBatchSelect?: (batchNo: string) => vo
 
       setFormValues({
         batchId: res.batchId,
+        labId: res.labId || '',
         labName: res.labName,
         testDate: parseDateToISO(res.testDate),
         notes: res.notes || '',

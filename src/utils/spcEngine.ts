@@ -10,6 +10,9 @@
  * 3. Bộ phát hiện đầy đủ 8 Quy tắc Nelson (Nelson Rules for SPC).
  */
 
+import { TestingLaboratory } from '../types/laboratory';
+import { resolveCanonicalLab } from '../services/laboratoryService';
+
 export interface SPCParameters {
   mean: number;
   stdDevOverall: number;
@@ -472,6 +475,8 @@ export interface SPCBatchRecord {
   batchNo?: string;
   mfgDate?: string;
   value: number;
+  labId?: string;
+  labName?: string;
 }
 
 export interface SPCAggregationSummary {
@@ -546,4 +551,61 @@ export function aggregateBatchSPC(
     oosRatePercent: n > 0 ? Number(((oosCount / n) * 100).toFixed(2)) : 0,
     executionDurationMs: performance.now() - startTime,
   };
+}
+
+export interface LabSPCGroupSummary {
+  labKey: string;
+  labId?: string;
+  canonicalLabName: string;
+  records: SPCBatchRecord[];
+  summary: SPCAggregationSummary;
+}
+
+/**
+ * Gom nhóm các bản ghi SPC theo Đơn vị kiểm nghiệm (ưu tiên labId, tự động đối chiếu canonicalName).
+ * Giúp biểu đồ phân tích xu hướng (Trend/SPC) gom dữ liệu của cùng 1 phòng lab
+ * kể cả khi có sai khác nhỏ về chuỗi tên nhập tay.
+ */
+export function groupRecordsByLabSPC(
+  records: SPCBatchRecord[],
+  options?: {
+    usl?: number;
+    lsl?: number;
+    target?: number;
+    laboratories?: TestingLaboratory[];
+  }
+): Record<string, LabSPCGroupSummary> {
+  const groups: Record<
+    string,
+    { labId?: string; canonicalLabName: string; records: SPCBatchRecord[] }
+  > = {};
+
+  for (const record of records) {
+    const rawKey = record.labId || record.labName || 'UNKNOWN';
+    const resolved = resolveCanonicalLab(rawKey, options?.laboratories);
+    const groupKey =
+      resolved.labId || (resolved.labName ? resolved.labName.toLowerCase() : 'unknown_lab');
+
+    if (!groups[groupKey]) {
+      groups[groupKey] = {
+        labId: resolved.labId || undefined,
+        canonicalLabName: resolved.labName || 'Không xác định',
+        records: [],
+      };
+    }
+    groups[groupKey].records.push(record);
+  }
+
+  const result: Record<string, LabSPCGroupSummary> = {};
+  for (const [groupKey, group] of Object.entries(groups)) {
+    result[groupKey] = {
+      labKey: groupKey,
+      labId: group.labId,
+      canonicalLabName: group.canonicalLabName,
+      records: group.records,
+      summary: aggregateBatchSPC(group.records, options),
+    };
+  }
+
+  return result;
 }

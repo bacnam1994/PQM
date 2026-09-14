@@ -66,6 +66,7 @@ const QUERY_KEY_TO_STORE_KEY: Record<string, string> = {
   testResults: 'testResults',
   criteriaAliases: 'criteriaAliases',
   aiLearnedMappings: 'aiLearnedMappings',
+  testingLaboratories: 'testingLaboratories',
 };
 
 queryClient.getQueryCache().subscribe((event) => {
@@ -184,6 +185,16 @@ export const useAppTCCS = () => {
     deleteCriteriaAlias: state.deleteCriteriaAlias,
     confirmCriteriaAlias: state.confirmCriteriaAlias,
     addAliasToExisting: state.addAliasToExisting,
+  }));
+};
+
+/** Hook chọn dữ liệu Đơn vị kiểm nghiệm Master Data */
+export const useAppLaboratories = () => {
+  return useAppStore((state) => ({
+    testingLaboratories: state.testingLaboratories,
+    addTestingLaboratory: state.addTestingLaboratory,
+    updateTestingLaboratory: state.updateTestingLaboratory,
+    deleteTestingLaboratory: state.deleteTestingLaboratory,
   }));
 };
 
