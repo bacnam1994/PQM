@@ -23,6 +23,7 @@ import { TccsMainCriteriaTable } from './tccs-form/TccsMainCriteriaTable';
 import { TccsSafetyCriteriaTable } from './tccs-form/TccsSafetyCriteriaTable';
 import { TccsAlternateRulesSection } from './tccs-form/TccsAlternateRulesSection';
 import { tccsFormSchema } from '../../schemas';
+import { OperationalDraftBanner } from '../../components/operational';
 import toast from 'react-hot-toast';
 
 export const COMMON_CRITERIA_UNITS = [
@@ -225,10 +226,11 @@ const TCCSFormPage = () => {
     errors,
   } = useForm(initialTccsFormState, validateTCCS);
 
-  const { clearDraft } = useFormDraft({
+  const { clearDraft, hasDraft, draftTimestamp, restoreDraft, discardDraft } = useFormDraft({
     key: 'tccs_form_draft',
     formValues,
     setFormValues: setValues,
+    isEnabled: !id && !cloneId,
     onDraftLoaded: (draft) => {
       if (!id && !cloneId) {
         setValues(draft);
@@ -412,6 +414,12 @@ const TCCSFormPage = () => {
           </p>
         </div>
       </div>
+      <OperationalDraftBanner
+        hasDraft={hasDraft && !id && !cloneId}
+        draftTimestamp={draftTimestamp}
+        onRestore={restoreDraft}
+        onDiscard={discardDraft}
+      />
 
       <div className="bg-surface rounded-xl shadow-xs border border-border p-6">
         <form onSubmit={handleSave} className="space-y-6">

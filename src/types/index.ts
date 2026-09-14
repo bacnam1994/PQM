@@ -12,3 +12,4 @@ export * from './permissions';
 export * from './deviation';
 export * from './approvalWorkflow';
 export * from './changeControl';
+export * from './operational';

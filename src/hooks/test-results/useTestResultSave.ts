@@ -13,7 +13,12 @@ import {
 } from '../../utils';
 import { calculateOverallStatus } from './../../utils/evaluation';
 import { lookupPharmaTerm, isCriteriaMatch } from '../../utils/aiMapping';
-import { TestResultEntry, TestResult } from '../../types';
+import {
+  TestResultEntry,
+  TestResult,
+  OperationalError,
+  normalizeOperationalError,
+} from '../../types';
 import { testResultFormSchema } from '../../schemas';
 
 interface ExtraTestResultEntry extends TestResultEntry {
@@ -35,6 +40,7 @@ export const useTestResultSave = ({
   aiOriginMapRef,
 }: any) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [saveError, setSaveError] = useState<OperationalError | null>(null);
 
   const notify = useAppStore((state) => state.notify);
   const updateTestResult = useAppStore((state) => state.updateTestResult);
@@ -46,6 +52,7 @@ export const useTestResultSave = ({
   const handleSaveResult = useCallback(
     async (e: React.FormEvent<HTMLFormElement>) => {
       e.preventDefault();
+      setSaveError(null);
       if (!formValues.batchId)
         return notify({ type: 'WARNING', message: 'Vui lòng chọn Lô hàng!' });
 
@@ -409,6 +416,28 @@ export const useTestResultSave = ({
         notify({ type: 'SUCCESS', title: 'Thành công', message: 'Đã lưu kết quả kiểm nghiệm.' });
       } catch (error) {
         console.error('Lỗi lưu kết quả:', error);
+        const isOffline = typeof navigator !== 'undefined' ? !navigator.onLine : false;
+        if (isOffline) {
+          notify({
+            type: 'INFO',
+            title: 'Lưu ngoại tuyến',
+            message:
+              'Đã ghi nhận thay đổi ở chế độ Ngoại tuyến. Dữ liệu sẽ tự động đẩy lên máy chủ ngay khi có kết nối mạng.',
+          });
+          clearDraft();
+          navigate('/test-results');
+        } else {
+          const normalized = normalizeOperationalError(error, 'SAVE', () => {
+            const formEl = document.getElementById('test-result-form') as HTMLFormElement | null;
+            if (formEl) formEl.requestSubmit();
+          });
+          setSaveError(normalized);
+          notify({
+            type: 'ERROR',
+            title: 'Lỗi lưu kết quả',
+            message: normalized.message,
+          });
+        }
       } finally {
         setIsSubmitting(false);
       }
@@ -435,5 +464,23 @@ export const useTestResultSave = ({
     ]
   );
 
-  return { handleSaveResult, isSubmitting };
+  const retrySave = useCallback(() => {
+    const formEl = document.getElementById('test-result-form') as HTMLFormElement | null;
+    if (formEl) {
+      if (typeof formEl.requestSubmit === 'function') {
+        formEl.requestSubmit();
+      } else {
+        formEl.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
+      }
+    }
+  }, []);
+
+  return {
+    handleSaveResult,
+    isSubmitting,
+    saveError,
+    setSaveError,
+    clearSaveError: () => setSaveError(null),
+    retrySave,
+  };
 };

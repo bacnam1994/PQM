@@ -2,7 +2,7 @@ import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react'
 /**
  * @file useTestResultLogic.ts
  * @description Hook trung tâm xử lý logic nhập liệu và đánh giá kết quả kiểm nghiệm.
- * 
+ *
  * @rules
  * 1. Logic chọn TCCS: Ưu tiên TCCS theo ngày SX của Lô (xem docs/SYSTEM_LOGIC.md).
  * 2. Logic đánh giá: Sử dụng evaluateCriterionSmart từ utils/criteriaEvaluation.
@@ -20,10 +20,27 @@ import { useTccsSelection } from '../useTccsSelection';
 import { useBatchStatusTransition } from '../useBatchStatusTransition';
 import { fetchTestResultsByBatchId } from '../../services/testResultService';
 import { useTestResultSave } from './useTestResultSave';
-import { calculateOverallStatus, TEST_RESULT_STATUS, BATCH_STATUS, CRITERION_TYPE_CONST, evaluateCriterionSmart, generateId, parseNumberFromText, ensureArray, getFromCache, checkRuleExemption, calculateCompletionStatus, parseDateToISO } from '../../utils';
+import {
+  calculateOverallStatus,
+  TEST_RESULT_STATUS,
+  BATCH_STATUS,
+  CRITERION_TYPE_CONST,
+  evaluateCriterionSmart,
+  generateId,
+  parseNumberFromText,
+  ensureArray,
+  getFromCache,
+  checkRuleExemption,
+  calculateCompletionStatus,
+  parseDateToISO,
+} from '../../utils';
 import { ref, query, orderByChild, equalTo, get } from 'firebase/database';
 import { db } from '../../firebase';
-import { buildAliasLookupMap, resolveCriteriaName, normalizeName } from '../../services/criteriaAliasService';
+import {
+  buildAliasLookupMap,
+  resolveCriteriaName,
+  normalizeName,
+} from '../../services/criteriaAliasService';
 import { hasAIDraft } from '../../services/ai/aiDraftManager';
 interface ExtraTestResultEntry extends TestResultEntry {
   limit?: string;
@@ -31,7 +48,7 @@ interface ExtraTestResultEntry extends TestResultEntry {
 
 // Hàm lấy ngày Local chính xác (Tránh lỗi UTC lùi 1 ngày vào buổi sáng)
 const getLocalISODate = () => {
-  const tzOffset = (new Date()).getTimezoneOffset() * 60000;
+  const tzOffset = new Date().getTimezoneOffset() * 60000;
   return new Date(Date.now() - tzOffset).toISOString().split('T')[0];
 };
 
@@ -41,46 +58,52 @@ export const initialTestResultFormState = {
   testDate: getLocalISODate(),
   notes: '',
   testResultsMap: {} as Record<string, string | number>,
-  extraCriteria: [] as {id: string, name: string, value: string, unit: string, limit: string}[],
-  attachments: [] as { name: string; url: string; source: 'google_drive' | 'firebase'; uploadedAt: string }[],
+  extraCriteria: [] as { id: string; name: string; value: string; unit: string; limit: string }[],
+  attachments: [] as {
+    name: string;
+    url: string;
+    source: 'google_drive' | 'firebase';
+    uploadedAt: string;
+  }[],
 };
 
 export type TestResultFormState = typeof initialTestResultFormState;
 
 export const useTestResultForm = (onInitialBatchSelect?: (batchNo: string) => void) => {
-  const tccsList = useAppStore(state => state.tccsList);
-  const batches = useAppStore(state => state.batches);
-  const updateBatchStatus = useAppStore(state => state.updateBatchStatus);
-  const updateBatchProgress = useAppStore(state => state.updateBatchProgress);
-  const notify = useAppStore(state => state.notify);
-  const testResults = useAppStore(state => state.testResults);
-  const allTestResults = useAppStore(state => state.allTestResults);
-  const addTestResult = useAppStore(state => state.addTestResult);
-  const updateTestResult = useAppStore(state => state.updateTestResult);
-  const deleteTestResult = useAppStore(state => state.deleteTestResult);
-  const user = useAppStore(state => state.user);
+  const tccsList = useAppStore((state) => state.tccsList);
+  const batches = useAppStore((state) => state.batches);
+  const updateBatchStatus = useAppStore((state) => state.updateBatchStatus);
+  const updateBatchProgress = useAppStore((state) => state.updateBatchProgress);
+  const notify = useAppStore((state) => state.notify);
+  const testResults = useAppStore((state) => state.testResults);
+  const allTestResults = useAppStore((state) => state.allTestResults);
+  const addTestResult = useAppStore((state) => state.addTestResult);
+  const updateTestResult = useAppStore((state) => state.updateTestResult);
+  const deleteTestResult = useAppStore((state) => state.deleteTestResult);
+  const user = useAppStore((state) => state.user);
   const { batches: hydratedBatches } = useDataGraph();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  
+
   const crud = useCrud<TestResult>();
   const [batchSearch, setBatchSearch] = useState('');
   const [showBatchDropdown, setShowBatchDropdown] = useState(false);
-  
+
   // State cho modal xem chi tiết TCCS
   const [isTccsDetailModalOpen, setIsTccsDetailModalOpen] = useState(false);
 
   // State lưu trữ dữ liệu lấy trực tiếp từ DB để tránh thất thoát do phân trang
   const [fetchedResultsForBatch, setFetchedResultsForBatch] = useState<TestResult[]>([]);
-  
+
   // Ref để lưu trữ nguồn gốc tên chỉ tiêu do AI đọc (để học máy)
   const aiOriginMapRef = useRef<Record<string, string>>({});
 
-
-
-  const handlePrintConsolidatedCoa = useCallback((batchId: string) => {
-    navigate(`/test-results/coa/${batchId}`);
-  }, [navigate]);
+  const handlePrintConsolidatedCoa = useCallback(
+    (batchId: string) => {
+      navigate(`/test-results/coa/${batchId}`);
+    },
+    [navigate]
+  );
 
   // Sử dụng useRef để giữ tham chiếu mới nhất của callback mà không gây re-render loop
   const onInitialBatchSelectRef = useRef(onInitialBatchSelect);
@@ -103,7 +126,7 @@ export const useTestResultForm = (onInitialBatchSelect?: (batchNo: string) => vo
 
   const applyAIFormPatch = useCallback(
     (patch: Partial<typeof initialTestResultFormState>) => {
-      setFormValues(prev => ({
+      setFormValues((prev) => ({
         ...prev,
         ...patch,
       }));
@@ -120,22 +143,36 @@ export const useTestResultForm = (onInitialBatchSelect?: (batchNo: string) => vo
   }, [formValues.batchId, fetchTestResultsByBatchId]);
 
   const skipSave = useCallback((vals: any) => {
-    return !vals.batchId && 
-           !vals.labName && 
-           !vals.notes && 
-           Object.keys(vals.testResultsMap || {}).length === 0 && 
-           (vals.extraCriteria || []).length === 0;
+    return (
+      !vals.batchId &&
+      !vals.labName &&
+      !vals.notes &&
+      Object.keys(vals.testResultsMap || {}).length === 0 &&
+      (vals.extraCriteria || []).length === 0
+    );
   }, []);
 
-  const onDraftLoaded = useCallback((data: any) => {
-    if (data.batchId) {
-      const batch = hydratedBatches.find(b => b.id === data.batchId);
-      if (batch) setBatchSearch(`${batch.batchNo} - ${batch.product?.name}`);
-    }
-  }, [hydratedBatches]);
+  const onDraftLoaded = useCallback(
+    (data: any) => {
+      if (data.batchId) {
+        const batch = hydratedBatches.find((b) => b.id === data.batchId);
+        if (batch) setBatchSearch(`${batch.batchNo} - ${batch.product?.name}`);
+      }
+    },
+    [hydratedBatches]
+  );
 
   // --- AUTO SAVE DRAFT ---
-  const { checkDraft, clearDraft } = useFormDraft({
+  const {
+    checkDraft,
+    clearDraft,
+    hasDraft,
+    draftTimestamp,
+    restoreDraft,
+    discardDraft,
+    isSavingDraft,
+    lastDraftSavedAt,
+  } = useFormDraft({
     key: 'TEST_RESULT_DRAFT',
     formValues,
     setFormValues,
@@ -146,42 +183,64 @@ export const useTestResultForm = (onInitialBatchSelect?: (batchNo: string) => vo
   });
 
   const {
-    manualTccsId, setManualTccsId, availableTCCSList, latestTCCS, defaultTCCS, activeTCCS, tccsMaps
+    manualTccsId,
+    setManualTccsId,
+    availableTCCSList,
+    latestTCCS,
+    defaultTCCS,
+    activeTCCS,
+    tccsMaps,
   } = useTccsSelection(formValues.batchId, hydratedBatches as any, tccsList as any);
 
   const {
-    isStatusConfirmOpen, setIsStatusConfirmOpen, pendingStatusUpdate, rejectReason, setRejectReason,
-    handleUpdateBatchStatus: _handleUpdateBatchStatus, confirmBatchStatusUpdate
+    isStatusConfirmOpen,
+    setIsStatusConfirmOpen,
+    pendingStatusUpdate,
+    rejectReason,
+    setRejectReason,
+    handleUpdateBatchStatus: _handleUpdateBatchStatus,
+    confirmBatchStatusUpdate,
   } = useBatchStatusTransition(updateBatchStatus, notify);
 
-  const handleUpdateBatchStatus = useCallback((newStatus: string, batchId?: string) => {
-    _handleUpdateBatchStatus(newStatus, batchId, formValues.batchId);
-  }, [_handleUpdateBatchStatus, formValues.batchId]);
+  const handleUpdateBatchStatus = useCallback(
+    (newStatus: string, batchId?: string) => {
+      _handleUpdateBatchStatus(newStatus, batchId, formValues.batchId);
+    },
+    [_handleUpdateBatchStatus, formValues.batchId]
+  );
 
   // Derived state: Existing results for batch
   const existingResultsForBatch = useMemo(() => {
     if (!formValues.batchId) return [];
-    
-    const sourceResults = (allTestResults && allTestResults.length > 0) ? allTestResults : testResults;
-    
+
+    const sourceResults =
+      allTestResults && allTestResults.length > 0 ? allTestResults : testResults;
+
     // Gộp kết quả từ Database (fetchedResultsForBatch) và State cục bộ
     // Dùng Map để ghi đè và loại bỏ trùng lặp dựa trên ID
     const uniqueResults = new Map<string, any>();
-    [...fetchedResultsForBatch, ...sourceResults].forEach(r => {
+    [...fetchedResultsForBatch, ...sourceResults].forEach((r) => {
       if (r.batchId === formValues.batchId && r.id !== crud.selectedItem?.id) {
         uniqueResults.set(r.id, r);
       }
     });
 
-    return Array.from(uniqueResults.values())
-      .sort((a, b) => new Date(b.testDate).getTime() - new Date(a.testDate).getTime());
-  }, [formValues.batchId, testResults, allTestResults, fetchedResultsForBatch, crud.selectedItem?.id]);
+    return Array.from(uniqueResults.values()).sort(
+      (a, b) => new Date(b.testDate).getTime() - new Date(a.testDate).getTime()
+    );
+  }, [
+    formValues.batchId,
+    testResults,
+    allTestResults,
+    fetchedResultsForBatch,
+    crud.selectedItem?.id,
+  ]);
 
   // Tối ưu: Đưa lịch sử kết quả vào Map để tra cứu O(1) thay vì dùng find() trong vòng lặp
   const existingResultsMap = useMemo(() => {
     const map = new Map<string, any>();
-    existingResultsForBatch.forEach(res => {
-      ensureArray(res.results).forEach(r => {
+    existingResultsForBatch.forEach((res) => {
+      ensureArray(res.results).forEach((r) => {
         const cName = (r.criteriaName || '').trim().toLowerCase();
         if (!map.has(cName)) map.set(cName, r);
       });
@@ -190,9 +249,12 @@ export const useTestResultForm = (onInitialBatchSelect?: (batchNo: string) => vo
   }, [existingResultsForBatch]);
 
   // Hàm helper tập trung xử lý logic Quy tắc thay thế
-  const checkRuleExemptionWrapper = useCallback((cName: string, getMapVal: (n: string) => any) => {
-    return checkRuleExemption(cName, getMapVal, activeTCCS, tccsMaps, existingResultsMap);
-  }, [activeTCCS, tccsMaps, existingResultsMap]);
+  const checkRuleExemptionWrapper = useCallback(
+    (cName: string, getMapVal: (n: string) => any) => {
+      return checkRuleExemption(cName, getMapVal, activeTCCS, tccsMaps, existingResultsMap);
+    },
+    [activeTCCS, tccsMaps, existingResultsMap]
+  );
 
   const completionStatus = useMemo(() => {
     return calculateCompletionStatus(activeTCCS, tccsMaps, formValues, existingResultsMap);
@@ -205,11 +267,13 @@ export const useTestResultForm = (onInitialBatchSelect?: (batchNo: string) => vo
 
     const getMapVal = (name: string) => {
       const target = name.trim().toLowerCase();
-      const key = Object.keys(formValues.testResultsMap).find(k => k.trim().toLowerCase() === target);
+      const key = Object.keys(formValues.testResultsMap).find(
+        (k) => k.trim().toLowerCase() === target
+      );
       return key ? formValues.testResultsMap[key] : undefined;
     };
 
-    allCriteria.forEach(c => {
+    allCriteria.forEach((c) => {
       const cName = c.name.trim().toLowerCase();
       const rule = rulesMap.get(cName);
       if (rule) {
@@ -238,18 +302,22 @@ export const useTestResultForm = (onInitialBatchSelect?: (batchNo: string) => vo
     let isMounted = true;
     const batchIdParam = searchParams.get('batchId');
     if (batchIdParam) {
-      const batch = hydratedBatches.find(b => b.id === batchIdParam);
+      const batch = hydratedBatches.find((b) => b.id === batchIdParam);
       if (batch) {
         resetHookForm();
         setFieldValue('batchId', batchIdParam);
         setBatchSearch(`${batch.batchNo} - ${batch.product?.name}`);
-        
-        if (batch.status !== BATCH_STATUS.TESTING && batch.status !== BATCH_STATUS.RELEASED && batch.status !== BATCH_STATUS.REJECTED) {
+
+        if (
+          batch.status !== BATCH_STATUS.TESTING &&
+          batch.status !== BATCH_STATUS.RELEASED &&
+          batch.status !== BATCH_STATUS.REJECTED
+        ) {
           updateBatchStatus(batchIdParam, BATCH_STATUS.TESTING);
         }
-        
+
         if (onInitialBatchSelectRef.current) {
-            onInitialBatchSelectRef.current(batch.batchNo);
+          onInitialBatchSelectRef.current(batch.batchNo);
         }
 
         // Nếu user click "Nhập kết quả" từ trang Danh sách Lô hàng, điều hướng thẳng sang Form
@@ -264,121 +332,150 @@ export const useTestResultForm = (onInitialBatchSelect?: (batchNo: string) => vo
     };
   }, [searchParams, hydratedBatches, navigate, updateBatchStatus, setFieldValue, resetHookForm]);
 
-
-  const handleBatchSelect = useCallback((batchId: string, preserveResults: boolean = false) => {
-    setFieldValue('batchId', batchId);
-    if (!preserveResults) {
-      setFieldValue('testResultsMap', {});
-      setFieldValue('extraCriteria', []);
-    }
-
-    if (batchId) {
-      const batch = batches.find(b => b.id === batchId);
-      if (batch && batch.status !== BATCH_STATUS.TESTING && batch.status !== BATCH_STATUS.RELEASED && batch.status !== BATCH_STATUS.REJECTED) {
-        updateBatchStatus(batchId, BATCH_STATUS.TESTING);
+  const handleBatchSelect = useCallback(
+    (batchId: string, preserveResults: boolean = false) => {
+      setFieldValue('batchId', batchId);
+      if (!preserveResults) {
+        setFieldValue('testResultsMap', {});
+        setFieldValue('extraCriteria', []);
       }
-    }
-  }, [setFieldValue, batches, updateBatchStatus]);
+
+      if (batchId) {
+        const batch = batches.find((b) => b.id === batchId);
+        if (
+          batch &&
+          batch.status !== BATCH_STATUS.TESTING &&
+          batch.status !== BATCH_STATUS.RELEASED &&
+          batch.status !== BATCH_STATUS.REJECTED
+        ) {
+          updateBatchStatus(batchId, BATCH_STATUS.TESTING);
+        }
+      }
+    },
+    [setFieldValue, batches, updateBatchStatus]
+  );
 
   const currentBatch = useMemo(() => {
-    return hydratedBatches.find(b => b.id === formValues.batchId);
+    return hydratedBatches.find((b) => b.id === formValues.batchId);
   }, [hydratedBatches, formValues.batchId]);
 
-  const criteriaAliases = useAppStore(state => state.criteriaAliases);
+  const criteriaAliases = useAppStore((state) => state.criteriaAliases);
 
   // Hàm chuyên dụng để nạp dữ liệu vào form khi mở Edit (Gọi trong useEffect của Page)
-  const populateFormForEdit = useCallback((res: HydratedTestResult) => {
-    const map: Record<string, string | number> = {};
-    const extras: typeof initialTestResultFormState.extraCriteria = [];
-    
-    // 1. Tìm TCCS áp dụng cho lô hàng này
-    const batch = hydratedBatches.find(b => b.id === res.batchId) || batches.find(b => b.id === res.batchId);
-    let targetTCCS = tccsList.find(t => t.id === batch?.tccsId);
-    if (!targetTCCS && batch) {
-      const productTccs = tccsList.filter(t => t.productId === batch.productId)
-        .sort((a, b) => new Date(b.issueDate).getTime() - new Date(a.issueDate).getTime());
-      if (batch.mfgDate && productTccs.length > 0) {
-        const mfgTime = new Date(batch.mfgDate).getTime();
-        const match = productTccs.find(t => new Date(t.issueDate).getTime() <= mfgTime);
-        targetTCCS = match || productTccs[productTccs.length - 1];
-      } else if (productTccs.length > 0) {
-        targetTCCS = productTccs[0];
-      }
-    }
+  const populateFormForEdit = useCallback(
+    (res: HydratedTestResult) => {
+      const map: Record<string, string | number> = {};
+      const extras: typeof initialTestResultFormState.extraCriteria = [];
 
-    const allCriteria = targetTCCS
-      ? [...ensureArray(targetTCCS.mainQualityCriteria), ...ensureArray(targetTCCS.safetyCriteria)].filter(c => c && c.name)
-      : [];
-
-    const aliasLookupMap = targetTCCS ? buildAliasLookupMap(criteriaAliases, targetTCCS.id) : new Map<string, string>();
-
-    // 2. Phân loại và gán kết quả vào form, tự động resolve alias
-    ensureArray(res.results).forEach(r => {
-      if (!r || !r.criteriaName) return;
-
-      if (targetTCCS) {
-        const canonical = resolveCriteriaName(r.criteriaName, targetTCCS, aliasLookupMap);
-        const matchedCriterion = allCriteria.find(c => normalizeName(c.name) === normalizeName(canonical) || normalizeName(c.name) === normalizeName(r.criteriaName));
-
-        if (matchedCriterion) {
-          map[matchedCriterion.name] = r.value;
-          return;
+      // 1. Tìm TCCS áp dụng cho lô hàng này
+      const batch =
+        hydratedBatches.find((b) => b.id === res.batchId) ||
+        batches.find((b) => b.id === res.batchId);
+      let targetTCCS = tccsList.find((t) => t.id === batch?.tccsId);
+      if (!targetTCCS && batch) {
+        const productTccs = tccsList
+          .filter((t) => t.productId === batch.productId)
+          .sort((a, b) => new Date(b.issueDate).getTime() - new Date(a.issueDate).getTime());
+        if (batch.mfgDate && productTccs.length > 0) {
+          const mfgTime = new Date(batch.mfgDate).getTime();
+          const match = productTccs.find((t) => new Date(t.issueDate).getTime() <= mfgTime);
+          targetTCCS = match || productTccs[productTccs.length - 1];
+        } else if (productTccs.length > 0) {
+          targetTCCS = productTccs[0];
         }
       }
 
-      // Nếu không khớp với chỉ tiêu nào trong TCCS (kể cả qua alias), giữ ở mục Extra
-      if (r.isExtra || !targetTCCS) {
-        extras.push({
-          id: generateId('extra'),
-          name: r.criteriaName,
-          value: r.value as string,
-          unit: r.unit || '',
-          limit: (r as any).limit || ''
-        });
-      } else {
-        map[r.criteriaName] = r.value;
+      const allCriteria = targetTCCS
+        ? [
+            ...ensureArray(targetTCCS.mainQualityCriteria),
+            ...ensureArray(targetTCCS.safetyCriteria),
+          ].filter((c) => c && c.name)
+        : [];
+
+      const aliasLookupMap = targetTCCS
+        ? buildAliasLookupMap(criteriaAliases, targetTCCS.id)
+        : new Map<string, string>();
+
+      // 2. Phân loại và gán kết quả vào form, tự động resolve alias
+      ensureArray(res.results).forEach((r) => {
+        if (!r || !r.criteriaName) return;
+
+        if (targetTCCS) {
+          const canonical = resolveCriteriaName(r.criteriaName, targetTCCS, aliasLookupMap);
+          const matchedCriterion = allCriteria.find(
+            (c) =>
+              normalizeName(c.name) === normalizeName(canonical) ||
+              normalizeName(c.name) === normalizeName(r.criteriaName)
+          );
+
+          if (matchedCriterion) {
+            map[matchedCriterion.name] = r.value;
+            return;
+          }
+        }
+
+        // Nếu không khớp với chỉ tiêu nào trong TCCS (kể cả qua alias), giữ ở mục Extra
+        if (r.isExtra || !targetTCCS) {
+          extras.push({
+            id: generateId('extra'),
+            name: r.criteriaName,
+            value: r.value as string,
+            unit: r.unit || '',
+            limit: (r as any).limit || '',
+          });
+        } else {
+          map[r.criteriaName] = r.value;
+        }
+      });
+
+      setFormValues({
+        batchId: res.batchId,
+        labName: res.labName,
+        testDate: parseDateToISO(res.testDate),
+        notes: res.notes || '',
+        testResultsMap: map,
+        extraCriteria: extras,
+        attachments: res.attachments || [],
+      });
+
+      const hydratedBatch =
+        hydratedBatches.find((b) => b.id === res.batchId) ||
+        batches.find((b) => b.id === res.batchId);
+      const productName = (hydratedBatch as any)?.product?.name || '';
+      if (hydratedBatch) {
+        setBatchSearch(
+          productName ? `${hydratedBatch.batchNo} - ${productName}` : hydratedBatch.batchNo
+        );
       }
+
+      // Clear AI Origin Map khi mở form để edit
+      aiOriginMapRef.current = {};
+    },
+    [hydratedBatches, batches, tccsList, criteriaAliases, setFormValues]
+  );
+
+  const switchToEditMode = useCallback(
+    (res: TestResult) => {
+      navigate(`/test-results/edit/${res.id}`);
+    },
+    [navigate]
+  );
+
+  const { handleSaveResult, isSubmitting, saveError, clearSaveError, retrySave } =
+    useTestResultSave({
+      formValues,
+      activeTCCS,
+      completionStatus,
+      crud,
+      clearDraft,
+      closeFormModal,
+      navigate,
+      existingResultsForBatch,
+      currentBatch,
+      tccsMaps,
+      existingResultsMap,
+      aiOriginMapRef,
     });
-    
-    setFormValues({
-      batchId: res.batchId,
-      labName: res.labName,
-      testDate: parseDateToISO(res.testDate),
-      notes: res.notes || '',
-      testResultsMap: map,
-      extraCriteria: extras,
-      attachments: res.attachments || [],
-    });
-    
-    const hydratedBatch = hydratedBatches.find(b => b.id === res.batchId) || batches.find(b => b.id === res.batchId);
-    const productName = (hydratedBatch as any)?.product?.name || '';
-    if (hydratedBatch) {
-      setBatchSearch(productName ? `${hydratedBatch.batchNo} - ${productName}` : hydratedBatch.batchNo);
-    }
-    
-    // Clear AI Origin Map khi mở form để edit
-    aiOriginMapRef.current = {};
-  }, [hydratedBatches, batches, tccsList, criteriaAliases, setFormValues]);
-
-  const switchToEditMode = useCallback((res: TestResult) => {
-    navigate(`/test-results/edit/${res.id}`);
-  }, [navigate]);
-
-
-  const { handleSaveResult, isSubmitting } = useTestResultSave({
-    formValues,
-    activeTCCS,
-    completionStatus,
-    crud,
-    clearDraft,
-    closeFormModal,
-    navigate,
-    existingResultsForBatch,
-    currentBatch,
-    tccsMaps,
-    existingResultsMap,
-    aiOriginMapRef
-  });
 
   return {
     crud,
@@ -411,12 +508,14 @@ export const useTestResultForm = (onInitialBatchSelect?: (batchNo: string) => vo
     pendingStatusUpdate,
     rejectReason,
     setRejectReason,
-    
+
     handleBatchSelect,
     handleUpdateBatchStatus, // Export hàm này để dùng ở UI
     populateFormForEdit,
     handleSaveResult,
-    closeFormModal: () => { closeFormModal(); }, // Wrap to match interface if needed
+    closeFormModal: () => {
+      closeFormModal();
+    }, // Wrap to match interface if needed
     switchToEditMode,
     handlePrintConsolidatedCoa,
     fetchTestResultsByBatchId, // Export hàm này để gọi chủ đích ở các component khác
@@ -426,5 +525,14 @@ export const useTestResultForm = (onInitialBatchSelect?: (batchNo: string) => vo
     applyAIFormPatch,
     checkDraft,
     clearDraft,
+    hasDraft,
+    draftTimestamp,
+    restoreDraft,
+    discardDraft,
+    isSavingDraft,
+    lastDraftSavedAt,
+    saveError,
+    clearSaveError,
+    retrySave,
   };
 };

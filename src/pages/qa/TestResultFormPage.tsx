@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { ArrowPathIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
+import { useIsMutating } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { useTestResultForm } from '../../hooks/test-results/useTestResultForm';
 import { useAppStore } from '../../store/useAppStore';
@@ -8,6 +9,13 @@ import { useDataGraph } from '../../hooks/useDataGraph';
 import { fetchTestResultById } from '../../services/testResultService';
 import { normalizeSearch, BATCH_STATUS } from '../../utils';
 import { consumeAIDraft, peekAIDraft } from '../../services/ai/aiDraftManager';
+import {
+  OperationalLoadingState,
+  OperationalDraftBanner,
+  OperationalOfflineBanner,
+  OperationalErrorBanner,
+  AutoSaveStatusBadge,
+} from '../../components/operational';
 
 // Specialized Form Subcomponents & Hooks
 import { TestResultHeader } from './test-result-form/components/TestResultHeader';
@@ -60,7 +68,37 @@ const TestResultFormPage: React.FC = () => {
     handleBatchSelect,
     handleSaveResult,
     switchToEditMode,
+    hasDraft,
+    draftTimestamp,
+    restoreDraft,
+    discardDraft,
+    isSavingDraft,
+    lastDraftSavedAt,
+    saveError,
+    clearSaveError,
+    retrySave,
   } = logic;
+
+  // Reload trigger for loading retry
+  const [reloadTrigger, setReloadTrigger] = useState(0);
+
+  // Track network connectivity & background mutations
+  const isMutating = useIsMutating();
+  const [isOnline, setIsOnline] = useState(
+    typeof navigator !== 'undefined' ? navigator.onLine : true
+  );
+
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
 
   // Track AI-filled field badges
   const [aiFilledFields, setAiFilledFields] = useState<Set<string>>(new Set());
@@ -161,7 +199,7 @@ const TestResultFormPage: React.FC = () => {
     return () => {
       isMounted = false;
     };
-  }, [id]);
+  }, [id, reloadTrigger]);
 
   // Sync batch name into search input when batch data loads
   useEffect(() => {
@@ -243,12 +281,13 @@ const TestResultFormPage: React.FC = () => {
 
   if (id && isLoadingEditItem) {
     return (
-      <div className="min-h-[70vh] flex items-center justify-center p-4">
-        <div className="bg-surface p-8 rounded-xl shadow-xs border border-border flex items-center gap-3 text-ink font-medium text-sm">
-          <ArrowPathIcon className="animate-spin text-emerald-600 dark:text-emerald-400 h-5 w-5" />{' '}
-          Đang tải dữ liệu phiếu kiểm nghiệm...
-        </div>
-      </div>
+      <OperationalLoadingState
+        message="Đang tải dữ liệu phiếu kiểm nghiệm..."
+        subMessage="Hệ thống đang kết nối và nạp thông tin chỉ tiêu..."
+        fullPage
+        timeoutSeconds={10}
+        onRetry={() => setReloadTrigger((prev) => prev + 1)}
+      />
     );
   }
 
@@ -306,6 +345,26 @@ const TestResultFormPage: React.FC = () => {
         <Surface variant="subtle" padding="sm" className="bg-surface-2/60 backdrop-blur-xs">
           <WorkflowSteps steps={workflowSteps} activeStep={currentWorkflowStep} />
         </Surface>
+
+        {/* 1. Offline Mode Indicator Banner */}
+        <OperationalOfflineBanner isOffline={!isOnline} queuedCount={isMutating} />
+
+        {/* 2. Error Recovery Banner with 1-Click Retry */}
+        {saveError && (
+          <OperationalErrorBanner
+            error={saveError}
+            onDismiss={clearSaveError}
+            onRetry={retrySave}
+          />
+        )}
+
+        {/* 3. Non-blocking Draft Recovery Banner */}
+        <OperationalDraftBanner
+          hasDraft={hasDraft && !aiDraftAppliedRef.current && crud.mode === 'ADD'}
+          draftTimestamp={draftTimestamp}
+          onRestore={restoreDraft}
+          onDiscard={discardDraft}
+        />
 
         {isApplyingAIDraft && (
           <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-3 py-2 text-xs text-emerald-700 dark:text-emerald-400">
@@ -402,13 +461,20 @@ const TestResultFormPage: React.FC = () => {
           {/* Sticky Bottom Workbench Action Bar */}
           <ActionBar
             left={
-              <button
-                type="button"
-                onClick={() => navigate('/test-results')}
-                className="px-4 py-2 text-ink-muted hover:text-ink font-medium text-xs hover:bg-surface-2 rounded-lg transition-colors cursor-pointer"
-              >
-                ← Hủy &amp; Quay lại danh sách
-              </button>
+              <div className="flex items-center gap-4">
+                <button
+                  type="button"
+                  onClick={() => navigate('/test-results')}
+                  className="px-4 py-2 text-ink-muted hover:text-ink font-medium text-xs hover:bg-surface-2 rounded-lg transition-colors cursor-pointer"
+                >
+                  ← Hủy &amp; Quay lại danh sách
+                </button>
+                <AutoSaveStatusBadge
+                  isSaving={isSavingDraft}
+                  lastSavedAt={lastDraftSavedAt}
+                  isOffline={!isOnline}
+                />
+              </div>
             }
             right={
               <div className="flex items-center gap-3">
@@ -422,7 +488,13 @@ const TestResultFormPage: React.FC = () => {
                   } disabled:opacity-40 disabled:cursor-not-allowed`}
                 >
                   {isSubmitting && <ArrowPathIcon className="w-4 h-4 animate-spin" />}
-                  {crud.mode === 'EDIT' ? 'Cập nhật Phiếu kiểm nghiệm' : 'Lưu & Hoàn tất Phiếu'}
+                  {crud.mode === 'EDIT'
+                    ? isSubmitting
+                      ? 'Đang cập nhật...'
+                      : 'Cập nhật Phiếu kiểm nghiệm'
+                    : isSubmitting
+                      ? 'Đang lưu...'
+                      : 'Lưu & Hoàn tất Phiếu'}
                 </button>
               </div>
             }

@@ -60,10 +60,7 @@ describe('useFormDraft Consent & Hardening', () => {
 
   it('does not restore when shouldRestoreDraft returns false', () => {
     acceptConsent();
-    localStorage.setItem(
-      'test-key',
-      JSON.stringify({ labName: 'OLD DRAFT' })
-    );
+    localStorage.setItem('test-key', JSON.stringify({ labName: 'OLD DRAFT' }));
 
     const setFormValues = vi.fn();
     const confirmSpy = vi.spyOn(window, 'confirm');
@@ -87,15 +84,12 @@ describe('useFormDraft Consent & Hardening', () => {
     expect(confirmSpy).not.toHaveBeenCalled();
   });
 
-  it('restores draft when shouldRestoreDraft returns true and user confirms', () => {
+  it('detects draft and restores via restoreDraft without window.confirm', () => {
     acceptConsent();
-    localStorage.setItem(
-      'test-key',
-      JSON.stringify({ labName: 'RESTORE ME' })
-    );
+    localStorage.setItem('test-key', JSON.stringify({ labName: 'RESTORE ME' }));
 
     const setFormValues = vi.fn();
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const confirmSpy = vi.spyOn(window, 'confirm');
 
     const { result } = renderHook(() =>
       useFormDraft({
@@ -106,13 +100,41 @@ describe('useFormDraft Consent & Hardening', () => {
       })
     );
 
+    expect(result.current.hasDraft).toBe(true);
+    expect(result.current.draftData).toEqual({ labName: 'RESTORE ME' });
+
     let restored = false;
     act(() => {
-      restored = result.current.checkDraft();
+      restored = result.current.restoreDraft();
     });
 
     expect(restored).toBe(true);
     expect(setFormValues).toHaveBeenCalledWith({ labName: 'RESTORE ME' });
+    expect(confirmSpy).not.toHaveBeenCalled();
+    expect(result.current.hasDraft).toBe(false);
+  });
+
+  it('allows auto-restoring draft directly when checkDraft(true) is invoked', () => {
+    acceptConsent();
+    localStorage.setItem('test-key-auto', JSON.stringify({ labName: 'AUTO RESTORE' }));
+
+    const setFormValues = vi.fn();
+    const { result } = renderHook(() =>
+      useFormDraft({
+        key: 'test-key-auto',
+        formValues: { labName: '' },
+        setFormValues,
+        autoDetect: false,
+      })
+    );
+
+    let restored = false;
+    act(() => {
+      restored = result.current.checkDraft(true);
+    });
+
+    expect(restored).toBe(true);
+    expect(setFormValues).toHaveBeenCalledWith({ labName: 'AUTO RESTORE' });
   });
 
   it('rejects and cleans up array JSON as form draft', () => {

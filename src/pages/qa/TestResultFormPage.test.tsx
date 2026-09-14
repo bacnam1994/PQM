@@ -1,6 +1,6 @@
 import React from 'react';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, act } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import TestResultFormPage from './TestResultFormPage';
 import { writeAIDraft, peekAIDraft, clearAIDraft } from '../../services/ai/aiDraftManager';
@@ -280,5 +280,50 @@ describe('TestResultFormPage AI Draft & Hardening Integration', () => {
       expect(labInput).not.toBeNull();
       expect(labInput.value).toBe('NEW AI LAB');
     });
+  });
+
+  it('displays OperationalDraftBanner when localStorage draft exists and restores draft on click', async () => {
+    localStorage.setItem(
+      'TEST_RESULT_DRAFT',
+      JSON.stringify({
+        batchId: 'batch_1',
+        labName: 'LAB DRAFT SAVED',
+        testDate: '2026-03-01',
+        testResultsMap: {},
+        extraCriteria: [],
+        attachments: [],
+      })
+    );
+    localStorage.setItem(
+      'TEST_RESULT_DRAFT_meta',
+      JSON.stringify({ savedAt: '2026-03-01T10:00:00Z' })
+    );
+
+    renderWithProviders('/test-results/new');
+
+    expect(await screen.findByText('Phát hiện bản nháp tự động lưu')).toBeDefined();
+    expect(screen.getByText('Khôi phục bản nháp')).toBeDefined();
+
+    // Click Khôi phục bản nháp
+    const restoreBtn = screen.getByText('Khôi phục bản nháp');
+    await act(async () => {
+      restoreBtn.click();
+    });
+
+    await waitFor(() => {
+      const labInput = document.querySelector('input[name="labName"]') as HTMLInputElement;
+      expect(labInput?.value).toBe('LAB DRAFT SAVED');
+    });
+  });
+
+  it('renders OperationalOfflineBanner when device is offline', async () => {
+    const originalOnLine = navigator.onLine;
+    Object.defineProperty(navigator, 'onLine', { value: false, configurable: true });
+
+    renderWithProviders('/test-results/new');
+
+    expect(await screen.findByText(/Đang làm việc ở chế độ Ngoại tuyến/i)).toBeDefined();
+
+    Object.defineProperty(navigator, 'onLine', { value: originalOnLine, configurable: true });
   });
 });
