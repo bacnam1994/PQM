@@ -7,6 +7,8 @@ import {
   onChildRemoved,
   get,
   goOnline,
+  query,
+  limitToLast,
 } from 'firebase/database';
 import { db } from '../firebase';
 import { useAppStore } from '../store/useAppStore';
@@ -26,6 +28,7 @@ interface CollectionConfig {
   queryKey: readonly any[];
   sortFn?: (a: any, b: any) => number;
   getScopedInvalidations?: (item: any, id: string) => void;
+  getInitialQuery?: (reference: any) => any;
 }
 
 const COLLECTION_CONFIGS: Record<string, CollectionConfig> = {
@@ -92,6 +95,7 @@ const COLLECTION_CONFIGS: Record<string, CollectionConfig> = {
     storeName: 'testResults',
     firebasePath: 'testResults',
     queryKey: TEST_RESULT_QUERY_KEYS.all,
+    getInitialQuery: (reference) => query(reference, limitToLast(100)),
     sortFn: (a, b) =>
       new Date(b.testDate || b.createdAt || 0).getTime() -
       new Date(a.testDate || a.createdAt || 0).getTime(),
@@ -188,29 +192,10 @@ export const useFirebaseSync = () => {
         if (cachedAiMappings?.length > 0)
           queryClient.setQueryData(TCCS_QUERY_KEYS.aiMappings, cachedAiMappings);
 
-        const currentState = useAppStore.getState();
+        // Đánh dấu trạng thái đã đồng bộ dữ liệu ngoại tuyến
+        useAppStore.getState().setSyncStatus('SAVED');
         useAppStore.getState().setAppState({
-          products: cachedProducts?.length > 0 ? cachedProducts : currentState.products,
-          batches: cachedBatches?.length > 0 ? cachedBatches : currentState.batches,
-          tccsList: cachedTccs?.length > 0 ? cachedTccs : currentState.tccsList,
-          productFormulas:
-            cachedFormulas?.length > 0 ? cachedFormulas : currentState.productFormulas,
-          rawMaterials: cachedMaterials?.length > 0 ? cachedMaterials : currentState.rawMaterials,
-          testResults:
-            cachedTestResults?.length > 0
-              ? cachedTestResults.sort(
-                  (a: any, b: any) =>
-                    new Date(b.testDate).getTime() - new Date(a.testDate).getTime()
-                )
-              : currentState.testResults,
-          aiLearnedMappings:
-            cachedAiMappings?.length > 0 ? cachedAiMappings : currentState.aiLearnedMappings,
-          qualityAlerts:
-            cachedQualityAlerts?.length > 0 ? cachedQualityAlerts : currentState.qualityAlerts,
-          criteriaAliases:
-            cachedCriteriaAliases?.length > 0
-              ? cachedCriteriaAliases
-              : currentState.criteriaAliases,
+          lastSync: new Date().toISOString(),
         });
       } catch (error) {
         console.error('[SyncEngine] Lỗi nạp cache IndexedDB:', error);
@@ -224,9 +209,12 @@ export const useFirebaseSync = () => {
       for (const config of Object.values(COLLECTION_CONFIGS)) {
         const reference = ref(db, config.firebasePath);
 
-        // 2.1. Nạp snapshot ban đầu 1 lần (Initial Snapshot Fetch)
+        // 2.1. Nạp snapshot ban đầu 1 lần (Initial Snapshot Fetch có giới hạn nếu có getInitialQuery)
         try {
-          const snapshot = await get(reference);
+          const queryTarget = config.getInitialQuery
+            ? config.getInitialQuery(reference)
+            : reference;
+          const snapshot = await get(queryTarget);
           if (snapshot.exists() && isMounted) {
             const data = snapshot.val();
             let list = data ? Object.values(data) : [];
@@ -234,10 +222,9 @@ export const useFirebaseSync = () => {
               list = list.sort(config.sortFn);
             }
 
-            // Đồng bộ toàn bộ danh sách ban đầu vào Query Cache & Store
+            // Đồng bộ toàn bộ danh sách ban đầu vào TanStack Query Cache (Single Source of Truth)
             queryClient.setQueryData(config.queryKey, list);
             useAppStore.getState().setAppState({
-              [config.key]: list,
               lastSync: new Date().toISOString(),
             });
 

@@ -56,10 +56,22 @@ export abstract class BaseFirebaseRepository<T extends { id: string }> implement
     const direction = options?.orderDirection || 'desc';
 
     // Trường hợp 1: Có bộ lọc phức tạp nhiều trường đồng thời (RTDB không hỗ trợ compound query)
-    // Cần nạp và lọc trong bộ nhớ kết hợp bảo toàn logic
+    // Tối ưu hóa: Tìm bộ lọc có độ chọn lọc cao nhất (selective filter với operator '==') để kéo candidate subset từ server
     if (filters && filters.length > 1) {
-      const allItems = await this.findAll();
-      return paginateDataset(allItems, options, filters);
+      const eqFilter = filters.find((f) => f.operator === '==');
+      let candidateItems: T[] = [];
+      if (eqFilter) {
+        candidateItems = await this.findByRelation(eqFilter.field, eqFilter.value);
+      } else {
+        try {
+          const boundedQuery = query(ref(db, this.collectionPath), limitToLast(500));
+          const snap = await get(boundedQuery);
+          candidateItems = snap.exists() ? (Object.values(snap.val()) as T[]) : [];
+        } catch {
+          candidateItems = await this.findAll();
+        }
+      }
+      return paginateDataset(candidateItems, options, filters);
     }
 
     // Trường hợp 2: Lọc đơn giản 1 trường (hoặc không filter) -> Truy vấn Server-side
@@ -143,12 +155,27 @@ export abstract class BaseFirebaseRepository<T extends { id: string }> implement
   }
 
   async count(filters?: QueryFilter<T>[]): Promise<number> {
-    if (filters && filters.length === 1 && filters[0].operator === '==') {
+    if (!filters || filters.length === 0) {
+      const allItems = await this.findAll();
+      return allItems.length;
+    }
+    if (filters.length === 1 && filters[0].operator === '==') {
       const items = await this.findByRelation(filters[0].field, filters[0].value);
       return items.length;
     }
-    const allItems = await this.findAll();
-    const filtered = applyFilters(allItems, filters);
+    const eqFilter = filters.find((f) => f.operator === '==');
+    let candidateItems: T[] = [];
+    if (eqFilter) {
+      candidateItems = await this.findByRelation(eqFilter.field, eqFilter.value);
+    } else {
+      try {
+        const snap = await get(query(ref(db, this.collectionPath), limitToLast(500)));
+        candidateItems = snap.exists() ? (Object.values(snap.val()) as T[]) : [];
+      } catch {
+        candidateItems = await this.findAll();
+      }
+    }
+    const filtered = applyFilters(candidateItems, filters);
     return filtered.length;
   }
 

@@ -211,7 +211,7 @@ export function detectNelsonRules(
   // ==========================================
   // Rule 2: 9 điểm liên tiếp cùng 1 phía đường trung bình (Mean Shift)
   // ==========================================
-  const r2Indices: number[] = [];
+  const r2Set = new Set<number>();
   let aboveCount = 0;
   let belowCount = 0;
 
@@ -229,24 +229,24 @@ export function detectNelsonRules(
 
     if (aboveCount >= 9 || belowCount >= 9) {
       for (let j = i - 8; j <= i; j++) {
-        if (!r2Indices.includes(j)) r2Indices.push(j);
+        r2Set.add(j);
       }
     }
   }
-  if (r2Indices.length > 0) {
+  if (r2Set.size > 0) {
     violations.push({
       ruleNumber: 2,
       ruleName: 'Dịch chuyển tâm quy trình (Mean Shift)',
       description: '9 điểm liên tiếp cùng nằm về một phía so với đường trung bình.',
       severity: 'CRITICAL',
-      violationIndices: r2Indices,
+      violationIndices: Array.from(r2Set),
     });
   }
 
   // ==========================================
   // Rule 3: 6 điểm liên tiếp tăng hoặc giảm đều (Trend)
   // ==========================================
-  const r3Indices: number[] = [];
+  const r3Set = new Set<number>();
   let incCount = 1;
   let decCount = 1;
 
@@ -264,24 +264,24 @@ export function detectNelsonRules(
 
     if (incCount >= 6 || decCount >= 6) {
       for (let j = i - 5; j <= i; j++) {
-        if (!r3Indices.includes(j)) r3Indices.push(j);
+        r3Set.add(j);
       }
     }
   }
-  if (r3Indices.length > 0) {
+  if (r3Set.size > 0) {
     violations.push({
       ruleNumber: 3,
       ruleName: 'Xu hướng trôi liên tục (Continuous Drift / Trend)',
       description: '6 điểm liên tiếp tăng dần đều hoặc giảm dần đều.',
       severity: 'WARNING',
-      violationIndices: r3Indices,
+      violationIndices: Array.from(r3Set),
     });
   }
 
   // ==========================================
   // Rule 4: 14 điểm liên tiếp đan xen lên xuống (Oscillation)
   // ==========================================
-  const r4Indices: number[] = [];
+  const r4Set = new Set<number>();
   let oscCount = 1;
 
   for (let i = 2; i < n; i++) {
@@ -297,74 +297,80 @@ export function detectNelsonRules(
     if (oscCount >= 13) {
       // 13 lần đảo chiều = 14 điểm liên tiếp
       for (let j = i - 13; j <= i; j++) {
-        if (!r4Indices.includes(j)) r4Indices.push(j);
+        r4Set.add(j);
       }
     }
   }
-  if (r4Indices.length > 0) {
+  if (r4Set.size > 0) {
     violations.push({
       ruleNumber: 4,
       ruleName: 'Dao động nhân tạo có chu kỳ (Systematic Oscillation)',
       description: '14 điểm liên tiếp đan xen lên xuống liên tục (nghi ngờ can thiệp thủ công).',
       severity: 'WARNING',
-      violationIndices: r4Indices,
+      violationIndices: Array.from(r4Set),
     });
   }
 
   // ==========================================
   // Rule 5: 2 trong 3 điểm liên tiếp ngoài 2 sigma cùng 1 phía
   // ==========================================
-  const r5Indices: number[] = [];
+  const r5Set = new Set<number>();
   for (let i = 2; i < n; i++) {
-    const window = [values[i - 2], values[i - 1], values[i]];
-    const above2Sig = window.filter((v) => v > mean + 2 * sigma).length;
-    const below2Sig = window.filter((v) => v < mean - 2 * sigma).length;
+    let above2Sig = 0;
+    let below2Sig = 0;
+    for (let k = i - 2; k <= i; k++) {
+      if (values[k] > mean + 2 * sigma) above2Sig++;
+      else if (values[k] < mean - 2 * sigma) below2Sig++;
+    }
 
     if (above2Sig >= 2 || below2Sig >= 2) {
       for (let j = i - 2; j <= i; j++) {
-        if (!r5Indices.includes(j)) r5Indices.push(j);
+        r5Set.add(j);
       }
     }
   }
-  if (r5Indices.length > 0) {
+  if (r5Set.size > 0) {
     violations.push({
       ruleNumber: 5,
       ruleName: 'Cảnh báo Vùng A (Zone A Warning)',
       description: '2 trong 3 điểm liên tiếp nằm ngoài vùng 2-Sigma cùng một phía.',
       severity: 'WARNING',
-      violationIndices: r5Indices,
+      violationIndices: Array.from(r5Set),
     });
   }
 
   // ==========================================
   // Rule 6: 4 trong 5 điểm liên tiếp ngoài 1 sigma cùng 1 phía
   // ==========================================
-  const r6Indices: number[] = [];
+  const r6Set = new Set<number>();
   for (let i = 4; i < n; i++) {
-    const window = values.slice(i - 4, i + 1);
-    const above1Sig = window.filter((v) => v > mean + sigma).length;
-    const below1Sig = window.filter((v) => v < mean - sigma).length;
+    let above1Sig = 0;
+    let below1Sig = 0;
+    for (let k = i - 4; k <= i; k++) {
+      if (values[k] > mean + sigma) above1Sig++;
+      else if (values[k] < mean - sigma) below1Sig++;
+    }
 
     if (above1Sig >= 4 || below1Sig >= 4) {
       for (let j = i - 4; j <= i; j++) {
-        if (!r6Indices.includes(j)) r6Indices.push(j);
+        r6Set.add(j);
       }
     }
   }
-  if (r6Indices.length > 0) {
+  if (r6Set.size > 0) {
     violations.push({
       ruleNumber: 6,
       ruleName: 'Cảnh báo Vùng B (Zone B Warning)',
       description: '4 trong 5 điểm liên tiếp nằm ngoài vùng 1-Sigma cùng một phía.',
       severity: 'INFO',
-      violationIndices: r6Indices,
+      violationIndices: Array.from(r6Set),
     });
   }
 
   // ==========================================
   // Rule 7: 15 điểm liên tiếp nằm trong vùng 1 sigma (Stratification / Hugging)
   // ==========================================
-  const r7Indices: number[] = [];
+  const r7Set = new Set<number>();
   let hugCount = 0;
 
   for (let i = 0; i < n; i++) {
@@ -376,25 +382,25 @@ export function detectNelsonRules(
 
     if (hugCount >= 15) {
       for (let j = i - 14; j <= i; j++) {
-        if (!r7Indices.includes(j)) r7Indices.push(j);
+        r7Set.add(j);
       }
     }
   }
-  if (r7Indices.length > 0) {
+  if (r7Set.size > 0) {
     violations.push({
       ruleNumber: 7,
       ruleName: 'Thiếu biến thiên ngẫu nhiên (Stratification / Hugging Center)',
       description:
         '15 điểm liên tiếp nằm trọn trong vùng 1-Sigma (nghi ngờ dữ liệu làm tròn hoặc báo cáo giả lập).',
       severity: 'WARNING',
-      violationIndices: r7Indices,
+      violationIndices: Array.from(r7Set),
     });
   }
 
   // ==========================================
   // Rule 8: 8 điểm liên tiếp ngoài vùng 1 sigma ở cả 2 phía (Bimodal Mixture)
   // ==========================================
-  const r8Indices: number[] = [];
+  const r8Set = new Set<number>();
   let mixCount = 0;
 
   for (let i = 0; i < n; i++) {
@@ -406,18 +412,18 @@ export function detectNelsonRules(
 
     if (mixCount >= 8) {
       for (let j = i - 7; j <= i; j++) {
-        if (!r8Indices.includes(j)) r8Indices.push(j);
+        r8Set.add(j);
       }
     }
   }
-  if (r8Indices.length > 0) {
+  if (r8Set.size > 0) {
     violations.push({
       ruleNumber: 8,
       ruleName: 'Hỗn hợp hai phân bố (Bimodal Mixture / Out of Zone C)',
       description:
         '8 điểm liên tiếp nằm ngoài vùng 1-Sigma ở cả hai phía (hỗn hợp hai nguồn nguyên liệu/máy khác nhau).',
       severity: 'CRITICAL',
-      violationIndices: r8Indices,
+      violationIndices: Array.from(r8Set),
     });
   }
 

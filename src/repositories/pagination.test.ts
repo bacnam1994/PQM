@@ -4,7 +4,7 @@ import {
   applyFilters,
   applySorting,
   paginateDataset,
-  getFieldValue
+  getFieldValue,
 } from './utils/paginationHelper';
 import { BaseFirebaseRepository } from './firebase/BaseFirebaseRepository';
 import { QueryFilter, PaginationOptions } from './types';
@@ -17,6 +17,13 @@ vi.mock('firebase/database', () => ({
   remove: vi.fn(() => Promise.resolve()),
   update: vi.fn(() => Promise.resolve()),
   get: vi.fn(),
+  query: vi.fn((r) => r),
+  orderByChild: vi.fn(() => ({})),
+  equalTo: vi.fn(() => ({})),
+  limitToFirst: vi.fn(() => ({})),
+  limitToLast: vi.fn(() => ({})),
+  startAt: vi.fn(() => ({})),
+  endAt: vi.fn(() => ({})),
 }));
 
 interface TestEntity {
@@ -44,17 +51,52 @@ class MockEntityRepository extends BaseFirebaseRepository<TestEntity> {
   }
 
   async delete(id: string): Promise<void> {
-    this.inMemoryData = this.inMemoryData.filter(item => item.id !== id);
+    this.inMemoryData = this.inMemoryData.filter((item) => item.id !== id);
   }
 }
 
 describe('Repository Layer - Pagination & Filtering Engine', () => {
   const sampleData: TestEntity[] = [
-    { id: 'e1', name: 'Alpha Paracetamol', category: 'Thuốc hạ sốt', quantity: 150, status: 'ACTIVE', createdAt: '2026-01-10T08:00:00Z' },
-    { id: 'e2', name: 'Beta Amoxicillin', category: 'Kháng sinh', quantity: 80, status: 'INACTIVE', createdAt: '2026-01-15T09:00:00Z' },
-    { id: 'e3', name: 'Gamma Ginkgo', category: 'Thực phẩm chức năng', quantity: 200, status: 'ACTIVE', createdAt: '2026-02-01T10:00:00Z' },
-    { id: 'e4', name: 'Delta Cefalexin', category: 'Kháng sinh', quantity: 45, status: 'ACTIVE', createdAt: '2026-02-10T11:00:00Z' },
-    { id: 'e5', name: 'Epsilon Vitamin C', category: 'Thực phẩm chức năng', quantity: 300, status: 'ACTIVE', createdAt: '2026-02-20T12:00:00Z' }
+    {
+      id: 'e1',
+      name: 'Alpha Paracetamol',
+      category: 'Thuốc hạ sốt',
+      quantity: 150,
+      status: 'ACTIVE',
+      createdAt: '2026-01-10T08:00:00Z',
+    },
+    {
+      id: 'e2',
+      name: 'Beta Amoxicillin',
+      category: 'Kháng sinh',
+      quantity: 80,
+      status: 'INACTIVE',
+      createdAt: '2026-01-15T09:00:00Z',
+    },
+    {
+      id: 'e3',
+      name: 'Gamma Ginkgo',
+      category: 'Thực phẩm chức năng',
+      quantity: 200,
+      status: 'ACTIVE',
+      createdAt: '2026-02-01T10:00:00Z',
+    },
+    {
+      id: 'e4',
+      name: 'Delta Cefalexin',
+      category: 'Kháng sinh',
+      quantity: 45,
+      status: 'ACTIVE',
+      createdAt: '2026-02-10T11:00:00Z',
+    },
+    {
+      id: 'e5',
+      name: 'Epsilon Vitamin C',
+      category: 'Thực phẩm chức năng',
+      quantity: 300,
+      status: 'ACTIVE',
+      createdAt: '2026-02-20T12:00:00Z',
+    },
   ];
 
   describe('1. Filter Operators', () => {
@@ -62,11 +104,15 @@ describe('Repository Layer - Pagination & Filtering Engine', () => {
       const filter: QueryFilter<TestEntity> = { field: 'status', operator: '==', value: 'active' };
       const result = applyFilters(sampleData, [filter]);
       expect(result.length).toBe(4);
-      expect(result.every(i => i.status === 'ACTIVE')).toBe(true);
+      expect(result.every((i) => i.status === 'ACTIVE')).toBe(true);
     });
 
     it('lọc với toán tử !=', () => {
-      const filter: QueryFilter<TestEntity> = { field: 'category', operator: '!=', value: 'Kháng sinh' };
+      const filter: QueryFilter<TestEntity> = {
+        field: 'category',
+        operator: '!=',
+        value: 'Kháng sinh',
+      };
       const result = applyFilters(sampleData, [filter]);
       expect(result.length).toBe(3);
     });
@@ -80,17 +126,25 @@ describe('Repository Layer - Pagination & Filtering Engine', () => {
     });
 
     it('lọc chuỗi con với toán tử contains', () => {
-      const filter: QueryFilter<TestEntity> = { field: 'name', operator: 'contains', value: 'cillin' };
+      const filter: QueryFilter<TestEntity> = {
+        field: 'name',
+        operator: 'contains',
+        value: 'cillin',
+      };
       const result = applyFilters(sampleData, [filter]);
       expect(result.length).toBe(1);
       expect(result[0].id).toBe('e2');
     });
 
     it('lọc danh sách giá trị với toán tử in', () => {
-      const filter: QueryFilter<TestEntity> = { field: 'id', operator: 'in', value: ['e1', 'e3', 'e99'] };
+      const filter: QueryFilter<TestEntity> = {
+        field: 'id',
+        operator: 'in',
+        value: ['e1', 'e3', 'e99'],
+      };
       const result = applyFilters(sampleData, [filter]);
       expect(result.length).toBe(2);
-      expect(result.map(r => r.id)).toEqual(['e1', 'e3']);
+      expect(result.map((r) => r.id)).toEqual(['e1', 'e3']);
     });
   });
 
@@ -114,7 +168,7 @@ describe('Repository Layer - Pagination & Filtering Engine', () => {
         page: 2,
         pageSize: 2,
         orderBy: 'quantity',
-        orderDirection: 'asc'
+        orderDirection: 'asc',
       };
 
       const result = paginateDataset(sampleData, options);
@@ -131,14 +185,23 @@ describe('Repository Layer - Pagination & Filtering Engine', () => {
 
     it('phân trang theo Cursor (Next/Prev tokens)', () => {
       // Trang 1: lấy 2 phần tử đầu
-      const page1 = paginateDataset(sampleData, { pageSize: 2, orderBy: 'id', orderDirection: 'asc' });
+      const page1 = paginateDataset(sampleData, {
+        pageSize: 2,
+        orderBy: 'id',
+        orderDirection: 'asc',
+      });
       expect(page1.items.length).toBe(2);
       expect(page1.items[0].id).toBe('e1');
       expect(page1.items[1].id).toBe('e2');
       expect(page1.nextCursor).toBe('e2');
 
       // Trang 2: dùng cursor của trang 1
-      const page2 = paginateDataset(sampleData, { pageSize: 2, cursor: page1.nextCursor, orderBy: 'id', orderDirection: 'asc' });
+      const page2 = paginateDataset(sampleData, {
+        pageSize: 2,
+        cursor: page1.nextCursor,
+        orderBy: 'id',
+        orderDirection: 'asc',
+      });
       expect(page2.items.length).toBe(2);
       expect(page2.items[0].id).toBe('e3');
       expect(page2.items[1].id).toBe('e4');
@@ -170,14 +233,16 @@ describe('Repository Layer - Pagination & Filtering Engine', () => {
       const totalActive = await repo.count([{ field: 'status', operator: '==', value: 'ACTIVE' }]);
       expect(totalActive).toBe(4);
 
-      const totalKhongSinh = await repo.count([{ field: 'category', operator: '==', value: 'Kháng sinh' }]);
+      const totalKhongSinh = await repo.count([
+        { field: 'category', operator: '==', value: 'Kháng sinh' },
+      ]);
       expect(totalKhongSinh).toBe(2);
     });
 
     it('findByRelation tìm chính xác các bản ghi theo khóa ngoại hoặc thuộc tính liên kết', async () => {
       const antibiotics = await repo.findByRelation('category', 'Kháng sinh');
       expect(antibiotics.length).toBe(2);
-      expect(antibiotics.map(a => a.id)).toEqual(['e2', 'e4']);
+      expect(antibiotics.map((a) => a.id)).toEqual(['e2', 'e4']);
     });
   });
 });

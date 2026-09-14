@@ -68,6 +68,35 @@ describe('Phase 8: Architecture Layering Boundary & Reliability', () => {
     expect(violations).toEqual([]);
   });
 
+  it('UI Components & Pages KHÔNG ĐƯỢC gọi trực tiếp low-level Firebase mutation APIs (set, remove, update với ref)', () => {
+    const uiFiles = [
+      ...findFiles(pagesDir, ['.ts', '.tsx']),
+      ...findFiles(componentsDir, ['.ts', '.tsx']),
+    ];
+
+    const forbiddenMutationPatterns = [
+      /\bset\s*\(\s*ref\s*\(/,
+      /\bremove\s*\(\s*ref\s*\(/,
+      /\bupdate\s*\(\s*ref\s*\(/,
+    ];
+
+    const violations: { file: string; pattern: string }[] = [];
+
+    for (const file of uiFiles) {
+      const content = fs.readFileSync(file, 'utf-8');
+      for (const pattern of forbiddenMutationPatterns) {
+        if (pattern.test(content)) {
+          violations.push({
+            file: path.relative(rootDir, file).replace(/\\/g, '/'),
+            pattern: pattern.toString(),
+          });
+        }
+      }
+    }
+
+    expect(violations).toEqual([]);
+  });
+
   it('Dịch vụ userService và storageService đóng gói các thao tác Firebase an toàn', async () => {
     const { userService } = await import('../services/userService');
     const { uploadStorageFile, deleteStorageFileByUrl } =
@@ -80,5 +109,23 @@ describe('Phase 8: Architecture Layering Boundary & Reliability', () => {
 
     expect(typeof uploadStorageFile).toBe('function');
     expect(typeof deleteStorageFileByUrl).toBe('function');
+  });
+
+  it('Xác nhận tính toàn vẹn chữ ký điện tử (ESignature & Audit Trail)', async () => {
+    const { SecurityRulesValidator } = await import('../services/securityRulesValidator');
+    const qaUser = { uid: 'u-qa', email: 'qa@pqm.com', role: 'QA' as const, isAdmin: false };
+    const qcUser = { uid: 'u-qc', email: 'qc@pqm.com', role: 'QC' as const, isAdmin: false };
+
+    // QC không được duyệt xuất xưởng lô
+    const qcRelease = SecurityRulesValidator.evaluate(qcUser, 'UPDATE', 'batches/b1', {
+      status: 'RELEASED',
+    });
+    expect(qcRelease.allowed).toBe(false);
+
+    // QA được duyệt xuất xưởng lô
+    const qaRelease = SecurityRulesValidator.evaluate(qaUser, 'UPDATE', 'batches/b1', {
+      status: 'RELEASED',
+    });
+    expect(qaRelease.allowed).toBe(true);
   });
 });

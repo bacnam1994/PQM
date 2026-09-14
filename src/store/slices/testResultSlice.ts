@@ -99,7 +99,7 @@ export const createTestResultSlice: StoreSlice<TestResultSlice> = (set, get) => 
       ) {
         return;
       }
-      const list = await testResultRepository.findAll();
+      const list = await testResultRepository.findRecent(200);
       queryClient.setQueryData(TEST_RESULT_QUERY_KEYS.all, list);
       set(
         {

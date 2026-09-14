@@ -69,7 +69,7 @@ const QUERY_KEY_TO_STORE_KEY: Record<string, string> = {
 };
 
 queryClient.getQueryCache().subscribe((event) => {
-  if (event?.type === 'updated' && event.action?.type === 'success') {
+  if (event?.type === 'updated') {
     const queryKey = event.query.queryKey;
     if (Array.isArray(queryKey) && queryKey.length === 1 && typeof queryKey[0] === 'string') {
       const storeKey = QUERY_KEY_TO_STORE_KEY[queryKey[0]];

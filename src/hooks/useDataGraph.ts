@@ -506,6 +506,42 @@ export const useDataGraph = () => {
     [formulasByProductId]
   );
 
+  const getProductById = useCallback(
+    (id: string): Product | undefined => productsById.get(id),
+    [productsById]
+  );
+  const getBatchById = useCallback(
+    (id: string): Batch | undefined => batchesById.get(id),
+    [batchesById]
+  );
+  const getTccsById = useCallback((id: string): TCCS | undefined => tccsById.get(id), [tccsById]);
+  const getTestResultById = useCallback(
+    (id: string): TestResult | undefined => testResultsById.get(id),
+    [testResultsById]
+  );
+
+  const getHydratedBatch = useCallback(
+    (batchId: string): HydratedBatch | undefined => {
+      const batch = batchesById.get(batchId);
+      if (!batch) return undefined;
+      const bTests = testResultsByBatchId.get(batch.id) || [];
+      const sortedTests = [...bTests].sort((a, b) => b.testDate.localeCompare(a.testDate));
+      const passTests = bTests.filter((t) => t.overallStatus === 'PASS');
+      return {
+        ...batch,
+        product: productsById.get(batch.productId),
+        tccs: batch.tccsSnapshot || tccsById.get(batch.tccsId),
+        formula: batch.formulaSnapshot || formulasByProductId.get(batch.productId),
+        testResults: sortedTests,
+        latestTestResult: sortedTests[0],
+        isFullyTested: bTests.length > 0 && bTests.some((t) => t.overallStatus === 'PASS'),
+        testResultsCount: bTests.length,
+        passRate: bTests.length > 0 ? Math.round((passTests.length / bTests.length) * 100) : 100,
+      };
+    },
+    [batchesById, productsById, tccsById, formulasByProductId, testResultsByBatchId]
+  );
+
   return {
     // Legacy Hydrated Arrays (100% Backward Compatibility)
     batches,
@@ -534,5 +570,10 @@ export const useDataGraph = () => {
     getTestResultsByBatchId,
     getActiveTccsByProductId,
     getFormulaByProductId,
+    getProductById,
+    getBatchById,
+    getTccsById,
+    getTestResultById,
+    getHydratedBatch,
   };
 };
