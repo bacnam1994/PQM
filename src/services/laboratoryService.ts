@@ -297,3 +297,90 @@ export const resolveCanonicalLab = (
   // Fallback: Giữ nguyên tên tự do nếu chưa nhận diện được
   return { labId: '', labName: trimmed };
 };
+
+export interface UnmappedLabDetectionResult {
+  testResultId: string;
+  rawLabName: string;
+  batchId?: string;
+  batchNo?: string;
+  productName?: string;
+  testDate?: string;
+  overallStatus?: 'PASS' | 'FAIL';
+  matchedLab?: TestingLaboratory;
+  confidence: 'EXACT' | 'ALIAS' | 'SUBSTRING' | 'FUZZY' | 'NONE';
+  similarity: number;
+}
+
+/**
+ * Rà soát danh sách phiếu kiểm nghiệm để tìm các phiếu có tên lab tự do hoặc chưa gán labId chuẩn
+ */
+export const detectUnmappedTestResults = (
+  testResults: Array<{
+    id: string;
+    batchId?: string;
+    labId?: string;
+    labName?: string;
+    testDate?: string;
+    overallStatus?: 'PASS' | 'FAIL';
+    batch?: any;
+  }>,
+  laboratories: TestingLaboratory[] = DEFAULT_TESTING_LABORATORIES,
+  batches: Array<{
+    id: string;
+    batchNo?: string;
+    product?: { name?: string };
+    productName?: string;
+  }> = []
+): UnmappedLabDetectionResult[] => {
+  if (!Array.isArray(testResults)) return [];
+
+  const labMap = new Map<string, TestingLaboratory>();
+  laboratories.forEach((lab) => {
+    if (lab?.id) labMap.set(lab.id, lab);
+  });
+
+  const batchMap = new Map<string, { batchNo?: string; productName?: string }>();
+  batches.forEach((b) => {
+    if (b?.id) {
+      batchMap.set(b.id, {
+        batchNo: b.batchNo,
+        productName: b.product?.name || b.productName,
+      });
+    }
+  });
+
+  const unmapped: UnmappedLabDetectionResult[] = [];
+
+  for (const tr of testResults) {
+    if (!tr || !tr.id) continue;
+
+    const hasValidLabId = tr.labId && labMap.has(tr.labId);
+    // Nếu đã có labId hợp lệ khớp trong danh mục, bỏ qua
+    if (hasValidLabId) continue;
+
+    const rawName = (tr.labName || '').trim();
+    if (!rawName) continue;
+
+    const batchInfo = tr.batchId ? batchMap.get(tr.batchId) : undefined;
+    const batchNo = tr.batch?.batchNo || batchInfo?.batchNo || '---';
+    const productName = tr.batch?.product?.name || batchInfo?.productName || '---';
+
+    const match = matchLaboratory(rawName, laboratories);
+
+    unmapped.push({
+      testResultId: tr.id,
+      rawLabName: rawName,
+      batchId: tr.batchId,
+      batchNo,
+      productName,
+      testDate: tr.testDate,
+      overallStatus: tr.overallStatus,
+      matchedLab: match ? match.lab : undefined,
+      confidence: match ? match.confidence : 'NONE',
+      similarity: match ? match.similarity : 0,
+    });
+  }
+
+  // Sắp xếp: các mục có độ tương đồng cao lên trước để dễ duyệt
+  return unmapped.sort((a, b) => b.similarity - a.similarity);
+};

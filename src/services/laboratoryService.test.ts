@@ -4,6 +4,7 @@ import {
   matchLaboratory,
   normalizeLabQuery,
   resolveCanonicalLab,
+  detectUnmappedTestResults,
 } from './laboratoryService';
 import { TestingLaboratory } from '../types/laboratory';
 
@@ -112,6 +113,62 @@ describe('laboratoryService - Master Data & Matching Engine', () => {
       expect(res.labId).toBe('');
       expect(res.labName).toBe('Phòng Thí nghiệm Lạ 123');
       expect(res.lab).toBeUndefined();
+    });
+  });
+
+  describe('detectUnmappedTestResults', () => {
+    it('detects test results without labId and matches against known laboratories', () => {
+      const mockTestResults = [
+        {
+          id: 'tr-01',
+          batchId: 'b-01',
+          labName: 'Quatest 3',
+          testDate: '2026-03-01',
+          overallStatus: 'PASS' as const,
+        },
+        {
+          id: 'tr-02',
+          batchId: 'b-02',
+          labId: 'lab_case',
+          labName: 'Trung tâm Dịch vụ Phân tích Thí nghiệm TP.HCM',
+          testDate: '2026-03-02',
+          overallStatus: 'PASS' as const,
+        },
+        {
+          id: 'tr-03',
+          batchId: 'b-03',
+          labName: 'Phòng kiểm nghiệm Chưa Biết ABC',
+          testDate: '2026-03-03',
+          overallStatus: 'FAIL' as const,
+        },
+      ];
+
+      const mockBatches = [
+        { id: 'b-01', batchNo: 'L26001', product: { name: 'Ginkgo Biloba 120mg' } },
+        { id: 'b-02', batchNo: 'L26002', product: { name: 'Vitamin C 500mg' } },
+        { id: 'b-03', batchNo: 'L26003', product: { name: 'Canxi Nano' } },
+      ];
+
+      const unmapped = detectUnmappedTestResults(
+        mockTestResults,
+        DEFAULT_TESTING_LABORATORIES,
+        mockBatches
+      );
+
+      // tr-02 already has lab_case which exists in DEFAULT_TESTING_LABORATORIES, so it should NOT be unmapped
+      expect(unmapped.length).toBe(2);
+
+      const item1 = unmapped.find((u) => u.testResultId === 'tr-01');
+      expect(item1).toBeDefined();
+      expect(item1?.batchNo).toBe('L26001');
+      expect(item1?.matchedLab?.id).toBe('lab_quatest3');
+      expect(item1?.similarity).toBeGreaterThan(0.8);
+
+      const item3 = unmapped.find((u) => u.testResultId === 'tr-03');
+      expect(item3).toBeDefined();
+      expect(item3?.batchNo).toBe('L26003');
+      expect(item3?.matchedLab).toBeUndefined();
+      expect(item3?.confidence).toBe('NONE');
     });
   });
 });

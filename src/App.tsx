@@ -1,4 +1,3 @@
-
 import React, { useEffect, Suspense, lazy } from 'react';
 import { Toaster } from 'react-hot-toast';
 import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
@@ -12,9 +11,15 @@ import { lazyWithRetry } from './utils/lazyWithRetry';
 
 const Dashboard = lazyWithRetry(() => import('./pages/system/Dashboard'), 'Dashboard');
 const ProductList = lazyWithRetry(() => import('./pages/products/ProductList'), 'ProductList');
-const ProductDetail = lazyWithRetry(() => import('./pages/products/ProductDetail'), 'ProductDetail');
+const ProductDetail = lazyWithRetry(
+  () => import('./pages/products/ProductDetail'),
+  'ProductDetail'
+);
 const TCCSList = lazyWithRetry(() => import('./pages/qa/TCCSList'), 'TCCSList');
-const ProductFormulaList = lazyWithRetry(() => import('./pages/qa/ProductFormulaList'), 'ProductFormulaList');
+const ProductFormulaList = lazyWithRetry(
+  () => import('./pages/qa/ProductFormulaList'),
+  'ProductFormulaList'
+);
 const MaterialList = lazyWithRetry(() => import('./pages/products/MaterialList'), 'MaterialList');
 const BatchList = lazyWithRetry(() => import('./pages/batches/BatchList'), 'BatchList');
 const TestResultList = lazyWithRetry(() => import('./pages/qa/TestResultList'), 'TestResultList');
@@ -24,32 +29,86 @@ const AccountPage = lazyWithRetry(() => import('./pages/system/AccountPage'), 'A
 const SearchPage = lazyWithRetry(() => import('./pages/system/SearchPage'), 'SearchPage');
 const LoginPage = lazyWithRetry(() => import('./pages/auth/LoginPage'), 'LoginPage');
 const SignupPage = lazyWithRetry(() => import('./pages/auth/SignupPage'), 'SignupPage');
-const ForgotPasswordPage = lazyWithRetry(() => import('./pages/auth/ForgotPasswordPage'), 'ForgotPasswordPage');
-const UserManagement = lazyWithRetry(() => import('./pages/system/UserManagement'), 'UserManagement');
-const TestResultFormPage = lazyWithRetry(() => import('./pages/qa/TestResultFormPage'), 'TestResultFormPage');
+const ForgotPasswordPage = lazyWithRetry(
+  () => import('./pages/auth/ForgotPasswordPage'),
+  'ForgotPasswordPage'
+);
+const UserManagement = lazyWithRetry(
+  () => import('./pages/system/UserManagement'),
+  'UserManagement'
+);
+const TestResultFormPage = lazyWithRetry(
+  () => import('./pages/qa/TestResultFormPage'),
+  'TestResultFormPage'
+);
 const CoAReportPage = lazyWithRetry(() => import('./pages/qa/CoAReportPage'), 'CoAReportPage');
-const ProductFormPage = lazyWithRetry(() => import('./pages/products/ProductFormPage'), 'ProductFormPage');
+const ProductFormPage = lazyWithRetry(
+  () => import('./pages/products/ProductFormPage'),
+  'ProductFormPage'
+);
 const BatchFormPage = lazyWithRetry(() => import('./pages/batches/BatchFormPage'), 'BatchFormPage');
-const BatchDetailPage = lazyWithRetry(() => import('./pages/batches/BatchDetailPage'), 'BatchDetailPage');
+const BatchDetailPage = lazyWithRetry(
+  () => import('./pages/batches/BatchDetailPage'),
+  'BatchDetailPage'
+);
 const TCCSFormPage = lazyWithRetry(() => import('./pages/qa/TCCSFormPage'), 'TCCSFormPage');
 const TccsDetailPage = lazyWithRetry(() => import('./pages/qa/TccsDetailPage'), 'TccsDetailPage');
-const ProductFormulaFormPage = lazyWithRetry(() => import('./pages/qa/ProductFormulaFormPage'), 'ProductFormulaFormPage');
-const MaterialFormPage = lazyWithRetry(() => import('./pages/products/MaterialFormPage'), 'MaterialFormPage');
-const CriteriaFormPage = lazyWithRetry(() => import('./pages/qa/CriteriaFormPage'), 'CriteriaFormPage');
+const ProductFormulaFormPage = lazyWithRetry(
+  () => import('./pages/qa/ProductFormulaFormPage'),
+  'ProductFormulaFormPage'
+);
+const MaterialFormPage = lazyWithRetry(
+  () => import('./pages/products/MaterialFormPage'),
+  'MaterialFormPage'
+);
+const CriteriaFormPage = lazyWithRetry(
+  () => import('./pages/qa/CriteriaFormPage'),
+  'CriteriaFormPage'
+);
 const NotFoundPage = lazyWithRetry(() => import('./pages/system/NotFoundPage'), 'NotFoundPage');
 const AlertsPage = lazyWithRetry(() => import('./pages/quality/AlertsPage'), 'AlertsPage');
-const QualitySummaryReport = lazyWithRetry(() => import('./pages/quality/QualitySummaryReport'), 'QualitySummaryReport');
-const TrendAnalysisPage = lazyWithRetry(() => import('./pages/quality/TrendAnalysisPage'), 'TrendAnalysisPage');
-const UnauthorizedPage = lazyWithRetry(() => import('./pages/auth/UnauthorizedPage'), 'UnauthorizedPage');
+const QualitySummaryReport = lazyWithRetry(
+  () => import('./pages/quality/QualitySummaryReport'),
+  'QualitySummaryReport'
+);
+const TrendAnalysisPage = lazyWithRetry(
+  () => import('./pages/quality/TrendAnalysisPage'),
+  'TrendAnalysisPage'
+);
+const UnauthorizedPage = lazyWithRetry(
+  () => import('./pages/auth/UnauthorizedPage'),
+  'UnauthorizedPage'
+);
 const WelcomePage = lazyWithRetry(() => import('./pages/auth/WelcomePage'), 'WelcomePage');
-const CriteriaAliasManager = lazyWithRetry(() => import('./pages/system/CriteriaAliasManager'), 'CriteriaAliasManager');
+const CriteriaAliasManager = lazyWithRetry(
+  () => import('./pages/system/CriteriaAliasManager'),
+  'CriteriaAliasManager'
+);
 const AuditLogPage = lazyWithRetry(() => import('./pages/system/AuditLogPage'), 'AuditLogPage');
 const CoAVerifyPage = lazyWithRetry(() => import('./pages/public/CoAVerifyPage'), 'CoAVerifyPage');
-const DeviationListPage = lazyWithRetry(() => import('./pages/qa/DeviationListPage'), 'DeviationListPage');
-const ChangeControlListPage = lazyWithRetry(() => import('./pages/quality/change-control/ChangeControlListPage'), 'ChangeControlListPage');
-const Batch360Page = lazyWithRetry(() => import('./pages/batches/batch-360/Batch360Page').then(m => ({ default: m.Batch360Page })), 'Batch360Page');
-const Product360Page = lazyWithRetry(() => import('./pages/products/product-360/Product360Page').then(m => ({ default: m.Product360Page })), 'Product360Page');
-
+const DeviationListPage = lazyWithRetry(
+  () => import('./pages/qa/DeviationListPage'),
+  'DeviationListPage'
+);
+const ChangeControlListPage = lazyWithRetry(
+  () => import('./pages/quality/change-control/ChangeControlListPage'),
+  'ChangeControlListPage'
+);
+const Batch360Page = lazyWithRetry(
+  () => import('./pages/batches/batch-360/Batch360Page').then((m) => ({ default: m.Batch360Page })),
+  'Batch360Page'
+);
+const Product360Page = lazyWithRetry(
+  () =>
+    import('./pages/products/product-360/Product360Page').then((m) => ({
+      default: m.Product360Page,
+    })),
+  'Product360Page'
+);
+const LaboratoryManagementPage = lazyWithRetry(
+  () => import('./pages/qa/LaboratoryManagementPage'),
+  'LaboratoryManagementPage'
+);
 
 const LoadingFallback = () => (
   <div className="flex items-center justify-center h-screen w-full bg-transparent transition-colors duration-300">
@@ -64,30 +123,38 @@ const LoadingFallback = () => (
 );
 
 const ProtectedRoute: React.FC = () => {
-  const { user, role, isAdmin, authLoading } = useAppStore(useShallow(s => ({
-    user: s.user,
-    role: s.role,
-    isAdmin: s.isAdmin,
-    authLoading: s.authLoading
-  })));
+  const { user, role, isAdmin, authLoading } = useAppStore(
+    useShallow((s) => ({
+      user: s.user,
+      role: s.role,
+      isAdmin: s.isAdmin,
+      authLoading: s.authLoading,
+    }))
+  );
 
   if (authLoading) return null;
   if (!user) return <Navigate to="/login" replace />;
-  
+
   if (role === 'GUEST' && !isAdmin) {
     return <Navigate to="/welcome" replace />;
   }
 
-  return <Layout><Outlet /></Layout>;
+  return (
+    <Layout>
+      <Outlet />
+    </Layout>
+  );
 };
 
 const GuestRoute: React.FC = () => {
-  const { user, role, isAdmin, authLoading } = useAppStore(useShallow(s => ({
-    user: s.user,
-    role: s.role,
-    isAdmin: s.isAdmin,
-    authLoading: s.authLoading
-  })));
+  const { user, role, isAdmin, authLoading } = useAppStore(
+    useShallow((s) => ({
+      user: s.user,
+      role: s.role,
+      isAdmin: s.isAdmin,
+      authLoading: s.authLoading,
+    }))
+  );
 
   if (authLoading) return null;
   if (!user) return <Navigate to="/login" replace />;
@@ -96,16 +163,22 @@ const GuestRoute: React.FC = () => {
     return <Navigate to="/" replace />;
   }
 
-  return <Layout><Outlet /></Layout>;
+  return (
+    <Layout>
+      <Outlet />
+    </Layout>
+  );
 };
 
 const AdminRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user, role, isAdmin, authLoading } = useAppStore(useShallow(s => ({
-    user: s.user,
-    role: s.role,
-    isAdmin: s.isAdmin,
-    authLoading: s.authLoading
-  })));
+  const { user, role, isAdmin, authLoading } = useAppStore(
+    useShallow((s) => ({
+      user: s.user,
+      role: s.role,
+      isAdmin: s.isAdmin,
+      authLoading: s.authLoading,
+    }))
+  );
 
   if (authLoading) return null;
   if (!user) return <Navigate to="/login" replace />;
@@ -117,10 +190,12 @@ const AdminRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
 // [BẢO MẬT] Route bảo vệ trang in/xuất báo cáo - không có sidebar nhưng bắt buộc đăng nhập
 const PrintRoute: React.FC = () => {
-  const { user, authLoading } = useAppStore(useShallow(s => ({
-    user: s.user,
-    authLoading: s.authLoading
-  })));
+  const { user, authLoading } = useAppStore(
+    useShallow((s) => ({
+      user: s.user,
+      authLoading: s.authLoading,
+    }))
+  );
 
   if (authLoading) return <LoadingFallback />;
   if (!user) return <Navigate to="/login" replace />;
@@ -129,7 +204,7 @@ const PrintRoute: React.FC = () => {
 };
 
 const AppRoutes: React.FC = () => {
-  const authLoading = useAppStore(s => s.authLoading);
+  const authLoading = useAppStore((s) => s.authLoading);
 
   useEffect(() => {
     if (!authLoading) {
@@ -163,36 +238,122 @@ const AppRoutes: React.FC = () => {
         <Route element={<ProtectedRoute />}>
           <Route path="/" element={<Dashboard />} />
           <Route path="/products" element={<ProductList />} />
-          <Route path="/products/new" element={<AdminRoute><ProductFormPage /></AdminRoute>} />
-          <Route path="/products/edit/:id" element={<AdminRoute><ProductFormPage /></AdminRoute>} />
+          <Route
+            path="/products/new"
+            element={
+              <AdminRoute>
+                <ProductFormPage />
+              </AdminRoute>
+            }
+          />
+          <Route
+            path="/products/edit/:id"
+            element={
+              <AdminRoute>
+                <ProductFormPage />
+              </AdminRoute>
+            }
+          />
           <Route path="/products/:id" element={<ProductDetail />} />
           <Route path="/products/360/:id" element={<Product360Page />} />
           <Route path="/tccs" element={<TCCSList />} />
-          <Route path="/tccs/new" element={<AdminRoute><TCCSFormPage /></AdminRoute>} />
-          <Route path="/tccs/edit/:id" element={<AdminRoute><TCCSFormPage /></AdminRoute>} />
+          <Route
+            path="/tccs/new"
+            element={
+              <AdminRoute>
+                <TCCSFormPage />
+              </AdminRoute>
+            }
+          />
+          <Route
+            path="/tccs/edit/:id"
+            element={
+              <AdminRoute>
+                <TCCSFormPage />
+              </AdminRoute>
+            }
+          />
           <Route path="/tccs/detail/:id" element={<TccsDetailPage />} />
           <Route path="/product-formulas" element={<ProductFormulaList />} />
-          <Route path="/product-formulas/new" element={<AdminRoute><ProductFormulaFormPage /></AdminRoute>} />
-          <Route path="/product-formulas/edit/:id" element={<AdminRoute><ProductFormulaFormPage /></AdminRoute>} />
+          <Route
+            path="/product-formulas/new"
+            element={
+              <AdminRoute>
+                <ProductFormulaFormPage />
+              </AdminRoute>
+            }
+          />
+          <Route
+            path="/product-formulas/edit/:id"
+            element={
+              <AdminRoute>
+                <ProductFormulaFormPage />
+              </AdminRoute>
+            }
+          />
           <Route path="/materials" element={<MaterialList />} />
-          <Route path="/materials/new" element={<AdminRoute><MaterialFormPage /></AdminRoute>} />
-          <Route path="/materials/edit/:id" element={<AdminRoute><MaterialFormPage /></AdminRoute>} />
+          <Route
+            path="/materials/new"
+            element={
+              <AdminRoute>
+                <MaterialFormPage />
+              </AdminRoute>
+            }
+          />
+          <Route
+            path="/materials/edit/:id"
+            element={
+              <AdminRoute>
+                <MaterialFormPage />
+              </AdminRoute>
+            }
+          />
           {/* /materials/catalog redirect về /materials — RawMaterialCatalog đã gộp vào MaterialList */}
           <Route path="/materials/catalog" element={<Navigate to="/materials" replace />} />
           <Route path="/criteria" element={<CriteriaList />} />
-          <Route path="/criteria/new" element={<AdminRoute><CriteriaFormPage /></AdminRoute>} />
-          <Route path="/criteria/edit/:id" element={<AdminRoute><CriteriaFormPage /></AdminRoute>} />
+          <Route
+            path="/criteria/new"
+            element={
+              <AdminRoute>
+                <CriteriaFormPage />
+              </AdminRoute>
+            }
+          />
+          <Route
+            path="/criteria/edit/:id"
+            element={
+              <AdminRoute>
+                <CriteriaFormPage />
+              </AdminRoute>
+            }
+          />
           <Route path="/batches" element={<BatchList />} />
           {/* USER được tạo lô mới, chỉ ADMIN mới sửa/xóa */}
           <Route path="/batches/new" element={<BatchFormPage />} />
-          <Route path="/batches/edit/:id" element={<AdminRoute><BatchFormPage /></AdminRoute>} />
+          <Route
+            path="/batches/edit/:id"
+            element={
+              <AdminRoute>
+                <BatchFormPage />
+              </AdminRoute>
+            }
+          />
           <Route path="/batches/:id" element={<BatchDetailPage />} />
           <Route path="/batches/360/:id" element={<Batch360Page />} />
           <Route path="/test-results" element={<TestResultList />} />
+          <Route path="/laboratories" element={<LaboratoryManagementPage />} />
+          <Route path="/labs" element={<Navigate to="/laboratories" replace />} />
           {/* USER được tạo phiếu KN mới, chỉ ADMIN mới sửa */}
           <Route path="/test-results/new" element={<TestResultFormPage />} />
           <Route path="/test-results/form" element={<Navigate to="/test-results/new" replace />} />
-          <Route path="/test-results/edit/:id" element={<AdminRoute><TestResultFormPage /></AdminRoute>} />
+          <Route
+            path="/test-results/edit/:id"
+            element={
+              <AdminRoute>
+                <TestResultFormPage />
+              </AdminRoute>
+            }
+          />
           <Route path="/deviations" element={<DeviationListPage />} />
           <Route path="/change-control" element={<ChangeControlListPage />} />
           <Route path="/reports/quality-summary" element={<QualitySummaryReport />} />
@@ -201,9 +362,30 @@ const AppRoutes: React.FC = () => {
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/account" element={<AccountPage />} />
           <Route path="/search" element={<SearchPage />} />
-          <Route path="/users" element={<AdminRoute><UserManagement /></AdminRoute>} />
-          <Route path="/audit-logs" element={<AdminRoute><AuditLogPage /></AdminRoute>} />
-          <Route path="/criteria-aliases" element={<AdminRoute><CriteriaAliasManager /></AdminRoute>} />
+          <Route
+            path="/users"
+            element={
+              <AdminRoute>
+                <UserManagement />
+              </AdminRoute>
+            }
+          />
+          <Route
+            path="/audit-logs"
+            element={
+              <AdminRoute>
+                <AuditLogPage />
+              </AdminRoute>
+            }
+          />
+          <Route
+            path="/criteria-aliases"
+            element={
+              <AdminRoute>
+                <CriteriaAliasManager />
+              </AdminRoute>
+            }
+          />
         </Route>
 
         <Route path="*" element={<NotFoundPage />} />
@@ -223,7 +405,7 @@ const GlobalNavigation = () => {
 
 // Component "tàng hình" để xử lý giao diện Dark Mode
 const ThemeManager = () => {
-  const theme = useAppStore(s => s.theme);
+  const theme = useAppStore((s) => s.theme);
   useEffect(() => {
     if (theme === 'dark') {
       document.documentElement.classList.add('dark');
@@ -236,7 +418,7 @@ const ThemeManager = () => {
 
 // Component đồng bộ preferences theo userId (per-user cookie key)
 const UserPreferenceSync = () => {
-  const user = useAppStore(s => s.user);
+  const user = useAppStore((s) => s.user);
   useEffect(() => {
     if (user?.uid) {
       loadUserPreferences(user.uid);
@@ -250,11 +432,11 @@ const UserPreferenceSync = () => {
 // Component theo dõi và lưu trang cuối người dùng đã truy cập
 const RouteTracker = () => {
   const location = useLocation();
-  const setLastVisitedPath = useUIStore(s => s.setLastVisitedPath);
+  const setLastVisitedPath = useUIStore((s) => s.setLastVisitedPath);
   useEffect(() => {
     // Không lưu các trang auth
     const excludedPaths = ['/login', '/signup', '/forgot-password'];
-    if (!excludedPaths.some(p => location.pathname.startsWith(p))) {
+    if (!excludedPaths.some((p) => location.pathname.startsWith(p))) {
       setLastVisitedPath(location.pathname);
     }
   }, [location.pathname, setLastVisitedPath]);
@@ -269,19 +451,19 @@ const getBasename = () => {
 
 const App: React.FC = () => {
   return (
-      <AppProvider>
-          <BrowserRouter basename={getBasename()}>
-            <GlobalNavigation />
-            <ThemeManager />
-            <UserPreferenceSync />
-            <RouteTracker />
-            <Toaster position="bottom-right" toastOptions={{ duration: 4000 }} />
-            <CookieConsentBanner />
-            <ErrorBoundary>
-              <AppRoutes />
-            </ErrorBoundary>
-          </BrowserRouter>
-      </AppProvider>
+    <AppProvider>
+      <BrowserRouter basename={getBasename()}>
+        <GlobalNavigation />
+        <ThemeManager />
+        <UserPreferenceSync />
+        <RouteTracker />
+        <Toaster position="bottom-right" toastOptions={{ duration: 4000 }} />
+        <CookieConsentBanner />
+        <ErrorBoundary>
+          <AppRoutes />
+        </ErrorBoundary>
+      </BrowserRouter>
+    </AppProvider>
   );
 };
 

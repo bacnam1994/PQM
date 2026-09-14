@@ -91,6 +91,46 @@ describe('Universal Search Index & Engine', () => {
     expect(resDev.some((r) => r.category === 'DEVIATION')).toBe(true);
   });
 
+  it('tìm kiếm phòng kiểm nghiệm (Testing Laboratories) theo mã, tên hoặc bí danh', () => {
+    const mockDataset: UniversalSearchDataset = {
+      laboratories: [
+        {
+          id: 'lab_quatest3',
+          code: 'QUATEST3',
+          canonicalName: 'Trung tâm Kỹ thuật Tiêu chuẩn Đo lường Chất lượng 3',
+          aliases: ['Quatest 3', 'KT3'],
+          type: 'EXTERNAL',
+          isActive: true,
+          createdAt: '2026-01-01',
+        },
+        {
+          id: 'lab_internal',
+          code: 'INTERNAL',
+          canonicalName: 'Phòng Kiểm nghiệm Nội bộ V-BIOTECH',
+          aliases: ['Phòng QC', 'QC'],
+          type: 'INTERNAL',
+          isActive: true,
+          createdAt: '2026-01-01',
+        },
+      ],
+    };
+
+    // Tìm kiếm theo bí danh "KT3"
+    const resAlias = searchUniversal('KT3', mockDataset);
+    expect(resAlias.length).toBeGreaterThanOrEqual(1);
+    expect(resAlias[0].id).toBe('lab-lab_quatest3');
+    expect(resAlias[0].path).toBe('/laboratories');
+
+    // Tìm kiếm theo mã "INTERNAL"
+    const resCode = searchUniversal('INTERNAL', mockDataset);
+    expect(resCode.length).toBeGreaterThanOrEqual(1);
+    expect(resCode[0].id).toBe('lab-lab_internal');
+
+    // Tìm kiếm từ khóa "Phong QC"
+    const resQC = searchUniversal('phong qc', mockDataset);
+    expect(resQC.some((r) => r.id === 'lab-lab_internal')).toBe(true);
+  });
+
   it('UniversalInvertedIndex hỗ trợ tra cứu chỉ mục đảo với phân trang và thời gian tìm kiếm < 150ms', () => {
     const mockDataset: UniversalSearchDataset = {
       products: Array.from({ length: 50 }, (_, i) => ({

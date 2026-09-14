@@ -8,7 +8,7 @@ import {
   Menu,
   MenuButton,
   MenuItem,
-  MenuItems
+  MenuItems,
 } from '@headlessui/react';
 import {
   Squares2X2Icon,
@@ -19,6 +19,7 @@ import {
   BeakerIcon,
   Square3Stack3DIcon,
   ClipboardDocumentCheckIcon,
+  BuildingOffice2Icon,
   ExclamationTriangleIcon,
   ArrowPathRoundedSquareIcon,
   BellIcon,
@@ -37,7 +38,7 @@ import {
   MagnifyingGlassIcon,
   SunIcon,
   MoonIcon,
-  UserCircleIcon
+  UserCircleIcon,
 } from '@heroicons/react/24/outline';
 import { useAppStore } from '../../store/useAppStore';
 import { useUIStore } from '../../store/useUIStore';
@@ -64,71 +65,74 @@ interface NavGroup {
 
 const navItems: NavGroup[] = [
   { name: 'Bảng điều khiển', path: '/', icon: Squares2X2Icon },
-  { 
-    name: 'Danh mục', 
+  {
+    name: 'Danh mục',
     icon: CubeIcon,
     children: [
       { name: 'Sản phẩm', path: '/products', icon: CubeIcon },
       { name: 'Nguyên liệu', path: '/materials', icon: CircleStackIcon },
       { name: 'Chỉ tiêu', path: '/criteria', icon: AdjustmentsHorizontalIcon },
-    ]
+      { name: 'Đơn vị kiểm nghiệm', path: '/laboratories', icon: BuildingOffice2Icon },
+    ],
   },
-  { 
-    name: 'Hồ sơ', 
+  {
+    name: 'Hồ sơ',
     icon: DocumentTextIcon,
     children: [
       { name: 'Hồ sơ TCCS', path: '/tccs', icon: DocumentTextIcon },
       { name: 'Công thức sản phẩm', path: '/product-formulas', icon: BeakerIcon },
-    ]
+    ],
   },
-  { 
-    name: 'Nghiệp vụ', 
+  {
+    name: 'Nghiệp vụ',
     icon: Square3Stack3DIcon,
     children: [
       { name: 'Quản lý Lô', path: '/batches', icon: Square3Stack3DIcon },
-      { name: 'Kiểm soát Lab', path: '/test-results', icon: ClipboardDocumentCheckIcon },
+      { name: 'Phiếu kiểm nghiệm', path: '/test-results', icon: ClipboardDocumentCheckIcon },
       { name: 'Quản lý Sai lệch (CAPA)', path: '/deviations', icon: ExclamationTriangleIcon },
       { name: 'Quản lý Thay đổi (CR)', path: '/change-control', icon: ArrowPathRoundedSquareIcon },
       { name: 'Cảnh báo chất lượng', path: '/alerts', icon: BellIcon, isAlerts: true },
       { name: 'Báo cáo tổng hợp', path: '/reports/quality-summary', icon: DocumentChartBarIcon },
       { name: 'Phân tích xu hướng', path: '/reports/trend-analysis', icon: ChartBarIcon },
-    ]
+    ],
   },
-  { 
-    name: 'Hệ thống', 
+  {
+    name: 'Hệ thống',
     icon: Cog6ToothIcon,
     children: [
       { name: 'Người dùng', path: '/users', icon: UsersIcon, adminOnly: true },
       { name: 'Nhật ký kiểm toán', path: '/audit-logs', icon: ShieldCheckIcon, adminOnly: true },
       { name: 'Liên kết chỉ tiêu', path: '/criteria-aliases', icon: LinkIcon, adminOnly: true },
       { name: 'Cấu hình', path: '/settings', icon: Cog6ToothIcon },
-    ]
-  }
+    ],
+  },
 ];
 
 const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const isCollapsed = useUIStore(state => state.sidebarCollapsed);
-  const toggleSidebar = useUIStore(state => state.toggleSidebar);
+  const isCollapsed = useUIStore((state) => state.sidebarCollapsed);
+  const toggleSidebar = useUIStore((state) => state.toggleSidebar);
   const [isMobileMenuOpen, setMobileMenuOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
-  
-  const user = useAppStore(state => state.user);
-  const role = useAppStore(state => state.role);
-  const isAdmin = useAppStore(state => state.isAdmin);
-  const logout = useAppStore(state => state.logout);
-  const theme = useAppStore(state => state.theme);
-  const setTheme = useAppStore(state => state.setTheme);
+
+  const user = useAppStore((state) => state.user);
+  const role = useAppStore((state) => state.role);
+  const isAdmin = useAppStore((state) => state.isAdmin);
+  const logout = useAppStore((state) => state.logout);
+  const theme = useAppStore((state) => state.theme);
+  const setTheme = useAppStore((state) => state.setTheme);
   const [searchTerm, setSearchTerm] = useState('');
   const [showDropdown, setShowDropdown] = useState(false);
   const searchInputRef = React.useRef<HTMLInputElement>(null);
 
-  const { products, batches, tccsList, rawMaterials } = useAppStore(useShallow(s => ({
-    products: s.products,
-    batches: s.batches,
-    tccsList: s.tccsList,
-    rawMaterials: s.rawMaterials
-  })));
+  const { products, batches, tccsList, rawMaterials } = useAppStore(
+    useShallow((s) => ({
+      products: s.products,
+      batches: s.batches,
+      tccsList: s.tccsList,
+      rawMaterials: s.rawMaterials,
+    }))
+  );
 
   // Kích hoạt hệ thống phím tắt toàn cục (Ctrl+K, Esc, Ctrl+S)
   useKeyboardShortcuts();
@@ -137,10 +141,21 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     if (!searchTerm.trim()) return null;
     const lowerQuery = searchTerm.toLowerCase();
     return {
-      products: products.filter(p => p.name.toLowerCase().includes(lowerQuery) || p.code.toLowerCase().includes(lowerQuery)).slice(0, 3),
-      batches: batches.filter(b => b.batchNo.toLowerCase().includes(lowerQuery)).slice(0, 3),
-      tccs: tccsList.filter(t => t.code.toLowerCase().includes(lowerQuery)).slice(0, 3),
-      materials: rawMaterials.filter(m => m.name.toLowerCase().includes(lowerQuery) || (m.code || '').toLowerCase().includes(lowerQuery)).slice(0, 3)
+      products: products
+        .filter(
+          (p) =>
+            p.name.toLowerCase().includes(lowerQuery) || p.code.toLowerCase().includes(lowerQuery)
+        )
+        .slice(0, 3),
+      batches: batches.filter((b) => b.batchNo.toLowerCase().includes(lowerQuery)).slice(0, 3),
+      tccs: tccsList.filter((t) => t.code.toLowerCase().includes(lowerQuery)).slice(0, 3),
+      materials: rawMaterials
+        .filter(
+          (m) =>
+            m.name.toLowerCase().includes(lowerQuery) ||
+            (m.code || '').toLowerCase().includes(lowerQuery)
+        )
+        .slice(0, 3),
     };
   }, [searchTerm, products, batches, tccsList, rawMaterials]);
 
@@ -150,37 +165,70 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     e.preventDefault();
     if (searchTerm.trim()) {
       navigate(`/search?q=${encodeURIComponent(searchTerm)}`);
-      setSearchTerm(''); 
+      setSearchTerm('');
       setShowDropdown(false);
       searchInputRef.current?.blur();
     }
   };
 
   const handleLogout = async () => {
-    if (window.confirm("Bạn có chắc chắn muốn đăng xuất?")) {
+    if (window.confirm('Bạn có chắc chắn muốn đăng xuất?')) {
       await logout();
       navigate('/login');
     }
   };
 
   const getPageHeaderInfo = (pathname: string) => {
-    if (pathname === '/') return { title: 'Bảng điều khiển', subtitle: 'Tổng quan hoạt động nghiệp vụ QMS V-Biotech' };
-    if (pathname.startsWith('/products')) return { title: 'Danh mục Sản phẩm', subtitle: 'Quản lý sản phẩm lưu hành và TCCS áp dụng' };
-    if (pathname.startsWith('/materials')) return { title: 'Danh mục Nguyên liệu', subtitle: 'Quản lý nguyên vật liệu sản xuất' };
-    if (pathname.startsWith('/criteria')) return { title: 'Danh mục Chỉ tiêu', subtitle: 'Quản lý chỉ tiêu kiểm soát chất lượng' };
-    if (pathname.startsWith('/tccs')) return { title: 'Hồ sơ TCCS', subtitle: 'Tiêu chuẩn cơ sở áp dụng cho từng sản phẩm' };
-    if (pathname.startsWith('/product-formulas')) return { title: 'Công thức Sản phẩm', subtitle: 'Định mức nguyên liệu và công thức chế phẩm' };
-    if (pathname.startsWith('/batches')) return { title: 'Quản lý Lô', subtitle: 'Theo dõi trạng thái, hồ sơ và kiểm nghiệm lô sản xuất' };
-    if (pathname.startsWith('/test-results')) return { title: 'Kiểm soát Lab', subtitle: 'Nhập kết quả kiểm nghiệm và phát hành CoA' };
-    if (pathname.startsWith('/deviations')) return { title: 'Quản lý Sai lệch & CAPA', subtitle: 'Theo dõi sự cố OOS, điều tra nguyên nhân gốc rễ và kiểm soát hành động khắc phục' };
-    if (pathname.startsWith('/change-control')) return { title: 'Quản lý Thay đổi (CR)', subtitle: 'Đánh giá rủi ro FMEA và kiểm soát thay đổi chuẩn GMP' };
-    if (pathname.startsWith('/reports')) return { title: 'Báo cáo tổng hợp', subtitle: 'Thống kê chất lượng và báo cáo định kỳ' };
-    if (pathname.startsWith('/users')) return { title: 'Người dùng', subtitle: 'Quản lý tài khoản và phân quyền thành viên' };
-    if (pathname.startsWith('/settings')) return { title: 'Cấu hình', subtitle: 'Thông tin hệ thống và tùy chọn kết nối API AI' };
-    if (pathname.startsWith('/account')) return { title: 'Tài khoản cá nhân', subtitle: 'Thông tin hồ sơ người dùng đang đăng nhập' };
-    if (pathname.startsWith('/alerts')) return { title: 'Cảnh báo chất lượng', subtitle: 'Giám sát chỉ tiêu vượt ngưỡng cảnh báo' };
-    if (pathname.startsWith('/audit-logs')) return { title: 'Nhật ký kiểm toán', subtitle: 'Lịch sử thay đổi dữ liệu và truy vết hệ thống (Audit Trail)' };
-    if (pathname.startsWith('/search')) return { title: 'Kết quả tìm kiếm', subtitle: 'Tìm kiếm dữ liệu toàn hệ thống' };
+    if (pathname === '/')
+      return { title: 'Bảng điều khiển', subtitle: 'Tổng quan hoạt động nghiệp vụ QMS V-Biotech' };
+    if (pathname.startsWith('/products'))
+      return { title: 'Danh mục Sản phẩm', subtitle: 'Quản lý sản phẩm lưu hành và TCCS áp dụng' };
+    if (pathname.startsWith('/materials'))
+      return { title: 'Danh mục Nguyên liệu', subtitle: 'Quản lý nguyên vật liệu sản xuất' };
+    if (pathname.startsWith('/criteria'))
+      return { title: 'Danh mục Chỉ tiêu', subtitle: 'Quản lý chỉ tiêu kiểm soát chất lượng' };
+    if (pathname.startsWith('/tccs'))
+      return { title: 'Hồ sơ TCCS', subtitle: 'Tiêu chuẩn cơ sở áp dụng cho từng sản phẩm' };
+    if (pathname.startsWith('/product-formulas'))
+      return {
+        title: 'Công thức Sản phẩm',
+        subtitle: 'Định mức nguyên liệu và công thức chế phẩm',
+      };
+    if (pathname.startsWith('/batches'))
+      return {
+        title: 'Quản lý Lô',
+        subtitle: 'Theo dõi trạng thái, hồ sơ và kiểm nghiệm lô sản xuất',
+      };
+    if (pathname.startsWith('/test-results'))
+      return { title: 'Kiểm soát Lab', subtitle: 'Nhập kết quả kiểm nghiệm và phát hành CoA' };
+    if (pathname.startsWith('/deviations'))
+      return {
+        title: 'Quản lý Sai lệch & CAPA',
+        subtitle:
+          'Theo dõi sự cố OOS, điều tra nguyên nhân gốc rễ và kiểm soát hành động khắc phục',
+      };
+    if (pathname.startsWith('/change-control'))
+      return {
+        title: 'Quản lý Thay đổi (CR)',
+        subtitle: 'Đánh giá rủi ro FMEA và kiểm soát thay đổi chuẩn GMP',
+      };
+    if (pathname.startsWith('/reports'))
+      return { title: 'Báo cáo tổng hợp', subtitle: 'Thống kê chất lượng và báo cáo định kỳ' };
+    if (pathname.startsWith('/users'))
+      return { title: 'Người dùng', subtitle: 'Quản lý tài khoản và phân quyền thành viên' };
+    if (pathname.startsWith('/settings'))
+      return { title: 'Cấu hình', subtitle: 'Thông tin hệ thống và tùy chọn kết nối API AI' };
+    if (pathname.startsWith('/account'))
+      return { title: 'Tài khoản cá nhân', subtitle: 'Thông tin hồ sơ người dùng đang đăng nhập' };
+    if (pathname.startsWith('/alerts'))
+      return { title: 'Cảnh báo chất lượng', subtitle: 'Giám sát chỉ tiêu vượt ngưỡng cảnh báo' };
+    if (pathname.startsWith('/audit-logs'))
+      return {
+        title: 'Nhật ký kiểm toán',
+        subtitle: 'Lịch sử thay đổi dữ liệu và truy vết hệ thống (Audit Trail)',
+      };
+    if (pathname.startsWith('/search'))
+      return { title: 'Kết quả tìm kiếm', subtitle: 'Tìm kiếm dữ liệu toàn hệ thống' };
     return { title: 'Hệ thống QMS', subtitle: 'Nền tảng kiểm soát chất lượng V-Biotech' };
   };
 
@@ -191,7 +239,11 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const days = ['Chủ Nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy'];
     const now = new Date();
     const dayName = days[now.getDay()];
-    const dateStr = now.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    const dateStr = now.toLocaleDateString('vi-VN', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    });
     return `${dayName}, ${dateStr} · Realtime`;
   };
 
@@ -209,14 +261,18 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
           }`}
           title="Bảng điều khiển"
         >
-          <Squares2X2Icon className={`w-4 h-4 shrink-0 ${location.pathname === '/' ? 'text-emerald-600 dark:text-emerald-400' : 'text-ink-muted group-hover:text-ink'}`} />
+          <Squares2X2Icon
+            className={`w-4 h-4 shrink-0 ${location.pathname === '/' ? 'text-emerald-600 dark:text-emerald-400' : 'text-ink-muted group-hover:text-ink'}`}
+          />
           {!isCollapsed && <span className="truncate">Bảng điều khiển</span>}
         </Link>
       </div>
 
       {/* Nav Groups */}
       {navItems.slice(1).map((group, idx) => {
-        const visibleChildren = (group.children || []).filter(child => !child.adminOnly || role === 'ADMIN' || isAdmin);
+        const visibleChildren = (group.children || []).filter(
+          (child) => !child.adminOnly || role === 'ADMIN' || isAdmin
+        );
         if (visibleChildren.length === 0) return null;
 
         return (
@@ -230,7 +286,9 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
             )}
 
             {visibleChildren.map((child) => {
-              const isActive = location.pathname === child.path || (child.path !== '/' && location.pathname.startsWith(child.path));
+              const isActive =
+                location.pathname === child.path ||
+                (child.path !== '/' && location.pathname.startsWith(child.path));
               const IconComp = child.icon;
 
               return (
@@ -245,10 +303,10 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                   }`}
                   title={child.name}
                 >
-                  <IconComp className={`w-4 h-4 shrink-0 ${isActive ? 'text-emerald-600 dark:text-emerald-400' : 'text-ink-muted group-hover:text-ink'}`} />
-                  {!isCollapsed && (
-                    <span className="flex-1 truncate">{child.name}</span>
-                  )}
+                  <IconComp
+                    className={`w-4 h-4 shrink-0 ${isActive ? 'text-emerald-600 dark:text-emerald-400' : 'text-ink-muted group-hover:text-ink'}`}
+                  />
+                  {!isCollapsed && <span className="flex-1 truncate">{child.name}</span>}
                   {child.isAlerts && hasAlerts && (
                     <span className="px-1.5 py-0.2 text-[10px] font-bold rounded-full bg-rose-500 text-white shrink-0">
                       {alertCount}
@@ -272,7 +330,11 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
           type="button"
           onClick={() => {
             onItemClick && onItemClick();
-            window.dispatchEvent(new CustomEvent('trigger-ai-chat', { detail: { prompt: 'Tổng quan tình trạng tất cả lô hàng hiện tại' } }));
+            window.dispatchEvent(
+              new CustomEvent('trigger-ai-chat', {
+                detail: { prompt: 'Tổng quan tình trạng tất cả lô hàng hiện tại' },
+              })
+            );
           }}
           className="w-full group flex items-center gap-x-3 rounded-lg px-3 py-2 text-xs font-medium text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/10 transition-colors text-left"
           title="Trợ lý AI Copilot"
@@ -331,7 +393,9 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                       </div>
                       <div>
                         <div className="text-sm font-bold tracking-tight text-ink">V-Biotech</div>
-                        <div className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 tracking-wider uppercase">QMS Platform</div>
+                        <div className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 tracking-wider uppercase">
+                          QMS Platform
+                        </div>
                       </div>
                     </div>
                     <button
@@ -370,7 +434,9 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
             {!isCollapsed && (
               <div className="min-w-0">
                 <div className="text-sm font-bold tracking-tight text-ink truncate">V-Biotech</div>
-                <div className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 tracking-wider uppercase truncate">QMS Platform</div>
+                <div className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 tracking-wider uppercase truncate">
+                  QMS Platform
+                </div>
               </div>
             )}
           </Link>
@@ -435,14 +501,18 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                 {/* Desktop Global Search Trigger */}
                 <button
                   type="button"
-                  onClick={() => window.dispatchEvent(new CustomEvent('pqm:toggle-command-palette'))}
+                  onClick={() =>
+                    window.dispatchEvent(new CustomEvent('pqm:toggle-command-palette'))
+                  }
                   className="hidden md:flex items-center gap-2.5 px-3 py-1.5 rounded-lg border border-border bg-surface-2/60 hover:bg-surface-2 text-xs font-medium text-ink-muted hover:text-ink transition-all shadow-2xs"
                   title="Tìm kiếm nhanh toàn hệ thống (Ctrl+K)"
                   aria-label="Tìm kiếm nhanh toàn hệ thống"
                 >
                   <MagnifyingGlassIcon className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
                   <span>Tìm kiếm nhanh...</span>
-                  <kbd className="px-1.5 py-0.5 text-[10px] font-mono bg-surface border border-border rounded text-ink-muted shadow-2xs">Ctrl K</kbd>
+                  <kbd className="px-1.5 py-0.5 text-[10px] font-mono bg-surface border border-border rounded text-ink-muted shadow-2xs">
+                    Ctrl K
+                  </kbd>
                 </button>
 
                 {/* Mobile Search Dropdown Trigger */}
@@ -470,12 +540,18 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                     <div className="absolute top-full right-0 mt-2 w-72 bg-surface rounded-2xl shadow-xl border border-border overflow-hidden z-50 p-2 text-xs">
                       {searchResults.products.length > 0 && (
                         <div className="mb-2">
-                          <div className="text-[10px] font-semibold text-ink-faint uppercase tracking-wider px-2 py-1">Sản phẩm</div>
-                          {searchResults.products.map(p => (
+                          <div className="text-[10px] font-semibold text-ink-faint uppercase tracking-wider px-2 py-1">
+                            Sản phẩm
+                          </div>
+                          {searchResults.products.map((p) => (
                             <button
                               key={p.id}
                               type="button"
-                              onClick={() => { navigate(`/products/${p.id}`); setSearchTerm(''); setShowDropdown(false); }}
+                              onClick={() => {
+                                navigate(`/products/${p.id}`);
+                                setSearchTerm('');
+                                setShowDropdown(false);
+                              }}
                               className="w-full text-left px-2 py-1.5 rounded-lg hover:bg-surface-2 transition-colors flex flex-col"
                             >
                               <span className="font-semibold text-ink">{p.name}</span>
@@ -486,16 +562,24 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                       )}
                       {searchResults.batches.length > 0 && (
                         <div className="mb-2">
-                          <div className="text-[10px] font-semibold text-ink-faint uppercase tracking-wider px-2 py-1">Lô hàng</div>
-                          {searchResults.batches.map(b => (
+                          <div className="text-[10px] font-semibold text-ink-faint uppercase tracking-wider px-2 py-1">
+                            Lô hàng
+                          </div>
+                          {searchResults.batches.map((b) => (
                             <button
                               key={b.id}
                               type="button"
-                              onClick={() => { navigate(`/batches/${b.id}`); setSearchTerm(''); setShowDropdown(false); }}
+                              onClick={() => {
+                                navigate(`/batches/${b.id}`);
+                                setSearchTerm('');
+                                setShowDropdown(false);
+                              }}
                               className="w-full text-left px-2 py-1.5 rounded-lg hover:bg-surface-2 transition-colors flex flex-col"
                             >
                               <span className="font-semibold text-ink">Lô: {b.batchNo}</span>
-                              <span className="text-[10px] text-ink-faint">NSX: {b.mfgDate || '---'}</span>
+                              <span className="text-[10px] text-ink-faint">
+                                NSX: {b.mfgDate || '---'}
+                              </span>
                             </button>
                           ))}
                         </div>
@@ -521,7 +605,11 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
               title={theme === 'dark' ? 'Chuyển sang chế độ sáng' : 'Chuyển sang chế độ tối'}
               aria-label="Chuyển chế độ sáng/tối"
             >
-              {theme === 'dark' ? <SunIcon className="w-4 h-4" /> : <MoonIcon className="w-4 h-4" />}
+              {theme === 'dark' ? (
+                <SunIcon className="w-4 h-4" />
+              ) : (
+                <MoonIcon className="w-4 h-4" />
+              )}
             </button>
 
             {/* Quality Alerts Notification */}
@@ -534,7 +622,11 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                 aria-label="Menu tài khoản"
               >
                 {user?.photoURL ? (
-                  <img src={user.photoURL} alt="Avatar" className="w-8 h-8 rounded-full object-cover shadow-2xs ring-1 ring-border" />
+                  <img
+                    src={user.photoURL}
+                    alt="Avatar"
+                    className="w-8 h-8 rounded-full object-cover shadow-2xs ring-1 ring-border"
+                  />
                 ) : (
                   <div className="w-8 h-8 rounded-full bg-emerald-600 text-white flex items-center justify-center font-bold text-xs shadow-2xs">
                     {user?.email ? user.email.slice(0, 2).toUpperCase() : 'US'}
@@ -553,9 +645,11 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
               >
                 <MenuItems className="absolute right-0 z-50 mt-2 w-56 origin-top-right rounded-xl bg-surface p-1.5 shadow-xl border border-border focus:outline-none text-xs">
                   <div className="px-3 py-2 border-b border-border mb-1">
-                    <div className="font-semibold text-ink truncate">{user?.displayName || user?.email || 'Người dùng'}</div>
+                    <div className="font-semibold text-ink truncate">
+                      {user?.displayName || user?.email || 'Người dùng'}
+                    </div>
                     <div className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold uppercase tracking-wider mt-0.5">
-                      {role === 'ADMIN' || isAdmin ? 'ADMIN' : (role || 'GUEST')}
+                      {role === 'ADMIN' || isAdmin ? 'ADMIN' : role || 'GUEST'}
                     </div>
                   </div>
 
@@ -611,9 +705,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
         {/* Main Content Area */}
         <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 bg-surface-2/30">
-          <div className="mx-auto max-w-7xl">
-            {children}
-          </div>
+          <div className="mx-auto max-w-7xl">{children}</div>
         </main>
       </div>
 
@@ -636,15 +728,21 @@ const QualityAlertBadge: React.FC = () => {
   return (
     <Link
       to="/alerts"
-      title={hasAlerts ? `${totalCount} cảnh báo chất lượng (${highCount} mức cao)` : 'Không có cảnh báo chất lượng'}
+      title={
+        hasAlerts
+          ? `${totalCount} cảnh báo chất lượng (${highCount} mức cao)`
+          : 'Không có cảnh báo chất lượng'
+      }
       className={`p-2 rounded-lg relative border transition-colors shadow-2xs ${
-        isActive 
-          ? 'border-rose-500 text-rose-600 dark:text-rose-400 bg-rose-500/10' 
+        isActive
+          ? 'border-rose-500 text-rose-600 dark:text-rose-400 bg-rose-500/10'
           : 'border-border text-ink-muted hover:text-ink hover:bg-surface-2'
       }`}
       aria-label="Xem cảnh báo chất lượng"
     >
-      <BellIcon className={`w-4 h-4 ${hasAlerts && highCount > 0 ? 'text-rose-500 animate-pulse' : ''}`} />
+      <BellIcon
+        className={`w-4 h-4 ${hasAlerts && highCount > 0 ? 'text-rose-500 animate-pulse' : ''}`}
+      />
       {hasAlerts && (
         <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 text-[10px] font-bold rounded-full bg-rose-500 text-white flex items-center justify-center shadow-xs border-2 border-surface">
           {totalCount > 99 ? '99+' : totalCount}
@@ -653,4 +751,3 @@ const QualityAlertBadge: React.FC = () => {
     </Link>
   );
 };
-

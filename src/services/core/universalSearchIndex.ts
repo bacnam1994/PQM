@@ -9,6 +9,7 @@
 import { Product, Batch, TCCS, TestResult, RawMaterial } from '../../types';
 import { QualityDeviation } from '../../types/deviation';
 import { ChangeRequest } from '../../types/changeControl';
+import { TestingLaboratory } from '../../types/laboratory';
 
 export type SearchResultCategory =
   | 'PRODUCT'
@@ -41,6 +42,7 @@ export interface UniversalSearchDataset {
   rawMaterials?: RawMaterial[];
   deviations?: QualityDeviation[];
   changeRequests?: ChangeRequest[];
+  laboratories?: TestingLaboratory[];
 }
 
 /**
@@ -137,6 +139,16 @@ export const QUICK_ACTIONS: UniversalSearchResult[] = [
     subtitle: 'Nhập kết quả kiểm nghiệm nội bộ hoặc gửi mẫu lab ngoài',
     path: '/test-results/new',
     badge: 'Tác vụ',
+    badgeColor: 'purple',
+    score: 0,
+  },
+  {
+    id: 'act-manage-labs',
+    category: 'ACTION',
+    title: 'Quản lý Đơn vị Kiểm nghiệm (Laboratories)',
+    subtitle: 'Danh mục phòng lab chuẩn hóa, quản lý bí danh OCR AI và chuẩn hóa phiếu',
+    path: '/laboratories',
+    badge: 'Danh mục',
     badgeColor: 'purple',
     score: 0,
   },
@@ -354,6 +366,35 @@ export function searchUniversal(
           badge: cr.changeType,
           badgeColor: cr.changeType === 'MAJOR' ? 'red' : 'blue',
           score: maxS + 8,
+        });
+      }
+    }
+  }
+
+  // 9. Quét Đơn vị Kiểm nghiệm (Testing Laboratories)
+  if (data.laboratories) {
+    for (const lab of data.laboratories) {
+      const sCode = computeMatchScore(trimmed, lab.code, true);
+      const sName = computeMatchScore(trimmed, lab.canonicalName);
+      let sAlias = 0;
+      if (Array.isArray(lab.aliases)) {
+        for (const alias of lab.aliases) {
+          const s = computeMatchScore(trimmed, alias);
+          if (s > sAlias) sAlias = s;
+        }
+      }
+      const maxS = Math.max(sCode, sName, sAlias);
+      if (maxS > 15) {
+        results.push({
+          id: `lab-${lab.id}`,
+          category: 'PAGE',
+          title: `Đơn vị: ${lab.canonicalName} (${lab.code})`,
+          subtitle: `Phân loại: ${lab.type === 'EXTERNAL' ? 'Ngoại kiểm' : 'Nội bộ'}${lab.aliases?.length ? ` • Bí danh: ${lab.aliases.slice(0, 3).join(', ')}` : ''}`,
+          path: '/laboratories',
+          badge: lab.code,
+          badgeColor: lab.type === 'EXTERNAL' ? 'purple' : 'blue',
+          score: maxS,
+          metadata: lab,
         });
       }
     }
