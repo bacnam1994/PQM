@@ -1,7 +1,53 @@
 import { Criterion, ProductFormula, FormulaIngredient } from '../types';
-import { parseNumberFromText } from './criteriaEvaluation';
+import { parseNumberFromText } from '../domain/evaluation/ValueNormalizer';
+import { SpecificationParser } from '../domain/evaluation/SpecificationParser';
 import { normalizeName, diceScore } from '../services/criteriaAliasService';
 import { isCriteriaMatch, lookupPharmaTerm } from './aiMapping';
+
+/**
+ * Tính toán tỷ lệ % để hiển thị trên Phiếu kiểm nghiệm / CoA
+ */
+export function calculateRelativePercentage(
+  actualValue: string | number | undefined,
+  declaredContent?: string | number,
+  limitText?: string
+): string | null {
+  if (!actualValue) return null;
+
+  // 1. Đọc chính xác số thực tế, xử lý trọn vẹn định dạng khoa học (VD: 1.5 x 10⁸ -> 150000000)
+  const actualNum = parseNumberFromText(actualValue);
+  if (isNaN(actualNum)) return null;
+
+  let baseNum = NaN;
+
+  // 2. Ưu tiên 1: Lấy từ Hàm lượng công bố (nếu có cấu hình)
+  if (
+    declaredContent !== undefined &&
+    declaredContent !== null &&
+    String(declaredContent).trim() !== ''
+  ) {
+    // Ép buộc dùng parseNumberFromText để giải quyết triệt để lỗi "10⁸" -> 10
+    baseNum = parseNumberFromText(declaredContent);
+  }
+
+  // 3. Ưu tiên 2 (Dự phòng thông minh): Tự bóc tách từ Tiêu chuẩn
+  // Xử lý bài toán L-Lysine: "15 ± 20 %" -> tự động lấy base là 15
+  if (isNaN(baseNum) && limitText) {
+    const spec = SpecificationParser.parse(limitText);
+    if (spec.type === 'TOLERANCE' && spec.baseValue !== undefined) {
+      baseNum = spec.baseValue;
+    }
+  }
+
+  // Nếu không tìm được cơ sở tính toán nào hợp lệ, hoặc base = 0 -> Bỏ qua
+  if (isNaN(baseNum) || baseNum === 0) return null;
+
+  // 4. Tính toán % và làm tròn 2 chữ số thập phân
+  const percentage = (actualNum / baseNum) * 100;
+  const rounded = Math.round(percentage * 100) / 100;
+
+  return `(${rounded}%)`;
+}
 
 export interface BasisInfo {
   basis: number | undefined;
@@ -15,10 +61,50 @@ export interface BasisInfo {
 }
 
 const ELEMENTAL_KEYWORDS = [
-  'tính theo', 'nguyên tố', 'elemental', 'ion', 'base',
-  '(zn)', '(fe)', '(ca)', '(mg)', '(cu)', '(mn)', '(se)', '(cr)', '(mo)', '(i)', '(k)', '(na)', '(p)',
-  'as zn', 'as fe', 'as ca', 'as mg', 'as cu', 'as mn', 'as se', 'as cr', 'as mo', 'as i', 'as k', 'as na',
-  'kẽm', 'sắt', 'canxi', 'magnesi', 'magne', 'đồng', 'mangan', 'selen', 'crom', 'molypden', 'iod', 'i-ốt', 'kali', 'natri'
+  'tính theo',
+  'nguyên tố',
+  'elemental',
+  'ion',
+  'base',
+  '(zn)',
+  '(fe)',
+  '(ca)',
+  '(mg)',
+  '(cu)',
+  '(mn)',
+  '(se)',
+  '(cr)',
+  '(mo)',
+  '(i)',
+  '(k)',
+  '(na)',
+  '(p)',
+  'as zn',
+  'as fe',
+  'as ca',
+  'as mg',
+  'as cu',
+  'as mn',
+  'as se',
+  'as cr',
+  'as mo',
+  'as i',
+  'as k',
+  'as na',
+  'kẽm',
+  'sắt',
+  'canxi',
+  'magnesi',
+  'magne',
+  'đồng',
+  'mangan',
+  'selen',
+  'crom',
+  'molypden',
+  'iod',
+  'i-ốt',
+  'kali',
+  'natri',
 ];
 
 /**
@@ -36,7 +122,7 @@ export const findMatchingFormulaItem = (
   if (!formula) return undefined;
   const allItems: FormulaIngredient[] = [
     ...(formula.ingredients || []),
-    ...(formula.excipients || [])
+    ...(formula.excipients || []),
   ].filter(Boolean);
 
   if (allItems.length === 0) return undefined;
@@ -44,11 +130,12 @@ export const findMatchingFormulaItem = (
   // Lớp 0: Khớp trực tiếp qua formulaIngredientId
   if (criterion.formulaIngredientId) {
     const linked = criterion.formulaIngredientId.trim().toLowerCase();
-    const match = allItems.find(i => 
-      i.id?.toLowerCase() === linked || 
-      i.name?.trim().toLowerCase() === linked ||
-      (resolver && resolver.isMatch(i.name, linked)) ||
-      normalizeName(i.name) === normalizeName(linked)
+    const match = allItems.find(
+      (i) =>
+        i.id?.toLowerCase() === linked ||
+        i.name?.trim().toLowerCase() === linked ||
+        (resolver && resolver.isMatch(i.name, linked)) ||
+        normalizeName(i.name) === normalizeName(linked)
     );
     if (match) return match;
   }
@@ -57,7 +144,9 @@ export const findMatchingFormulaItem = (
   const critNorm = normalizeName(critName);
 
   // Lớp 1: Khớp chính xác tên đã chuẩn hóa
-  const exact = allItems.find(i => normalizeName(i.name) === critNorm || (resolver && resolver.isMatch(i.name, critName)));
+  const exact = allItems.find(
+    (i) => normalizeName(i.name) === critNorm || (resolver && resolver.isMatch(i.name, critName))
+  );
   if (exact) return exact;
 
   // Lớp 2: Khớp qua Từ điển Dược khoa
@@ -80,7 +169,7 @@ export const findMatchingFormulaItem = (
 
   // Lớp 4: Dice coefficient (ngưỡng 0.6)
   let bestItem: FormulaIngredient | undefined = undefined;
-  let bestScore = 0.60;
+  let bestScore = 0.6;
   for (const item of allItems) {
     const score = Math.max(diceScore(critName, item.name), diceScore(item.name, critName));
     if (score > bestScore) {
@@ -108,33 +197,48 @@ export const resolveDeclaredBasis = (
       basisType: 'NONE',
       isElementalCandidate: false,
       activeBasisLabel: '---',
-      sourceDescription: 'Chưa có chỉ tiêu'
+      sourceDescription: 'Chưa có chỉ tiêu',
     };
   }
 
   const formulaItem = findMatchingFormulaItem(criterion, formula, resolver);
 
-  const dc = formulaItem?.declaredContent != null
-    ? (typeof formulaItem.declaredContent === 'string' ? parseNumberFromText(formulaItem.declaredContent) : Number(formulaItem.declaredContent))
-    : undefined;
-  const validDc = (dc !== undefined && !isNaN(dc) && dc > 0) ? dc : undefined;
+  const dc =
+    formulaItem?.declaredContent != null
+      ? typeof formulaItem.declaredContent === 'string'
+        ? parseNumberFromText(formulaItem.declaredContent)
+        : Number(formulaItem.declaredContent)
+      : undefined;
+  const validDc = dc !== undefined && !isNaN(dc) && dc > 0 ? dc : undefined;
 
-  const ec = formulaItem?.elementalContent != null
-    ? (typeof formulaItem.elementalContent === 'string' ? parseNumberFromText(formulaItem.elementalContent) : Number(formulaItem.elementalContent))
-    : undefined;
-  const validEc = (ec !== undefined && !isNaN(ec) && ec > 0) ? ec : undefined;
+  const ec =
+    formulaItem?.elementalContent != null
+      ? typeof formulaItem.elementalContent === 'string'
+        ? parseNumberFromText(formulaItem.elementalContent)
+        : Number(formulaItem.elementalContent)
+      : undefined;
+  const validEc = ec !== undefined && !isNaN(ec) && ec > 0 ? ec : undefined;
 
-  const tccsDc = criterion.declaredContent != null && criterion.declaredContent !== ''
-    ? (typeof criterion.declaredContent === 'string' ? parseNumberFromText(criterion.declaredContent) : Number(criterion.declaredContent))
-    : undefined;
-  const validTccsDc = (tccsDc !== undefined && !isNaN(tccsDc) && tccsDc > 0) ? tccsDc : undefined;
+  const tccsDc =
+    criterion.declaredContent != null && criterion.declaredContent !== ''
+      ? typeof criterion.declaredContent === 'string'
+        ? parseNumberFromText(criterion.declaredContent)
+        : Number(criterion.declaredContent)
+      : undefined;
+  const validTccsDc = tccsDc !== undefined && !isNaN(tccsDc) && tccsDc > 0 ? tccsDc : undefined;
 
-  const minVal = criterion.min != null && criterion.min !== ''
-    ? (typeof criterion.min === 'string' ? parseNumberFromText(criterion.min) : Number(criterion.min))
-    : undefined;
-  const maxVal = criterion.max != null && criterion.max !== ''
-    ? (typeof criterion.max === 'string' ? parseNumberFromText(criterion.max) : Number(criterion.max))
-    : undefined;
+  const minVal =
+    criterion.min != null && criterion.min !== ''
+      ? typeof criterion.min === 'string'
+        ? parseNumberFromText(criterion.min)
+        : Number(criterion.min)
+      : undefined;
+  const maxVal =
+    criterion.max != null && criterion.max !== ''
+      ? typeof criterion.max === 'string'
+        ? parseNumberFromText(criterion.max)
+        : Number(criterion.max)
+      : undefined;
 
   const isElementalCandidate = Boolean(validEc && validEc > 0);
 
@@ -148,7 +252,7 @@ export const resolveDeclaredBasis = (
       elementalContent: validEc,
       isElementalCandidate,
       activeBasisLabel: `${validEc} ${criterion.unit || formulaItem?.unit || ''} (Nguyên tố)`,
-      sourceDescription: `Nguyên tố ${formulaItem?.name || ''}`
+      sourceDescription: `Nguyên tố ${formulaItem?.name || ''}`,
     };
   }
   if (manualChoice === 'DECLARED' && (validDc || validTccsDc)) {
@@ -161,7 +265,7 @@ export const resolveDeclaredBasis = (
       elementalContent: validEc,
       isElementalCandidate,
       activeBasisLabel: `${b} ${criterion.unit || formulaItem?.unit || ''} (Muối/Hợp chất)`,
-      sourceDescription: `Muối/Hợp chất ${formulaItem?.name || ''}`
+      sourceDescription: `Muối/Hợp chất ${formulaItem?.name || ''}`,
     };
   }
 
@@ -176,7 +280,7 @@ export const resolveDeclaredBasis = (
       elementalContent: validEc,
       isElementalCandidate,
       activeBasisLabel: `${validEc} ${criterion.unit || formulaItem?.unit || ''} (Nguyên tố - TCCS)`,
-      sourceDescription: `Nguyên tố từ công thức (${formulaItem?.name})`
+      sourceDescription: `Nguyên tố từ công thức (${formulaItem?.name})`,
     };
   }
   if (criterion.calculationBasis === 'DECLARED' && (validDc || validTccsDc)) {
@@ -189,22 +293,25 @@ export const resolveDeclaredBasis = (
       elementalContent: validEc,
       isElementalCandidate,
       activeBasisLabel: `${b} ${criterion.unit || formulaItem?.unit || ''} (Muối - TCCS)`,
-      sourceDescription: `Muối từ công thức (${formulaItem?.name})`
+      sourceDescription: `Muối từ công thức (${formulaItem?.name})`,
     };
   }
 
   // B. Tự động nhận diện thông minh khi có elementalContent
   if (validEc && validEc > 0) {
     const cNameLower = (criterion.name || '').toLowerCase();
-    
+
     // Kiểm tra tên chỉ tiêu có chứa từ khóa nguyên tố hoặc tên nguyên tố
-    const hasElementalKeyword = ELEMENTAL_KEYWORDS.some(kw => cNameLower.includes(kw));
+    const hasElementalKeyword = ELEMENTAL_KEYWORDS.some((kw) => cNameLower.includes(kw));
 
     // Kiểm tra thang đo số liệu: Min/Max trong TCCS gần với elementalContent hơn hay gần với declaredContent hơn?
     let isCloserToElemental = false;
-    const refVal = (minVal !== undefined && maxVal !== undefined)
-      ? (minVal + maxVal) / 2
-      : (minVal !== undefined ? minVal : maxVal);
+    const refVal =
+      minVal !== undefined && maxVal !== undefined
+        ? (minVal + maxVal) / 2
+        : minVal !== undefined
+          ? minVal
+          : maxVal;
 
     if (refVal !== undefined && validDc !== undefined) {
       const distEc = Math.abs(refVal - validEc);
@@ -223,7 +330,7 @@ export const resolveDeclaredBasis = (
         elementalContent: validEc,
         isElementalCandidate: true,
         activeBasisLabel: `${validEc} ${criterion.unit || formulaItem?.unit || ''} (Nguyên tố)`,
-        sourceDescription: `Tự động nhận diện nguyên tố (${formulaItem?.name})`
+        sourceDescription: `Tự động nhận diện nguyên tố (${formulaItem?.name})`,
       };
     }
   }
@@ -238,7 +345,7 @@ export const resolveDeclaredBasis = (
       elementalContent: validEc,
       isElementalCandidate,
       activeBasisLabel: `${validDc} ${criterion.unit || formulaItem?.unit || ''} (Công bố)`,
-      sourceDescription: `Hàm lượng công bố từ công thức (${formulaItem?.name})`
+      sourceDescription: `Hàm lượng công bố từ công thức (${formulaItem?.name})`,
     };
   }
 
@@ -251,7 +358,7 @@ export const resolveDeclaredBasis = (
       elementalContent: validEc,
       isElementalCandidate,
       activeBasisLabel: `${validTccsDc} ${criterion.unit || ''} (Công bố TCCS)`,
-      sourceDescription: `Hàm lượng công bố khai báo trong TCCS`
+      sourceDescription: `Hàm lượng công bố khai báo trong TCCS`,
     };
   }
 
@@ -266,7 +373,7 @@ export const resolveDeclaredBasis = (
       elementalContent: validEc,
       isElementalCandidate,
       activeBasisLabel: `${mid} ${criterion.unit || ''} (Trung điểm TCCS)`,
-      sourceDescription: `Điểm giữa giới hạn Min (${minVal}) - Max (${maxVal})`
+      sourceDescription: `Điểm giữa giới hạn Min (${minVal}) - Max (${maxVal})`,
     };
   }
 
@@ -279,7 +386,7 @@ export const resolveDeclaredBasis = (
       elementalContent: validEc,
       isElementalCandidate,
       activeBasisLabel: `≥ ${minVal} ${criterion.unit || ''} (Mức Min TCCS)`,
-      sourceDescription: `Mức tối thiểu quy định trong TCCS`
+      sourceDescription: `Mức tối thiểu quy định trong TCCS`,
     };
   }
 
@@ -292,7 +399,7 @@ export const resolveDeclaredBasis = (
       elementalContent: validEc,
       isElementalCandidate,
       activeBasisLabel: `≤ ${maxVal} ${criterion.unit || ''} (Mức Max TCCS)`,
-      sourceDescription: `Mức tối đa quy định trong TCCS`
+      sourceDescription: `Mức tối đa quy định trong TCCS`,
     };
   }
 
@@ -304,6 +411,6 @@ export const resolveDeclaredBasis = (
     elementalContent: validEc,
     isElementalCandidate,
     activeBasisLabel: 'Chưa có chuẩn',
-    sourceDescription: 'Không có hàm lượng công bố hoặc mức giới hạn hợp lệ'
+    sourceDescription: 'Không có hàm lượng công bố hoặc mức giới hạn hợp lệ',
   };
 };

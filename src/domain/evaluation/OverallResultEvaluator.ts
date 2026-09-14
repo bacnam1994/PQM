@@ -8,9 +8,9 @@
  */
 
 import { TestResultEntry, TCCS } from '../../types';
-import { parseFlexibleValue } from '../../utils/parsing';
 import { TEST_RESULT_STATUS, EVALUATION_RULE } from '../../utils/constants';
 import { normalizeName } from '../../services/criteriaAliasService';
+import { CriterionEvaluator } from './CriterionEvaluator';
 import { AlternateRuleEvaluator } from './AlternateRuleEvaluator';
 
 export class OverallResultEvaluator {
@@ -18,15 +18,9 @@ export class OverallResultEvaluator {
    * Tính toán kết quả tổng thể toàn phiếu (PASS hoặc FAIL)
    */
   static calculateOverallStatus(results: TestResultEntry[], tccs: TCCS | null): 'PASS' | 'FAIL' {
-    // Chốt chặn an toàn: Phiếu trống không có chỉ tiêu nào phải đánh FAIL
-    if (!results || results.length === 0) {
-      return TEST_RESULT_STATUS.FAIL;
-    }
+    if (!results || results.length === 0) return TEST_RESULT_STATUS.FAIL;
 
     const rules = tccs?.alternateRules || [];
-
-    // Lọc danh sách các chỉ tiêu thực sự KHÔNG ĐẠT (isPass === false)
-    // Các chỉ tiêu không có giới hạn hoặc mang tính thông tin (isPass === null / undefined) không tính là FAIL
     const failures = results.filter((r) => r.isPass === false);
 
     const isNameMatch = (nameA?: string, nameB?: string) => {
@@ -34,17 +28,34 @@ export class OverallResultEvaluator {
       return normalizeName(nameA) === normalizeName(nameB);
     };
 
-    // 1. Xử lý logic FAIL_RETRY (Stage 2)
+    // 1. Duyệt qua các chỉ tiêu rớt (Failures) để xem có được cứu/miễn không
     for (const fail of failures) {
-      const rule = rules.find(
+      // VÁ BUG 3: Kiểm tra xem lỗi này có thuộc chỉ tiêu phụ được miễn kiểm không?
+      const condRuleWhereThisIsAlt = rules.find(
+        (r) => r.type === EVALUATION_RULE.CONDITIONAL_CHECK && isNameMatch(r.alt, fail.criteriaName)
+      );
+      if (condRuleWhereThisIsAlt) {
+        const mainResult = results.find((r) =>
+          isNameMatch(r.criteriaName, condRuleWhereThisIsAlt.main)
+        );
+        if (mainResult) {
+          const isTriggered = CriterionEvaluator.checkRange(
+            condRuleWhereThisIsAlt.conditionValue || '',
+            String(mainResult.value)
+          );
+          // Nếu điều kiện KHÔNG bị kích hoạt -> chỉ tiêu phụ này được MIỄN KIỂM -> Bỏ qua lỗi FAIL của nó
+          if (isTriggered !== true) continue;
+        }
+      }
+
+      // Xử lý logic FAIL_RETRY (Stage 2)
+      const retryRule = rules.find(
         (r: any) =>
           isNameMatch(r.main, fail.criteriaName) &&
           (!r.type || r.type === EVALUATION_RULE.FAIL_RETRY)
       );
-
-      if (rule) {
-        const altResult = results.find((r) => isNameMatch(r.criteriaName, rule.alt));
-        // Không dùng !altResult.value vì số 0 (Zero) là giá trị hợp lệ (VD: 0 CFU)
+      if (retryRule) {
+        const altResult = results.find((r) => isNameMatch(r.criteriaName, retryRule.alt));
         if (
           !altResult ||
           altResult.value === undefined ||
@@ -54,31 +65,29 @@ export class OverallResultEvaluator {
           return TEST_RESULT_STATUS.FAIL;
         }
       } else {
+        // Không thuộc diện miễn kiểm, cũng không có luật FAIL_RETRY cứu -> Đánh rớt phiếu
         return TEST_RESULT_STATUS.FAIL;
       }
     }
 
-    // 2. Xử lý logic CONDITIONAL_CHECK
+    // 2. VÁ BUG 2: Rà soát xem có CONDITIONAL_CHECK nào BỊ KÍCH HOẠT mà chưa đạt không?
     const conditionalRules = rules.filter((r: any) => r.type === EVALUATION_RULE.CONDITIONAL_CHECK);
-
     for (const rule of conditionalRules) {
       const mainResult = results.find((r) => isNameMatch(r.criteriaName, rule.main));
-      if (
-        mainResult &&
-        mainResult.isPass &&
-        mainResult.value !== undefined &&
-        mainResult.value !== ''
-      ) {
-        const threshold = parseFlexibleValue((rule as any).conditionValue);
-        const val = parseFlexibleValue(String(mainResult.value));
+      if (mainResult && mainResult.value !== undefined && mainResult.value !== '') {
+        // Kiểm tra xem giá trị chỉ tiêu chính có kích hoạt điều kiện phải làm thêm không
+        const isTriggered = CriterionEvaluator.checkRange(
+          rule.conditionValue || '',
+          String(mainResult.value)
+        );
 
-        if (threshold !== null && val !== null && val > threshold) {
+        if (isTriggered === true) {
           const altResult = results.find((r) => isNameMatch(r.criteriaName, rule.alt));
           if (
             !altResult ||
             altResult.value === undefined ||
             altResult.value === '' ||
-            !altResult.isPass
+            altResult.isPass === false
           ) {
             return TEST_RESULT_STATUS.FAIL;
           }

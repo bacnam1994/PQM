@@ -10,6 +10,7 @@ import { SpecificationParser } from './SpecificationParser';
 import { normalizeValue, parseNumberFromText } from './ValueNormalizer';
 import { QualityEvaluationEngine } from './QualityEvaluationEngine';
 import { AlternateRuleEvaluator } from './AlternateRuleEvaluator';
+import { OverallResultEvaluator } from './OverallResultEvaluator';
 
 describe('P4 — Evaluation Engine 18 Edge Cases Test Suite', () => {
   // Case 1: ND (Not Detected / Không phát hiện)
@@ -66,6 +67,13 @@ describe('P4 — Evaluation Engine 18 Edge Cases Test Suite', () => {
       const specND = SpecificationParser.parse('Không phát hiện');
       expect(CriterionEvaluator.evaluateParsed(specND, normalizeValue('< 10'))).toBe(true);
     });
+
+    it('không đạt chuẩn khi lab trả về < 10 nhưng tiêu chuẩn <= 3 (sửa lỗi LOD hardcode 10)', () => {
+      const specLte3 = SpecificationParser.parse('<= 3');
+      expect(CriterionEvaluator.evaluateParsed(specLte3, normalizeValue('< 10'))).toBe(false);
+      // Ngược lại < 2 thỏa mãn tiêu chuẩn <= 3 vì 2 <= 3
+      expect(CriterionEvaluator.evaluateParsed(specLte3, normalizeValue('< 2'))).toBe(true);
+    });
   });
 
   // Case 5: < LOQ (Nhỏ hơn giới hạn định lượng)
@@ -111,7 +119,7 @@ describe('P4 — Evaluation Engine 18 Edge Cases Test Suite', () => {
 
   // Case 8: 5 - 10 (Dải khoảng dấu gạch ngang)
   describe('Case 8: 5 - 10 (Dải khoảng dấu gạch ngang)', () => {
-    it('đánh giá đúng dải min 5, max 10', () => {
+    it('đánh giá đúng dải min 5, max 10 kèm quy tắc làm tròn số nguyên khi tiêu chuẩn không có phần thập phân', () => {
       const spec = SpecificationParser.parse('5 - 10');
       expect(spec.type).toBe('RANGE');
       expect(spec.min).toBe(5);
@@ -120,14 +128,35 @@ describe('P4 — Evaluation Engine 18 Edge Cases Test Suite', () => {
       expect(CriterionEvaluator.evaluateParsed(spec, normalizeValue('5'))).toBe(true);
       expect(CriterionEvaluator.evaluateParsed(spec, normalizeValue('7.5'))).toBe(true);
       expect(CriterionEvaluator.evaluateParsed(spec, normalizeValue('10'))).toBe(true);
-      expect(CriterionEvaluator.evaluateParsed(spec, normalizeValue('4.99'))).toBe(false);
-      expect(CriterionEvaluator.evaluateParsed(spec, normalizeValue('10.01'))).toBe(false);
+      // Làm tròn số nguyên theo tiêu chuẩn không có phần thập phân (4.99 -> 5, 10.01 -> 10)
+      expect(CriterionEvaluator.evaluateParsed(spec, normalizeValue('4.99'))).toBe(true);
+      expect(CriterionEvaluator.evaluateParsed(spec, normalizeValue('10.01'))).toBe(true);
+      // Ngoài khoảng sau khi làm tròn
+      expect(CriterionEvaluator.evaluateParsed(spec, normalizeValue('4.4'))).toBe(false);
+      expect(CriterionEvaluator.evaluateParsed(spec, normalizeValue('10.6'))).toBe(false);
+
+      // Với tiêu chuẩn có chữ số thập phân (5.00 - 10.00), 4.99 không được làm tròn lên 5
+      const specDec = SpecificationParser.parse('5.00 - 10.00');
+      expect(CriterionEvaluator.evaluateParsed(specDec, normalizeValue('4.99'))).toBe(false);
+      expect(CriterionEvaluator.evaluateParsed(specDec, normalizeValue('10.01'))).toBe(false);
+    });
+
+    it('bóc tách chính xác dải khoảng liền kề số dạng 5.0-10.0 và -20.0--10.0', () => {
+      const specAdjacent = SpecificationParser.parse('5.0-10.0');
+      expect(specAdjacent.type).toBe('RANGE');
+      expect(specAdjacent.min).toBe(5.0);
+      expect(specAdjacent.max).toBe(10.0);
+
+      const specNegative = SpecificationParser.parse('-20.0--10.0');
+      expect(specNegative.type).toBe('RANGE');
+      expect(specNegative.min).toBe(-20.0);
+      expect(specNegative.max).toBe(-10.0);
     });
   });
 
   // Case 9: 5 ~ 10 (Dải khoảng dấu ngã)
   describe('Case 9: 5 ~ 10 (Dải khoảng dấu ngã)', () => {
-    it('đánh giá đúng dải min 5, max 10 với ký tự ngã', () => {
+    it('đánh giá đúng dải min 5, max 10 với ký tự ngã kèm quy tắc làm tròn', () => {
       const spec = SpecificationParser.parse('5 ~ 10');
       expect(spec.type).toBe('RANGE');
       expect(spec.min).toBe(5);
@@ -136,8 +165,12 @@ describe('P4 — Evaluation Engine 18 Edge Cases Test Suite', () => {
       expect(CriterionEvaluator.evaluateParsed(spec, normalizeValue('5'))).toBe(true);
       expect(CriterionEvaluator.evaluateParsed(spec, normalizeValue('8'))).toBe(true);
       expect(CriterionEvaluator.evaluateParsed(spec, normalizeValue('10'))).toBe(true);
-      expect(CriterionEvaluator.evaluateParsed(spec, normalizeValue('4.9'))).toBe(false);
-      expect(CriterionEvaluator.evaluateParsed(spec, normalizeValue('10.1'))).toBe(false);
+      // Làm tròn số nguyên (4.9 -> 5, 10.1 -> 10)
+      expect(CriterionEvaluator.evaluateParsed(spec, normalizeValue('4.9'))).toBe(true);
+      expect(CriterionEvaluator.evaluateParsed(spec, normalizeValue('10.1'))).toBe(true);
+      // Ngoài khoảng sau khi làm tròn
+      expect(CriterionEvaluator.evaluateParsed(spec, normalizeValue('4.4'))).toBe(false);
+      expect(CriterionEvaluator.evaluateParsed(spec, normalizeValue('10.6'))).toBe(false);
     });
   });
 
@@ -193,6 +226,17 @@ describe('P4 — Evaluation Engine 18 Edge Cases Test Suite', () => {
 
       const strictSpec = SpecificationParser.parse('<= 0.0005');
       expect(CriterionEvaluator.evaluateParsed(strictSpec, normalizeValue('1e-3'))).toBe(false);
+    });
+
+    it('nhận diện siêu linh hoạt các biến thể khoa học (1.5 x 10^8, 1.5*10^8, 1.5 × 10⁸, 1.5x10 8) mà không làm hỏng số nguyên thường (100, 1000)', () => {
+      expect(parseNumberFromText('1.5 x 10^8')).toBe(150000000);
+      expect(parseNumberFromText('1.5*10^8')).toBe(150000000);
+      expect(parseNumberFromText('1.5 × 10⁸')).toBe(150000000);
+      expect(parseNumberFromText('1.5x10 8')).toBe(150000000);
+      expect(parseNumberFromText('10^3')).toBe(1000);
+      expect(parseNumberFromText('10³')).toBe(1000);
+      expect(parseNumberFromText('100')).toBe(100);
+      expect(parseNumberFromText('1000')).toBe(1000);
     });
   });
 
@@ -269,7 +313,7 @@ describe('P4 — Evaluation Engine 18 Edge Cases Test Suite', () => {
       expect(res.alternateCriterionName).toBe('Độ đồng đều khối lượng (Lần 2)');
     });
 
-    it('CONDITIONAL_CHECK: kiểm tra điều kiện chỉ tiêu thay thế khi chỉ tiêu chính không đạt', () => {
+    it('CONDITIONAL_CHECK: tại cấp chỉ tiêu không làm thay đổi isPass của chỉ tiêu Main, quyết định tổng thể thuộc về OverallResultEvaluator', () => {
       const mainCriterion = {
         name: 'Độ hòa tan (Giai đoạn 1)',
         type: 'NUMBER',
@@ -287,7 +331,7 @@ describe('P4 — Evaluation Engine 18 Edge Cases Test Suite', () => {
         },
       ];
 
-      // Giai đoạn 1 = 78 (FAIL), Giai đoạn 2 = 76 (>= 75 -> PASS)
+      // Với CONDITIONAL_CHECK, evaluateCriterionWithAlternates trả về isPass: false cho Main
       const res = AlternateRuleEvaluator.evaluateCriterionWithAlternates(
         mainCriterion,
         '78',
@@ -295,9 +339,84 @@ describe('P4 — Evaluation Engine 18 Edge Cases Test Suite', () => {
         alternateRules
       );
 
-      expect(res.isPass).toBe(true);
-      expect(res.usedAlternate).toBe(true);
-      expect(res.ruleApplied).toBe('CONDITIONAL_CHECK');
+      expect(res.isPass).toBe(false);
+      expect(res.usedAlternate).toBe(false);
+
+      // Thẩm định tổng thể qua OverallResultEvaluator:
+      const tccs: any = { alternateRules };
+
+      // 1. Khi điều kiện được kích hoạt và chỉ tiêu alt đạt -> PASS
+      const resultsTriggeredPass: any[] = [
+        { criteriaName: 'Độ hòa tan (Giai đoạn 1)', value: '78', isPass: true },
+        { criteriaName: 'Độ hòa tan (Giai đoạn 2)', value: '76', isPass: true },
+      ];
+      expect(OverallResultEvaluator.calculateOverallStatus(resultsTriggeredPass, tccs)).toBe(
+        'PASS'
+      );
+
+      // 2. Khi điều kiện được kích hoạt mà chỉ tiêu alt không đạt/thiếu -> FAIL
+      const resultsTriggeredFail: any[] = [
+        { criteriaName: 'Độ hòa tan (Giai đoạn 1)', value: '78', isPass: true },
+        { criteriaName: 'Độ hòa tan (Giai đoạn 2)', value: '', isPass: false },
+      ];
+      expect(OverallResultEvaluator.calculateOverallStatus(resultsTriggeredFail, tccs)).toBe(
+        'FAIL'
+      );
+
+      // 3. VÁ BUG 3 (Tránh chết chùm): Khi điều kiện KHÔNG kích hoạt (< 75), alt bị FAIL nhưng vẫn được MIỄN KIỂM -> PASS
+      const microbialTCCS: any = {
+        alternateRules: [
+          {
+            id: 'rule_micro',
+            type: 'CONDITIONAL_CHECK',
+            main: 'Tổng số vi sinh vật',
+            alt: 'E.coli',
+            conditionValue: '> 1000',
+          },
+        ],
+      };
+      const resultsExempted: any[] = [
+        { criteriaName: 'Tổng số vi sinh vật', value: '500', isPass: true }, // <= 1000 -> không kích hoạt
+        { criteriaName: 'E.coli', value: '', isPass: false }, // không làm / đánh rớt
+      ];
+      expect(OverallResultEvaluator.calculateOverallStatus(resultsExempted, microbialTCCS)).toBe(
+        'PASS'
+      );
+    });
+
+    it('checkRuleExemption: kiểm tra chính xác toán tử của điều kiện qua CriterionEvaluator', () => {
+      const activeTCCS = { id: 'tccs1' };
+      const tccsMaps = {
+        rulesMap: new Map([
+          [
+            'e.coli',
+            { type: 'CONDITIONAL_CHECK', main: 'Tổng số vi sinh vật', conditionValue: '> 1000' },
+          ],
+        ]),
+        criteriaMap: new Map([
+          ['tổng số vi sinh vật', { name: 'Tổng số vi sinh vật', type: 'NUMBER', max: 5000 }],
+        ]),
+      };
+
+      // TH1: Vi sinh vật = 500 (không kích hoạt điều kiện > 1000) -> Được miễn kiểm E.coli
+      const isExempted500 = AlternateRuleEvaluator.checkRuleExemption(
+        'e.coli',
+        (name) => (name === 'tổng số vi sinh vật' ? '500' : undefined),
+        activeTCCS,
+        tccsMaps,
+        new Map()
+      );
+      expect(isExempted500).toBe(true);
+
+      // TH2: Vi sinh vật = 1500 (kích hoạt điều kiện > 1000) -> Bắt buộc kiểm tra, KHÔNG được miễn kiểm
+      const isExempted1500 = AlternateRuleEvaluator.checkRuleExemption(
+        'e.coli',
+        (name) => (name === 'tổng số vi sinh vật' ? '1500' : undefined),
+        activeTCCS,
+        tccsMaps,
+        new Map()
+      );
+      expect(isExempted1500).toBe(false);
     });
   });
 });

@@ -51,7 +51,11 @@ describe('checkRange()', () => {
       expect(checkRange('≤ 10', '11')).toBe(false);
       expect(checkRange('> 5', '5')).toBe(false);
       expect(checkRange('>= 5.5', '6.0')).toBe(true);
-      expect(checkRange('100', '100.1')).toBe(false);
+      // Với tiêu chuẩn số nguyên không có thập phân (100), 100.1 làm tròn thành 100 -> true
+      expect(checkRange('100', '100.1')).toBe(true);
+      expect(checkRange('100', '100.6')).toBe(false);
+      // Với tiêu chuẩn có thập phân (100.0), 100.1 giữ nguyên > 100.0 -> false
+      expect(checkRange('100.0', '100.1')).toBe(false);
     });
   });
 
@@ -75,17 +79,22 @@ describe('checkRange()', () => {
       expect(checkRange('<= 10', '<10')).toBe(true);
     });
 
-    it('<10 phải ĐẠT khi giới hạn là "≤ 3" hoặc "≤ 3 CFU/g" (chuẩn phòng lab LOD/LOQ 0 CFU)', () => {
-      expect(checkRange('≤ 3', '< 10')).toBe(true);
-      expect(checkRange('<= 3', '< 10')).toBe(true);
-      expect(checkRange('≤ 3 CFU/g', '< 10 CFU/g')).toBe(true);
-      expect(checkRange('≤ 3', '< 10^1')).toBe(true);
+    it('LOD/LOQ: < X thỏa mãn tiêu chuẩn <= Y nếu X <= Y (sửa lỗi LOD hardcode 10)', () => {
+      // Khi X > Y: không đạt chuẩn
+      expect(checkRange('≤ 3', '< 10')).toBe(false);
+      expect(checkRange('<= 3', '< 10')).toBe(false);
+      expect(checkRange('≤ 3 CFU/g', '< 10 CFU/g')).toBe(false);
+      expect(checkRange('≤ 3', '< 10^1')).toBe(false);
+      expect(checkRange('< 3', '< 10')).toBe(false);
+      expect(checkRange('NMT 3', '< 10')).toBe(false);
+      expect(checkRange('0 - 3', '< 10')).toBe(false);
+
+      // Khi X <= Y: đạt chuẩn
       expect(checkRange('≤ 3', '< 3')).toBe(true);
       expect(checkRange('≤ 3', '< 1')).toBe(true);
       expect(checkRange('≤ 3', '< 0.1')).toBe(true);
-      expect(checkRange('< 3', '< 10')).toBe(true);
-      expect(checkRange('NMT 3', '< 10')).toBe(true);
-      expect(checkRange('0 - 3', '< 10')).toBe(true);
+
+      // Định tính: Không phát hiện / Âm tính luôn đạt với < X
       expect(checkRange('Không được có', '< 10')).toBe(true);
       expect(checkRange('Âm tính', '< 10')).toBe(true);
     });
@@ -154,7 +163,14 @@ describe('evaluateCriterionWithAlternates()', () => {
 
   it('FAIL_RETRY: Trả về isPass=true khi alt đạt điều kiện', () => {
     const allValues = { 'Độ hòa tan stage 2': '79' };
-    const rules = [{ main: 'Độ hòa tan', alt: 'Độ hòa tan stage 2', type: 'FAIL_RETRY' as const, conditionValue: '<= 80' }];
+    const rules = [
+      {
+        main: 'Độ hòa tan',
+        alt: 'Độ hòa tan stage 2',
+        type: 'FAIL_RETRY' as const,
+        conditionValue: '<= 80',
+      },
+    ];
     const result = evaluateCriterionWithAlternates(baseCriterion, '85', allValues, rules);
     expect(result.isPass).toBe(true);
     expect(result.usedAlternate).toBe(true);
@@ -162,7 +178,14 @@ describe('evaluateCriterionWithAlternates()', () => {
 
   it('FAIL_RETRY: Trả về isPass=false khi alt không đạt điều kiện', () => {
     const allValues = { 'Độ hòa tan stage 2': '82' };
-    const rules = [{ main: 'Độ hòa tan', alt: 'Độ hòa tan stage 2', type: 'FAIL_RETRY' as const, conditionValue: '<= 80' }];
+    const rules = [
+      {
+        main: 'Độ hòa tan',
+        alt: 'Độ hòa tan stage 2',
+        type: 'FAIL_RETRY' as const,
+        conditionValue: '<= 80',
+      },
+    ];
     const result = evaluateCriterionWithAlternates(baseCriterion, '85', allValues, rules);
     expect(result.isPass).toBe(false);
     expect(result.usedAlternate).toBe(false);

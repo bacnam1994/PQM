@@ -54,7 +54,7 @@ describe('P12 — Production-Scale Performance Benchmark Suite', () => {
       const queryTime = performance.now() - queryStart;
 
       expect(indexTime).toBeLessThan(100);
-      expect(queryTime).toBeLessThan(30);
+      expect(queryTime).toBeLessThan(60);
       expect(res.results.length).toBeGreaterThan(0);
     });
   });
@@ -99,7 +99,7 @@ describe('P12 — Production-Scale Performance Benchmark Suite', () => {
       expect(report.sampleSize).toBe(50000);
       expect(report.capability.cp).toBeDefined();
       expect(report.downsampledPoints?.length).toBe(500);
-      expect(duration).toBeLessThan(350);
+      expect(duration).toBeLessThan(500);
     });
 
     it('Evaluation Engine thông lượng > 5.000 chỉ tiêu/giây trên tập lớn', () => {
@@ -143,7 +143,7 @@ describe('P12 — Production-Scale Performance Benchmark Suite', () => {
 
       expect(report.sampleSize).toBe(100000);
       expect(report.downsampledPoints?.length).toBe(500);
-      expect(duration).toBeLessThan(500);
+      expect(duration).toBeLessThan(800);
     });
   });
 

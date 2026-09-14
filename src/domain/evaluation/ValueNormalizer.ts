@@ -72,7 +72,7 @@ export const normalizeNumericString = (value: string | number | null | undefined
   if (value === null || value === undefined) return '';
   let str = standardizeDecimalString(value);
 
-  // Chuyển đổi ký tự số mũ đặc biệt về định dạng tiêu chuẩn (^)
+  // 1. Chuyển đổi số mũ nhỏ về ^
   str = str.replace(/[⁰¹²³⁴⁵⁶⁷⁸⁹⁻]+/g, (match) => {
     return (
       '^' +
@@ -83,26 +83,20 @@ export const normalizeNumericString = (value: string | number | null | undefined
     );
   });
 
-  // Chuẩn hóa dấu nhân và khoảng trắng xung quanh về 'x'
-  str = str.replace(/\s*[xX*×]\s*/g, 'x');
+  // 2. VÁ LỖI BACILLUS: Nhận diện định dạng khoa học linh hoạt (bỏ qua mọi khoảng trắng, dấu x, dấu *)
+  str = str.replace(/([+-]?\d*\.?\d+)\s*[xX*×]\s*10\s*(?:\^)?\s*([+-]?\d+)/gi, (_, p1, p2) => {
+    const num = parseFloat(p1);
+    const exp = parseInt(p2, 10);
+    return String(num * Math.pow(10, exp));
+  });
 
-  // Xử lý định dạng khoa học có chứa hệ số nhân (VD: 1.5x10^5, 1.5x10 5)
-  str = str.replace(
-    /([+-]?\d*\.?\d+)\s*x\s*10(?:(?:\s*\^\s*)|(?:\s+))([+-]?\d+)/gi,
-    (_, p1, p2) => {
-      const num = parseFloat(p1);
-      const exp = parseInt(p2, 10);
-      return String(num * Math.pow(10, exp));
-    }
-  );
-
-  // Xử lý định dạng khoa học đứng độc lập (VD: 10^3, khoảng trắng 10 3)
-  str = str.replace(/(^|[^\d.x])10(?:(?:\s*\^\s*)|(?:\s+))([+-]?\d+)/gi, (_, prefix, p1) => {
+  // 3. Xử lý định dạng khoa học đứng độc lập (VD: 10^3, khoảng trắng 10 3)
+  str = str.replace(/(^|[^\d.xX*×])10(?:\s*\^\s*|\s+)([+-]?\d+)/gi, (_, prefix, p1) => {
     const exp = parseInt(p1, 10);
     return prefix + String(Math.pow(10, exp));
   });
 
-  // Mở rộng scientific notation dạng 1.6e9
+  // 4. Mở rộng khoa học dạng e (VD: 1.6e9)
   str = str.replace(/([+-]?\d+(\.\d+)?)e([+-]?\d+)/gi, (match) => {
     try {
       const num = Number(match);

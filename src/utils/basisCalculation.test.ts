@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { resolveDeclaredBasis, findMatchingFormulaItem } from './basisCalculation';
+import {
+  resolveDeclaredBasis,
+  findMatchingFormulaItem,
+  calculateRelativePercentage,
+} from './basisCalculation';
 import { Criterion, CriterionType, ProductFormula } from '../types';
 
 describe('basisCalculation - resolveDeclaredBasis', () => {
@@ -12,24 +16,24 @@ describe('basisCalculation - resolveDeclaredBasis', () => {
         name: 'Kẽm gluconat',
         declaredContent: 70,
         elementalContent: 10,
-        unit: 'mg/viên'
+        unit: 'mg/viên',
       },
       {
         id: 'ing2',
         name: 'Sắt (II) fumarat',
         declaredContent: 100,
         elementalContent: 32.8,
-        unit: 'mg/viên'
+        unit: 'mg/viên',
       },
       {
         id: 'ing3',
         name: 'Paracetamol',
         declaredContent: 500,
-        unit: 'mg/viên'
-      }
+        unit: 'mg/viên',
+      },
     ],
     createdAt: '',
-    updatedAt: ''
+    updatedAt: '',
   };
 
   it('1. Tự động nhận diện nguyên tố khi tên chỉ tiêu là Kẽm (Zn) và công thức có Kẽm gluconat (70mg muối, 10mg nguyên tố)', () => {
@@ -38,7 +42,7 @@ describe('basisCalculation - resolveDeclaredBasis', () => {
       unit: 'mg/viên',
       min: 8.0,
       max: 12.0,
-      type: CriterionType.NUMBER
+      type: CriterionType.NUMBER,
     };
 
     const res = resolveDeclaredBasis(criterion, sampleFormula);
@@ -56,7 +60,7 @@ describe('basisCalculation - resolveDeclaredBasis', () => {
       declaredContent: 70, // Giả sử bị điền nhầm hàm lượng muối vào TCCS
       calculationBasis: 'ELEMENTAL',
       formulaIngredientId: 'Kẽm gluconat',
-      type: CriterionType.NUMBER
+      type: CriterionType.NUMBER,
     };
 
     const res = resolveDeclaredBasis(criterion, sampleFormula);
@@ -70,7 +74,7 @@ describe('basisCalculation - resolveDeclaredBasis', () => {
       unit: 'mg/viên',
       calculationBasis: 'DECLARED',
       formulaIngredientId: 'Kẽm gluconat',
-      type: CriterionType.NUMBER
+      type: CriterionType.NUMBER,
     };
 
     const res = resolveDeclaredBasis(criterion, sampleFormula);
@@ -82,7 +86,7 @@ describe('basisCalculation - resolveDeclaredBasis', () => {
     const criterion: Criterion = {
       name: 'Sắt',
       unit: 'mg/viên',
-      type: CriterionType.NUMBER
+      type: CriterionType.NUMBER,
     };
 
     // Chọn thủ công ELEMENTAL
@@ -100,7 +104,7 @@ describe('basisCalculation - resolveDeclaredBasis', () => {
     const criterion: Criterion = {
       name: 'Định lượng Paracetamol',
       unit: 'mg/viên',
-      type: CriterionType.NUMBER
+      type: CriterionType.NUMBER,
     };
 
     const res = resolveDeclaredBasis(criterion, sampleFormula);
@@ -115,11 +119,48 @@ describe('basisCalculation - resolveDeclaredBasis', () => {
       unit: 'mg',
       min: 90,
       max: 110,
-      type: CriterionType.NUMBER
+      type: CriterionType.NUMBER,
     };
 
     const res = resolveDeclaredBasis(criterion, undefined);
     expect(res.basis).toBe(100);
     expect(res.basisType).toBe('MIDPOINT');
+  });
+});
+
+describe('basisCalculation - calculateRelativePercentage', () => {
+  it('1. Tính toán % chính xác từ hàm lượng công bố', () => {
+    expect(calculateRelativePercentage(15, 15)).toBe('(100%)');
+    expect(calculateRelativePercentage('15.5', 15)).toBe('(103.33%)');
+    expect(calculateRelativePercentage(14.7, 15)).toBe('(98%)');
+  });
+
+  it('2. Xử lý chuẩn xác định dạng khoa học và số mũ (1.5 x 10⁸ vs 10⁸)', () => {
+    expect(calculateRelativePercentage('1.5 x 10⁸', '10⁸')).toBe('(150%)');
+    expect(calculateRelativePercentage('1.5x10^5', '10^5')).toBe('(150%)');
+  });
+
+  it('3. Dự phòng thông minh: tự bóc tách cơ sở tính toán từ tiêu chuẩn dạng TOLERANCE (15 ± 20 % -> base 15)', () => {
+    // Không có declaredContent -> tự động lấy base = 15 từ limitText
+    expect(calculateRelativePercentage('16.2', undefined, '15 ± 20 %')).toBe('(108%)');
+    expect(calculateRelativePercentage(15, undefined, '15 ± 20%')).toBe('(100%)');
+  });
+
+  it('4. Ưu tiên declaredContent trước limitText nếu cả hai đều có', () => {
+    expect(calculateRelativePercentage('16', '20', '15 ± 20 %')).toBe('(80%)');
+  });
+
+  it('5. Trả về null khi actualValue trống hoặc không phải số hợp lệ', () => {
+    expect(calculateRelativePercentage(undefined, 100)).toBeNull();
+    expect(calculateRelativePercentage('', 100)).toBeNull();
+    expect(calculateRelativePercentage('Không phát hiện', 100)).toBeNull();
+    expect(calculateRelativePercentage('Âm tính', 100)).toBeNull();
+  });
+
+  it('6. Trả về null khi không tìm được base hợp lệ hoặc base = 0', () => {
+    expect(calculateRelativePercentage(15, 0)).toBeNull();
+    expect(calculateRelativePercentage(15, undefined, undefined)).toBeNull();
+    expect(calculateRelativePercentage(15, undefined, 'Không được có')).toBeNull();
+    expect(calculateRelativePercentage(15, 'abc')).toBeNull();
   });
 });

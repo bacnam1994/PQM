@@ -10,8 +10,18 @@
 
 import { ParsedSpecification, NormalizedValue, SingleCriterionResult } from './EvaluationTypes';
 import { SpecificationParser } from './SpecificationParser';
-import { normalizeValue, parseNumberFromText } from './ValueNormalizer';
+import { normalizeValue, parseNumberFromText, normalizeNumericString } from './ValueNormalizer';
 import { evaluateCriterion as legacyEvaluateCriterion } from '../../utils/parsing';
+
+// Thêm hàm làm tròn ngay dưới các import
+function roundToSignificant(value: number, specString: string): number {
+  const norm = normalizeNumericString(specString);
+  const match = (norm || specString || '').match(/\.(\d+)/);
+  if (!match) return Math.round(value); // Không có thập phân -> Làm tròn số nguyên
+  const decPlaces = match[1].length;
+  const factor = Math.pow(10, decPlaces);
+  return Math.round(value * factor) / factor;
+}
 
 export class CriterionEvaluator {
   /**
@@ -41,16 +51,21 @@ export class CriterionEvaluator {
       return null;
     }
 
-    // Ngoại lệ giới hạn phát hiện phòng kiểm nghiệm (LOD / LOQ Exception):
-    // Khi phương pháp đếm đĩa không mọc khuẩn lạc nào (0 CFU) ở độ pha loãng 10^-1, lab xuất "< 10".
-    // Nồng độ thực tế là 0. Với các chỉ tiêu có giới hạn trên (<= 3, <= 5, NMT 3), 0 <= limitNum nên luôn ĐẠT (PASS).
+    // SỬA BUG 1: Hàm isLODOrZero
     const isLODOrZero = (limitNum: number): boolean => {
       if (!val.isStrictLessThan) return false;
       const rawNum = parseNumberFromText(val.stringValue);
-      if (limitNum >= 0 && (val.isND || isNaN(rawNum) || rawNum <= 10)) {
+      // Kết quả < X thỏa mãn tiêu chuẩn <= Y nếu X <= Y (Xóa bỏ hardcode 10)
+      if (limitNum >= 0 && (val.isND || isNaN(rawNum) || rawNum <= limitNum)) {
         return true;
       }
       return false;
+    };
+
+    const isGreaterOrEqual = (limitNum: number): boolean => {
+      if (!val.isStrictGreaterThan) return false;
+      const rawNum = parseNumberFromText(val.stringValue);
+      return !isNaN(rawNum) && rawNum >= limitNum;
     };
 
     // 3. Tiêu chuẩn Dung sai: base ± tolerance
@@ -64,40 +79,41 @@ export class CriterionEvaluator {
       return actualVal >= base - tol - eps && actualVal <= base + tol + eps;
     }
 
+    // ÁP DỤNG BUG 3: Làm tròn trước khi so sánh (Ví dụ cho khối RANGE và COMPARISON)
+    const roundedVal = roundToSignificant(actualVal, spec.raw);
+
     // 4. Tiêu chuẩn Dải khoảng: min - max hoặc min ~ max
     if (spec.type === 'RANGE') {
       const min = spec.min ?? 0;
       const max = spec.max ?? 0;
-      const eps = Math.max(Math.abs(min), Math.abs(max), Math.abs(actualVal)) * 1e-10;
-      if (actualVal >= min - eps && actualVal <= max + eps) {
+      const eps = Math.max(Math.abs(min), Math.abs(max), Math.abs(roundedVal)) * 1e-10;
+      if (roundedVal >= min - eps && roundedVal <= max + eps) {
         return true;
       }
-      if (min <= 0 && isLODOrZero(max)) {
-        return true;
-      }
+      if (min <= 0 && isLODOrZero(max)) return true;
       return false;
     }
 
     // 5. Tiêu chuẩn Toán tử so sánh: <=, >=, <, >, NMT, NLT
     if (spec.type === 'COMPARISON') {
       const target = spec.targetValue ?? 0;
-      const eps = Math.max(Math.abs(target), Math.abs(actualVal)) * 1e-10;
+      const eps = Math.max(Math.abs(target), Math.abs(roundedVal)) * 1e-10;
 
       switch (spec.operator) {
         case '<=':
         case 'NMT':
-          return actualVal <= target + eps || isLODOrZero(target);
+          return roundedVal <= target + eps || isLODOrZero(target);
         case '>=':
         case 'NLT':
-          return actualVal >= target - eps;
+          return roundedVal >= target - eps || isGreaterOrEqual(target);
         case '<':
-          return actualVal < target || isLODOrZero(target);
+          return roundedVal < target || isLODOrZero(target);
         case '>':
-          return actualVal > target;
+          return roundedVal > target || isGreaterOrEqual(target);
         case '==':
-          return Math.abs(actualVal - target) <= eps;
+          return Math.abs(roundedVal - target) <= eps;
         default:
-          return actualVal <= target + eps || isLODOrZero(target);
+          return roundedVal <= target + eps || isLODOrZero(target);
       }
     }
 

@@ -79,8 +79,8 @@ export class SpecificationParser {
     }
 
     // 4. Kiểm tra định dạng Dải khoảng: "min - max" hoặc "min ~ max"
-    // Lưu ý: regex \s+-\s+|\s*~\s* để không cắt nhầm dấu trừ của số âm (VD: -20 - -10)
-    const rangeParts = normNumeric.split(/\s+-\s+|\s*~\s*/);
+    // MỚI: Bắt được cả "5.0-10.0" mà không bắt nhầm dấu trừ của "-20"
+    const rangeParts = normNumeric.split(/\s*~\s*|\s+-\s+|(?<=\d)-(?=\d|-)/);
     if (rangeParts.length === 2) {
       const min = parseNumberFromText(rangeParts[0]);
       const max = parseNumberFromText(rangeParts[1]);
