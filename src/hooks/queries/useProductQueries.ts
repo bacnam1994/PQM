@@ -8,15 +8,8 @@ import { materialAppService } from '../../services/app/MaterialAppService';
 import { useAppStore } from '../../store/useAppStore';
 import { Product, ProductFormula, RawMaterial } from '../../types';
 
-export const PRODUCT_QUERY_KEYS = {
-  all: ['products'] as const,
-  detail: (id: string) => ['products', id] as const,
-  formulas: ['productFormulas'] as const,
-  formulaDetail: (id: string) => ['productFormulas', id] as const,
-  formulaByProduct: (productId: string) => ['productFormulas', 'byProduct', productId] as const,
-  materials: ['rawMaterials'] as const,
-  materialDetail: (id: string) => ['rawMaterials', id] as const,
-};
+import { PRODUCT_QUERY_KEYS } from '../../constants/queryKeys';
+export { PRODUCT_QUERY_KEYS };
 
 /**
  * Hook tải danh sách Sản phẩm (TanStack Query Cache - Single Source of Truth)

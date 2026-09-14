@@ -1,10 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { 
-  calcMean, 
-  calcStdDev, 
-  calcWithinStdDev, 
-  calcProcessCapability, 
-  detectNelsonRules 
+import {
+  calcMean,
+  calcStdDev,
+  calcWithinStdDev,
+  calcProcessCapability,
+  detectNelsonRules,
+  aggregateBatchSPC,
 } from './spcEngine';
 
 describe('Advanced SPC Engine (ISO 22514 / AIAG)', () => {
@@ -45,8 +46,8 @@ describe('Advanced SPC Engine (ISO 22514 / AIAG)', () => {
       const data = [10, 10, 10.1, 9.9, 10, 10.2, 15, 9.8, 10];
       const violations = detectNelsonRules(data, 10, 1);
 
-      expect(violations.some(v => v.ruleNumber === 1)).toBe(true);
-      const r1 = violations.find(v => v.ruleNumber === 1);
+      expect(violations.some((v) => v.ruleNumber === 1)).toBe(true);
+      const r1 = violations.find((v) => v.ruleNumber === 1);
       expect(r1!.violationIndices).toContain(6); // Vị trí số 15
     });
 
@@ -55,24 +56,21 @@ describe('Advanced SPC Engine (ISO 22514 / AIAG)', () => {
       const data = [10.5, 10.6, 10.4, 10.8, 10.3, 10.7, 10.5, 10.9, 10.6];
       const violations = detectNelsonRules(data, 10, 1);
 
-      expect(violations.some(v => v.ruleNumber === 2)).toBe(true);
+      expect(violations.some((v) => v.ruleNumber === 2)).toBe(true);
     });
 
     it('phát hiện Rule 3: 6 điểm liên tiếp tăng dần đều (Trend)', () => {
       const data = [10.0, 10.2, 10.4, 10.6, 10.8, 11.0];
       const violations = detectNelsonRules(data, 10, 1);
 
-      expect(violations.some(v => v.ruleNumber === 3)).toBe(true);
+      expect(violations.some((v) => v.ruleNumber === 3)).toBe(true);
     });
 
     it('phát hiện Rule 4: 14 điểm liên tiếp đan xen lên xuống (Oscillation)', () => {
-      const data = [
-        10.5, 9.5, 10.4, 9.6, 10.5, 9.5, 10.4, 9.6,
-        10.5, 9.5, 10.4, 9.6, 10.5, 9.5
-      ];
+      const data = [10.5, 9.5, 10.4, 9.6, 10.5, 9.5, 10.4, 9.6, 10.5, 9.5, 10.4, 9.6, 10.5, 9.5];
       const violations = detectNelsonRules(data, 10, 1);
 
-      expect(violations.some(v => v.ruleNumber === 4)).toBe(true);
+      expect(violations.some((v) => v.ruleNumber === 4)).toBe(true);
     });
 
     it('phát hiện Rule 5: 2 trong 3 điểm liên tiếp ngoài 2-Sigma cùng phía', () => {
@@ -80,7 +78,7 @@ describe('Advanced SPC Engine (ISO 22514 / AIAG)', () => {
       const data = [10, 10, 12.5, 10.2, 12.3, 10];
       const violations = detectNelsonRules(data, 10, 1);
 
-      expect(violations.some(v => v.ruleNumber === 5)).toBe(true);
+      expect(violations.some((v) => v.ruleNumber === 5)).toBe(true);
     });
 
     it('phát hiện Rule 7: 15 điểm liên tiếp nằm trong 1-Sigma (Stratification)', () => {
@@ -88,7 +86,29 @@ describe('Advanced SPC Engine (ISO 22514 / AIAG)', () => {
       const data = Array(15).fill(10.1);
       const violations = detectNelsonRules(data, 10, 2);
 
-      expect(violations.some(v => v.ruleNumber === 7)).toBe(true);
+      expect(violations.some((v) => v.ruleNumber === 7)).toBe(true);
+    });
+  });
+
+  describe('aggregateBatchSPC (Phase 6 Performance Aggregation)', () => {
+    it('tổng hợp các chỉ số SPC và KPI trong một lần duyệt O(N) duy nhất', () => {
+      const records = [
+        { batchNo: 'B01', mfgDate: '2026-01-01', value: 98.5 },
+        { batchNo: 'B02', mfgDate: '2026-01-02', value: 99.2 },
+        { batchNo: 'B03', mfgDate: '2026-01-03', value: 100.1 },
+        { batchNo: 'B04', mfgDate: '2026-01-04', value: 101.3 },
+        { batchNo: 'B05', mfgDate: '2026-01-05', value: 106.0 }, // OOS > 105
+      ];
+
+      const summary = aggregateBatchSPC(records, { usl: 105, lsl: 95, target: 100 });
+
+      expect(summary.sampleSize).toBe(5);
+      expect(summary.oosCount).toBe(1);
+      expect(summary.oosRatePercent).toBe(20);
+      expect(summary.trendSlope).toBeGreaterThan(0);
+      expect(summary.parameters.mean).toBeCloseTo(101.02, 1);
+      expect(summary.capability.status).toBeDefined();
+      expect(summary.executionDurationMs).toBeLessThan(100);
     });
   });
 });

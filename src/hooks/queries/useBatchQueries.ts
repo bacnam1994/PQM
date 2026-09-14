@@ -4,11 +4,8 @@ import { batchAppService } from '../../services/app/BatchAppService';
 import { useAppStore } from '../../store/useAppStore';
 import { Batch, ElectronicSignature } from '../../types';
 
-export const BATCH_QUERY_KEYS = {
-  all: ['batches'] as const,
-  detail: (id: string) => ['batches', id] as const,
-  byProduct: (productId: string) => ['batches', 'product', productId] as const,
-};
+import { BATCH_QUERY_KEYS } from '../../constants/queryKeys';
+export { BATCH_QUERY_KEYS };
 
 /**
  * Hook tải danh sách Lô sản xuất với Caching & Background Refresh

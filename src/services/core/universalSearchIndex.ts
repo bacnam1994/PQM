@@ -10,7 +10,7 @@ import { Product, Batch, TCCS, TestResult, RawMaterial } from '../../types';
 import { QualityDeviation } from '../../types/deviation';
 import { ChangeRequest } from '../../types/changeControl';
 
-export type SearchResultCategory = 
+export type SearchResultCategory =
   | 'PRODUCT'
   | 'BATCH'
   | 'TCCS'
@@ -62,9 +62,7 @@ export function removeVietnameseAccents(str: string): string {
  */
 export function tokenize(str: string): string[] {
   const normalized = removeVietnameseAccents(str);
-  return normalized
-    .split(/[\s,./\-_+:;()]+/)
-    .filter(token => token.length > 0);
+  return normalized.split(/[\s,./\-_+:;()]+/).filter((token) => token.length > 0);
 }
 
 /**
@@ -75,7 +73,11 @@ export function tokenize(str: string): string[] {
  * - Chứa toàn bộ chuỗi tìm kiếm: 40
  * - Khớp từng token: 15 / token
  */
-export function computeMatchScore(query: string, targetText: string, isCode: boolean = false): number {
+export function computeMatchScore(
+  query: string,
+  targetText: string,
+  isCode: boolean = false
+): number {
   if (!query || !targetText) return 0;
 
   const normQuery = removeVietnameseAccents(query);
@@ -126,7 +128,7 @@ export const QUICK_ACTIONS: UniversalSearchResult[] = [
     path: '/batches/new',
     badge: 'Tác vụ',
     badgeColor: 'blue',
-    score: 0
+    score: 0,
   },
   {
     id: 'act-new-test',
@@ -136,7 +138,7 @@ export const QUICK_ACTIONS: UniversalSearchResult[] = [
     path: '/test-results/new',
     badge: 'Tác vụ',
     badgeColor: 'purple',
-    score: 0
+    score: 0,
   },
   {
     id: 'act-new-cr',
@@ -146,7 +148,7 @@ export const QUICK_ACTIONS: UniversalSearchResult[] = [
     path: '/change-control',
     badge: 'GMP QMS',
     badgeColor: 'amber',
-    score: 0
+    score: 0,
   },
   {
     id: 'act-pqr-report',
@@ -156,7 +158,7 @@ export const QUICK_ACTIONS: UniversalSearchResult[] = [
     path: '/reports/quality-summary',
     badge: 'Báo cáo',
     badgeColor: 'green',
-    score: 0
+    score: 0,
   },
   {
     id: 'act-trend-analysis',
@@ -166,7 +168,7 @@ export const QUICK_ACTIONS: UniversalSearchResult[] = [
     path: '/reports/trend-analysis',
     badge: 'Analytics',
     badgeColor: 'blue',
-    score: 0
+    score: 0,
   },
   {
     id: 'act-alerts',
@@ -176,14 +178,18 @@ export const QUICK_ACTIONS: UniversalSearchResult[] = [
     path: '/alerts',
     badge: 'Cảnh báo',
     badgeColor: 'red',
-    score: 0
-  }
+    score: 0,
+  },
 ];
 
 /**
  * Tìm kiếm toàn cục trên dữ liệu hệ thống
  */
-export function searchUniversal(query: string, data: UniversalSearchDataset, limit: number = 20): UniversalSearchResult[] {
+export function searchUniversal(
+  query: string,
+  data: UniversalSearchDataset,
+  limit: number = 20
+): UniversalSearchResult[] {
   const trimmed = query.trim();
   if (!trimmed) {
     return QUICK_ACTIONS.slice(0, 6);
@@ -218,7 +224,7 @@ export function searchUniversal(query: string, data: UniversalSearchDataset, lim
           path: `/products/${p.id}`,
           badge: p.status || 'ACTIVE',
           badgeColor: p.status === 'ACTIVE' ? 'green' : 'gray',
-          score: maxS + 5
+          score: maxS + 5,
         });
       }
     }
@@ -238,7 +244,7 @@ export function searchUniversal(query: string, data: UniversalSearchDataset, lim
           path: `/batches/${b.id}`,
           badge: b.status,
           badgeColor: b.status === 'RELEASED' ? 'green' : b.status === 'REJECTED' ? 'red' : 'amber',
-          score: maxS + 10
+          score: maxS + 10,
         });
       }
     }
@@ -258,7 +264,7 @@ export function searchUniversal(query: string, data: UniversalSearchDataset, lim
           path: `/tccs/detail/${t.id}`,
           badge: t.isActive ? 'ĐANG HIỆU LỰC' : 'LỊCH SỬ',
           badgeColor: t.isActive ? 'green' : 'gray',
-          score: maxS + 5
+          score: maxS + 5,
         });
       }
     }
@@ -280,7 +286,7 @@ export function searchUniversal(query: string, data: UniversalSearchDataset, lim
           path: `/test-results/print/${tr.id}`,
           badge: tr.overallStatus === 'PASS' ? 'PASS' : 'FAIL',
           badgeColor: tr.overallStatus === 'PASS' ? 'green' : 'red',
-          score: maxS
+          score: maxS,
         });
       }
     }
@@ -292,7 +298,7 @@ export function searchUniversal(query: string, data: UniversalSearchDataset, lim
       const sCode = computeMatchScore(trimmed, m.code, true);
       const sName = computeMatchScore(trimmed, m.name);
       const sCas = m.casNumber ? computeMatchScore(trimmed, m.casNumber, true) : 0;
-      const sAliases = (m.aliases || []).map(a => computeMatchScore(trimmed, a));
+      const sAliases = (m.aliases || []).map((a) => computeMatchScore(trimmed, a));
       const maxAlias = sAliases.length > 0 ? Math.max(...sAliases) : 0;
       const maxS = Math.max(sCode, sName, sCas, maxAlias);
       if (maxS > 15) {
@@ -304,7 +310,7 @@ export function searchUniversal(query: string, data: UniversalSearchDataset, lim
           path: `/materials`,
           badge: m.category || 'MATERIAL',
           badgeColor: 'purple',
-          score: maxS
+          score: maxS,
         });
       }
     }
@@ -326,7 +332,7 @@ export function searchUniversal(query: string, data: UniversalSearchDataset, lim
           path: `/deviations`,
           badge: d.severity,
           badgeColor: d.severity === 'CRITICAL' ? 'red' : 'amber',
-          score: maxS + 8
+          score: maxS + 8,
         });
       }
     }
@@ -347,14 +353,241 @@ export function searchUniversal(query: string, data: UniversalSearchDataset, lim
           path: `/change-control`,
           badge: cr.changeType,
           badgeColor: cr.changeType === 'MAJOR' ? 'red' : 'blue',
-          score: maxS + 8
+          score: maxS + 8,
         });
       }
     }
   }
 
   // Sắp xếp giảm dần theo score và lấy top kết quả
-  return results
-    .sort((a, b) => b.score - a.score)
-    .slice(0, limit);
+  return results.sort((a, b) => b.score - a.score).slice(0, limit);
+}
+
+export interface PaginatedUniversalSearchResult {
+  results: UniversalSearchResult[];
+  total: number;
+  page: number;
+  pageSize: number;
+  hasMore: boolean;
+  searchDurationMs: number;
+}
+
+/**
+ * UniversalInvertedIndex (Phase 6)
+ * Chỉ mục đảo (Inverted Token Index) phục vụ tra cứu tức thì < 150ms trên tập dữ liệu lớn.
+ */
+export class UniversalInvertedIndex {
+  private tokenMap = new Map<string, Set<UniversalSearchResult>>();
+  private allResults: UniversalSearchResult[] = [];
+
+  constructor(data?: UniversalSearchDataset) {
+    if (data) {
+      this.buildIndex(data);
+    }
+  }
+
+  public buildIndex(data: UniversalSearchDataset): void {
+    this.tokenMap.clear();
+    const items: UniversalSearchResult[] = [];
+
+    for (const act of QUICK_ACTIONS) items.push(act);
+
+    if (data.products) {
+      for (const p of data.products) {
+        items.push({
+          id: `prod-${p.id}`,
+          category: 'PRODUCT',
+          title: `${p.name} (${p.code})`,
+          subtitle: `Nhóm: ${p.group || 'Chưa phân nhóm'} • ĐKCB: ${p.registrationNo || 'N/A'}`,
+          path: `/products/${p.id}`,
+          badge: p.status || 'ACTIVE',
+          badgeColor: p.status === 'ACTIVE' ? 'green' : 'gray',
+          score: 0,
+        });
+      }
+    }
+
+    if (data.batches) {
+      for (const b of data.batches) {
+        items.push({
+          id: `batch-${b.id}`,
+          category: 'BATCH',
+          title: `Lô ${b.batchNo}`,
+          subtitle: `NSX: ${b.mfgDate || 'N/A'} • HSD: ${b.expDate || 'N/A'}`,
+          path: `/batches/${b.id}`,
+          badge: b.status,
+          badgeColor: b.status === 'RELEASED' ? 'green' : b.status === 'REJECTED' ? 'red' : 'amber',
+          score: 0,
+        });
+      }
+    }
+
+    if (data.tccsList) {
+      for (const t of data.tccsList) {
+        items.push({
+          id: `tccs-${t.id}`,
+          category: 'TCCS',
+          title: `Tiêu chuẩn ${t.code}`,
+          subtitle: `Ngày ban hành: ${t.issueDate || 'N/A'} • Hạn dùng: ${t.shelfLife || 'N/A'}`,
+          path: `/tccs/detail/${t.id}`,
+          badge: t.isActive ? 'ĐANG HIỆU LỰC' : 'LỊCH SỬ',
+          badgeColor: t.isActive ? 'green' : 'gray',
+          score: 0,
+        });
+      }
+    }
+
+    if (data.testResults) {
+      for (const tr of data.testResults) {
+        items.push({
+          id: `tr-${tr.id}`,
+          category: 'TEST_RESULT',
+          title: `Phiếu KN Lab: ${tr.labName || 'Chưa đặt tên Lab'}`,
+          subtitle: `Ngày kiểm nghiệm: ${tr.testDate || 'N/A'}`,
+          path: `/test-results/print/${tr.id}`,
+          badge: tr.overallStatus === 'PASS' ? 'PASS' : 'FAIL',
+          badgeColor: tr.overallStatus === 'PASS' ? 'green' : 'red',
+          score: 0,
+        });
+      }
+    }
+
+    if (data.rawMaterials) {
+      for (const m of data.rawMaterials) {
+        items.push({
+          id: `mat-${m.id}`,
+          category: 'MATERIAL',
+          title: `${m.name} (${m.code})`,
+          subtitle: `Tiêu chuẩn: ${m.standard || 'N/A'} • CAS: ${m.casNumber || 'N/A'}`,
+          path: `/materials`,
+          badge: m.category || 'MATERIAL',
+          badgeColor: 'purple',
+          score: 0,
+        });
+      }
+    }
+
+    if (data.deviations) {
+      for (const d of data.deviations) {
+        items.push({
+          id: `dev-${d.id}`,
+          category: 'DEVIATION',
+          title: `Sai lệch [${d.deviationNo}] ${d.title}`,
+          subtitle: `Mức độ: ${d.severity} • Trạng thái: ${d.status}`,
+          path: `/deviations`,
+          badge: d.severity,
+          badgeColor: d.severity === 'CRITICAL' ? 'red' : 'amber',
+          score: 0,
+        });
+      }
+    }
+
+    if (data.changeRequests) {
+      for (const cr of data.changeRequests) {
+        items.push({
+          id: `cr-${cr.id}`,
+          category: 'CHANGE_CONTROL',
+          title: `Thay đổi [${cr.crNo}] ${cr.title}`,
+          subtitle: `Loại: ${cr.changeType} • Trạng thái: ${cr.status}`,
+          path: `/change-control`,
+          badge: cr.changeType,
+          badgeColor: cr.changeType === 'MAJOR' ? 'red' : 'blue',
+          score: 0,
+        });
+      }
+    }
+
+    this.allResults = items;
+
+    for (const item of items) {
+      const text = `${item.title} ${item.subtitle} ${item.badge || ''}`;
+      const tokens = tokenize(text);
+      for (const token of tokens) {
+        let set = this.tokenMap.get(token);
+        if (!set) {
+          set = new Set();
+          this.tokenMap.set(token, set);
+        }
+        set.add(item);
+      }
+    }
+  }
+
+  public searchPaginated(
+    query: string,
+    page: number = 1,
+    pageSize: number = 20
+  ): PaginatedUniversalSearchResult {
+    const startTime = performance.now();
+    const trimmed = query.trim();
+
+    if (!trimmed) {
+      const quick = QUICK_ACTIONS.slice(0, 6);
+      return {
+        results: quick,
+        total: quick.length,
+        page: 1,
+        pageSize: quick.length,
+        hasMore: false,
+        searchDurationMs: performance.now() - startTime,
+      };
+    }
+
+    const queryTokens = tokenize(trimmed);
+    let candidates: Set<UniversalSearchResult>;
+
+    if (queryTokens.length === 0) {
+      candidates = new Set(this.allResults);
+    } else {
+      candidates = new Set();
+      for (const qTok of queryTokens) {
+        for (const [idxTok, itemSet] of this.tokenMap.entries()) {
+          if (idxTok.startsWith(qTok)) {
+            for (const item of itemSet) {
+              candidates.add(item);
+            }
+          }
+        }
+      }
+    }
+
+    const scored: UniversalSearchResult[] = [];
+    for (const item of candidates) {
+      const isCode =
+        item.category === 'PRODUCT' || item.category === 'BATCH' || item.category === 'TCCS';
+      const s1 = computeMatchScore(trimmed, item.title, isCode);
+      const s2 = computeMatchScore(trimmed, item.subtitle);
+      const maxS = Math.max(s1, s2);
+      if (maxS > 15) {
+        scored.push({ ...item, score: maxS });
+      }
+    }
+
+    scored.sort((a, b) => b.score - a.score);
+    const total = scored.length;
+    const start = (page - 1) * pageSize;
+    const paginated = scored.slice(start, start + pageSize);
+
+    return {
+      results: paginated,
+      total,
+      page,
+      pageSize,
+      hasMore: start + pageSize < total,
+      searchDurationMs: performance.now() - startTime,
+    };
+  }
+}
+
+/**
+ * Tra cứu phân trang theo chuẩn Phase 6
+ */
+export function searchUniversalPaginated(
+  query: string,
+  data: UniversalSearchDataset,
+  page: number = 1,
+  pageSize: number = 20
+): PaginatedUniversalSearchResult {
+  const index = new UniversalInvertedIndex(data);
+  return index.searchPaginated(query, page, pageSize);
 }

@@ -1,19 +1,14 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { ref, get } from 'firebase/database';
-import { db } from '../../firebase';
 import { tccsRepository } from '../../repositories/firebase/FirebaseTCCSRepository';
+import { criteriaAliasRepository } from '../../repositories/firebase/FirebaseCriteriaAliasRepository';
+import { aiLearnedMappingRepository } from '../../repositories/firebase/FirebaseAILearnedMappingRepository';
 import { tccsAppService } from '../../services/app/TCCSAppService';
 import { useAppStore } from '../../store/useAppStore';
 import { TCCS, CriteriaAlias, AILearnedMapping, Batch } from '../../types';
 import { BATCH_QUERY_KEYS } from './useBatchQueries';
 
-export const TCCS_QUERY_KEYS = {
-  all: ['tccsList'] as const,
-  detail: (id: string) => ['tccsList', id] as const,
-  byProduct: (productId: string) => ['tccsList', 'product', productId] as const,
-  aliases: ['criteriaAliases'] as const,
-  aiMappings: ['aiLearnedMappings'] as const,
-};
+import { TCCS_QUERY_KEYS } from '../../constants/queryKeys';
+export { TCCS_QUERY_KEYS };
 
 /**
  * Hook tải danh sách Tiêu chuẩn cơ sở (TCCS)
@@ -62,9 +57,7 @@ export function useCriteriaAliasesQuery() {
   return useQuery<CriteriaAlias[]>({
     queryKey: TCCS_QUERY_KEYS.aliases,
     queryFn: async () => {
-      const snap = await get(ref(db, 'criteria_aliases'));
-      if (!snap.exists()) return [];
-      return Object.values(snap.val()) as CriteriaAlias[];
+      return await criteriaAliasRepository.findAll();
     },
   });
 }
@@ -76,9 +69,7 @@ export function useAILearnedMappingsQuery() {
   return useQuery<AILearnedMapping[]>({
     queryKey: TCCS_QUERY_KEYS.aiMappings,
     queryFn: async () => {
-      const snap = await get(ref(db, 'ai_learned_mappings'));
-      if (!snap.exists()) return [];
-      return Object.values(snap.val()) as AILearnedMapping[];
+      return await aiLearnedMappingRepository.findAll();
     },
   });
 }

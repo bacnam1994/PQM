@@ -1,16 +1,15 @@
 import React, { useState } from 'react';
-import { 
-  CloudIcon, 
-  ArrowTopRightOnSquareIcon, 
-  ArrowUpTrayIcon, 
-  ArrowPathIcon, 
-  PlusIcon, 
-  DocumentTextIcon, 
-  XMarkIcon 
+import {
+  CloudIcon,
+  ArrowTopRightOnSquareIcon,
+  ArrowUpTrayIcon,
+  ArrowPathIcon,
+  PlusIcon,
+  DocumentTextIcon,
+  XMarkIcon,
 } from '@heroicons/react/24/outline';
 import { useUIStore } from '../../../../store/useUIStore';
-import { storage } from '../../../../firebase';
-import { ref as storageRef, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
+import { uploadStorageFile } from '../../../../services/storageService';
 import toast from 'react-hot-toast';
 
 export interface Attachment {
@@ -46,7 +45,8 @@ export const AttachmentSection: React.FC<AttachmentSectionProps> = ({
 
   const handleAddManualLink = () => {
     if (!manualLink) return;
-    const name = manualName.trim() || manualLink.split('/').pop()?.split('?')[0] || 'Tài liệu Google Drive';
+    const name =
+      manualName.trim() || manualLink.split('/').pop()?.split('?')[0] || 'Tài liệu Google Drive';
     const newAttachment: Attachment = {
       name,
       url: manualLink,
@@ -59,42 +59,28 @@ export const AttachmentSection: React.FC<AttachmentSectionProps> = ({
     toast.success('Đã gắn liên kết Google Drive thành công!');
   };
 
-  const uploadToFirebaseStorage = (file: File): Promise<void> => {
-    return new Promise((resolve, reject) => {
-      try {
-        const path = `attachments/${batchId || 'temp'}/${Date.now()}_${file.name}`;
-        const sRef = storageRef(storage, path);
-        const uploadTask = uploadBytesResumable(sRef, file);
+  const uploadToFirebaseStorage = async (file: File): Promise<void> => {
+    try {
+      const path = `attachments/${batchId || 'temp'}/${Date.now()}_${file.name}`;
+      const downloadURL = await uploadStorageFile(file, path, (progress) => {
+        setUploadProgress(progress);
+      });
 
-        uploadTask.on(
-          'state_changed',
-          (snapshot) => {
-            const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-            setUploadProgress(Math.round(progress));
-          },
-          (error) => {
-            console.error(error);
-            toast.error('Lỗi khi tải file lên Storage: ' + error.message);
-            reject(error);
-          },
-          async () => {
-            const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
-            const newAttachment: Attachment = {
-              name: file.name,
-              url: downloadURL,
-              source: 'firebase',
-              uploadedAt: new Date().toISOString(),
-            };
-            setFieldValue('attachments', [...(attachments || []), newAttachment]);
-            toast.success(`Đã tải lên tệp ${file.name} thành công!`);
-            setUploadProgress(null);
-            resolve();
-          }
-        );
-      } catch (err) {
-        reject(err);
-      }
-    });
+      const newAttachment: Attachment = {
+        name: file.name,
+        url: downloadURL,
+        source: 'firebase',
+        uploadedAt: new Date().toISOString(),
+      };
+      setFieldValue('attachments', [...(attachments || []), newAttachment]);
+      toast.success(`Đã tải lên tệp ${file.name} thành công!`);
+      setUploadProgress(null);
+    } catch (error: any) {
+      console.error(error);
+      toast.error('Lỗi khi tải file lên Storage: ' + (error?.message || 'Lỗi không xác định'));
+      setUploadProgress(null);
+      throw error;
+    }
   };
 
   const uploadToGoogleDrive = async (file: File): Promise<void> => {
@@ -116,7 +102,10 @@ export const AttachmentSection: React.FC<AttachmentSectionProps> = ({
             };
 
             const form = new FormData();
-            form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+            form.append(
+              'metadata',
+              new Blob([JSON.stringify(metadata)], { type: 'application/json' })
+            );
             form.append('file', file);
 
             setUploadProgress(60);
@@ -157,7 +146,11 @@ export const AttachmentSection: React.FC<AttachmentSectionProps> = ({
       });
 
       if (!gClient) {
-        reject(new Error('Không thể khởi tạo Google Identity Services. Hãy đảm bảo đã thêm script của Google.'));
+        reject(
+          new Error(
+            'Không thể khởi tạo Google Identity Services. Hãy đảm bảo đã thêm script của Google.'
+          )
+        );
       } else {
         gClient.requestAccessToken({ prompt: 'consent' });
       }
@@ -175,7 +168,9 @@ export const AttachmentSection: React.FC<AttachmentSectionProps> = ({
         await uploadToGoogleDrive(file);
       } catch (err: any) {
         console.error('Google Drive Upload Error, falling back to Firebase Storage:', err);
-        toast.error('Lỗi tải lên Google Drive: ' + err.message + '. Đang chuyển sang lưu Firebase Storage...');
+        toast.error(
+          'Lỗi tải lên Google Drive: ' + err.message + '. Đang chuyển sang lưu Firebase Storage...'
+        );
         await uploadToFirebaseStorage(file);
       } finally {
         setIsUploading(false);
@@ -216,7 +211,9 @@ export const AttachmentSection: React.FC<AttachmentSectionProps> = ({
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-surface-2 p-4 rounded-xl border border-border">
         <div className="space-y-3 flex flex-col justify-center border-b md:border-b-0 md:border-r border-border pb-4 md:pb-0 md:pr-4">
-          <p className="text-xs font-semibold text-ink-soft uppercase tracking-wider">Tải lên tài liệu</p>
+          <p className="text-xs font-semibold text-ink-soft uppercase tracking-wider">
+            Tải lên tài liệu
+          </p>
           <div className="relative">
             <input
               type="file"
@@ -242,7 +239,10 @@ export const AttachmentSection: React.FC<AttachmentSectionProps> = ({
                   <ArrowUpTrayIcon className="w-6 h-6 text-ink-muted group-hover:text-emerald-600 transition-colors" />
                   <p className="text-xs font-semibold text-ink mt-1">Chọn file ảnh hoặc PDF</p>
                   <p className="text-[11px] text-ink-muted">
-                    Tải lên {useGoogleDriveUpload && googleDriveClientId && googleDriveApiKey ? 'Google Drive' : 'Firebase Storage'}
+                    Tải lên{' '}
+                    {useGoogleDriveUpload && googleDriveClientId && googleDriveApiKey
+                      ? 'Google Drive'
+                      : 'Firebase Storage'}
                   </p>
                 </div>
               )}
@@ -250,14 +250,19 @@ export const AttachmentSection: React.FC<AttachmentSectionProps> = ({
           </div>
           {uploadProgress !== null && (
             <div className="w-full bg-surface-3 h-1.5 rounded-full overflow-hidden">
-              <div className="bg-emerald-600 h-full transition-all duration-300" style={{ width: `${uploadProgress}%` }} />
+              <div
+                className="bg-emerald-600 h-full transition-all duration-300"
+                style={{ width: `${uploadProgress}%` }}
+              />
             </div>
           )}
         </div>
 
         <div className="space-y-3 flex flex-col justify-between pt-2 md:pt-0 md:pl-2">
           <div className="space-y-2">
-            <p className="text-xs font-semibold text-ink-soft uppercase tracking-wider">Liên kết Google Drive thủ công</p>
+            <p className="text-xs font-semibold text-ink-soft uppercase tracking-wider">
+              Liên kết Google Drive thủ công
+            </p>
             <input
               type="text"
               placeholder="Dán liên kết file trong Google Drive..."
@@ -294,7 +299,9 @@ export const AttachmentSection: React.FC<AttachmentSectionProps> = ({
             >
               <div
                 className={`p-2 rounded-lg shrink-0 ${
-                  att.source === 'google_drive' ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400' : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+                  att.source === 'google_drive'
+                    ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400'
+                    : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
                 }`}
               >
                 <DocumentTextIcon className="w-5 h-5" />

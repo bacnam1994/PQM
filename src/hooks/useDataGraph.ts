@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useCallback } from 'react';
 import {
   useProductsQuery,
   useProductFormulasQuery,
@@ -96,39 +96,113 @@ export const useDataGraph = () => {
   const { data: rawCriteriaAliases = EMPTY_ARRAY } = useCriteriaAliasesQuery();
   const rawAllTestResults = rawTestResults;
 
-  // Khởi tạo các Map tra cứu 1 lần duy nhất để tái sử dụng cho tất cả Derived State
-  const productMap = useMemo(() => new Map(rawProducts.map((p) => [p.id, p])), [rawProducts]);
-  const tccsMap = useMemo(() => new Map(rawTccsList.map((t) => [t.id, t])), [rawTccsList]);
-  const batchMap = useMemo(() => new Map(rawBatches.map((b) => [b.id, b])), [rawBatches]);
-  const batchNoMap = useMemo(() => new Map(rawBatches.map((b) => [b.batchNo, b])), [rawBatches]);
-  const formulaMap = useMemo(
-    () => new Map(rawProductFormulas.map((f) => [f.productId, f])),
+  // ==========================================
+  // 1. PRIMARY MAPS (By ID & Unique Keys) - O(N)
+  // ==========================================
+  const productsById = useMemo(
+    () => new Map<string, Product>(rawProducts.map((p) => [p.id, p])),
+    [rawProducts]
+  );
+  const tccsById = useMemo(
+    () => new Map<string, TCCS>(rawTccsList.map((t) => [t.id, t])),
+    [rawTccsList]
+  );
+  const batchesById = useMemo(
+    () => new Map<string, Batch>(rawBatches.map((b) => [b.id, b])),
+    [rawBatches]
+  );
+  const batchesByBatchNo = useMemo(
+    () =>
+      new Map<string, Batch>(
+        rawBatches.filter((b) => b.batchNo).map((b) => [b.batchNo.toLowerCase(), b])
+      ),
+    [rawBatches]
+  );
+  const testResultsById = useMemo(
+    () => new Map<string, TestResult>(rawTestResults.map((r) => [r.id, r])),
+    [rawTestResults]
+  );
+  const formulasByProductId = useMemo(
+    () => new Map<string, ProductFormula>(rawProductFormulas.map((f) => [f.productId, f])),
     [rawProductFormulas]
   );
-  const materialMap = useMemo(
-    () => new Map(rawRawMaterials.map((m) => [m.id, m])),
+  const materialsById = useMemo(
+    () => new Map<string, RawMaterial>(rawRawMaterials.map((m) => [m.id, m])),
     [rawRawMaterials]
   );
 
-  // Tra cứu Lô linh hoạt (ID, BatchNo hoặc suffix)
+  // Tra cứu Lô linh hoạt (ID, BatchNo hoặc suffix) - O(1) lookup
   const getBatchForTestResult = useMemo(
     () =>
       (batchId: string): Batch | undefined => {
         if (!batchId) return undefined;
-        if (batchMap.has(batchId)) return batchMap.get(batchId);
-        if (batchNoMap.has(batchId)) return batchNoMap.get(batchId);
+        if (batchesById.has(batchId)) return batchesById.get(batchId);
+        const lower = batchId.toLowerCase();
+        if (batchesByBatchNo.has(lower)) return batchesByBatchNo.get(lower);
         return rawBatches.find(
           (b) =>
             (b.id && batchId.endsWith(b.id)) ||
             (batchId && b.id.endsWith(batchId)) ||
-            (b.batchNo && b.batchNo.toLowerCase() === batchId.toLowerCase())
+            (b.batchNo && b.batchNo.toLowerCase() === lower)
         );
       },
-    [batchMap, batchNoMap, rawBatches]
+    [batchesById, batchesByBatchNo, rawBatches]
   );
 
-  // Gom nhóm Test Results theo BatchId (sử dụng nguồn dữ liệu đầy đủ nhất)
-  const testResultsByBatch = useMemo(() => {
+  // ==========================================
+  // 2. SECONDARY INDEXES (Grouping Multi-Maps) - O(N)
+  // ==========================================
+
+  // Batches by ProductId
+  const batchesByProductId = useMemo(() => {
+    const map = new Map<string, Batch[]>();
+    rawBatches.forEach((b) => {
+      if (!b.productId) return;
+      const list = map.get(b.productId) || [];
+      list.push(b);
+      map.set(b.productId, list);
+    });
+    return map;
+  }, [rawBatches]);
+
+  // Batches by TccsId
+  const batchesByTccsId = useMemo(() => {
+    const map = new Map<string, Batch[]>();
+    rawBatches.forEach((b) => {
+      if (!b.tccsId) return;
+      const list = map.get(b.tccsId) || [];
+      list.push(b);
+      map.set(b.tccsId, list);
+    });
+    return map;
+  }, [rawBatches]);
+
+  // TCCS by ProductId
+  const tccsByProductId = useMemo(() => {
+    const map = new Map<string, TCCS[]>();
+    rawTccsList.forEach((t) => {
+      if (!t.productId) return;
+      const list = map.get(t.productId) || [];
+      list.push(t);
+      map.set(t.productId, list);
+    });
+    return map;
+  }, [rawTccsList]);
+
+  // Aliases by TccsId
+  const aliasesByTccsId = useMemo(() => {
+    const map = new Map<string, CriteriaAlias[]>();
+    rawCriteriaAliases.forEach((a) => {
+      if (!a.tccsId) return;
+      const list = map.get(a.tccsId) || [];
+      list.push(a);
+      map.set(a.tccsId, list);
+    });
+    return map;
+  }, [rawCriteriaAliases]);
+
+  // Test Results by BatchId
+  const testResultsByBatchId = useMemo(() => {
     const map = new Map<string, TestResult[]>();
     const sourceTests =
       rawTestResults.length >= (rawAllTestResults?.length || 0)
@@ -144,50 +218,37 @@ export const useDataGraph = () => {
     return map;
   }, [rawTestResults, rawAllTestResults, getBatchForTestResult]);
 
-  // Gom nhóm Batches theo ProductId
-  const batchesByProduct = useMemo(() => {
-    const map = new Map<string, Batch[]>();
-    rawBatches.forEach((b) => {
-      const list = map.get(b.productId) || [];
-      list.push(b);
-      map.set(b.productId, list);
+  // Inverted index: Formulas by MaterialId
+  const formulasByMaterialId = useMemo(() => {
+    const map = new Map<string, ProductFormula[]>();
+    rawProductFormulas.forEach((f) => {
+      const matIds = new Set<string>();
+      (f.ingredients || []).forEach((i) => i.materialId && matIds.add(i.materialId));
+      (f.excipients || []).forEach((e) => e.materialId && matIds.add(e.materialId));
+      matIds.forEach((mId) => {
+        const list = map.get(mId) || [];
+        list.push(f);
+        map.set(mId, list);
+      });
     });
     return map;
-  }, [rawBatches]);
+  }, [rawProductFormulas]);
 
-  // Gom nhóm TCCS theo ProductId
-  const tccsByProduct = useMemo(() => {
-    const map = new Map<string, TCCS[]>();
-    rawTccsList.forEach((t) => {
-      const list = map.get(t.productId) || [];
-      list.push(t);
-      map.set(t.productId, list);
-    });
-    return map;
-  }, [rawTccsList]);
-
-  // Gom nhóm Aliases theo TccsId
-  const aliasesByTccs = useMemo(() => {
-    const map = new Map<string, CriteriaAlias[]>();
-    rawCriteriaAliases.forEach((a) => {
-      const list = map.get(a.tccsId) || [];
-      list.push(a);
-      map.set(a.tccsId, list);
-    });
-    return map;
-  }, [rawCriteriaAliases]);
+  // ==========================================
+  // 3. HYDRATED ENTITIES (Instant Index Lookups)
+  // ==========================================
 
   // Hydrated Batches
   const batches = useMemo<HydratedBatch[]>(() => {
     return rawBatches.map((batch) => {
-      const bTests = testResultsByBatch.get(batch.id) || [];
+      const bTests = testResultsByBatchId.get(batch.id) || [];
       const sortedTests = [...bTests].sort((a, b) => b.testDate.localeCompare(a.testDate));
       const passTests = bTests.filter((t) => t.overallStatus === 'PASS');
       return {
         ...batch,
-        product: productMap.get(batch.productId),
-        tccs: batch.tccsSnapshot || tccsMap.get(batch.tccsId),
-        formula: batch.formulaSnapshot || formulaMap.get(batch.productId),
+        product: productsById.get(batch.productId),
+        tccs: batch.tccsSnapshot || tccsById.get(batch.tccsId),
+        formula: batch.formulaSnapshot || formulasByProductId.get(batch.productId),
         testResults: sortedTests,
         latestTestResult: sortedTests[0],
         isFullyTested: bTests.length > 0 && bTests.some((t) => t.overallStatus === 'PASS'),
@@ -195,14 +256,14 @@ export const useDataGraph = () => {
         passRate: bTests.length > 0 ? Math.round((passTests.length / bTests.length) * 100) : 100,
       };
     });
-  }, [rawBatches, productMap, tccsMap, formulaMap, testResultsByBatch]);
+  }, [rawBatches, productsById, tccsById, formulasByProductId, testResultsByBatchId]);
 
   // Hydrated Test Results
   const testResults = useMemo<HydratedTestResult[]>(() => {
     return rawTestResults.map((res) => {
       const rawBatch = getBatchForTestResult(res.batchId);
-      const product = rawBatch ? productMap.get(rawBatch.productId) : undefined;
-      const tccs = rawBatch ? rawBatch.tccsSnapshot || tccsMap.get(rawBatch.tccsId) : undefined;
+      const product = rawBatch ? productsById.get(rawBatch.productId) : undefined;
+      const tccs = rawBatch ? rawBatch.tccsSnapshot || tccsById.get(rawBatch.tccsId) : undefined;
       const overallStatus =
         res.results && res.results.length > 0
           ? calculateOverallStatus(res.results, tccs || null)
@@ -213,13 +274,13 @@ export const useDataGraph = () => {
         overallStatus,
         batch: rawBatch
           ? (() => {
-              const bTests = testResultsByBatch.get(rawBatch.id) || [];
+              const bTests = testResultsByBatchId.get(rawBatch.id) || [];
               const passCount = bTests.filter((t) => t.overallStatus === 'PASS').length;
               return {
                 ...rawBatch,
                 product,
                 tccs,
-                formula: formulaMap.get(rawBatch.productId),
+                formula: formulasByProductId.get(rawBatch.productId),
                 testResults: bTests,
                 isFullyTested: bTests.some((t) => t.overallStatus === 'PASS'),
                 testResultsCount: bTests.length,
@@ -231,14 +292,21 @@ export const useDataGraph = () => {
         tccs,
       };
     });
-  }, [rawTestResults, getBatchForTestResult, productMap, tccsMap, formulaMap, testResultsByBatch]);
+  }, [
+    rawTestResults,
+    getBatchForTestResult,
+    productsById,
+    tccsById,
+    formulasByProductId,
+    testResultsByBatchId,
+  ]);
 
   const allTestResultsHydrated = useMemo<HydratedTestResult[]>(() => {
     if (!rawAllTestResults || rawAllTestResults.length === 0) return [];
     return rawAllTestResults.map((res) => {
       const rawBatch = getBatchForTestResult(res.batchId);
-      const product = rawBatch ? productMap.get(rawBatch.productId) : undefined;
-      const tccs = rawBatch ? tccsMap.get(rawBatch.tccsId) : undefined;
+      const product = rawBatch ? productsById.get(rawBatch.productId) : undefined;
+      const tccs = rawBatch ? tccsById.get(rawBatch.tccsId) : undefined;
       const overallStatus =
         res.results && res.results.length > 0
           ? calculateOverallStatus(res.results, tccs || null)
@@ -249,13 +317,13 @@ export const useDataGraph = () => {
         overallStatus,
         batch: rawBatch
           ? (() => {
-              const bTests = testResultsByBatch.get(rawBatch.id) || [];
+              const bTests = testResultsByBatchId.get(rawBatch.id) || [];
               const passCount = bTests.filter((t) => t.overallStatus === 'PASS').length;
               return {
                 ...rawBatch,
                 product,
                 tccs,
-                formula: formulaMap.get(rawBatch.productId),
+                formula: formulasByProductId.get(rawBatch.productId),
                 testResults: bTests,
                 isFullyTested: bTests.some((t) => t.overallStatus === 'PASS'),
                 testResultsCount: bTests.length,
@@ -270,10 +338,10 @@ export const useDataGraph = () => {
   }, [
     rawAllTestResults,
     getBatchForTestResult,
-    productMap,
-    tccsMap,
-    formulaMap,
-    testResultsByBatch,
+    productsById,
+    tccsById,
+    formulasByProductId,
+    testResultsByBatchId,
   ]);
 
   // Hydrated Formulas
@@ -281,7 +349,7 @@ export const useDataGraph = () => {
     return rawProductFormulas.map((f) => {
       let unlinked = 0;
       const hydratedIngredients: HydratedFormulaIngredient[] = (f.ingredients || []).map((ing) => {
-        const mat = ing.materialId ? materialMap.get(ing.materialId) : undefined;
+        const mat = ing.materialId ? materialsById.get(ing.materialId) : undefined;
         if (!mat) unlinked++;
         return {
           ...ing,
@@ -291,7 +359,7 @@ export const useDataGraph = () => {
       });
 
       const hydratedExcipients: HydratedFormulaIngredient[] = (f.excipients || []).map((exc) => {
-        const mat = exc.materialId ? materialMap.get(exc.materialId) : undefined;
+        const mat = exc.materialId ? materialsById.get(exc.materialId) : undefined;
         if (!mat) unlinked++;
         return {
           ...exc,
@@ -302,30 +370,26 @@ export const useDataGraph = () => {
 
       return {
         ...f,
-        product: productMap.get(f.productId),
+        product: productsById.get(f.productId),
         hydratedIngredients,
         hydratedExcipients,
         unlinkedCount: unlinked,
       };
     });
-  }, [rawProductFormulas, productMap, materialMap]);
+  }, [rawProductFormulas, productsById, materialsById]);
 
-  // Hydrated Raw Materials
+  // Hydrated Raw Materials (Using Inverted Index)
   const rawMaterials = useMemo<HydratedRawMaterial[]>(() => {
     return rawRawMaterials.map((mat) => {
-      const usedInFormulas: ProductFormula[] = [];
+      const usedInFormulas = formulasByMaterialId.get(mat.id) || [];
       const usedInProducts: Product[] = [];
+      const seenProductIds = new Set<string>();
 
-      rawProductFormulas.forEach((f) => {
-        const hasMat =
-          (f.ingredients || []).some((i) => i.materialId === mat.id) ||
-          (f.excipients || []).some((e) => e.materialId === mat.id);
-        if (hasMat) {
-          usedInFormulas.push(f);
-          const p = productMap.get(f.productId);
-          if (p && !usedInProducts.some((up) => up.id === p.id)) {
-            usedInProducts.push(p);
-          }
+      usedInFormulas.forEach((f) => {
+        if (!seenProductIds.has(f.productId)) {
+          seenProductIds.add(f.productId);
+          const p = productsById.get(f.productId);
+          if (p) usedInProducts.push(p);
         }
       });
 
@@ -336,77 +400,114 @@ export const useDataGraph = () => {
         usageCount: usedInFormulas.length,
       };
     });
-  }, [rawRawMaterials, rawProductFormulas, productMap]);
+  }, [rawRawMaterials, formulasByMaterialId, productsById]);
 
-  // Hydrated TCCS
+  // Hydrated TCCS (Using BatchesByTccsId Index)
   const tccsList = useMemo<HydratedTCCS[]>(() => {
     return rawTccsList.map((t) => {
-      const batchesUsingThis = rawBatches.filter((b) => b.tccsId === t.id);
+      const batchesUsingThis = batchesByTccsId.get(t.id) || [];
       const batchesCount = batchesUsingThis.length;
-      // Tính tổng phiếu KN và tỷ lệ đạt qua tất cả lô dùng TCCS này
-      const allTccsTests: TestResult[] = [];
+      let passCount = 0;
+      let testResultsCount = 0;
       batchesUsingThis.forEach((b) => {
-        const bTests = testResultsByBatch.get(b.id) || [];
-        allTccsTests.push(...bTests);
+        const bTests = testResultsByBatchId.get(b.id) || [];
+        testResultsCount += bTests.length;
+        passCount += bTests.filter((r) => r.overallStatus === 'PASS').length;
       });
-      const passCount = allTccsTests.filter((r) => r.overallStatus === 'PASS').length;
-      const testResultsCount = allTccsTests.length;
       const passRate =
         testResultsCount > 0 ? Math.round((passCount / testResultsCount) * 100) : 100;
       return {
         ...t,
-        product: productMap.get(t.productId),
-        formula: formulaMap.get(t.productId),
+        product: productsById.get(t.productId),
+        formula: formulasByProductId.get(t.productId),
         batchesCount,
-        aliases: aliasesByTccs.get(t.id) || [],
+        aliases: aliasesByTccsId.get(t.id) || [],
         testResultsCount,
         passRate,
       };
     });
-  }, [rawTccsList, productMap, formulaMap, rawBatches, aliasesByTccs, testResultsByBatch]);
+  }, [
+    rawTccsList,
+    productsById,
+    formulasByProductId,
+    batchesByTccsId,
+    aliasesByTccsId,
+    testResultsByBatchId,
+  ]);
 
-  // Hydrated Products
+  // Hydrated Products (Using BatchesByProductId & TestResultsByBatchId Indexes)
   const products = useMemo<HydratedProduct[]>(() => {
     return rawProducts.map((prod) => {
-      const pTccs = tccsByProduct.get(prod.id) || [];
+      const pTccs = tccsByProductId.get(prod.id) || [];
       const activeTCCS = pTccs.find((t) => t.isActive) || pTccs[0];
-      const pBatches = batchesByProduct.get(prod.id) || [];
+      const pBatches = batchesByProductId.get(prod.id) || [];
       const sortedBatches = [...pBatches].sort((a, b) => b.mfgDate.localeCompare(a.mfgDate));
 
-      const pBatchIds = new Set(pBatches.map((b) => b.id));
-      const pTests = rawTestResults.filter((r) => pBatchIds.has(r.batchId));
-      const passTests = pTests.filter((t) => t.overallStatus === 'PASS');
-      const passRate =
-        pTests.length > 0 ? Math.round((passTests.length / pTests.length) * 100) : 100;
+      let pTestsCount = 0;
+      let passCount = 0;
+      pBatches.forEach((b) => {
+        const bTests = testResultsByBatchId.get(b.id) || [];
+        pTestsCount += bTests.length;
+        passCount += bTests.filter((t) => t.overallStatus === 'PASS').length;
+      });
+
+      const passRate = pTestsCount > 0 ? Math.round((passCount / pTestsCount) * 100) : 100;
 
       return {
         ...prod,
         activeTCCS,
         allTCCS: pTccs,
-        formula: formulaMap.get(prod.id),
+        formula: formulasByProductId.get(prod.id),
         batches: sortedBatches,
         batchesCount: pBatches.length,
-        testResultsCount: pTests.length,
+        testResultsCount: pTestsCount,
         passRate,
         latestBatch: sortedBatches[0],
       };
     });
-  }, [rawProducts, tccsByProduct, formulaMap, batchesByProduct, rawTestResults]);
+  }, [rawProducts, tccsByProductId, formulasByProductId, batchesByProductId, testResultsByBatchId]);
 
   // Hydrated Criteria Aliases
   const criteriaAliases = useMemo<HydratedCriteriaAlias[]>(() => {
     return rawCriteriaAliases.map((a) => {
-      const tccs = tccsMap.get(a.tccsId);
-      const product = tccs ? productMap.get(tccs.productId) : undefined;
+      const tccs = tccsById.get(a.tccsId);
+      const product = tccs ? productsById.get(tccs.productId) : undefined;
       return {
         ...a,
         tccs,
         product,
       };
     });
-  }, [rawCriteriaAliases, tccsMap, productMap]);
+  }, [rawCriteriaAliases, tccsById, productsById]);
+
+  // ==========================================
+  // 4. FAST LOOKUP HELPERS - O(1)
+  // ==========================================
+  const getBatchesByProductId = useCallback(
+    (productId: string): Batch[] => batchesByProductId.get(productId) || EMPTY_ARRAY,
+    [batchesByProductId]
+  );
+
+  const getTestResultsByBatchId = useCallback(
+    (batchId: string): TestResult[] => testResultsByBatchId.get(batchId) || EMPTY_ARRAY,
+    [testResultsByBatchId]
+  );
+
+  const getActiveTccsByProductId = useCallback(
+    (productId: string): TCCS | undefined => {
+      const list = tccsByProductId.get(productId) || EMPTY_ARRAY;
+      return list.find((t) => t.isActive) || list[0];
+    },
+    [tccsByProductId]
+  );
+
+  const getFormulaByProductId = useCallback(
+    (productId: string): ProductFormula | undefined => formulasByProductId.get(productId),
+    [formulasByProductId]
+  );
 
   return {
+    // Legacy Hydrated Arrays (100% Backward Compatibility)
     batches,
     testResults,
     allTestResultsHydrated,
@@ -415,5 +516,23 @@ export const useDataGraph = () => {
     productFormulas,
     rawMaterials,
     criteriaAliases,
+
+    // High-Performance Data Graph Index Maps (Phase 5)
+    productsById,
+    batchesById,
+    batchesByProductId,
+    batchesByTccsId,
+    tccsById,
+    tccsByProductId,
+    testResultsById,
+    testResultsByBatchId,
+    formulasByProductId,
+    aliasesByTccsId,
+
+    // Fast Lookup Helpers
+    getBatchesByProductId,
+    getTestResultsByBatchId,
+    getActiveTccsByProductId,
+    getFormulaByProductId,
   };
 };

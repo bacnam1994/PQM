@@ -132,7 +132,9 @@ export const useTrendAnalyticsState = () => {
       string,
       { batchCount: number; resultCount: number; lastMfgDate?: string }
     >();
+    const batchMap = new Map<string, any>();
     batches.forEach((b) => {
+      batchMap.set(b.id, b);
       if (!b.productId) return;
       const cur = stats.get(b.productId) || { batchCount: 0, resultCount: 0 };
       cur.batchCount += 1;
@@ -144,7 +146,7 @@ export const useTrendAnalyticsState = () => {
 
     testResults.forEach((r: any) => {
       if (!r.batchId) return;
-      const b = batches.find((batch) => batch.id === r.batchId);
+      const b = batchMap.get(r.batchId);
       if (b?.productId) {
         const cur = stats.get(b.productId) || { batchCount: 0, resultCount: 0 };
         cur.resultCount += 1;

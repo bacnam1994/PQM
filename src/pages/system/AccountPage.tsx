@@ -1,26 +1,24 @@
 import React, { useState } from 'react';
 import { useAppStore } from '../../store/useAppStore';
-import { 
-  ShieldCheckIcon, 
-  BookmarkSquareIcon, 
-  ArrowPathIcon, 
-  UserIcon, 
+import {
+  ShieldCheckIcon,
+  BookmarkSquareIcon,
+  ArrowPathIcon,
+  UserIcon,
   UserCircleIcon,
-  EnvelopeIcon, 
-  LockClosedIcon, 
-  CameraIcon 
+  EnvelopeIcon,
+  LockClosedIcon,
+  CameraIcon,
 } from '@heroicons/react/24/outline';
 import { PageHeader } from '../../components/ui';
 import { DSFormInput } from '../../components/ui/DesignSystem';
 import toast from 'react-hot-toast';
-import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { updateProfile } from 'firebase/auth';
-import { FirebaseError } from 'firebase/app';
+import { userService } from '../../services/userService';
 
 const AccountPage: React.FC = () => {
-  const user = useAppStore(state => state.user);
-  const role = useAppStore(state => state.role);
-  const changePassword = useAppStore(state => state.changePassword);
+  const user = useAppStore((state) => state.user);
+  const role = useAppStore((state) => state.role);
+  const changePassword = useAppStore((state) => state.changePassword);
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -32,30 +30,30 @@ const AccountPage: React.FC = () => {
   const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
     if (newPassword !== confirmPassword) {
-      toast.error("Mật khẩu xác nhận không khớp.");
+      toast.error('Mật khẩu xác nhận không khớp.');
       return;
     }
     if (newPassword.length < 6) {
-      toast.error("Mật khẩu mới phải có ít nhất 6 ký tự.");
+      toast.error('Mật khẩu mới phải có ít nhất 6 ký tự.');
       return;
     }
 
     setLoading(true);
     try {
       await changePassword(currentPassword, newPassword);
-      toast.success("Đổi mật khẩu thành công!");
+      toast.success('Đổi mật khẩu thành công!');
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
     } catch (error) {
       console.error(error);
-      const fbError = error as FirebaseError;
-      if (fbError.code === 'auth/wrong-password' || fbError.code === 'auth/invalid-credential') {
-        toast.error("Mật khẩu hiện tại không đúng.");
-      } else if (fbError.code === 'auth/requires-recent-login') {
-        toast.error("Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại để đổi mật khẩu.");
+      const fbError = error as any;
+      if (fbError?.code === 'auth/wrong-password' || fbError?.code === 'auth/invalid-credential') {
+        toast.error('Mật khẩu hiện tại không đúng.');
+      } else if (fbError?.code === 'auth/requires-recent-login') {
+        toast.error('Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại để đổi mật khẩu.');
       } else {
-        toast.error("Đã có lỗi xảy ra. Vui lòng thử lại.");
+        toast.error('Đã có lỗi xảy ra. Vui lòng thử lại.');
       }
     } finally {
       setLoading(false);
@@ -74,17 +72,12 @@ const AccountPage: React.FC = () => {
     if (!avatarFile || !user) return;
     setUploadingAvatar(true);
     try {
-      const storage = getStorage();
-      const storageRef = ref(storage, `avatars/${user.uid}_${Date.now()}`);
-      await uploadBytes(storageRef, avatarFile);
-      const photoURL = await getDownloadURL(storageRef);
-      
-      await updateProfile(user, { photoURL });
-      toast.success("Cập nhật ảnh đại diện thành công!");
+      await userService.uploadUserAvatar(user, avatarFile);
+      toast.success('Cập nhật ảnh đại diện thành công!');
       setAvatarFile(null);
     } catch (error) {
       console.error(error);
-      toast.error("Lỗi khi tải ảnh lên. Vui lòng thử lại.");
+      toast.error('Lỗi khi tải ảnh lên. Vui lòng thử lại.');
     } finally {
       setUploadingAvatar(false);
     }
@@ -92,10 +85,10 @@ const AccountPage: React.FC = () => {
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
-      <PageHeader 
-        title="Quản lý tài khoản" 
-        subtitle="Thông tin cá nhân và bảo mật." 
-        icon={UserIcon} 
+      <PageHeader
+        title="Quản lý tài khoản"
+        subtitle="Thông tin cá nhân và bảo mật."
+        icon={UserIcon}
       />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -116,25 +109,40 @@ const AccountPage: React.FC = () => {
               <div className="relative group">
                 <div className="w-24 h-24 rounded-full bg-surface-2 border-4 border-surface shadow-lg overflow-hidden flex items-center justify-center">
                   {avatarPreview || user?.photoURL ? (
-                    <img src={avatarPreview || user?.photoURL || ''} alt="Avatar" className="w-full h-full object-cover" />
+                    <img
+                      src={avatarPreview || user?.photoURL || ''}
+                      alt="Avatar"
+                      className="w-full h-full object-cover"
+                    />
                   ) : (
                     <UserCircleIcon className="w-16 h-16 text-ink-muted/50" />
                   )}
                 </div>
-                <label htmlFor="avatar-upload" className="absolute bottom-0 right-0 p-2 bg-emerald-600 text-white rounded-full shadow-md cursor-pointer hover:bg-emerald-700 transition-all hover:scale-110 active:scale-95">
+                <label
+                  htmlFor="avatar-upload"
+                  className="absolute bottom-0 right-0 p-2 bg-emerald-600 text-white rounded-full shadow-md cursor-pointer hover:bg-emerald-700 transition-all hover:scale-110 active:scale-95"
+                >
                   <CameraIcon className="w-3.5 h-3.5" />
                 </label>
-                <input 
-                  id="avatar-upload" 
-                  type="file" 
-                  accept="image/*" 
-                  className="hidden" 
+                <input
+                  id="avatar-upload"
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
                   onChange={handleFileSelect}
                 />
               </div>
               {avatarFile && (
-                <button onClick={handleUploadAvatar} disabled={uploadingAvatar} className="mt-3 px-4 py-1.5 bg-emerald-600 text-white text-[10px] font-bold uppercase rounded-lg shadow-md hover:bg-emerald-700 transition-all flex items-center gap-2">
-                  {uploadingAvatar ? <ArrowPathIcon className="w-3 h-3 animate-spin"/> : <BookmarkSquareIcon className="w-3 h-3"/>}
+                <button
+                  onClick={handleUploadAvatar}
+                  disabled={uploadingAvatar}
+                  className="mt-3 px-4 py-1.5 bg-emerald-600 text-white text-[10px] font-bold uppercase rounded-lg shadow-md hover:bg-emerald-700 transition-all flex items-center gap-2"
+                >
+                  {uploadingAvatar ? (
+                    <ArrowPathIcon className="w-3 h-3 animate-spin" />
+                  ) : (
+                    <BookmarkSquareIcon className="w-3 h-3" />
+                  )}
                   {uploadingAvatar ? 'Đang tải...' : 'Lưu ảnh'}
                 </button>
               )}
@@ -145,7 +153,9 @@ const AccountPage: React.FC = () => {
                 <EnvelopeIcon className="w-5 h-5" />
               </div>
               <div>
-                <p className="text-xs text-ink-muted font-bold uppercase tracking-wider mb-0.5">Email đăng nhập</p>
+                <p className="text-xs text-ink-muted font-bold uppercase tracking-wider mb-0.5">
+                  Email đăng nhập
+                </p>
                 <p className="text-ink font-bold text-lg">{user?.email}</p>
               </div>
             </div>
@@ -155,8 +165,12 @@ const AccountPage: React.FC = () => {
                 <ShieldCheckIcon className="w-5 h-5" />
               </div>
               <div>
-                <p className="text-xs text-ink-muted font-bold uppercase tracking-wider mb-0.5">Vai trò hệ thống</p>
-                <span className={`inline-flex px-3 py-1 rounded-lg text-xs font-black uppercase ${role === 'ADMIN' ? 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300' : 'bg-surface-2 text-ink-muted border border-border'}`}>
+                <p className="text-xs text-ink-muted font-bold uppercase tracking-wider mb-0.5">
+                  Vai trò hệ thống
+                </p>
+                <span
+                  className={`inline-flex px-3 py-1 rounded-lg text-xs font-black uppercase ${role === 'ADMIN' ? 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300' : 'bg-surface-2 text-ink-muted border border-border'}`}
+                >
                   {role}
                 </span>
               </div>
@@ -176,42 +190,46 @@ const AccountPage: React.FC = () => {
           </div>
 
           <form onSubmit={handleChangePassword} className="space-y-4">
-            <DSFormInput 
-              label="Mật khẩu hiện tại" 
-              type="password" 
-              required 
-              value={currentPassword} 
-              onChange={(e: any) => setCurrentPassword(e.target.value)} 
+            <DSFormInput
+              label="Mật khẩu hiện tại"
+              type="password"
+              required
+              value={currentPassword}
+              onChange={(e: any) => setCurrentPassword(e.target.value)}
               placeholder="••••••••"
             />
-            
+
             <div className="grid grid-cols-2 gap-4">
-              <DSFormInput 
-                label="Mật khẩu mới" 
-                type="password" 
-                required 
-                value={newPassword} 
-                onChange={(e: any) => setNewPassword(e.target.value)} 
+              <DSFormInput
+                label="Mật khẩu mới"
+                type="password"
+                required
+                value={newPassword}
+                onChange={(e: any) => setNewPassword(e.target.value)}
                 placeholder="••••••••"
               />
-              <DSFormInput 
-                label="Xác nhận mới" 
-                type="password" 
-                required 
-                value={confirmPassword} 
-                onChange={(e: any) => setConfirmPassword(e.target.value)} 
+              <DSFormInput
+                label="Xác nhận mới"
+                type="password"
+                required
+                value={confirmPassword}
+                onChange={(e: any) => setConfirmPassword(e.target.value)}
                 placeholder="••••••••"
               />
             </div>
 
             <div className="pt-2 flex justify-end">
-              <button 
-                type="submit" 
+              <button
+                type="submit"
                 disabled={loading || !currentPassword || !newPassword}
                 className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-black uppercase text-[10px] tracking-wider transition-all disabled:opacity-50 flex items-center gap-2 shadow-md shadow-emerald-500/20"
               >
-                {loading ? <ArrowPathIcon className="w-3.5 h-3.5 animate-spin" /> : <BookmarkSquareIcon className="w-3.5 h-3.5" />}
-                {loading ? "Đang xử lý..." : "Cập nhật mật khẩu"}
+                {loading ? (
+                  <ArrowPathIcon className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <BookmarkSquareIcon className="w-3.5 h-3.5" />
+                )}
+                {loading ? 'Đang xử lý...' : 'Cập nhật mật khẩu'}
               </button>
             </div>
           </form>

@@ -1,4 +1,6 @@
 import { tccsAppService } from '../../services/app/TCCSAppService';
+import { queryClient } from '../../lib/queryClient';
+import { TCCS_QUERY_KEYS } from '../../constants/queryKeys';
 import { TCCSSlice, StoreSlice } from './types';
 import { TCCS, CriteriaAlias } from '../../types';
 import { resolveCurrentIdentity } from '../utils/storeHelpers';
@@ -14,6 +16,10 @@ export const createTCCSSlice: StoreSlice<TCCSSlice> = (set, get) => ({
     try {
       const state = get();
       await tccsAppService.createTCCS(t, state.tccsList, resolveCurrentIdentity(state));
+      queryClient.invalidateQueries({ queryKey: TCCS_QUERY_KEYS.all });
+      if (t.productId) {
+        queryClient.invalidateQueries({ queryKey: TCCS_QUERY_KEYS.byProduct(t.productId) });
+      }
     } catch (error: any) {
       get().notify({ type: 'ERROR', title: 'Lỗi lưu TCCS', message: error.message });
       throw error;
@@ -30,6 +36,11 @@ export const createTCCSSlice: StoreSlice<TCCSSlice> = (set, get) => ({
         state.criteriaAliases,
         resolveCurrentIdentity(state)
       );
+      queryClient.invalidateQueries({ queryKey: TCCS_QUERY_KEYS.all });
+      queryClient.invalidateQueries({ queryKey: TCCS_QUERY_KEYS.detail(t.id) });
+      if (t.productId) {
+        queryClient.invalidateQueries({ queryKey: TCCS_QUERY_KEYS.byProduct(t.productId) });
+      }
     } catch (error: any) {
       get().notify({ type: 'ERROR', title: 'Lỗi cập nhật TCCS', message: error.message });
       throw error;
@@ -41,12 +52,13 @@ export const createTCCSSlice: StoreSlice<TCCSSlice> = (set, get) => ({
       const state = get();
       const tccs = state.tccsList.find((t: TCCS) => t.id === id);
       await tccsAppService.deleteTCCS(
-        id, 
-        state.batches, 
-        resolveCurrentIdentity(state), 
+        id,
+        state.batches,
+        resolveCurrentIdentity(state),
         tccs?.code,
         state.criteriaAliases
       );
+      queryClient.invalidateQueries({ queryKey: TCCS_QUERY_KEYS.all });
     } catch (error: any) {
       get().notify({ type: 'WARNING', title: 'Không thể xóa', message: error.message });
       throw error;
@@ -58,11 +70,12 @@ export const createTCCSSlice: StoreSlice<TCCSSlice> = (set, get) => ({
     try {
       const state = get();
       await tccsAppService.addAiLearnedMapping(
-        originalName, 
-        systemName, 
-        state.aiLearnedMappings, 
+        originalName,
+        systemName,
+        state.aiLearnedMappings,
         resolveCurrentIdentity(state)
       );
+      queryClient.invalidateQueries({ queryKey: TCCS_QUERY_KEYS.aiMappings });
     } catch (e: any) {
       console.error('Lỗi cập nhật AI Learned Mapping:', e);
     }
@@ -72,6 +85,7 @@ export const createTCCSSlice: StoreSlice<TCCSSlice> = (set, get) => ({
   addCriteriaAlias: async (alias: CriteriaAlias) => {
     try {
       await tccsAppService.addCriteriaAlias(alias, resolveCurrentIdentity(get()));
+      queryClient.invalidateQueries({ queryKey: TCCS_QUERY_KEYS.aliases });
     } catch (error: any) {
       get().notify({ type: 'ERROR', title: 'Lỗi tạo Criteria Alias', message: error.message });
       throw error;
@@ -81,6 +95,7 @@ export const createTCCSSlice: StoreSlice<TCCSSlice> = (set, get) => ({
   updateCriteriaAlias: async (alias: CriteriaAlias) => {
     try {
       await tccsAppService.updateCriteriaAlias(alias, get().user);
+      queryClient.invalidateQueries({ queryKey: TCCS_QUERY_KEYS.aliases });
     } catch (error: any) {
       get().notify({ type: 'ERROR', title: 'Lỗi cập nhật Criteria Alias', message: error.message });
       throw error;
@@ -91,6 +106,7 @@ export const createTCCSSlice: StoreSlice<TCCSSlice> = (set, get) => ({
     try {
       const alias = get().criteriaAliases.find((a: CriteriaAlias) => a.id === id);
       await tccsAppService.deleteCriteriaAlias(id, get().user, alias?.canonicalName);
+      queryClient.invalidateQueries({ queryKey: TCCS_QUERY_KEYS.aliases });
     } catch (error: any) {
       get().notify({ type: 'ERROR', title: 'Lỗi xóa Criteria Alias', message: error.message });
       throw error;
@@ -102,9 +118,10 @@ export const createTCCSSlice: StoreSlice<TCCSSlice> = (set, get) => ({
       const alias = get().criteriaAliases.find((a: CriteriaAlias) => a.id === id);
       if (!alias) return;
       await tccsAppService.confirmCriteriaAlias(alias, get().user);
+      queryClient.invalidateQueries({ queryKey: TCCS_QUERY_KEYS.aliases });
       get().notify({
         type: 'SUCCESS',
-        message: `Đã xác nhận alias cho "${alias.canonicalName}"`
+        message: `Đã xác nhận alias cho "${alias.canonicalName}"`,
       });
     } catch (error: any) {
       get().notify({ type: 'ERROR', title: 'Lỗi xác nhận Criteria Alias', message: error.message });
@@ -117,13 +134,14 @@ export const createTCCSSlice: StoreSlice<TCCSSlice> = (set, get) => ({
       const alias = get().criteriaAliases.find((a: CriteriaAlias) => a.id === aliasId);
       if (!alias) return;
       await tccsAppService.addAliasToExisting(alias, newAlias, get().user);
+      queryClient.invalidateQueries({ queryKey: TCCS_QUERY_KEYS.aliases });
       get().notify({
         type: 'SUCCESS',
-        message: `Đã thêm alias "${newAlias}" cho "${alias.canonicalName}"`
+        message: `Đã thêm alias "${newAlias}" cho "${alias.canonicalName}"`,
       });
     } catch (error: any) {
       get().notify({ type: 'ERROR', title: 'Lỗi thêm alias', message: error.message });
       throw error;
     }
-  }
+  },
 });

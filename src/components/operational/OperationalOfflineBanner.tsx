@@ -1,7 +1,6 @@
 import React from 'react';
 import { CloudArrowDownIcon, ArrowPathIcon } from '@heroicons/react/24/outline';
-import { goOnline } from 'firebase/database';
-import { db } from '../../firebase';
+import { reconnectDatabase } from '../../firebase';
 import { queryClient } from '../../lib/queryClient';
 
 interface OperationalOfflineBannerProps {
@@ -19,7 +18,7 @@ export const OperationalOfflineBanner: React.FC<OperationalOfflineBannerProps> =
 
   const handleReconnect = () => {
     try {
-      goOnline(db);
+      reconnectDatabase();
       queryClient.resumePausedMutations();
     } catch (e) {
       console.warn('Lỗi kết nối lại:', e);

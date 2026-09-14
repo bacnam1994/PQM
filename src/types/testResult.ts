@@ -20,6 +20,30 @@ export interface Attachment {
   uploadedAt: string;
 }
 
+export interface EvaluationSnapshotCriterionResult {
+  criteriaName: string;
+  value: any;
+  normalizedValue?: any;
+  isPass: boolean | null;
+  ruleApplied?: string;
+  usedAlternate?: boolean;
+  note?: string;
+}
+
+export interface EvaluationSnapshot {
+  engineVersion: string;
+  tccsId?: string;
+  tccsVersion?: string | number;
+  evaluatedAt: string;
+  evaluatedBy: string;
+  overallStatus: 'PASS' | 'FAIL';
+  criterionResults: EvaluationSnapshotCriterionResult[];
+  alternateUsed: boolean;
+  reasons: string[];
+  warnings: string[];
+  evaluationHash: string;
+}
+
 export interface TestResult {
   id: string;
   batchId: string;
@@ -32,6 +56,7 @@ export interface TestResult {
   testDate: string;
   results: TestResultEntry[];
   overallStatus: 'PASS' | 'FAIL';
+  evaluationSnapshot?: EvaluationSnapshot;
   notes?: string;
   attachments?: Attachment[];
   version?: number;

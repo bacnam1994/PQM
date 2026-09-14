@@ -1,6 +1,7 @@
-import { ref, get as firebaseGet } from 'firebase/database';
-import { db } from '../../firebase';
+import { testResultRepository } from '../../repositories/firebase/FirebaseTestResultRepository';
 import { testResultAppService } from '../../services/app/TestResultAppService';
+import { queryClient } from '../../lib/queryClient';
+import { TEST_RESULT_QUERY_KEYS } from '../../constants/queryKeys';
 import { TestResultSlice, StoreSlice } from './types';
 import { TestResult } from '../../types';
 import { resolveCurrentIdentity } from '../utils/storeHelpers';
@@ -18,6 +19,10 @@ export const createTestResultSlice: StoreSlice<TestResultSlice> = (set, get) => 
       const batch = state.batches.find((b: any) => b.id === r.batchId);
       const currentUser = resolveCurrentIdentity(state);
       await testResultAppService.createTestResult(r, currentUser, { batch });
+      queryClient.invalidateQueries({ queryKey: TEST_RESULT_QUERY_KEYS.all });
+      if (r.batchId) {
+        queryClient.invalidateQueries({ queryKey: TEST_RESULT_QUERY_KEYS.byBatch(r.batchId) });
+      }
       await get().syncQualityAlerts();
     } catch (error: any) {
       get().notify({ type: 'ERROR', title: 'Lỗi lưu phiếu kiểm nghiệm', message: error.message });
@@ -31,9 +36,18 @@ export const createTestResultSlice: StoreSlice<TestResultSlice> = (set, get) => 
       const oldResult = state.testResults.find((item: TestResult) => item.id === r.id);
       const currentUser = resolveCurrentIdentity(state);
       await testResultAppService.updateTestResult(r, currentUser, oldResult);
+      queryClient.invalidateQueries({ queryKey: TEST_RESULT_QUERY_KEYS.all });
+      queryClient.invalidateQueries({ queryKey: TEST_RESULT_QUERY_KEYS.detail(r.id) });
+      if (r.batchId) {
+        queryClient.invalidateQueries({ queryKey: TEST_RESULT_QUERY_KEYS.byBatch(r.batchId) });
+      }
       await get().syncQualityAlerts();
     } catch (error: any) {
-      get().notify({ type: 'ERROR', title: 'Lỗi cập nhật phiếu kiểm nghiệm', message: error.message });
+      get().notify({
+        type: 'ERROR',
+        title: 'Lỗi cập nhật phiếu kiểm nghiệm',
+        message: error.message,
+      });
       throw error;
     }
   },
@@ -44,6 +58,12 @@ export const createTestResultSlice: StoreSlice<TestResultSlice> = (set, get) => 
       const oldResult = state.testResults.find((item: TestResult) => item.id === id);
       const currentUser = resolveCurrentIdentity(state);
       await testResultAppService.deleteTestResult(id, currentUser, oldResult);
+      queryClient.invalidateQueries({ queryKey: TEST_RESULT_QUERY_KEYS.all });
+      if (oldResult?.batchId) {
+        queryClient.invalidateQueries({
+          queryKey: TEST_RESULT_QUERY_KEYS.byBatch(oldResult.batchId),
+        });
+      }
       await get().syncQualityAlerts();
     } catch (error: any) {
       get().notify({ type: 'ERROR', title: 'Lỗi xóa phiếu kiểm nghiệm', message: error.message });
@@ -52,11 +72,7 @@ export const createTestResultSlice: StoreSlice<TestResultSlice> = (set, get) => 
   },
 
   loadMoreTestResults: () =>
-    set(
-      (state) => ({ testResultLimit: state.testResultLimit + 50 }),
-      false,
-      'loadMoreTestResults'
-    ),
+    set((state) => ({ testResultLimit: state.testResultLimit + 50 }), false, 'loadMoreTestResults'),
 
   mergeTestResults: (list: TestResult[]) =>
     set(
@@ -83,20 +99,18 @@ export const createTestResultSlice: StoreSlice<TestResultSlice> = (set, get) => 
       ) {
         return;
       }
-      const snapshot = await firebaseGet(ref(db, 'testResults'));
-      if (snapshot.exists()) {
-        const list = Object.values(snapshot.val()) as TestResult[];
-        set(
-          {
-            allTestResults: list,
-            _lastFetchTestResultsTime: Date.now()
-          } as any,
-          false,
-          'fetchAllTestResultsForDashboard'
-        );
-      }
+      const list = await testResultRepository.findAll();
+      queryClient.setQueryData(TEST_RESULT_QUERY_KEYS.all, list);
+      set(
+        {
+          allTestResults: list,
+          _lastFetchTestResultsTime: Date.now(),
+        } as any,
+        false,
+        'fetchAllTestResultsForDashboard'
+      );
     } catch (e) {
       console.error('Lỗi tải toàn bộ dữ liệu cho Dashboard:', e);
     }
-  }
+  },
 });

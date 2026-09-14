@@ -7,10 +7,14 @@
 import { TestResult, Batch } from '../../types';
 import { ITestResultRepository } from '../../repositories/TestResultRepository';
 import { testResultRepository as defaultTestResultRepo } from '../../repositories/firebase/FirebaseTestResultRepository';
-import { DeviationAppService, deviationAppService as defaultDeviationAppService } from './DeviationAppService';
+import {
+  DeviationAppService,
+  deviationAppService as defaultDeviationAppService,
+} from './DeviationAppService';
 import { can } from '../permissionService';
 import { logAuditAction } from '../auditService';
 import { validateOptimisticLock, nextVersion } from '../../utils/concurrency';
+import { buildEvaluationSnapshot } from '../../domain/evaluation';
 
 export class TestResultAppService {
   constructor(
@@ -22,8 +26,8 @@ export class TestResultAppService {
    * Tạo mới Phiếu kiểm nghiệm
    */
   async createTestResult(
-    testResult: TestResult, 
-    currentUser: any, 
+    testResult: TestResult,
+    currentUser: any,
     options?: { batch?: Batch }
   ): Promise<void> {
     if (!can(currentUser, 'test_result:create')) {
@@ -43,15 +47,22 @@ export class TestResultAppService {
     // Tự động kiểm tra tính toán tổng hợp PASS / FAIL dựa trên các chỉ tiêu chi tiết
     let evaluatedStatus: 'PASS' | 'FAIL' = testResult.overallStatus || 'PASS';
     if (testResult.results && testResult.results.length > 0) {
-      const hasFailedEntry = testResult.results.some(r => r.isPass === false);
+      const hasFailedEntry = testResult.results.some((r) => r.isPass === false);
       evaluatedStatus = hasFailedEntry ? 'FAIL' : 'PASS';
     }
+
+    const evaluationSnapshot =
+      testResult.evaluationSnapshot ||
+      buildEvaluationSnapshot({ ...testResult, overallStatus: evaluatedStatus }, currentUser, {
+        batch: options?.batch,
+      });
 
     const cleanResult: TestResult = {
       ...testResult,
       overallStatus: evaluatedStatus,
+      evaluationSnapshot,
       version: testResult.version && testResult.version > 0 ? testResult.version : 1,
-      createdAt: testResult.createdAt || new Date().toISOString()
+      createdAt: testResult.createdAt || new Date().toISOString(),
     };
 
     await this.repo.save(cleanResult);
@@ -70,7 +81,7 @@ export class TestResultAppService {
       collection: 'TEST_RESULTS',
       documentId: cleanResult.id,
       details: `Thêm phiếu KN: Lô ${options?.batch?.batchNo || cleanResult.batchId}, Lab: ${cleanResult.labName}, Kết quả: ${cleanResult.overallStatus} (v${cleanResult.version})`,
-      performedBy: currentUser?.email || 'unknown'
+      performedBy: currentUser?.email || 'unknown',
     });
   }
 
@@ -78,16 +89,22 @@ export class TestResultAppService {
    * Cập nhật Phiếu kiểm nghiệm có bảo vệ Optimistic Concurrency Control (OCC)
    */
   async updateTestResult(
-    testResult: TestResult, 
-    currentUser: any, 
+    testResult: TestResult,
+    currentUser: any,
     oldTestResult?: TestResult
   ): Promise<void> {
     if (!can(currentUser, 'test_result:update', oldTestResult || testResult)) {
-      throw new Error('Từ chối quyền: Không thể chỉnh sửa phiếu kiểm nghiệm đã duyệt hoặc bị khóa.');
+      throw new Error(
+        'Từ chối quyền: Không thể chỉnh sửa phiếu kiểm nghiệm đã duyệt hoặc bị khóa.'
+      );
     }
 
     // Kiểm tra xung đột khóa lạc quan (OCC)
-    validateOptimisticLock(oldTestResult?.version, testResult.version, `Phiếu kiểm nghiệm ${testResult.id}`);
+    validateOptimisticLock(
+      oldTestResult?.version,
+      testResult.version,
+      `Phiếu kiểm nghiệm ${testResult.id}`
+    );
 
     if (!testResult.batchId?.trim()) {
       throw new Error('Phiếu kiểm nghiệm phải gắn liền với một Lô sản xuất cụ thể.');
@@ -101,17 +118,22 @@ export class TestResultAppService {
 
     let evaluatedStatus: 'PASS' | 'FAIL' = testResult.overallStatus || 'PASS';
     if (testResult.results && testResult.results.length > 0) {
-      const hasFailedEntry = testResult.results.some(r => r.isPass === false);
+      const hasFailedEntry = testResult.results.some((r) => r.isPass === false);
       evaluatedStatus = hasFailedEntry ? 'FAIL' : 'PASS';
     }
 
     const newVersion = nextVersion(oldTestResult?.version ?? testResult.version);
 
+    const evaluationSnapshot =
+      testResult.evaluationSnapshot ||
+      buildEvaluationSnapshot({ ...testResult, overallStatus: evaluatedStatus }, currentUser);
+
     const cleanResult: TestResult = {
       ...testResult,
       overallStatus: evaluatedStatus,
+      evaluationSnapshot,
       version: newVersion,
-      updatedAt: new Date().toISOString()
+      updatedAt: new Date().toISOString(),
     };
 
     await this.repo.update(cleanResult);
@@ -130,18 +152,14 @@ export class TestResultAppService {
       collection: 'TEST_RESULTS',
       documentId: cleanResult.id,
       details: `Cập nhật phiếu KN: ${cleanResult.id}, Kết quả: ${cleanResult.overallStatus} (v${cleanResult.version})`,
-      performedBy: currentUser?.email || 'unknown'
+      performedBy: currentUser?.email || 'unknown',
     });
   }
 
   /**
    * Xóa Phiếu kiểm nghiệm
    */
-  async deleteTestResult(
-    id: string, 
-    currentUser: any, 
-    oldTestResult?: TestResult
-  ): Promise<void> {
+  async deleteTestResult(id: string, currentUser: any, oldTestResult?: TestResult): Promise<void> {
     if (!can(currentUser, 'test_result:delete', oldTestResult)) {
       throw new Error('Từ chối quyền: Bạn không có quyền xóa phiếu kiểm nghiệm này.');
     }
@@ -153,7 +171,7 @@ export class TestResultAppService {
       collection: 'TEST_RESULTS',
       documentId: id,
       details: `Xóa phiếu KN: ${id}`,
-      performedBy: currentUser?.email || 'unknown'
+      performedBy: currentUser?.email || 'unknown',
     });
   }
 }

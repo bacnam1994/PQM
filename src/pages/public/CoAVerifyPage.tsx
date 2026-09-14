@@ -7,19 +7,22 @@
 
 import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { db } from '../../firebase';
-import { ref, get } from 'firebase/database';
-import { 
-  ShieldCheckIcon, 
-  ExclamationTriangleIcon, 
-  CheckCircleIcon, 
-  XCircleIcon, 
-  DocumentTextIcon, 
-  CubeIcon, 
-  BuildingOffice2Icon, 
+import { testResultRepository } from '../../repositories/firebase/FirebaseTestResultRepository';
+import { batchRepository } from '../../repositories/firebase/FirebaseBatchRepository';
+import { productRepository } from '../../repositories/firebase/FirebaseProductRepository';
+import { tccsRepository } from '../../repositories/firebase/FirebaseTCCSRepository';
+import { signatureService } from '../../services/signatureService';
+import {
+  ShieldCheckIcon,
+  ExclamationTriangleIcon,
+  CheckCircleIcon,
+  XCircleIcon,
+  DocumentTextIcon,
+  CubeIcon,
+  BuildingOffice2Icon,
   ArrowTopRightOnSquareIcon,
-  CheckBadgeIcon, 
-  ArrowPathIcon 
+  CheckBadgeIcon,
+  ArrowPathIcon,
 } from '@heroicons/react/24/outline';
 import { TestResult, Batch, Product, TCCS } from '../../types';
 import { ElectronicSignature } from '../../types/signature';
@@ -48,26 +51,16 @@ export const CoAVerifyPage: React.FC = () => {
         setError(null);
 
         // 1. Thử tìm theo TestResult ID
-        let trData: TestResult | null = null;
-        const trSnap = await get(ref(db, `testResults/${id}`));
-        
-        if (trSnap.exists()) {
-          trData = { id: trSnap.key!, ...trSnap.val() };
-        } else {
+        let trData: TestResult | null = await testResultRepository.findById(id);
+
+        if (!trData) {
           // 2. Thử tìm theo Batch ID nếu id truyền vào là batchId
-          const batchSnap = await get(ref(db, `batches/${id}`));
-          if (batchSnap.exists()) {
-            const bData: Batch = { id: batchSnap.key!, ...batchSnap.val() };
+          const bData = await batchRepository.findById(id);
+          if (bData) {
             setBatch(bData);
-            
-            // Tìm TestResult liên kết với Batch
-            const allTrSnap = await get(ref(db, 'testResults'));
-            if (allTrSnap.exists()) {
-              const allTr = allTrSnap.val();
-              const foundKey = Object.keys(allTr).find(k => allTr[k].batchId === bData.id);
-              if (foundKey) {
-                trData = { id: foundKey, ...allTr[foundKey] };
-              }
+            const foundTests = await testResultRepository.findByRelation('batchId', bData.id);
+            if (foundTests.length > 0) {
+              trData = foundTests[0];
             }
           }
         }
@@ -83,42 +76,39 @@ export const CoAVerifyPage: React.FC = () => {
         // 3. Tải thông tin Lô (nếu chưa có)
         let currentBatch: Batch | null = null;
         if (trData.batchId) {
-          const bSnap = await get(ref(db, `batches/${trData.batchId}`));
-          if (bSnap.exists()) {
-            currentBatch = { id: bSnap.key!, ...bSnap.val() };
+          currentBatch = await batchRepository.findById(trData.batchId);
+          if (currentBatch) {
             setBatch(currentBatch);
 
             // 4. Tải thông tin Sản phẩm
             if (currentBatch.productId) {
-              const pSnap = await get(ref(db, `products/${currentBatch.productId}`));
-              if (pSnap.exists()) {
-                setProduct({ id: pSnap.key!, ...pSnap.val() });
-              }
+              const p = await productRepository.findById(currentBatch.productId);
+              if (p) setProduct(p);
             }
           }
         }
 
         // 5. Tải thông tin TCCS (thông qua Batch hoặc Product)
         if (currentBatch && currentBatch.tccsId) {
-          const tccsSnap = await get(ref(db, `tccs/${currentBatch.tccsId}`));
-          if (tccsSnap.exists()) {
-            setTccs({ id: tccsSnap.key!, ...tccsSnap.val() });
-          }
+          const t = await tccsRepository.findById(currentBatch.tccsId);
+          if (t) setTccs(t);
         }
 
         // 6. Tải Chữ ký điện tử (FDA 21 CFR Part 11) nếu có
         try {
-          const sigSnap = await get(ref(db, 'electronic_signatures'));
-          if (sigSnap.exists()) {
-            const allSigs = Object.values(sigSnap.val()) as ElectronicSignature[];
-            const found = allSigs.find(s =>
-              s && (
-                (currentBatch && s.documentId === currentBatch.id) ||
-                (trData && s.documentId === trData.id)
-              )
-            );
-            if (found) {
-              setSignature(found);
+          const docId = trData.id || currentBatch?.id;
+          if (docId) {
+            const sigs = await signatureService.getSignaturesForDocument('COA_ISSUE', docId);
+            if (sigs.length > 0) {
+              setSignature(sigs[0]);
+            } else if (currentBatch) {
+              const batchSigs = await signatureService.getSignaturesForDocument(
+                'BATCH_RELEASE',
+                currentBatch.id
+              );
+              if (batchSigs.length > 0) {
+                setSignature(batchSigs[0]);
+              }
             }
           }
         } catch (sigErr) {
@@ -135,7 +125,11 @@ export const CoAVerifyPage: React.FC = () => {
     fetchData();
   }, [id]);
 
-  const isPassed = testResult?.overallStatus === 'PASS' || (testResult && calculateOverallStatus(testResult.results || [], tccs) === TEST_RESULT_STATUS.PASS);
+  const isPassed = testResult?.evaluationSnapshot
+    ? testResult.evaluationSnapshot.overallStatus === 'PASS'
+    : testResult?.overallStatus === 'PASS' ||
+      (testResult &&
+        calculateOverallStatus(testResult.results || [], tccs) === TEST_RESULT_STATUS.PASS);
 
   if (loading) {
     return (
@@ -144,7 +138,9 @@ export const CoAVerifyPage: React.FC = () => {
           <ArrowPathIcon className="w-8 h-8 animate-spin text-emerald-600 dark:text-emerald-400" />
           <div>
             <h2 className="text-base font-semibold text-ink">Đang xác thực chứng chỉ...</h2>
-            <p className="text-xs text-ink-muted mt-1">Hệ thống QMS V-Biotech đang kiểm tra tính toàn vẹn dữ liệu</p>
+            <p className="text-xs text-ink-muted mt-1">
+              Hệ thống QMS V-Biotech đang kiểm tra tính toàn vẹn dữ liệu
+            </p>
           </div>
         </div>
       </div>
@@ -160,7 +156,9 @@ export const CoAVerifyPage: React.FC = () => {
           </div>
           <div>
             <h2 className="text-lg font-bold text-ink">Không thể xác thực</h2>
-            <p className="text-xs text-ink-muted mt-1.5">{error || 'Chứng chỉ không tồn tại hoặc đã bị gỡ bỏ.'}</p>
+            <p className="text-xs text-ink-muted mt-1.5">
+              {error || 'Chứng chỉ không tồn tại hoặc đã bị gỡ bỏ.'}
+            </p>
           </div>
           <Link
             to="/login"
@@ -176,7 +174,6 @@ export const CoAVerifyPage: React.FC = () => {
   return (
     <div className="min-h-screen bg-surface-2 py-8 px-4 sm:px-6">
       <div className="max-w-2xl mx-auto space-y-5">
-        
         {/* Banner Thương hiệu & Huy hiệu Xác thực */}
         <div className="bg-surface rounded-xl p-6 sm:p-7 shadow-xs border border-border text-center relative overflow-hidden">
           <div className="inline-flex items-center justify-center p-2.5 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 mb-3 border border-emerald-500/20">
@@ -202,7 +199,8 @@ export const CoAVerifyPage: React.FC = () => {
             </span>
             <span>•</span>
             <span className="flex items-center gap-1.5">
-              <BuildingOffice2Icon className="w-4 h-4 text-emerald-600 dark:text-emerald-400" /> {testResult.labName || 'Phòng Kiểm nghiệm V-Biotech'}
+              <BuildingOffice2Icon className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />{' '}
+              {testResult.labName || 'Phòng Kiểm nghiệm V-Biotech'}
             </span>
           </div>
         </div>
@@ -210,28 +208,39 @@ export const CoAVerifyPage: React.FC = () => {
         {/* Thẻ Chi tiết Sản phẩm & Lô */}
         <div className="bg-surface rounded-xl p-5 shadow-xs border border-border space-y-4">
           <h2 className="text-xs font-semibold uppercase tracking-wider text-ink-muted flex items-center gap-2">
-            <CubeIcon className="w-4 h-4 text-emerald-600 dark:text-emerald-400" /> Thông tin Lô Sản phẩm
+            <CubeIcon className="w-4 h-4 text-emerald-600 dark:text-emerald-400" /> Thông tin Lô Sản
+            phẩm
           </h2>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
             <div className="p-3 rounded-lg bg-surface-2/60 border border-border">
               <span className="text-xs text-ink-muted block font-medium">Tên sản phẩm</span>
-              <span className="font-semibold text-ink text-sm mt-0.5 block">{product?.name || '---'}</span>
+              <span className="font-semibold text-ink text-sm mt-0.5 block">
+                {product?.name || '---'}
+              </span>
             </div>
 
             <div className="p-3 rounded-lg bg-surface-2/60 border border-border">
-              <span className="text-xs text-ink-muted block font-medium">Số lô sản xuất (Batch No.)</span>
-              <span className="font-semibold font-mono text-emerald-600 dark:text-emerald-400 text-sm mt-0.5 block">{batch?.batchNo || '---'}</span>
+              <span className="text-xs text-ink-muted block font-medium">
+                Số lô sản xuất (Batch No.)
+              </span>
+              <span className="font-semibold font-mono text-emerald-600 dark:text-emerald-400 text-sm mt-0.5 block">
+                {batch?.batchNo || '---'}
+              </span>
             </div>
 
             <div className="p-3 rounded-lg bg-surface-2/60 border border-border">
               <span className="text-xs text-ink-muted block font-medium">Ngày sản xuất (MFG)</span>
-              <span className="font-medium text-ink text-sm mt-0.5 block">{batch?.mfgDate ? formatDateStandard(batch.mfgDate) : '---'}</span>
+              <span className="font-medium text-ink text-sm mt-0.5 block">
+                {batch?.mfgDate ? formatDateStandard(batch.mfgDate) : '---'}
+              </span>
             </div>
 
             <div className="p-3 rounded-lg bg-surface-2/60 border border-border">
               <span className="text-xs text-ink-muted block font-medium">Hạn sử dụng (EXP)</span>
-              <span className="font-medium text-ink text-sm mt-0.5 block">{batch?.expDate ? formatDateStandard(batch.expDate) : '---'}</span>
+              <span className="font-medium text-ink text-sm mt-0.5 block">
+                {batch?.expDate ? formatDateStandard(batch.expDate) : '---'}
+              </span>
             </div>
           </div>
         </div>
@@ -245,8 +254,12 @@ export const CoAVerifyPage: React.FC = () => {
                   <ShieldCheckIcon className="w-4 h-4" />
                 </div>
                 <div>
-                  <h3 className="font-semibold text-xs text-zinc-100 uppercase tracking-wide">Chữ ký điện tử hợp lệ (21 CFR Part 11)</h3>
-                  <p className="text-[11px] text-zinc-400">Chứng nhận tính toàn vẹn bất biến (ALCOA+ Compliant)</p>
+                  <h3 className="font-semibold text-xs text-zinc-100 uppercase tracking-wide">
+                    Chữ ký điện tử hợp lệ (21 CFR Part 11)
+                  </h3>
+                  <p className="text-[11px] text-zinc-400">
+                    Chứng nhận tính toàn vẹn bất biến (ALCOA+ Compliant)
+                  </p>
                 </div>
               </div>
               <span className="px-2.5 py-0.5 rounded-full text-[10px] font-medium bg-emerald-400/15 text-emerald-400 border border-emerald-400/30">
@@ -256,20 +269,34 @@ export const CoAVerifyPage: React.FC = () => {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
               <div className="bg-zinc-800/60 p-2.5 rounded-lg border border-zinc-700/50">
-                <span className="text-zinc-400 block text-[10px] uppercase font-medium">Người ký & Chức danh</span>
-                <span className="font-medium text-zinc-100 text-xs mt-0.5 block">{signature.signerName}</span>
-                <span className="text-zinc-400 block text-[10px] font-mono mt-0.5">{signature.signerEmail} ({signature.role})</span>
+                <span className="text-zinc-400 block text-[10px] uppercase font-medium">
+                  Người ký & Chức danh
+                </span>
+                <span className="font-medium text-zinc-100 text-xs mt-0.5 block">
+                  {signature.signerName}
+                </span>
+                <span className="text-zinc-400 block text-[10px] font-mono mt-0.5">
+                  {signature.signerEmail} ({signature.role})
+                </span>
               </div>
 
               <div className="bg-zinc-800/60 p-2.5 rounded-lg border border-zinc-700/50">
-                <span className="text-zinc-400 block text-[10px] uppercase font-medium">Thời gian ký</span>
-                <span className="font-medium text-zinc-100 text-xs mt-0.5 block">{new Date(signature.signedAt).toLocaleString('vi-VN')}</span>
-                <span className="text-zinc-400 block text-[10px] mt-0.5 font-mono truncate">{signature.signedAt}</span>
+                <span className="text-zinc-400 block text-[10px] uppercase font-medium">
+                  Thời gian ký
+                </span>
+                <span className="font-medium text-zinc-100 text-xs mt-0.5 block">
+                  {new Date(signature.signedAt).toLocaleString('vi-VN')}
+                </span>
+                <span className="text-zinc-400 block text-[10px] mt-0.5 font-mono truncate">
+                  {signature.signedAt}
+                </span>
               </div>
             </div>
 
             <div className="mt-2.5 bg-zinc-800/60 p-2.5 rounded-lg border border-zinc-700/50 space-y-0.5">
-              <span className="text-zinc-400 block text-[10px] uppercase font-medium">Ý nghĩa pháp lý</span>
+              <span className="text-zinc-400 block text-[10px] uppercase font-medium">
+                Ý nghĩa pháp lý
+              </span>
               <p className="text-xs text-amber-300/90 font-medium italic">"{signature.meaning}"</p>
             </div>
 
@@ -286,12 +313,21 @@ export const CoAVerifyPage: React.FC = () => {
         <div className="bg-surface rounded-xl p-5 shadow-xs border border-border space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-xs font-semibold uppercase tracking-wider text-ink-muted flex items-center gap-2">
-              <DocumentTextIcon className="w-4 h-4 text-emerald-600 dark:text-emerald-400" /> Kết quả Kiểm nghiệm
+              <DocumentTextIcon className="w-4 h-4 text-emerald-600 dark:text-emerald-400" /> Kết
+              quả Kiểm nghiệm
             </h2>
-            <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${
-              isPassed ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20' : 'bg-rose-500/10 text-rose-700 dark:text-rose-400 border border-rose-500/20'
-            }`}>
-              {isPassed ? <CheckCircleIcon className="w-3.5 h-3.5" /> : <XCircleIcon className="w-3.5 h-3.5" />}
+            <span
+              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${
+                isPassed
+                  ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20'
+                  : 'bg-rose-500/10 text-rose-700 dark:text-rose-400 border border-rose-500/20'
+              }`}
+            >
+              {isPassed ? (
+                <CheckCircleIcon className="w-3.5 h-3.5" />
+              ) : (
+                <XCircleIcon className="w-3.5 h-3.5" />
+              )}
               {isPassed ? 'ĐẠT TIÊU CHUẨN' : 'KHÔNG ĐẠT'}
             </span>
           </div>
@@ -315,9 +351,13 @@ export const CoAVerifyPage: React.FC = () => {
                       {r.value} {r.unit}
                     </td>
                     <td className="py-2 px-3.5 text-center">
-                      <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-medium ${
-                        r.isPass ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20' : 'bg-rose-500/10 text-rose-700 dark:text-rose-400 border border-rose-500/20'
-                      }`}>
+                      <span
+                        className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-medium ${
+                          r.isPass
+                            ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20'
+                            : 'bg-rose-500/10 text-rose-700 dark:text-rose-400 border border-rose-500/20'
+                        }`}
+                      >
                         {r.isPass ? 'Đạt' : 'KĐ'}
                       </span>
                     </td>
@@ -328,13 +368,18 @@ export const CoAVerifyPage: React.FC = () => {
           </div>
 
           <div className="pt-1 text-[11px] text-ink-muted text-center">
-            Mã định danh phiếu: <span className="font-mono text-ink font-medium">{testResult.id}</span> · Ngày kiểm: {formatDateStandard(testResult.testDate)}
+            Mã định danh phiếu:{' '}
+            <span className="font-mono text-ink font-medium">{testResult.id}</span> · Ngày kiểm:{' '}
+            {formatDateStandard(testResult.testDate)}
           </div>
         </div>
 
         {/* Footer */}
         <div className="text-center text-xs text-ink-muted space-y-1.5 py-4">
-          <p>© {new Date().getFullYear()} V-Biotech Quality Management System. Tất cả quyền được bảo lưu.</p>
+          <p>
+            © {new Date().getFullYear()} V-Biotech Quality Management System. Tất cả quyền được bảo
+            lưu.
+          </p>
           <Link
             to="/login"
             className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 hover:underline font-medium"
@@ -342,7 +387,6 @@ export const CoAVerifyPage: React.FC = () => {
             Truy cập Cổng Quản trị Nội bộ <ArrowTopRightOnSquareIcon className="w-3 h-3" />
           </Link>
         </div>
-
       </div>
     </div>
   );

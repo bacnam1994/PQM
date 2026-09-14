@@ -1,27 +1,35 @@
 import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
+import { ToastType, ToastMessage, AppStoreState, AppStoreActions, AppStore } from './slices/types';
 import {
-  ToastType,
-  ToastMessage,
-  AppStoreState,
-  AppStoreActions,
-  AppStore
-} from './slices/types';
-import { MutationMeta, executeOfflineOptimistic, processFormulaBeforeSave, handleSaveRecord, handleDeleteRecord, resolveCurrentIdentity } from './utils/storeHelpers';
+  MutationMeta,
+  executeOfflineOptimistic,
+  processFormulaBeforeSave,
+  handleSaveRecord,
+  handleDeleteRecord,
+  resolveCurrentIdentity,
+} from './utils/storeHelpers';
 import { createAuthSlice } from './slices/authSlice';
 import { createSystemSlice } from './slices/systemSlice';
 import { createProductSlice } from './slices/productSlice';
 import { createBatchSlice } from './slices/batchSlice';
 import { createTestResultSlice } from './slices/testResultSlice';
 import { createTCCSSlice } from './slices/tccsSlice';
+import { queryClient } from '../lib/queryClient';
 
 // Re-export types for backward compatibility across the entire app
 export type { ToastType, ToastMessage, MutationMeta, AppStoreState, AppStoreActions, AppStore };
-export { executeOfflineOptimistic, processFormulaBeforeSave, handleSaveRecord, handleDeleteRecord, resolveCurrentIdentity };
+export {
+  executeOfflineOptimistic,
+  processFormulaBeforeSave,
+  handleSaveRecord,
+  handleDeleteRecord,
+  resolveCurrentIdentity,
+};
 
 /**
  * useAppStore — Central Zustand Store (V4 Modular Slice Pattern)
- * 
+ *
  * Kiến trúc V4:
  * - authSlice: Xác thực người dùng, phân quyền, mật khẩu.
  * - systemSlice: SyncStatus, toasts, theme, navigate, qualityAlerts, backup/restore.
@@ -29,7 +37,7 @@ export { executeOfflineOptimistic, processFormulaBeforeSave, handleSaveRecord, h
  * - batchSlice: Batches, batch status transitions, electronic signatures (qua BatchAppService).
  * - testResultSlice: TestResults, pagination, dashboard fetching (qua TestResultAppService).
  * - tccsSlice: TCCS, Criteria Aliases, AI Learned Mappings (qua TCCSAppService).
- * 
+ *
  * Đảm bảo 100% tương thích ngược với tất cả components đang sử dụng useAppStore.
  */
 export const useAppStore = create<AppStore>()(
@@ -40,11 +48,43 @@ export const useAppStore = create<AppStore>()(
       ...createProductSlice(...a),
       ...createBatchSlice(...a),
       ...createTestResultSlice(...a),
-      ...createTCCSSlice(...a)
+      ...createTCCSSlice(...a),
     }),
     { name: 'PQM_AppStore' }
   )
 );
+
+// --- TANSTACK QUERY -> ZUSTAND READ-THROUGH FACADE SYNCHRONIZATION ---
+// TanStack Query là Single Source of Truth cho Server State.
+// Zustand đóng vai trò Read-Through Facade để bảo toàn 100% tương thích ngược cho các components cũ.
+const QUERY_KEY_TO_STORE_KEY: Record<string, string> = {
+  products: 'products',
+  batches: 'batches',
+  tccsList: 'tccsList',
+  productFormulas: 'productFormulas',
+  rawMaterials: 'rawMaterials',
+  testResults: 'testResults',
+  criteriaAliases: 'criteriaAliases',
+  aiLearnedMappings: 'aiLearnedMappings',
+};
+
+queryClient.getQueryCache().subscribe((event) => {
+  if (event?.type === 'updated' && event.action?.type === 'success') {
+    const queryKey = event.query.queryKey;
+    if (Array.isArray(queryKey) && queryKey.length === 1 && typeof queryKey[0] === 'string') {
+      const storeKey = QUERY_KEY_TO_STORE_KEY[queryKey[0]];
+      if (storeKey) {
+        const currentData = event.query.state.data;
+        if (currentData !== undefined) {
+          const currentStoreVal = (useAppStore.getState() as any)[storeKey];
+          if (currentStoreVal !== currentData) {
+            useAppStore.setState({ [storeKey]: currentData } as any);
+          }
+        }
+      }
+    }
+  }
+});
 
 // --- TỐI ƯU HÓA HOOK SELECTORS (Dành cho components cần tối ưu re-render) ---
 
@@ -62,7 +102,7 @@ export const useAppAuth = () => {
     logout: state.logout,
     signup: state.signup,
     changePassword: state.changePassword,
-    resetPassword: state.resetPassword
+    resetPassword: state.resetPassword,
   }));
 };
 
@@ -79,7 +119,7 @@ export const useAppSystem = () => {
     setTheme: state.setTheme,
     notify: state.notify,
     removeToast: state.removeToast,
-    syncQualityAlerts: state.syncQualityAlerts
+    syncQualityAlerts: state.syncQualityAlerts,
   }));
 };
 
@@ -98,7 +138,7 @@ export const useAppProducts = () => {
     deleteProductFormula: state.deleteProductFormula,
     addRawMaterial: state.addRawMaterial,
     updateRawMaterial: state.updateRawMaterial,
-    deleteRawMaterial: state.deleteRawMaterial
+    deleteRawMaterial: state.deleteRawMaterial,
   }));
 };
 
@@ -110,7 +150,7 @@ export const useAppBatches = () => {
     updateBatch: state.updateBatch,
     deleteBatch: state.deleteBatch,
     updateBatchStatus: state.updateBatchStatus,
-    updateBatchProgress: state.updateBatchProgress
+    updateBatchProgress: state.updateBatchProgress,
   }));
 };
 
@@ -125,7 +165,7 @@ export const useAppTestResults = () => {
     deleteTestResult: state.deleteTestResult,
     loadMoreTestResults: state.loadMoreTestResults,
     mergeTestResults: state.mergeTestResults,
-    fetchAllTestResultsForDashboard: state.fetchAllTestResultsForDashboard
+    fetchAllTestResultsForDashboard: state.fetchAllTestResultsForDashboard,
   }));
 };
 
@@ -143,7 +183,7 @@ export const useAppTCCS = () => {
     updateCriteriaAlias: state.updateCriteriaAlias,
     deleteCriteriaAlias: state.deleteCriteriaAlias,
     confirmCriteriaAlias: state.confirmCriteriaAlias,
-    addAliasToExisting: state.addAliasToExisting
+    addAliasToExisting: state.addAliasToExisting,
   }));
 };
 

@@ -4,12 +4,8 @@ import { testResultAppService } from '../../services/app/TestResultAppService';
 import { useAppStore } from '../../store/useAppStore';
 import { TestResult, Batch } from '../../types';
 
-export const TEST_RESULT_QUERY_KEYS = {
-  all: ['testResults'] as const,
-  detail: (id: string) => ['testResults', id] as const,
-  byBatch: (batchId: string) => ['testResults', 'batch', batchId] as const,
-  recent: (limit: number) => ['testResults', 'recent', limit] as const,
-};
+import { TEST_RESULT_QUERY_KEYS } from '../../constants/queryKeys';
+export { TEST_RESULT_QUERY_KEYS };
 
 /**
  * Hook tải danh sách Phiếu kiểm nghiệm
