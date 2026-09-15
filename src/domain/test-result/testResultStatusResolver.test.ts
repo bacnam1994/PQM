@@ -1,10 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import {
   normalizeTestResultStatus,
+  resolveCanonicalTestStatus,
   normalizeCriterionPassStatus,
   resolveTestResultStatus,
   calculateOverallStatusForTestResult,
   resolveFinalTestResultForBatch,
+  resolveAuthoritativeTestResultForBatch,
   detectTestResultStatusMismatch,
 } from './testResultStatusResolver';
 import { Batch, TestResult, TCCS } from '../../types';
@@ -13,7 +15,7 @@ describe('Canonical Test Result Status Resolver & Mismatch Detector', () => {
   // =========================================================================
   // 1. NORMALIZATION TESTS (Mục 7 & 8)
   // =========================================================================
-  describe('normalizeTestResultStatus', () => {
+  describe('normalizeTestResultStatus & resolveCanonicalTestStatus', () => {
     it('normalizes various representations of PASS correctly', () => {
       const passVariants = [
         'PASS',
@@ -32,6 +34,7 @@ describe('Canonical Test Result Status Resolver & Mismatch Detector', () => {
       ];
       passVariants.forEach((v) => {
         expect(normalizeTestResultStatus(v)).toBe('PASS');
+        expect(resolveCanonicalTestStatus(v)).toBe('PASS');
       });
     });
 
@@ -53,6 +56,7 @@ describe('Canonical Test Result Status Resolver & Mismatch Detector', () => {
       ];
       failVariants.forEach((v) => {
         expect(normalizeTestResultStatus(v)).toBe('FAIL');
+        expect(resolveCanonicalTestStatus(v)).toBe('FAIL');
       });
     });
 
@@ -69,6 +73,7 @@ describe('Canonical Test Result Status Resolver & Mismatch Detector', () => {
       ];
       pendingVariants.forEach((v) => {
         expect(normalizeTestResultStatus(v)).toBe('PENDING');
+        expect(resolveCanonicalTestStatus(v)).toBe('PENDING');
       });
     });
 
@@ -78,6 +83,7 @@ describe('Canonical Test Result Status Resolver & Mismatch Detector', () => {
       expect(normalizeTestResultStatus('')).toBe('UNKNOWN');
       expect(normalizeTestResultStatus('   ')).toBe('UNKNOWN');
       expect(normalizeTestResultStatus('N/A')).toBe('UNKNOWN');
+      expect(resolveCanonicalTestStatus(undefined)).toBe('UNKNOWN');
     });
   });
 
@@ -424,6 +430,12 @@ describe('Canonical Test Result Status Resolver & Mismatch Detector', () => {
       const resolution = resolveFinalTestResultForBatch(mockBatch, [draftTr, approvedTr]);
       expect(resolution.finalTestResult?.id).toBe('tr_approved');
       expect(resolution.status).toBe('PASS');
+
+      const authoritative = resolveAuthoritativeTestResultForBatch(mockBatch, [
+        draftTr,
+        approvedTr,
+      ]);
+      expect(authoritative?.id).toBe('tr_approved');
     });
   });
 

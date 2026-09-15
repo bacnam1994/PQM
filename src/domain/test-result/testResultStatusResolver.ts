@@ -69,6 +69,7 @@ export interface TestResultMismatchDiagnostic {
   testResultId: string;
   testResultLabName: string;
   reason: string;
+  source?: string;
   confidence: 'HIGH' | 'MEDIUM' | 'LOW';
   isAutoHealable: boolean;
   suggestedAction?: string;
@@ -83,6 +84,7 @@ export interface TestResultMismatchDiagnostic {
     hasCriteriaFailures: boolean;
     failedCriteriaCount: number;
     totalCriteriaCount: number;
+    criteriaSummary?: string;
     evaluatedWithTccs: boolean;
     dataReady: boolean;
   };
@@ -189,6 +191,12 @@ export function normalizeTestResultStatus(value: unknown): CanonicalTestStatus {
 
   return 'UNKNOWN';
 }
+
+/**
+ * Canonical Status Resolver (Mục 4)
+ * Điểm vào chuẩn hóa trung tâm duy nhất cho trạng thái kết quả kiểm nghiệm.
+ */
+export const resolveCanonicalTestStatus = normalizeTestResultStatus;
 
 /**
  * 2. Chuẩn hóa cờ đạt của từng chỉ tiêu riêng lẻ (isPass)
@@ -552,6 +560,19 @@ export function resolveFinalTestResultForBatch(
 }
 
 /**
+ * Canonical Authoritative Test Result Resolver (Mục 9)
+ * Chọn phiếu kiểm nghiệm chính thức / hiện hành cho Lô sản xuất.
+ */
+export function resolveAuthoritativeTestResultForBatch(
+  batch: Batch,
+  testResults: TestResult[] = [],
+  boundTccs?: TCCS | null
+): TestResult | undefined {
+  const res = resolveFinalTestResultForBatch(batch, testResults, boundTccs);
+  return res.finalTestResult;
+}
+
+/**
  * 6. Canonical Mismatch Detector:
  * Đối chiếu phát hiện sai lệch giữa kết quả lưu trên phiếu và kết quả tính toán theo chỉ tiêu thực tế
  */
@@ -572,6 +593,7 @@ export function detectTestResultStatusMismatch(
     testResultId: testResult?.id || '',
     testResultLabName: testResult?.labName || '',
     reason: 'NO_MISMATCH',
+    source: 'TestResult',
     confidence: 'HIGH',
     isAutoHealable: false,
     diagnosticDetails: {
@@ -581,6 +603,7 @@ export function detectTestResultStatusMismatch(
       hasCriteriaFailures: false,
       failedCriteriaCount: 0,
       totalCriteriaCount: 0,
+      criteriaSummary: '',
       evaluatedWithTccs: Boolean(boundTccs),
       dataReady: !isTestResultsLoading && testResultsLoaded && !isError,
     },
@@ -623,11 +646,15 @@ export function detectTestResultStatusMismatch(
 
   const results = testResult.results || [];
   const failures = results.filter((r) => normalizeCriterionPassStatus(r.isPass) === false);
+  const passCount = results.filter((r) => normalizeCriterionPassStatus(r.isPass) === true).length;
+  const criteriaSummary = `${passCount}/${results.length} chỉ tiêu đạt`;
+
   defaultDiagnostic.diagnosticDetails.storedStatusCanonical = storedCanonical;
   defaultDiagnostic.diagnosticDetails.computedStatusCanonical = computedCanonical;
   defaultDiagnostic.diagnosticDetails.hasCriteriaFailures = failures.length > 0;
   defaultDiagnostic.diagnosticDetails.failedCriteriaCount = failures.length;
   defaultDiagnostic.diagnosticDetails.totalCriteriaCount = results.length;
+  defaultDiagnostic.diagnosticDetails.criteriaSummary = criteriaSummary;
 
   // 5. UNKNOWN / PENDING Guard:
   // Nếu trạng thái đang là UNKNOWN hoặc PENDING, tuyệt đối không tạo alert mismatch
@@ -677,6 +704,13 @@ export function detectTestResultStatusMismatch(
       ? 'STORED_PASS_BUT_COMPUTED_FAIL'
       : 'STORED_FAIL_BUT_COMPUTED_PASS';
 
+  // Chỉ Auto-Heal khi có rule chắc chắn và dữ liệu chỉ tiêu đầy đủ (Item 15)
+  const isSafeToAutoHeal =
+    results.length > 0 &&
+    (computedCanonical === 'FAIL'
+      ? failures.length > 0
+      : results.every((r) => normalizeCriterionPassStatus(r.isPass) === true));
+
   return {
     ...defaultDiagnostic,
     hasMismatch: true,
@@ -685,12 +719,15 @@ export function detectTestResultStatusMismatch(
     expectedStatus: computedCanonical,
     actualStatus: storedCanonical,
     reason,
+    source: 'TestResult',
     confidence: 'HIGH',
-    isAutoHealable: true,
-    autoHealPayload: {
-      testResultId: testResult.id,
-      correctStatus: computedCanonical,
-    },
+    isAutoHealable: isSafeToAutoHeal,
+    autoHealPayload: isSafeToAutoHeal
+      ? {
+          testResultId: testResult.id,
+          correctStatus: computedCanonical,
+        }
+      : undefined,
     suggestedAction: `Cập nhật lại trạng thái phiếu thành "${computedCanonical}" theo kết quả đánh giá các chỉ tiêu.`,
   };
 }

@@ -20,6 +20,9 @@ import {
   ConsistencyCategory,
   SystemDataSnapshot,
 } from '../../services/dataConsistencyService';
+import { queryClient } from '../../lib/queryClient';
+import { TEST_RESULT_QUERY_KEYS } from '../../hooks/queries/useTestResultQueries';
+import { BATCH_QUERY_KEYS } from '../../hooks/queries/useBatchQueries';
 import toast from 'react-hot-toast';
 
 export const DataConsistencyCenter: React.FC = () => {
@@ -85,10 +88,12 @@ export const DataConsistencyCenter: React.FC = () => {
 
   const handleManualScan = useCallback(() => {
     setIsScanning(true);
+    queryClient.invalidateQueries({ queryKey: TEST_RESULT_QUERY_KEYS.all });
+    queryClient.invalidateQueries({ queryKey: BATCH_QUERY_KEYS.all });
     setTimeout(() => {
       setIsScanning(false);
       toast.success('Đã hoàn tất rà soát toàn bộ hệ thống!');
-    }, 500);
+    }, 400);
   }, []);
 
   // Thực hiện quét liên kết dữ liệu
@@ -144,6 +149,12 @@ export const DataConsistencyCenter: React.FC = () => {
           const testRes = testResults.find((t) => t.id === testResultId);
           if (testRes) {
             await updateTestResult({ ...testRes, overallStatus: correctStatus });
+            queryClient.invalidateQueries({ queryKey: TEST_RESULT_QUERY_KEYS.all });
+            if (testRes.batchId) {
+              queryClient.invalidateQueries({
+                queryKey: TEST_RESULT_QUERY_KEYS.byBatch(testRes.batchId),
+              });
+            }
             toast.success(`Đã cập nhật trạng thái phiếu kiểm nghiệm thành ${correctStatus}`);
           }
         } else if (issue.autoHealAction === 'FIX_TEST_RELATIONSHIP') {
@@ -578,6 +589,54 @@ export const DataConsistencyCenter: React.FC = () => {
                     <p className="font-bold text-ink mb-1">Hành động khắc phục đề xuất:</p>
                     <p className="text-ink-muted">{issue.suggestedAction}</p>
                   </div>
+
+                  {/* Kỳ vọng vs Thực tế (Model chuẩn hóa) */}
+                  {(issue.expected || issue.actual) && (
+                    <div className="grid grid-cols-2 gap-2 mt-2">
+                      <div className="bg-surface p-2.5 rounded-lg border border-border">
+                        <p className="font-bold text-ink-muted text-[11px] mb-0.5">
+                          Kỳ vọng (Expected):
+                        </p>
+                        <p className="font-semibold text-emerald-600 dark:text-emerald-400">
+                          {issue.expected || 'N/A'}
+                        </p>
+                      </div>
+                      <div className="bg-surface p-2.5 rounded-lg border border-border">
+                        <p className="font-bold text-ink-muted text-[11px] mb-0.5">
+                          Thực tế (Actual):
+                        </p>
+                        <p className="font-semibold text-rose-600 dark:text-rose-400">
+                          {issue.actual || 'N/A'}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Chi tiết chẩn đoán ALCOA+ (Diagnostic Details) */}
+                  {(issue.diagnostics || issue.reason || issue.source) && (
+                    <div className="bg-surface-3/40 p-2.5 rounded-lg border border-border mt-2 space-y-1 text-[11px]">
+                      <p className="font-bold text-ink text-[11px]">Chi tiết chẩn đoán ALCOA+:</p>
+                      {issue.diagnostics?.criteriaSummary && (
+                        <p className="text-ink-muted">
+                          Chỉ tiêu:{' '}
+                          <span className="text-ink font-medium">
+                            {issue.diagnostics.criteriaSummary}
+                          </span>
+                        </p>
+                      )}
+                      {issue.reason && (
+                        <p className="text-ink-muted">
+                          Mã nguyên nhân: <span className="font-mono text-ink">{issue.reason}</span>
+                        </p>
+                      )}
+                      {issue.source && (
+                        <p className="text-ink-muted">
+                          Nguồn thẩm định:{' '}
+                          <span className="text-ink font-medium">{issue.source}</span>
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
             </div>

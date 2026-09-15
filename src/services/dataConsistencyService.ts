@@ -53,8 +53,12 @@ export type ConsistencyIssueType =
   | 'MULTIPLE_ACTIVE_TCCS'
   | 'NO_ACTIVE_TCCS'
   | 'TEST_RESULT_STATUS_MISMATCH'
+  | 'STATUS_MISMATCH'
   | 'RELEASED_BATCH_NO_PASSING_TEST'
+  | 'MISSING_TEST_RESULT'
+  | 'CRITERIA_FAIL'
   | 'TEST_RESULT_RELATIONSHIP_INVALID'
+  | 'INVALID_LINK'
   | 'REJECTED_BATCH_MISSING_REASON'
   | 'INVALID_DATE_SEQUENCE'
   | 'UNLINKED_FORMULA_MATERIAL'
@@ -78,6 +82,12 @@ export type IssueSeverity = 'CRITICAL' | 'WARNING' | 'INFO';
 export interface ConsistencyIssue {
   id: string;
   type: ConsistencyIssueType;
+  code?:
+    | 'MISSING_TEST_RESULT'
+    | 'STATUS_MISMATCH'
+    | 'CRITERIA_FAIL'
+    | 'INVALID_LINK'
+    | ConsistencyIssueType;
   category: ConsistencyCategory;
   severity: IssueSeverity;
   title: string;
@@ -97,6 +107,20 @@ export interface ConsistencyIssue {
     | 'CLEAN_ORPHAN_ALIAS'
     | 'NORMALIZE_TEST_LAB';
   healPayload?: any;
+  expected?: string;
+  actual?: string;
+  reason?: string;
+  source?: string;
+  diagnostics?: {
+    batchId?: string;
+    testResultId?: string;
+    storedStatus?: string;
+    calculatedStatus?: string;
+    criteriaSummary?: string;
+    failedCriteriaCount?: number;
+    totalCriteriaCount?: number;
+    [key: string]: any;
+  };
 }
 
 export interface ConsistencyReport {
@@ -387,6 +411,41 @@ export const auditDataConsistency = (data: SystemDataSnapshot): ConsistencyRepor
     }
   });
 
+  // 2.3 Kiểm tra liên kết Phiếu kiểm nghiệm <-> Lô sản xuất sai khóa kỹ thuật (Legacy batchNo hoặc sai ID)
+  testResultIndex.invalidLinkResults.forEach((item) => {
+    if (item.relationshipType === 'LEGACY_BATCH_NO' && item.matchedBatchId) {
+      const b = batchMap.get(item.matchedBatchId);
+      issues.push({
+        id: `invalid_link_test_${item.testResult.id}`,
+        type: 'TEST_RESULT_RELATIONSHIP_INVALID',
+        code: 'INVALID_LINK',
+        category: 'CROSS_ENTITY_MISMATCH',
+        severity: 'WARNING',
+        title: `Phiếu kiểm nghiệm liên kết sai khóa: ${item.testResult.labName}`,
+        description:
+          item.mismatchReason ||
+          `Phiếu kiểm nghiệm dùng số lô "${item.testResult.batchId}" thay vì ID kỹ thuật của Lô "${b?.batchNo || item.matchedBatchId}".`,
+        entityType: 'TEST_RESULT',
+        entityId: item.testResult.id,
+        entityName: `${item.testResult.labName} (${item.testResult.testDate || 'N/A'})`,
+        relatedEntityId: item.matchedBatchId,
+        relatedEntityName: b?.batchNo,
+        expected: `batchId = "${item.matchedBatchId}"`,
+        actual: `batchId = "${item.testResult.batchId}"`,
+        reason: 'INVALID_LINK',
+        source: 'BatchTestResultResolver',
+        suggestedAction:
+          'Cập nhật khóa liên kết kỹ thuật (batchId = batch.id) cho phiếu kiểm nghiệm để đảm bảo tính toàn vẹn dữ liệu.',
+        autoHealable: true,
+        autoHealAction: 'FIX_TEST_RELATIONSHIP',
+        healPayload: {
+          batchId: item.matchedBatchId,
+          testResultIds: [item.testResult.id],
+        },
+      });
+    }
+  });
+
   // =========================================================================
   // 3. BẤT NHẤT QUÁN TRẠNG THÁI LOGIC (LOGICAL & STATUS INCONSISTENCIES)
   // =========================================================================
@@ -395,7 +454,22 @@ export const auditDataConsistency = (data: SystemDataSnapshot): ConsistencyRepor
   // Sử dụng Canonical Mismatch Detector (Data Freshness Aware + Normalization + Multi-Test Context)
   testResults.forEach((r) => {
     if (r.results && r.results.length > 0) {
+      // Bỏ qua phiếu bị xóa mềm hoặc đã hủy
+      if ((r as any).isDeleted || (r as any).deleted) return;
+      const statusUpper = String((r as any).status || '').toUpperCase();
+      if (statusUpper === 'CANCELLED' || statusUpper === 'VOIDED' || statusUpper === 'INVALID')
+        return;
+
       const match = testResultIndex.getBatchForTestResult(r);
+      // Bỏ qua phiếu mồ côi hoặc sai liên kết (đã được phân loại riêng thành ORPHAN_TEST_RESULT / INVALID_LINK)
+      if (
+        match.relationshipType === 'INVALID_ORPHAN' ||
+        match.relationshipType === 'INVALID_EMPTY_BATCH_ID' ||
+        match.relationshipType === 'LEGACY_BATCH_NO'
+      ) {
+        return;
+      }
+
       const rawBatch = match.batch;
       const boundTccs = rawBatch?.tccsId ? tccsMap.get(rawBatch.tccsId) : undefined;
       const batchCandidateResults = rawBatch
@@ -417,6 +491,7 @@ export const auditDataConsistency = (data: SystemDataSnapshot): ConsistencyRepor
         issues.push({
           id: `status_mismatch_test_${r.id}`,
           type: 'TEST_RESULT_STATUS_MISMATCH',
+          code: 'STATUS_MISMATCH',
           category: 'LOGICAL_STATUS_INCONSISTENCY',
           severity: mismatch.alertType || 'CRITICAL',
           title: `Sai lệch Đạt/Không Đạt phiếu kiểm nghiệm: ${r.labName}`,
@@ -424,6 +499,19 @@ export const auditDataConsistency = (data: SystemDataSnapshot): ConsistencyRepor
           entityType: 'TEST_RESULT',
           entityId: r.id,
           entityName: `${r.labName} - ${rawBatch?.batchNo || ''}`,
+          expected: mismatch.expectedStatus,
+          actual: mismatch.actualStatus,
+          reason: mismatch.reason,
+          source: mismatch.source || 'TestResult',
+          diagnostics: {
+            batchId: rawBatch?.id || r.batchId,
+            testResultId: r.id,
+            storedStatus: mismatch.actualStatus,
+            calculatedStatus: mismatch.expectedStatus,
+            criteriaSummary: mismatch.diagnosticDetails?.criteriaSummary,
+            failedCriteriaCount: mismatch.diagnosticDetails?.failedCriteriaCount,
+            totalCriteriaCount: mismatch.diagnosticDetails?.totalCriteriaCount,
+          },
           suggestedAction:
             mismatch.suggestedAction ||
             `Cập nhật lại trạng thái phiếu thành "${mismatch.expectedStatus}".`,
@@ -468,6 +556,7 @@ export const auditDataConsistency = (data: SystemDataSnapshot): ConsistencyRepor
           issues.push({
             id: `released_no_pass_${b.id}`,
             type: 'RELEASED_BATCH_NO_PASSING_TEST',
+            code: 'MISSING_TEST_RESULT',
             category: 'LOGICAL_STATUS_INCONSISTENCY',
             severity: 'CRITICAL',
             title: `Lô đã xuất xưởng nhưng chưa kiểm nghiệm: ${b.batchNo}`,
@@ -475,37 +564,54 @@ export const auditDataConsistency = (data: SystemDataSnapshot): ConsistencyRepor
             entityType: 'BATCH',
             entityId: b.id,
             entityName: b.batchNo,
+            expected: 'Phiếu kiểm nghiệm ĐẠT (PASS)',
+            actual: 'Không có phiếu kiểm nghiệm',
+            reason: 'MISSING_TEST_RESULT',
+            source: 'BatchIntegrityValidator',
             suggestedAction:
               evaluation.suggestedAction ||
               'Xem xét lại quyết định duyệt lô hoặc chuyển trạng thái sang ĐANG KIỂM TRA (TESTING).',
             autoHealable: false,
           });
         } else if (evaluation.integrityStatus === 'RELATIONSHIP_ERROR') {
-          issues.push({
-            id: `relationship_err_${b.id}`,
-            type: 'TEST_RESULT_RELATIONSHIP_INVALID',
-            category: 'CROSS_ENTITY_MISMATCH',
-            severity: 'WARNING',
-            title: `Lỗi liên kết phiếu kiểm nghiệm: ${b.batchNo}`,
-            description: evaluation.summaryMessage,
-            entityType: 'BATCH',
-            entityId: b.id,
-            entityName: b.batchNo,
-            relatedEntityId: resolution.legacyResults[0]?.id,
-            suggestedAction:
-              evaluation.suggestedAction ||
-              'Cập nhật khóa liên kết kỹ thuật (batchId = batch.id) cho phiếu kiểm nghiệm.',
-            autoHealable: true,
-            autoHealAction: 'FIX_TEST_RELATIONSHIP',
-            healPayload: {
-              batchId: b.id,
-              testResultIds: resolution.legacyResults.map((r) => r.id),
-            },
-          });
+          const issueId = `relationship_err_${b.id}`;
+          if (
+            !issues.some(
+              (i) => i.id === issueId || (i.relatedEntityId === b.id && i.code === 'INVALID_LINK')
+            )
+          ) {
+            issues.push({
+              id: issueId,
+              type: 'TEST_RESULT_RELATIONSHIP_INVALID',
+              code: 'INVALID_LINK',
+              category: 'CROSS_ENTITY_MISMATCH',
+              severity: 'WARNING',
+              title: `Lỗi liên kết phiếu kiểm nghiệm: ${b.batchNo}`,
+              description: evaluation.summaryMessage,
+              entityType: 'BATCH',
+              entityId: b.id,
+              entityName: b.batchNo,
+              relatedEntityId: resolution.legacyResults[0]?.id,
+              expected: `Khóa liên kết batchId = "${b.id}"`,
+              actual: `Khóa liên kết legacy (batchNo = "${b.batchNo}")`,
+              reason: 'INVALID_LINK',
+              source: 'BatchIntegrityValidator',
+              suggestedAction:
+                evaluation.suggestedAction ||
+                'Cập nhật khóa liên kết kỹ thuật (batchId = batch.id) cho phiếu kiểm nghiệm.',
+              autoHealable: true,
+              autoHealAction: 'FIX_TEST_RELATIONSHIP',
+              healPayload: {
+                batchId: b.id,
+                testResultIds: resolution.legacyResults.map((r) => r.id),
+              },
+            });
+          }
         } else if (evaluation.integrityStatus === 'TEST_RESULT_INVALID_STATUS') {
           issues.push({
             id: `released_no_pass_${b.id}`,
             type: 'RELEASED_BATCH_NO_PASSING_TEST',
+            code: 'CRITERIA_FAIL',
             category: 'LOGICAL_STATUS_INCONSISTENCY',
             severity: 'CRITICAL',
             title: `Lô đã xuất xưởng nhưng kết quả kiểm nghiệm không đạt: ${b.batchNo}`,
@@ -513,6 +619,10 @@ export const auditDataConsistency = (data: SystemDataSnapshot): ConsistencyRepor
             entityType: 'BATCH',
             entityId: b.id,
             entityName: b.batchNo,
+            expected: 'Kết quả kiểm nghiệm ĐẠT (PASS)',
+            actual: 'Kết quả kiểm nghiệm KHÔNG ĐẠT (FAIL)',
+            reason: 'CRITERIA_FAIL',
+            source: 'BatchIntegrityValidator',
             suggestedAction:
               evaluation.suggestedAction ||
               'Xem xét lại quyết định duyệt lô, thực hiện kiểm nghiệm lại hoặc chuyển trạng thái sang BỊ LOẠI (REJECTED) / ĐANG KIỂM TRA (TESTING).',

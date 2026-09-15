@@ -696,4 +696,336 @@ describe('dataConsistencyService - Data Linkage & Consistency Engine', () => {
     const releasedAlert = report.issues.find((i) => i.type === 'RELEASED_BATCH_NO_PASSING_TEST');
     expect(releasedAlert).toBeUndefined();
   });
+
+  // =========================================================================
+  // BỘ TEST CASES BẮT BUỘC (TC01 - TC12)
+  // =========================================================================
+  describe('Bộ Test Cases Bắt Buộc Chuẩn Hóa Trạng Thái & False-Positive (TC01 - TC12)', () => {
+    // TC01: Lô có phiếu, tất cả chỉ tiêu PASS -> 0 cảnh báo
+    it('TC01: Lô có phiếu, tất cả chỉ tiêu PASS -> 0 cảnh báo', () => {
+      const data: SystemDataSnapshot = {
+        products: [sampleProduct],
+        rawMaterials: [sampleRawMaterial],
+        tccsList: [sampleTCCS],
+        productFormulas: [sampleFormula],
+        batches: [sampleBatch],
+        testResults: [sampleTestResult],
+      };
+      const report = auditDataConsistency(data);
+      expect(
+        report.issues.filter(
+          (i) =>
+            i.type === 'TEST_RESULT_STATUS_MISMATCH' || i.type === 'RELEASED_BATCH_NO_PASSING_TEST'
+        )
+      ).toHaveLength(0);
+      expect(report.totalIssuesCount).toBe(0);
+    });
+
+    // TC02: overallStatus=PASS, tất cả isPass=true -> 0 cảnh báo
+    it('TC02: overallStatus=PASS, tất cả isPass=true -> 0 cảnh báo', () => {
+      const tr: TestResult = {
+        ...sampleTestResult,
+        id: 'tc02_test',
+        overallStatus: 'PASS',
+        results: [
+          { criteriaName: 'Định lượng Ginkgo Biloba', value: 100, isPass: true },
+          { criteriaName: 'Độ rã', value: 15, isPass: true },
+        ],
+      };
+      const report = auditDataConsistency({
+        products: [sampleProduct],
+        rawMaterials: [sampleRawMaterial],
+        tccsList: [sampleTCCS],
+        productFormulas: [sampleFormula],
+        batches: [sampleBatch],
+        testResults: [tr],
+      });
+      const mismatch = report.issues.find(
+        (i) => i.code === 'STATUS_MISMATCH' || i.type === 'TEST_RESULT_STATUS_MISMATCH'
+      );
+      expect(mismatch).toBeUndefined();
+    });
+
+    // TC03: overallStatus=FAIL, có 1 chỉ tiêu FAIL -> Không cảnh báo mismatch; trạng thái FAIL hợp lệ
+    it('TC03: overallStatus=FAIL, có 1 chỉ tiêu FAIL -> Không cảnh báo mismatch', () => {
+      const batchTesting: Batch = { ...sampleBatch, status: 'TESTING' };
+      const tr: TestResult = {
+        ...sampleTestResult,
+        id: 'tc03_test',
+        overallStatus: 'FAIL',
+        results: [
+          { criteriaName: 'Định lượng Ginkgo Biloba', value: 50, isPass: false },
+          { criteriaName: 'Độ rã', value: 15, isPass: true },
+        ],
+      };
+      const report = auditDataConsistency({
+        products: [sampleProduct],
+        rawMaterials: [sampleRawMaterial],
+        tccsList: [sampleTCCS],
+        productFormulas: [sampleFormula],
+        batches: [batchTesting],
+        testResults: [tr],
+      });
+      const mismatch = report.issues.find(
+        (i) => i.code === 'STATUS_MISMATCH' || i.type === 'TEST_RESULT_STATUS_MISMATCH'
+      );
+      expect(mismatch).toBeUndefined();
+    });
+
+    // TC04: overallStatus=PASS, nhưng có 1 chỉ tiêu FAIL -> Cảnh báo sai lệch
+    it('TC04: overallStatus=PASS, nhưng có 1 chỉ tiêu FAIL -> Cảnh báo sai lệch STATUS_MISMATCH', () => {
+      const tr: TestResult = {
+        ...sampleTestResult,
+        id: 'tc04_test',
+        overallStatus: 'PASS',
+        results: [
+          { criteriaName: 'Định lượng Ginkgo Biloba', value: 50, isPass: false },
+          { criteriaName: 'Độ rã', value: 15, isPass: true },
+        ],
+      };
+      const report = auditDataConsistency({
+        products: [sampleProduct],
+        rawMaterials: [sampleRawMaterial],
+        tccsList: [sampleTCCS],
+        productFormulas: [sampleFormula],
+        batches: [sampleBatch],
+        testResults: [tr],
+      });
+      const mismatch = report.issues.find(
+        (i) => i.code === 'STATUS_MISMATCH' || i.type === 'TEST_RESULT_STATUS_MISMATCH'
+      );
+      expect(mismatch).toBeDefined();
+      expect(mismatch?.actual).toBe('PASS');
+      expect(mismatch?.expected).toBe('FAIL');
+      expect(mismatch?.diagnostics?.failedCriteriaCount).toBe(1);
+    });
+
+    // TC05: overallStatus=FAIL, nhưng tất cả chỉ tiêu PASS -> Cảnh báo sai lệch
+    it('TC05: overallStatus=FAIL, nhưng tất cả chỉ tiêu PASS -> Cảnh báo sai lệch STATUS_MISMATCH', () => {
+      const tr: TestResult = {
+        ...sampleTestResult,
+        id: 'tc05_test',
+        overallStatus: 'FAIL',
+        results: [
+          { criteriaName: 'Định lượng Ginkgo Biloba', value: 100, isPass: true },
+          { criteriaName: 'Độ rã', value: 15, isPass: true },
+        ],
+      };
+      const report = auditDataConsistency({
+        products: [sampleProduct],
+        rawMaterials: [sampleRawMaterial],
+        tccsList: [sampleTCCS],
+        productFormulas: [sampleFormula],
+        batches: [sampleBatch],
+        testResults: [tr],
+      });
+      const mismatch = report.issues.find(
+        (i) => i.code === 'STATUS_MISMATCH' || i.type === 'TEST_RESULT_STATUS_MISMATCH'
+      );
+      expect(mismatch).toBeDefined();
+      expect(mismatch?.actual).toBe('FAIL');
+      expect(mismatch?.expected).toBe('PASS');
+    });
+
+    // TC06: Phiếu có batchId đúng -> Match
+    it('TC06: Phiếu có batchId đúng -> Match thành công, không có cảnh báo liên kết', () => {
+      const tr: TestResult = {
+        ...sampleTestResult,
+        batchId: sampleBatch.id,
+      };
+      const report = auditDataConsistency({
+        products: [sampleProduct],
+        rawMaterials: [sampleRawMaterial],
+        tccsList: [sampleTCCS],
+        productFormulas: [sampleFormula],
+        batches: [sampleBatch],
+        testResults: [tr],
+      });
+      const linkIssue = report.issues.find(
+        (i) => i.code === 'INVALID_LINK' || i.type === 'TEST_RESULT_RELATIONSHIP_INVALID'
+      );
+      expect(linkIssue).toBeUndefined();
+    });
+
+    // TC07: Phiếu tồn tại nhưng batchId sai -> INVALID_LINK
+    it('TC07: Phiếu tồn tại nhưng batchId sai (chứa số lô legacy) -> INVALID_LINK', () => {
+      const trLegacy: TestResult = {
+        ...sampleTestResult,
+        id: 'tr_legacy_batch_no',
+        batchId: sampleBatch.batchNo, // dùng batchNo thay vì ID
+      };
+      const report = auditDataConsistency({
+        products: [sampleProduct],
+        rawMaterials: [sampleRawMaterial],
+        tccsList: [sampleTCCS],
+        productFormulas: [sampleFormula],
+        batches: [sampleBatch],
+        testResults: [trLegacy],
+      });
+      const linkIssue = report.issues.find(
+        (i) => i.code === 'INVALID_LINK' || i.type === 'TEST_RESULT_RELATIONSHIP_INVALID'
+      );
+      expect(linkIssue).toBeDefined();
+      expect(linkIssue?.autoHealable).toBe(true);
+      // Không bị nhầm lẫn phát cảnh báo status mismatch
+      const statusMismatch = report.issues.find(
+        (i) => i.code === 'STATUS_MISMATCH' || i.type === 'TEST_RESULT_STATUS_MISMATCH'
+      );
+      expect(statusMismatch).toBeUndefined();
+    });
+
+    // TC08: Lô không có phiếu -> MISSING_TEST_RESULT
+    it('TC08: Lô xuất xưởng không có phiếu -> MISSING_TEST_RESULT', () => {
+      const report = auditDataConsistency({
+        products: [sampleProduct],
+        rawMaterials: [sampleRawMaterial],
+        tccsList: [sampleTCCS],
+        productFormulas: [sampleFormula],
+        batches: [sampleBatch], // status RELEASED
+        testResults: [],
+      });
+      const missingIssue = report.issues.find(
+        (i) => i.code === 'MISSING_TEST_RESULT' || i.type === 'RELEASED_BATCH_NO_PASSING_TEST'
+      );
+      expect(missingIssue).toBeDefined();
+    });
+
+    // TC09: Có nhiều phiếu, một phiếu cũ FAIL, phiếu authoritative PASS -> Không cảnh báo sai
+    it('TC09: Có nhiều phiếu, một phiếu cũ FAIL, phiếu authoritative PASS -> Không cảnh báo sai', () => {
+      const oldFailTest: any = {
+        id: 'tr_old_fail_tc09',
+        batchId: sampleBatch.id,
+        labName: 'Lab Internal',
+        testDate: '2024-01-02',
+        overallStatus: 'FAIL',
+        version: 1,
+        results: [{ criteriaName: 'Độ ẩm', value: 15, isPass: false }],
+        createdAt: '2024-01-02',
+      };
+      const newPassTest: any = {
+        id: 'tr_new_pass_tc09',
+        batchId: sampleBatch.id,
+        labName: 'Quatest 3',
+        testDate: '2024-01-06',
+        overallStatus: 'PASS',
+        status: 'FINAL',
+        version: 2,
+        results: [{ criteriaName: 'Độ ẩm', value: 5, isPass: true }],
+        createdAt: '2024-01-06',
+      };
+      const report = auditDataConsistency({
+        products: [sampleProduct],
+        rawMaterials: [sampleRawMaterial],
+        tccsList: [sampleTCCS],
+        productFormulas: [sampleFormula],
+        batches: [sampleBatch],
+        testResults: [oldFailTest, newPassTest],
+      });
+      // Không có cảnh báo sai lệch cho phiếu cũ vì phiếu cũ tự thân đúng (FAIL == FAIL)
+      // Và lô đã có phiếu authoritative đạt
+      const mismatch = report.issues.find(
+        (i) => i.code === 'STATUS_MISMATCH' || i.type === 'TEST_RESULT_STATUS_MISMATCH'
+      );
+      expect(mismatch).toBeUndefined();
+      const releasedAlert = report.issues.find(
+        (i) => i.code === 'MISSING_TEST_RESULT' || i.type === 'RELEASED_BATCH_NO_PASSING_TEST'
+      );
+      expect(releasedAlert).toBeUndefined();
+    });
+
+    // TC10: Status có khoảng trắng/chữ hoa/chữ thường -> Normalize -> đúng trạng thái
+    it('TC10: Status có khoảng trắng/chữ hoa/chữ thường (" đạt ", "ĐẠT", "pass") -> Normalize -> không cảnh báo', () => {
+      const trWhitespace: any = {
+        ...sampleTestResult,
+        id: 'tr_whitespace',
+        overallStatus: '  đạt  ',
+        results: [{ criteriaName: 'Định lượng', value: 100, isPass: true }],
+      };
+      const report = auditDataConsistency({
+        products: [sampleProduct],
+        rawMaterials: [sampleRawMaterial],
+        tccsList: [sampleTCCS],
+        productFormulas: [sampleFormula],
+        batches: [sampleBatch],
+        testResults: [trWhitespace],
+      });
+      const mismatch = report.issues.find(
+        (i) => i.code === 'STATUS_MISMATCH' || i.type === 'TEST_RESULT_STATUS_MISMATCH'
+      );
+      expect(mismatch).toBeUndefined();
+    });
+
+    // TC11: Dữ liệu đang loading -> Không tạo discrepancy giả
+    it('TC11: Dữ liệu đang loading -> Không tạo discrepancy giả', () => {
+      const trBad: TestResult = {
+        ...sampleTestResult,
+        overallStatus: 'PASS',
+        results: [{ criteriaName: 'Độ ẩm', value: 20, isPass: false }],
+      };
+      const report = auditDataConsistency({
+        products: [sampleProduct],
+        rawMaterials: [sampleRawMaterial],
+        tccsList: [sampleTCCS],
+        productFormulas: [sampleFormula],
+        batches: [sampleBatch],
+        testResults: [trBad],
+        dataFreshness: {
+          isTestResultsLoading: true,
+          testResultsLoaded: false,
+        },
+      });
+      const mismatch = report.issues.find(
+        (i) => i.code === 'STATUS_MISMATCH' || i.type === 'TEST_RESULT_STATUS_MISMATCH'
+      );
+      expect(mismatch).toBeUndefined();
+      const releasedAlert = report.issues.find(
+        (i) => i.code === 'MISSING_TEST_RESULT' || i.type === 'RELEASED_BATCH_NO_PASSING_TEST'
+      );
+      expect(releasedAlert).toBeUndefined();
+    });
+
+    // TC12: Sau khi sửa phiếu từ FAIL -> PASS -> Reconciliation cập nhật ngay
+    it('TC12: Sau khi sửa phiếu từ FAIL -> PASS -> Reconciliation cập nhật ngay', () => {
+      // Ban đầu có sai lệch: lưu PASS nhưng chỉ tiêu FAIL
+      const initialTR: TestResult = {
+        ...sampleTestResult,
+        id: 'tr_tc12',
+        overallStatus: 'PASS',
+        results: [{ criteriaName: 'Định lượng', value: 40, isPass: false }],
+      };
+      const report1 = auditDataConsistency({
+        products: [sampleProduct],
+        rawMaterials: [sampleRawMaterial],
+        tccsList: [sampleTCCS],
+        productFormulas: [sampleFormula],
+        batches: [sampleBatch],
+        testResults: [initialTR],
+      });
+      expect(
+        report1.issues.some(
+          (i) => i.code === 'STATUS_MISMATCH' || i.type === 'TEST_RESULT_STATUS_MISMATCH'
+        )
+      ).toBe(true);
+
+      // Sửa chỉ tiêu thành PASS (hoặc cập nhật kết quả kiểm nghiệm mới)
+      const fixedTR: TestResult = {
+        ...initialTR,
+        overallStatus: 'PASS',
+        results: [{ criteriaName: 'Định lượng', value: 100, isPass: true }],
+      };
+      const report2 = auditDataConsistency({
+        products: [sampleProduct],
+        rawMaterials: [sampleRawMaterial],
+        tccsList: [sampleTCCS],
+        productFormulas: [sampleFormula],
+        batches: [sampleBatch],
+        testResults: [fixedTR],
+      });
+      expect(
+        report2.issues.some(
+          (i) => i.code === 'STATUS_MISMATCH' || i.type === 'TEST_RESULT_STATUS_MISMATCH'
+        )
+      ).toBe(false);
+    });
+  });
 });
