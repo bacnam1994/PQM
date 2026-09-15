@@ -7,7 +7,7 @@
  */
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { 
+import {
   ShieldExclamationIcon,
   PlusIcon,
   MagnifyingGlassIcon,
@@ -21,13 +21,20 @@ import {
   DocumentTextIcon,
   EyeIcon,
   ArrowPathIcon,
-  CheckIcon
+  CheckIcon,
 } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 import { useAppStore } from '../../store/useAppStore';
 import { useShallow } from 'zustand/react/shallow';
-import { QualityDeviation, DeviationStatus, DeviationSeverity, DeviationSource } from '../../types/deviation';
-import { firebaseDeviationRepository } from '../../repositories/firebase/FirebaseDeviationRepository';
+import {
+  QualityDeviation,
+  DeviationStatus,
+  DeviationSeverity,
+  DeviationSource,
+} from '../../types/deviation';
+import { useDeviationsQuery } from '../../hooks/queries/useDeviationQueries';
+import { useQueryClient } from '@tanstack/react-query';
+import { DEVIATION_QUERY_KEYS } from '../../constants/queryKeys';
 import { deviationAppService } from '../../services/app/DeviationAppService';
 import { aiGateway } from '../../services/ai/AIGateway';
 import { formatDateStandard } from '../../utils';
@@ -37,18 +44,65 @@ import { CAPATrackerView } from '../quality/deviations/CAPATrackerView';
 import { DeviationWorkflowModal } from '../quality/deviations/DeviationWorkflowModal';
 
 // Trạng thái workflow hiển thị
-const STATUS_CONFIG: Record<DeviationStatus, { label: string; bg: string; text: string; border: string; step: number }> = {
-  LOGGED: { label: 'Mới ghi nhận', bg: 'bg-surface-2', text: 'text-ink-soft', border: 'border-border', step: 1 },
-  UNDER_INVESTIGATION: { label: 'Đang điều tra', bg: 'bg-amber-50 dark:bg-amber-950/40', text: 'text-amber-700 dark:text-amber-300', border: 'border-amber-200 dark:border-amber-800', step: 2 },
-  CAPA_PLANNED: { label: 'Đang thực hiện CAPA', bg: 'bg-sky-50 dark:bg-sky-950/40', text: 'text-sky-700 dark:text-sky-300', border: 'border-sky-200 dark:border-sky-800', step: 3 },
-  EFFECTIVENESS_REVIEW: { label: 'Đánh giá hiệu quả', bg: 'bg-purple-50 dark:bg-purple-950/40', text: 'text-purple-700 dark:text-purple-300', border: 'border-purple-200 dark:border-purple-800', step: 4 },
-  CLOSED: { label: 'Đã đóng hồ sơ', bg: 'bg-emerald-50 dark:bg-emerald-950/40', text: 'text-emerald-700 dark:text-emerald-300', border: 'border-emerald-200 dark:border-emerald-800', step: 5 },
+const STATUS_CONFIG: Record<
+  DeviationStatus,
+  { label: string; bg: string; text: string; border: string; step: number }
+> = {
+  LOGGED: {
+    label: 'Mới ghi nhận',
+    bg: 'bg-surface-2',
+    text: 'text-ink-soft',
+    border: 'border-border',
+    step: 1,
+  },
+  UNDER_INVESTIGATION: {
+    label: 'Đang điều tra',
+    bg: 'bg-amber-50 dark:bg-amber-950/40',
+    text: 'text-amber-700 dark:text-amber-300',
+    border: 'border-amber-200 dark:border-amber-800',
+    step: 2,
+  },
+  CAPA_PLANNED: {
+    label: 'Đang thực hiện CAPA',
+    bg: 'bg-sky-50 dark:bg-sky-950/40',
+    text: 'text-sky-700 dark:text-sky-300',
+    border: 'border-sky-200 dark:border-sky-800',
+    step: 3,
+  },
+  EFFECTIVENESS_REVIEW: {
+    label: 'Đánh giá hiệu quả',
+    bg: 'bg-purple-50 dark:bg-purple-950/40',
+    text: 'text-purple-700 dark:text-purple-300',
+    border: 'border-purple-200 dark:border-purple-800',
+    step: 4,
+  },
+  CLOSED: {
+    label: 'Đã đóng hồ sơ',
+    bg: 'bg-emerald-50 dark:bg-emerald-950/40',
+    text: 'text-emerald-700 dark:text-emerald-300',
+    border: 'border-emerald-200 dark:border-emerald-800',
+    step: 5,
+  },
 };
 
 const SEVERITY_CONFIG: Record<DeviationSeverity, { label: string; badge: string; dot: string }> = {
-  CRITICAL: { label: 'Nghiêm trọng (Critical)', badge: 'bg-rose-50 dark:bg-rose-950/50 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800', dot: 'bg-rose-500' },
-  MAJOR: { label: 'Đáng kể (Major)', badge: 'bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800', dot: 'bg-amber-500' },
-  MINOR: { label: 'Nhẹ (Minor)', badge: 'bg-surface-2 text-ink-muted border-border', dot: 'bg-surface-3' },
+  CRITICAL: {
+    label: 'Nghiêm trọng (Critical)',
+    badge:
+      'bg-rose-50 dark:bg-rose-950/50 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800',
+    dot: 'bg-rose-500',
+  },
+  MAJOR: {
+    label: 'Đáng kể (Major)',
+    badge:
+      'bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800',
+    dot: 'bg-amber-500',
+  },
+  MINOR: {
+    label: 'Nhẹ (Minor)',
+    badge: 'bg-surface-2 text-ink-muted border-border',
+    dot: 'bg-surface-3',
+  },
 };
 
 const SOURCE_LABELS: Record<DeviationSource, string> = {
@@ -61,16 +115,18 @@ const SOURCE_LABELS: Record<DeviationSource, string> = {
 };
 
 const DeviationListPage: React.FC = () => {
-  const { user, role, isAdmin, batches, products } = useAppStore(useShallow(s => ({
-    user: s.user,
-    role: s.role,
-    isAdmin: s.isAdmin,
-    batches: s.batches,
-    products: s.products
-  })));
+  const { user, role, isAdmin, batches, products } = useAppStore(
+    useShallow((s) => ({
+      user: s.user,
+      role: s.role,
+      isAdmin: s.isAdmin,
+      batches: s.batches,
+      products: s.products,
+    }))
+  );
 
-  const [deviations, setDeviations] = useState<QualityDeviation[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
+  const { data: deviations = [], isLoading: loading, refetch } = useDeviationsQuery();
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const [severityFilter, setSeverityFilter] = useState<string>('ALL');
@@ -82,7 +138,11 @@ const DeviationListPage: React.FC = () => {
   const [showTransitionModal, setShowTransitionModal] = useState(false);
   const [targetStatus, setTargetStatus] = useState<DeviationStatus>('UNDER_INVESTIGATION');
 
-  const handleWorkflowConfirm = async (status: DeviationStatus, notes: string, investigator?: string) => {
+  const handleWorkflowConfirm = async (
+    status: DeviationStatus,
+    notes: string,
+    investigator?: string
+  ) => {
     if (!selectedDeviation) return;
     try {
       await deviationAppService.updateStatus(
@@ -91,7 +151,9 @@ const DeviationListPage: React.FC = () => {
         { ...user, role, isAdmin: isAdmin || role === 'ADMIN' },
         { notes, investigator }
       );
-      toast.success(`Hồ sơ ${selectedDeviation.deviationNo} đã chuyển sang "${STATUS_CONFIG[status].label}"`);
+      toast.success(
+        `Hồ sơ ${selectedDeviation.deviationNo} đã chuyển sang "${STATUS_CONFIG[status].label}"`
+      );
       setShowTransitionModal(false);
       await loadDeviations();
     } catch (err: any) {
@@ -121,7 +183,7 @@ const DeviationListPage: React.FC = () => {
     severity: 'MAJOR' as DeviationSeverity,
     batchId: '',
     description: '',
-    immediateAction: ''
+    immediateAction: '',
   });
 
   // CAPA Action Item Form state inside drawer
@@ -130,37 +192,25 @@ const DeviationListPage: React.FC = () => {
     action: '',
     type: 'CORRECTIVE' as 'CORRECTIVE' | 'PREVENTIVE' | 'IMMEDIATE',
     responsible: '',
-    deadline: new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0]
+    deadline: new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0],
   });
 
-  // Tải danh sách sai lệch từ kho lưu trữ
+  // Tải lại danh sách sai lệch qua TanStack Query Cache
   const loadDeviations = useCallback(async () => {
-    setLoading(true);
-    try {
-      const data = await firebaseDeviationRepository.findAll();
-      setDeviations(data.sort((a, b) => (b.loggedAt || '').localeCompare(a.loggedAt || '')));
-    } catch (error) {
-      console.error('Lỗi nạp danh sách sai lệch:', error);
-      toast.error('Không thể tải dữ liệu hồ sơ sai lệch.');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    loadDeviations();
-  }, [loadDeviations]);
+    await queryClient.invalidateQueries({ queryKey: DEVIATION_QUERY_KEYS.all });
+    await refetch();
+  }, [queryClient, refetch]);
 
   useEffect(() => {
     if (selectedDeviation) {
-      const fresh = deviations.find(d => d.id === selectedDeviation.id);
+      const fresh = deviations.find((d) => d.id === selectedDeviation.id);
       if (fresh) setSelectedDeviation(fresh);
     }
-  }, [deviations]);
+  }, [deviations, selectedDeviation]);
 
   // Lọc theo bộ lọc
   const filteredDeviations = useMemo(() => {
-    return deviations.filter(d => {
+    return deviations.filter((d) => {
       if (statusFilter !== 'ALL' && d.status !== statusFilter) return false;
       if (severityFilter !== 'ALL' && d.severity !== severityFilter) return false;
       if (searchQuery.trim()) {
@@ -183,20 +233,23 @@ const DeviationListPage: React.FC = () => {
     }
 
     try {
-      const batch = batches.find(b => b.id === newForm.batchId);
-      const product = batch ? products.find(p => p.id === batch.productId) : undefined;
+      const batch = batches.find((b) => b.id === newForm.batchId);
+      const product = batch ? products.find((p) => p.id === batch.productId) : undefined;
 
-      await deviationAppService.createDeviation({
-        title: newForm.title.trim(),
-        source: newForm.source,
-        severity: newForm.severity,
-        batchId: newForm.batchId || undefined,
-        batchNo: batch?.batchNo,
-        productId: batch?.productId,
-        productName: product?.name,
-        description: newForm.description.trim() || undefined,
-        immediateAction: newForm.immediateAction.trim() || undefined
-      }, user);
+      await deviationAppService.createDeviation(
+        {
+          title: newForm.title.trim(),
+          source: newForm.source,
+          severity: newForm.severity,
+          batchId: newForm.batchId || undefined,
+          batchNo: batch?.batchNo,
+          productId: batch?.productId,
+          productName: product?.name,
+          description: newForm.description.trim() || undefined,
+          immediateAction: newForm.immediateAction.trim() || undefined,
+        },
+        user
+      );
 
       toast.success('Khởi tạo hồ sơ sai lệch thành công!');
       setShowCreateModal(false);
@@ -206,7 +259,7 @@ const DeviationListPage: React.FC = () => {
         severity: 'MAJOR',
         batchId: '',
         description: '',
-        immediateAction: ''
+        immediateAction: '',
       });
       await loadDeviations();
     } catch (err: any) {
@@ -231,7 +284,7 @@ const DeviationListPage: React.FC = () => {
           type: capaForm.type,
           responsible: capaForm.responsible.trim() || user?.email || 'QA Staff',
           deadline: capaForm.deadline,
-          status: 'PENDING'
+          status: 'PENDING',
         },
         user
       );
@@ -241,7 +294,7 @@ const DeviationListPage: React.FC = () => {
         action: '',
         type: 'CORRECTIVE',
         responsible: '',
-        deadline: new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0]
+        deadline: new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0],
       });
       setShowAddCapa(false);
       await loadDeviations();
@@ -278,7 +331,7 @@ const DeviationListPage: React.FC = () => {
         productName: selectedDeviation.productName || 'Không xác định',
         failedCriteria: selectedDeviation.failedCriteria || [],
         description: selectedDeviation.description || 'Không có mô tả chi tiết',
-        immediateAction: selectedDeviation.immediateAction
+        immediateAction: selectedDeviation.immediateAction,
       };
 
       const response = await aiGateway.execute({
@@ -288,14 +341,14 @@ const DeviationListPage: React.FC = () => {
           userId: user?.uid,
           userEmail: user?.email,
           documentType: 'DEVIATION',
-          documentId: selectedDeviation.id
-        }
+          documentId: selectedDeviation.id,
+        },
       });
 
       if (response.success && response.data) {
         setAiAnalysis({
           content: response.data,
-          metadata: response.metadata
+          metadata: response.metadata,
         });
         toast.success('AI đã hoàn thành phân tích nguyên nhân gốc rễ!');
       } else {
@@ -323,7 +376,8 @@ const DeviationListPage: React.FC = () => {
                 Quản lý Sai lệch & CAPA
               </h1>
               <p className="text-xs sm:text-sm text-ink-muted">
-                Theo dõi sự cố OOS, điều tra nguyên nhân gốc rễ và kiểm soát hành động khắc phục/phòng ngừa (GMP-WHO / 21 CFR Part 211)
+                Theo dõi sự cố OOS, điều tra nguyên nhân gốc rễ và kiểm soát hành động khắc
+                phục/phòng ngừa (GMP-WHO / 21 CFR Part 211)
               </p>
             </div>
           </div>
@@ -396,219 +450,236 @@ const DeviationListPage: React.FC = () => {
         />
       ) : (
         <>
-      {/* Search & Filter Bar */}
-      <div className="bg-surface p-3 rounded-xl border border-border shadow-xs flex flex-col md:flex-row gap-3 items-center justify-between">
-        <div className="relative flex-1 w-full">
-          <MagnifyingGlassIcon className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-muted" />
-          <input
-            type="text"
-            placeholder="Tìm theo mã hồ sơ (DEV-...), lô sản xuất, tên sản phẩm hoặc tiêu đề..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-8 py-2 bg-surface-2 border border-border rounded-xl text-xs text-ink outline-none focus:ring-2 focus:ring-rose-500/20 transition-colors"
-          />
-          {searchQuery && (
-            <button
-              onClick={() => setSearchQuery('')}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-ink-muted hover:text-ink"
-            >
-              <XMarkIcon className="w-4 h-4" />
-            </button>
-          )}
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
-          <div className="flex items-center gap-1.5 bg-surface-2 border border-border rounded-xl px-2.5 py-1">
-            <FunnelIcon className="w-3.5 h-3.5 text-ink-muted" />
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="bg-transparent text-xs font-medium outline-none cursor-pointer text-ink"
-            >
-              <option value="ALL">Tất cả trạng thái</option>
-              <option value="LOGGED">Mới ghi nhận</option>
-              <option value="UNDER_INVESTIGATION">Đang điều tra</option>
-              <option value="CAPA_PLANNED">Đang thực hiện CAPA</option>
-              <option value="EFFECTIVENESS_REVIEW">Đánh giá hiệu quả</option>
-              <option value="CLOSED">Đã đóng hồ sơ</option>
-            </select>
-          </div>
-
-          <div className="flex items-center gap-1.5 bg-surface-2 border border-border rounded-xl px-2.5 py-1">
-            <select
-              value={severityFilter}
-              onChange={(e) => setSeverityFilter(e.target.value)}
-              className="bg-transparent text-xs font-medium outline-none cursor-pointer text-ink"
-            >
-              <option value="ALL">Tất cả mức độ</option>
-              <option value="CRITICAL">Nghiêm trọng (Critical)</option>
-              <option value="MAJOR">Đáng kể (Major)</option>
-              <option value="MINOR">Nhẹ (Minor)</option>
-            </select>
-          </div>
-        </div>
-      </div>
-
-      {/* Deviations Data Table */}
-      <div className="bg-surface rounded-xl border border-border shadow-xs overflow-hidden">
-        {loading ? (
-          <div className="flex flex-col items-center justify-center py-16 text-ink-muted">
-            <ArrowPathIcon className="animate-spin mb-2.5 text-rose-500 w-8 h-8" />
-            <p className="text-xs">Đang tải danh sách hồ sơ sai lệch...</p>
-          </div>
-        ) : filteredDeviations.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 text-center px-4">
-            <div className="w-12 h-12 rounded-xl bg-surface-2 flex items-center justify-center text-ink-muted mb-2.5">
-              <CheckCircleIcon className="w-6 h-6 text-emerald-500" />
+          {/* Search & Filter Bar */}
+          <div className="bg-surface p-3 rounded-xl border border-border shadow-xs flex flex-col md:flex-row gap-3 items-center justify-between">
+            <div className="relative flex-1 w-full">
+              <MagnifyingGlassIcon className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-muted" />
+              <input
+                type="text"
+                placeholder="Tìm theo mã hồ sơ (DEV-...), lô sản xuất, tên sản phẩm hoặc tiêu đề..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-9 pr-8 py-2 bg-surface-2 border border-border rounded-xl text-xs text-ink outline-none focus:ring-2 focus:ring-rose-500/20 transition-colors"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-ink-muted hover:text-ink"
+                >
+                  <XMarkIcon className="w-4 h-4" />
+                </button>
+              )}
             </div>
-            <h3 className="text-sm font-semibold text-ink">Không có hồ sơ sai lệch nào</h3>
-            <p className="text-xs text-ink-muted mt-1 max-w-sm">
-              Không tìm thấy hồ sơ sai lệch nào phù hợp với bộ lọc hiện tại. Tất cả các lô và chỉ tiêu đang trong ngưỡng an toàn.
-            </p>
+
+            <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
+              <div className="flex items-center gap-1.5 bg-surface-2 border border-border rounded-xl px-2.5 py-1">
+                <FunnelIcon className="w-3.5 h-3.5 text-ink-muted" />
+                <select
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  className="bg-transparent text-xs font-medium outline-none cursor-pointer text-ink"
+                >
+                  <option value="ALL">Tất cả trạng thái</option>
+                  <option value="LOGGED">Mới ghi nhận</option>
+                  <option value="UNDER_INVESTIGATION">Đang điều tra</option>
+                  <option value="CAPA_PLANNED">Đang thực hiện CAPA</option>
+                  <option value="EFFECTIVENESS_REVIEW">Đánh giá hiệu quả</option>
+                  <option value="CLOSED">Đã đóng hồ sơ</option>
+                </select>
+              </div>
+
+              <div className="flex items-center gap-1.5 bg-surface-2 border border-border rounded-xl px-2.5 py-1">
+                <select
+                  value={severityFilter}
+                  onChange={(e) => setSeverityFilter(e.target.value)}
+                  className="bg-transparent text-xs font-medium outline-none cursor-pointer text-ink"
+                >
+                  <option value="ALL">Tất cả mức độ</option>
+                  <option value="CRITICAL">Nghiêm trọng (Critical)</option>
+                  <option value="MAJOR">Đáng kể (Major)</option>
+                  <option value="MINOR">Nhẹ (Minor)</option>
+                </select>
+              </div>
+            </div>
           </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse text-xs">
-              <thead>
-                <tr className="border-b border-border bg-surface-2/60 text-ink-muted font-semibold text-xs">
-                  <th className="py-3 px-4">Mã hồ sơ</th>
-                  <th className="py-3 px-4">Tiêu đề & Nguồn</th>
-                  <th className="py-3 px-4">Lô / Sản phẩm</th>
-                  <th className="py-3 px-4">Mức độ</th>
-                  <th className="py-3 px-4">Trạng thái Workflow</th>
-                  <th className="py-3 px-4">Tiến độ CAPA</th>
-                  <th className="py-3 px-4 text-right">Thao tác</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {filteredDeviations.map(dev => {
-                  const statusInfo = STATUS_CONFIG[dev.status] || STATUS_CONFIG.LOGGED;
-                  const severityInfo = SEVERITY_CONFIG[dev.severity] || SEVERITY_CONFIG.MINOR;
-                  const capaTotal = dev.capaItems?.length || 0;
-                  const capaDone = dev.capaItems?.filter(c => c.status === 'COMPLETED').length || 0;
 
-                  return (
-                    <tr 
-                      key={dev.id} 
-                      className="hover:bg-surface-2 transition-colors cursor-pointer group"
-                      onClick={() => {
-                        setSelectedDeviation(dev);
-                        setAiAnalysis(null);
-                      }}
-                    >
-                      <td className="py-3 px-4 whitespace-nowrap">
-                        <div className="font-semibold text-ink flex items-center gap-1.5">
-                          <span>{dev.deviationNo}</span>
-                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-surface-2 text-ink-muted font-mono border border-border">v{dev.version}</span>
-                        </div>
-                        <div className="text-[11px] text-ink-muted mt-0.5">
-                          {formatDateStandard(dev.loggedAt)}
-                        </div>
-                      </td>
-
-                      <td className="py-3 px-4 max-w-xs">
-                        <div className="font-medium text-ink truncate group-hover:text-rose-600 dark:group-hover:text-rose-400 transition-colors">
-                          {dev.title}
-                        </div>
-                        <div className="flex items-center gap-1.5 mt-0.5">
-                          <span className="text-[11px] px-2 py-0.5 rounded-full bg-surface-2 text-ink-soft border border-border">
-                            {SOURCE_LABELS[dev.source] || dev.source}
-                          </span>
-                          {dev.failedCriteria && dev.failedCriteria.length > 0 && (
-                            <span className="text-[11px] text-rose-600 dark:text-rose-400 font-medium">
-                              ({dev.failedCriteria.length} chỉ tiêu OOS)
-                            </span>
-                          )}
-                        </div>
-                      </td>
-
-                      <td className="py-3 px-4 whitespace-nowrap">
-                        {dev.batchNo ? (
-                          <>
-                            <div className="font-medium text-ink">
-                              Lô: <span className="font-semibold">{dev.batchNo}</span>
-                            </div>
-                            <div className="text-xs text-ink-muted truncate max-w-[180px]">
-                              {dev.productName || 'Chế phẩm liên kết'}
-                            </div>
-                          </>
-                        ) : (
-                          <span className="text-xs text-ink-muted italic">Không gắn lô cụ thể</span>
-                        )}
-                      </td>
-
-                      <td className="py-3 px-4 whitespace-nowrap">
-                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border ${severityInfo.badge}`}>
-                          <span className={`w-1.5 h-1.5 rounded-full ${severityInfo.dot}`} />
-                          {severityInfo.label.split(' ')[0]}
-                        </span>
-                      </td>
-
-                      <td className="py-3 px-4 whitespace-nowrap">
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded-lg text-xs font-medium border ${statusInfo.bg} ${statusInfo.text} ${statusInfo.border}`}>
-                          {statusInfo.label}
-                        </span>
-                      </td>
-
-                      <td className="py-3 px-4 whitespace-nowrap">
-                        {capaTotal > 0 ? (
-                          <div className="flex items-center gap-2">
-                            <div className="w-16 h-1.5 bg-surface-3 rounded-full overflow-hidden">
-                              <div 
-                                className={`h-full ${capaDone === capaTotal ? 'bg-emerald-500' : 'bg-sky-500'} rounded-full`} 
-                                style={{ width: `${Math.round((capaDone / capaTotal) * 100)}%` }} 
-                              />
-                            </div>
-                            <span className="text-xs text-ink-muted font-mono">{capaDone}/{capaTotal}</span>
-                          </div>
-                        ) : (
-                          <span className="text-xs text-ink-muted">Chưa tạo CAPA</span>
-                        )}
-                      </td>
-
-                      <td className="py-3 px-4 text-right whitespace-nowrap" onClick={e => e.stopPropagation()}>
-                        <div className="flex items-center justify-end gap-1">
-                          <button
-                            onClick={() => {
-                              setSelectedDeviation(dev);
-                              setAiAnalysis(null);
-                            }}
-                            className="p-1 rounded-lg text-ink-muted hover:text-ink hover:bg-surface-2 transition-colors"
-                            title="Xem chi tiết & CAPA"
-                          >
-                            <EyeIcon className="w-4 h-4" />
-                          </button>
-
-                          {dev.status !== 'CLOSED' && (
-                            <button
-                              onClick={() => {
-                                setSelectedDeviation(dev);
-                                const nextMap: Record<DeviationStatus, DeviationStatus> = {
-                                  LOGGED: 'UNDER_INVESTIGATION',
-                                  UNDER_INVESTIGATION: 'CAPA_PLANNED',
-                                  CAPA_PLANNED: 'EFFECTIVENESS_REVIEW',
-                                  EFFECTIVENESS_REVIEW: 'CLOSED',
-                                  CLOSED: 'CLOSED'
-                                };
-                                setTargetStatus(nextMap[dev.status]);
-                                setShowTransitionModal(true);
-                              }}
-                              className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-surface-2 hover:bg-rose-50 dark:hover:bg-rose-950/40 hover:text-rose-600 text-xs font-medium text-ink-soft transition-colors border border-border"
-                            >
-                              <span>Chuyển bước</span>
-                              <ArrowRightIcon className="w-3 h-3" />
-                            </button>
-                          )}
-                        </div>
-                      </td>
+          {/* Deviations Data Table */}
+          <div className="bg-surface rounded-xl border border-border shadow-xs overflow-hidden">
+            {loading ? (
+              <div className="flex flex-col items-center justify-center py-16 text-ink-muted">
+                <ArrowPathIcon className="animate-spin mb-2.5 text-rose-500 w-8 h-8" />
+                <p className="text-xs">Đang tải danh sách hồ sơ sai lệch...</p>
+              </div>
+            ) : filteredDeviations.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-16 text-center px-4">
+                <div className="w-12 h-12 rounded-xl bg-surface-2 flex items-center justify-center text-ink-muted mb-2.5">
+                  <CheckCircleIcon className="w-6 h-6 text-emerald-500" />
+                </div>
+                <h3 className="text-sm font-semibold text-ink">Không có hồ sơ sai lệch nào</h3>
+                <p className="text-xs text-ink-muted mt-1 max-w-sm">
+                  Không tìm thấy hồ sơ sai lệch nào phù hợp với bộ lọc hiện tại. Tất cả các lô và
+                  chỉ tiêu đang trong ngưỡng an toàn.
+                </p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead>
+                    <tr className="border-b border-border bg-surface-2/60 text-ink-muted font-semibold text-xs">
+                      <th className="py-3 px-4">Mã hồ sơ</th>
+                      <th className="py-3 px-4">Tiêu đề & Nguồn</th>
+                      <th className="py-3 px-4">Lô / Sản phẩm</th>
+                      <th className="py-3 px-4">Mức độ</th>
+                      <th className="py-3 px-4">Trạng thái Workflow</th>
+                      <th className="py-3 px-4">Tiến độ CAPA</th>
+                      <th className="py-3 px-4 text-right">Thao tác</th>
                     </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {filteredDeviations.map((dev) => {
+                      const statusInfo = STATUS_CONFIG[dev.status] || STATUS_CONFIG.LOGGED;
+                      const severityInfo = SEVERITY_CONFIG[dev.severity] || SEVERITY_CONFIG.MINOR;
+                      const capaTotal = dev.capaItems?.length || 0;
+                      const capaDone =
+                        dev.capaItems?.filter((c) => c.status === 'COMPLETED').length || 0;
+
+                      return (
+                        <tr
+                          key={dev.id}
+                          className="hover:bg-surface-2 transition-colors cursor-pointer group"
+                          onClick={() => {
+                            setSelectedDeviation(dev);
+                            setAiAnalysis(null);
+                          }}
+                        >
+                          <td className="py-3 px-4 whitespace-nowrap">
+                            <div className="font-semibold text-ink flex items-center gap-1.5">
+                              <span>{dev.deviationNo}</span>
+                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-surface-2 text-ink-muted font-mono border border-border">
+                                v{dev.version}
+                              </span>
+                            </div>
+                            <div className="text-[11px] text-ink-muted mt-0.5">
+                              {formatDateStandard(dev.loggedAt)}
+                            </div>
+                          </td>
+
+                          <td className="py-3 px-4 max-w-xs">
+                            <div className="font-medium text-ink truncate group-hover:text-rose-600 dark:group-hover:text-rose-400 transition-colors">
+                              {dev.title}
+                            </div>
+                            <div className="flex items-center gap-1.5 mt-0.5">
+                              <span className="text-[11px] px-2 py-0.5 rounded-full bg-surface-2 text-ink-soft border border-border">
+                                {SOURCE_LABELS[dev.source] || dev.source}
+                              </span>
+                              {dev.failedCriteria && dev.failedCriteria.length > 0 && (
+                                <span className="text-[11px] text-rose-600 dark:text-rose-400 font-medium">
+                                  ({dev.failedCriteria.length} chỉ tiêu OOS)
+                                </span>
+                              )}
+                            </div>
+                          </td>
+
+                          <td className="py-3 px-4 whitespace-nowrap">
+                            {dev.batchNo ? (
+                              <>
+                                <div className="font-medium text-ink">
+                                  Lô: <span className="font-semibold">{dev.batchNo}</span>
+                                </div>
+                                <div className="text-xs text-ink-muted truncate max-w-[180px]">
+                                  {dev.productName || 'Chế phẩm liên kết'}
+                                </div>
+                              </>
+                            ) : (
+                              <span className="text-xs text-ink-muted italic">
+                                Không gắn lô cụ thể
+                              </span>
+                            )}
+                          </td>
+
+                          <td className="py-3 px-4 whitespace-nowrap">
+                            <span
+                              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border ${severityInfo.badge}`}
+                            >
+                              <span className={`w-1.5 h-1.5 rounded-full ${severityInfo.dot}`} />
+                              {severityInfo.label.split(' ')[0]}
+                            </span>
+                          </td>
+
+                          <td className="py-3 px-4 whitespace-nowrap">
+                            <span
+                              className={`inline-flex items-center px-2 py-0.5 rounded-lg text-xs font-medium border ${statusInfo.bg} ${statusInfo.text} ${statusInfo.border}`}
+                            >
+                              {statusInfo.label}
+                            </span>
+                          </td>
+
+                          <td className="py-3 px-4 whitespace-nowrap">
+                            {capaTotal > 0 ? (
+                              <div className="flex items-center gap-2">
+                                <div className="w-16 h-1.5 bg-surface-3 rounded-full overflow-hidden">
+                                  <div
+                                    className={`h-full ${capaDone === capaTotal ? 'bg-emerald-500' : 'bg-sky-500'} rounded-full`}
+                                    style={{
+                                      width: `${Math.round((capaDone / capaTotal) * 100)}%`,
+                                    }}
+                                  />
+                                </div>
+                                <span className="text-xs text-ink-muted font-mono">
+                                  {capaDone}/{capaTotal}
+                                </span>
+                              </div>
+                            ) : (
+                              <span className="text-xs text-ink-muted">Chưa tạo CAPA</span>
+                            )}
+                          </td>
+
+                          <td
+                            className="py-3 px-4 text-right whitespace-nowrap"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <div className="flex items-center justify-end gap-1">
+                              <button
+                                onClick={() => {
+                                  setSelectedDeviation(dev);
+                                  setAiAnalysis(null);
+                                }}
+                                className="p-1 rounded-lg text-ink-muted hover:text-ink hover:bg-surface-2 transition-colors"
+                                title="Xem chi tiết & CAPA"
+                              >
+                                <EyeIcon className="w-4 h-4" />
+                              </button>
+
+                              {dev.status !== 'CLOSED' && (
+                                <button
+                                  onClick={() => {
+                                    setSelectedDeviation(dev);
+                                    const nextMap: Record<DeviationStatus, DeviationStatus> = {
+                                      LOGGED: 'UNDER_INVESTIGATION',
+                                      UNDER_INVESTIGATION: 'CAPA_PLANNED',
+                                      CAPA_PLANNED: 'EFFECTIVENESS_REVIEW',
+                                      EFFECTIVENESS_REVIEW: 'CLOSED',
+                                      CLOSED: 'CLOSED',
+                                    };
+                                    setTargetStatus(nextMap[dev.status]);
+                                    setShowTransitionModal(true);
+                                  }}
+                                  className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-surface-2 hover:bg-rose-50 dark:hover:bg-rose-950/40 hover:text-rose-600 text-xs font-medium text-ink-soft transition-colors border border-border"
+                                >
+                                  <span>Chuyển bước</span>
+                                  <ArrowRightIcon className="w-3 h-3" />
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
-        )}
-      </div>
         </>
       )}
 
@@ -622,13 +693,13 @@ const DeviationListPage: React.FC = () => {
                   <span className="text-base font-semibold text-ink font-mono">
                     {selectedDeviation.deviationNo}
                   </span>
-                  <span className={`px-2 py-0.5 rounded-full text-xs font-medium border ${SEVERITY_CONFIG[selectedDeviation.severity].badge}`}>
+                  <span
+                    className={`px-2 py-0.5 rounded-full text-xs font-medium border ${SEVERITY_CONFIG[selectedDeviation.severity].badge}`}
+                  >
                     {SEVERITY_CONFIG[selectedDeviation.severity].label}
                   </span>
                 </div>
-                <h2 className="text-sm font-medium text-ink mt-0.5">
-                  {selectedDeviation.title}
-                </h2>
+                <h2 className="text-sm font-medium text-ink mt-0.5">{selectedDeviation.title}</h2>
               </div>
               <button
                 onClick={() => setSelectedDeviation(null)}
@@ -641,7 +712,15 @@ const DeviationListPage: React.FC = () => {
             {/* Stepper Pipeline */}
             <div className="p-3 bg-surface-2 border-b border-border">
               <div className="flex items-center justify-between">
-                {(['LOGGED', 'UNDER_INVESTIGATION', 'CAPA_PLANNED', 'EFFECTIVENESS_REVIEW', 'CLOSED'] as DeviationStatus[]).map((st) => {
+                {(
+                  [
+                    'LOGGED',
+                    'UNDER_INVESTIGATION',
+                    'CAPA_PLANNED',
+                    'EFFECTIVENESS_REVIEW',
+                    'CLOSED',
+                  ] as DeviationStatus[]
+                ).map((st) => {
                   const cfg = STATUS_CONFIG[st];
                   const currentStep = STATUS_CONFIG[selectedDeviation.status].step;
                   const isPassed = currentStep > cfg.step;
@@ -649,18 +728,24 @@ const DeviationListPage: React.FC = () => {
 
                   return (
                     <div key={st} className="flex-1 flex flex-col items-center relative">
-                      <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold transition-all ${
-                        isPassed 
-                          ? 'bg-emerald-600 text-white' 
-                          : isCurrent 
-                            ? 'bg-rose-600 text-white ring-2 ring-rose-200 dark:ring-rose-950' 
-                            : 'bg-surface-3 text-ink-muted'
-                      }`}>
+                      <div
+                        className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold transition-all ${
+                          isPassed
+                            ? 'bg-emerald-600 text-white'
+                            : isCurrent
+                              ? 'bg-rose-600 text-white ring-2 ring-rose-200 dark:ring-rose-950'
+                              : 'bg-surface-3 text-ink-muted'
+                        }`}
+                      >
                         {isPassed ? <CheckIcon className="w-3.5 h-3.5" /> : cfg.step}
                       </div>
-                      <span className={`text-[10px] font-medium mt-1 text-center hidden sm:block ${
-                        isCurrent ? 'text-rose-600 dark:text-rose-400 font-semibold' : 'text-ink-muted'
-                      }`}>
+                      <span
+                        className={`text-[10px] font-medium mt-1 text-center hidden sm:block ${
+                          isCurrent
+                            ? 'text-rose-600 dark:text-rose-400 font-semibold'
+                            : 'text-ink-muted'
+                        }`}
+                      >
                         {cfg.label}
                       </span>
                     </div>
@@ -716,7 +801,9 @@ const DeviationListPage: React.FC = () => {
                         {selectedDeviation.failedCriteria.map((c, i) => (
                           <tr key={i} className="bg-surface">
                             <td className="p-2 font-medium text-ink">{c.name}</td>
-                            <td className="p-2 font-semibold text-rose-600 dark:text-rose-400">{c.actualValue}</td>
+                            <td className="p-2 font-semibold text-rose-600 dark:text-rose-400">
+                              {c.actualValue}
+                            </td>
                             <td className="p-2 text-ink-muted">{c.specification}</td>
                           </tr>
                         ))}
@@ -728,7 +815,9 @@ const DeviationListPage: React.FC = () => {
 
               <div className="space-y-2.5">
                 <div>
-                  <span className="text-xs font-medium text-ink-muted uppercase">Mô tả hiện tượng sai lệch:</span>
+                  <span className="text-xs font-medium text-ink-muted uppercase">
+                    Mô tả hiện tượng sai lệch:
+                  </span>
                   <p className="mt-1 p-2.5 rounded-lg bg-surface-2 text-ink border border-border">
                     {selectedDeviation.description || 'Không có mô tả bổ sung.'}
                   </p>
@@ -758,7 +847,11 @@ const DeviationListPage: React.FC = () => {
                     disabled={aiLoading}
                     className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium transition-colors shadow-xs disabled:opacity-50"
                   >
-                    {aiLoading ? <ArrowPathIcon className="w-3.5 h-3.5 animate-spin" /> : <SparklesIcon className="w-3.5 h-3.5" />}
+                    {aiLoading ? (
+                      <ArrowPathIcon className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <SparklesIcon className="w-3.5 h-3.5" />
+                    )}
                     <span>{aiAnalysis ? 'Phân tích lại' : 'Chạy AI phân tích'}</span>
                   </button>
                 </div>
@@ -773,13 +866,21 @@ const DeviationListPage: React.FC = () => {
                 {aiAnalysis && (
                   <div className="space-y-2 pt-2 border-t border-border">
                     <div className="flex items-center justify-between text-[11px] text-ink-muted">
-                      <span>Mô hình: <b className="text-ink">{aiAnalysis.metadata?.modelUsed}</b></span>
-                      <span>Độ tin cậy: <b className="text-emerald-600 font-semibold">{aiAnalysis.metadata?.confidenceLevel} ({Math.round(aiAnalysis.metadata?.confidenceScore * 100)}%)</b></span>
+                      <span>
+                        Mô hình: <b className="text-ink">{aiAnalysis.metadata?.modelUsed}</b>
+                      </span>
+                      <span>
+                        Độ tin cậy:{' '}
+                        <b className="text-emerald-600 font-semibold">
+                          {aiAnalysis.metadata?.confidenceLevel} (
+                          {Math.round(aiAnalysis.metadata?.confidenceScore * 100)}%)
+                        </b>
+                      </span>
                     </div>
 
                     <div className="p-2.5 bg-surface rounded-lg border border-border text-ink whitespace-pre-line leading-relaxed">
-                      {typeof aiAnalysis.content === 'string' 
-                        ? aiAnalysis.content 
+                      {typeof aiAnalysis.content === 'string'
+                        ? aiAnalysis.content
                         : JSON.stringify(aiAnalysis.content, null, 2)}
                     </div>
                   </div>
@@ -805,11 +906,16 @@ const DeviationListPage: React.FC = () => {
                 </div>
 
                 {showAddCapa && (
-                  <form onSubmit={handleAddCAPASubmit} className="p-3 rounded-lg bg-surface-2 border border-border space-y-2">
+                  <form
+                    onSubmit={handleAddCAPASubmit}
+                    className="p-3 rounded-lg bg-surface-2 border border-border space-y-2"
+                  >
                     <div className="flex gap-2">
                       <select
                         value={capaForm.type}
-                        onChange={e => setCapaForm(f => ({ ...f, type: e.target.value as any }))}
+                        onChange={(e) =>
+                          setCapaForm((f) => ({ ...f, type: e.target.value as any }))
+                        }
                         className="px-2 py-1 rounded bg-surface border border-border text-ink outline-none"
                       >
                         <option value="CORRECTIVE">Khắc phục (Corrective)</option>
@@ -820,7 +926,7 @@ const DeviationListPage: React.FC = () => {
                       <input
                         type="date"
                         value={capaForm.deadline}
-                        onChange={e => setCapaForm(f => ({ ...f, deadline: e.target.value }))}
+                        onChange={(e) => setCapaForm((f) => ({ ...f, deadline: e.target.value }))}
                         className="px-2 py-1 rounded bg-surface border border-border text-ink outline-none"
                       />
                     </div>
@@ -828,7 +934,7 @@ const DeviationListPage: React.FC = () => {
                     <textarea
                       placeholder="Mô tả cụ thể hành động cần thực hiện..."
                       value={capaForm.action}
-                      onChange={e => setCapaForm(f => ({ ...f, action: e.target.value }))}
+                      onChange={(e) => setCapaForm((f) => ({ ...f, action: e.target.value }))}
                       rows={2}
                       className="w-full p-2 rounded bg-surface border border-border text-ink outline-none"
                     />
@@ -851,42 +957,48 @@ const DeviationListPage: React.FC = () => {
                   </form>
                 )}
 
-                {(!selectedDeviation.capaItems || selectedDeviation.capaItems.length === 0) ? (
+                {!selectedDeviation.capaItems || selectedDeviation.capaItems.length === 0 ? (
                   <p className="text-xs text-ink-muted italic p-3 bg-surface-2 rounded-lg text-center border border-border">
                     Chưa có hành động CAPA nào được gán cho hồ sơ này.
                   </p>
                 ) : (
                   <div className="space-y-1.5">
-                    {selectedDeviation.capaItems.map(capa => {
+                    {selectedDeviation.capaItems.map((capa) => {
                       const isDone = capa.status === 'COMPLETED';
                       return (
-                        <div 
+                        <div
                           key={capa.id}
                           className={`p-2.5 rounded-lg border flex items-start justify-between gap-3 text-xs ${
-                            isDone 
-                              ? 'bg-emerald-50/40 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-900/50' 
+                            isDone
+                              ? 'bg-emerald-50/40 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-900/50'
                               : 'bg-surface border-border'
                           }`}
                         >
                           <div className="space-y-0.5 flex-1">
                             <div className="flex items-center gap-1.5">
-                              <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
-                                capa.type === 'CORRECTIVE' 
-                                  ? 'bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-300' 
-                                  : 'bg-sky-100 dark:bg-sky-950 text-sky-700 dark:text-sky-300'
-                              }`}>
+                              <span
+                                className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                                  capa.type === 'CORRECTIVE'
+                                    ? 'bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-300'
+                                    : 'bg-sky-100 dark:bg-sky-950 text-sky-700 dark:text-sky-300'
+                                }`}
+                              >
                                 {capa.type === 'CORRECTIVE' ? 'KHẮC PHỤC' : 'PHÒNG NGỪA'}
                               </span>
                               <span className="text-ink-muted">Hạn: {capa.deadline}</span>
                               <span className="text-ink-muted">· {capa.responsible}</span>
                             </div>
-                            <p className={`font-medium ${isDone ? 'line-through text-ink-muted' : 'text-ink'}`}>
+                            <p
+                              className={`font-medium ${isDone ? 'line-through text-ink-muted' : 'text-ink'}`}
+                            >
                               {capa.action}
                             </p>
                             {isDone && (
                               <p className="text-[11px] text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
                                 <CheckIcon className="w-3 h-3" />
-                                <span>Đã hoàn thành lúc {formatDateStandard(capa.completedAt)}</span>
+                                <span>
+                                  Đã hoàn thành lúc {formatDateStandard(capa.completedAt)}
+                                </span>
                               </p>
                             )}
                           </div>
@@ -913,10 +1025,14 @@ const DeviationListPage: React.FC = () => {
                     <span>Hồ sơ đã thẩm định và chính thức Đóng (GMP Closed)</span>
                   </div>
                   <p className="text-ink-soft italic">
-                    "{selectedDeviation.closureNotes || 'Đã kiểm tra tính hiệu quả của CAPA và phê duyệt đóng hồ sơ.'}"
+                    "
+                    {selectedDeviation.closureNotes ||
+                      'Đã kiểm tra tính hiệu quả của CAPA và phê duyệt đóng hồ sơ.'}
+                    "
                   </p>
                   <div className="text-[11px] text-ink-muted pt-0.5">
-                    Đóng bởi: <b>{selectedDeviation.closedBy || 'QA Officer'}</b> vào lúc {formatDateStandard(selectedDeviation.closedAt)}
+                    Đóng bởi: <b>{selectedDeviation.closedBy || 'QA Officer'}</b> vào lúc{' '}
+                    {formatDateStandard(selectedDeviation.closedAt)}
                   </div>
                 </div>
               )}
@@ -935,7 +1051,7 @@ const DeviationListPage: React.FC = () => {
                       UNDER_INVESTIGATION: 'CAPA_PLANNED',
                       CAPA_PLANNED: 'EFFECTIVENESS_REVIEW',
                       EFFECTIVENESS_REVIEW: 'CLOSED',
-                      CLOSED: 'CLOSED'
+                      CLOSED: 'CLOSED',
                     };
                     setTargetStatus(nextMap[selectedDeviation.status]);
                     setShowTransitionModal(true);
@@ -977,7 +1093,7 @@ const DeviationListPage: React.FC = () => {
               type="text"
               placeholder="VD: Nhiệt độ kho bảo quản vượt ngưỡng 32°C trong 4 giờ"
               value={newForm.title}
-              onChange={e => setNewForm(f => ({ ...f, title: e.target.value }))}
+              onChange={(e) => setNewForm((f) => ({ ...f, title: e.target.value }))}
               required
               className="w-full p-2 bg-surface-2 border border-border rounded-lg text-ink outline-none"
             />
@@ -990,7 +1106,7 @@ const DeviationListPage: React.FC = () => {
               </label>
               <select
                 value={newForm.source}
-                onChange={e => setNewForm(f => ({ ...f, source: e.target.value as any }))}
+                onChange={(e) => setNewForm((f) => ({ ...f, source: e.target.value as any }))}
                 className="w-full p-2 bg-surface-2 border border-border rounded-lg text-ink"
               >
                 <option value="OOS_TEST_RESULT">OOS Kiểm nghiệm</option>
@@ -1008,7 +1124,7 @@ const DeviationListPage: React.FC = () => {
               </label>
               <select
                 value={newForm.severity}
-                onChange={e => setNewForm(f => ({ ...f, severity: e.target.value as any }))}
+                onChange={(e) => setNewForm((f) => ({ ...f, severity: e.target.value as any }))}
                 className="w-full p-2 bg-surface-2 border border-border rounded-lg text-ink"
               >
                 <option value="MINOR">Nhẹ (Minor)</option>
@@ -1024,12 +1140,12 @@ const DeviationListPage: React.FC = () => {
             </label>
             <select
               value={newForm.batchId}
-              onChange={e => setNewForm(f => ({ ...f, batchId: e.target.value }))}
+              onChange={(e) => setNewForm((f) => ({ ...f, batchId: e.target.value }))}
               className="w-full p-2 bg-surface-2 border border-border rounded-lg text-ink"
             >
               <option value="">-- Không gắn lô cụ thể --</option>
-              {batches.map(b => {
-                const prod = products.find(p => p.id === b.productId);
+              {batches.map((b) => {
+                const prod = products.find((p) => p.id === b.productId);
                 return (
                   <option key={b.id} value={b.id}>
                     {b.batchNo} - {prod?.name || 'Sản phẩm'}
@@ -1047,7 +1163,7 @@ const DeviationListPage: React.FC = () => {
               rows={2}
               placeholder="Mô tả diễn biến, thời điểm phát hiện, thiết bị liên quan..."
               value={newForm.description}
-              onChange={e => setNewForm(f => ({ ...f, description: e.target.value }))}
+              onChange={(e) => setNewForm((f) => ({ ...f, description: e.target.value }))}
               className="w-full p-2 bg-surface-2 border border-border rounded-lg text-ink outline-none"
             />
           </div>
@@ -1060,7 +1176,7 @@ const DeviationListPage: React.FC = () => {
               type="text"
               placeholder="VD: Dán nhãn Biệt trữ (Quarantine) khu vực bị ảnh hưởng"
               value={newForm.immediateAction}
-              onChange={e => setNewForm(f => ({ ...f, immediateAction: e.target.value }))}
+              onChange={(e) => setNewForm((f) => ({ ...f, immediateAction: e.target.value }))}
               className="w-full p-2 bg-surface-2 border border-border rounded-lg text-ink outline-none"
             />
           </div>
@@ -1087,4 +1203,3 @@ const DeviationListPage: React.FC = () => {
 };
 
 export default DeviationListPage;
-

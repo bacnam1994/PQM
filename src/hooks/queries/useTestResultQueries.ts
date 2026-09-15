@@ -3,23 +3,41 @@ import { testResultRepository } from '../../repositories/firebase/FirebaseTestRe
 import { testResultAppService } from '../../services/app/TestResultAppService';
 import { useAppStore } from '../../store/useAppStore';
 import { TestResult, Batch } from '../../types';
+import { PaginationOptions, QueryFilter, PaginatedResult } from '../../repositories/types';
 
 import { TEST_RESULT_QUERY_KEYS } from '../../constants/queryKeys';
 export { TEST_RESULT_QUERY_KEYS };
 
 /**
- * Hook tải danh sách Phiếu kiểm nghiệm
+ * Hook tải danh sách Phiếu kiểm nghiệm (mặc định lấy 500 bản ghi mới nhất để bảo vệ bộ nhớ)
  */
-export function useTestResultsQuery() {
+export function useTestResultsQuery(limit?: number) {
   return useQuery<TestResult[]>({
-    queryKey: TEST_RESULT_QUERY_KEYS.all,
+    queryKey: limit ? TEST_RESULT_QUERY_KEYS.recent(limit) : TEST_RESULT_QUERY_KEYS.all,
     queryFn: async () => {
-      const items = await testResultRepository.findAll();
+      const items = limit
+        ? await testResultRepository.findRecent(limit)
+        : await testResultRepository.findRecent(500);
       return items.sort(
         (a, b) =>
           new Date(b.testDate || b.createdAt || 0).getTime() -
           new Date(a.testDate || a.createdAt || 0).getTime()
       );
+    },
+  });
+}
+
+/**
+ * Hook phân trang Phiếu kiểm nghiệm Server-side
+ */
+export function useTestResultsPaginatedQuery(
+  options?: PaginationOptions<TestResult>,
+  filters?: QueryFilter<TestResult>[]
+) {
+  return useQuery<PaginatedResult<TestResult>>({
+    queryKey: TEST_RESULT_QUERY_KEYS.paginated(options, filters),
+    queryFn: async () => {
+      return await testResultRepository.findPaginated(options, filters);
     },
   });
 }

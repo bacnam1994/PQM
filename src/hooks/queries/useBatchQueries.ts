@@ -3,6 +3,7 @@ import { batchRepository } from '../../repositories/firebase/FirebaseBatchReposi
 import { batchAppService } from '../../services/app/BatchAppService';
 import { useAppStore } from '../../store/useAppStore';
 import { Batch, ElectronicSignature } from '../../types';
+import { PaginationOptions, QueryFilter, PaginatedResult } from '../../repositories/types';
 
 import { BATCH_QUERY_KEYS } from '../../constants/queryKeys';
 export { BATCH_QUERY_KEYS };
@@ -10,11 +11,29 @@ export { BATCH_QUERY_KEYS };
 /**
  * Hook tải danh sách Lô sản xuất với Caching & Background Refresh
  */
-export function useBatchesQuery() {
+export function useBatchesQuery(limit?: number) {
   return useQuery<Batch[]>({
-    queryKey: BATCH_QUERY_KEYS.all,
+    queryKey: limit ? BATCH_QUERY_KEYS.recent(limit) : BATCH_QUERY_KEYS.all,
     queryFn: async () => {
+      if (limit) {
+        return await batchRepository.findRecent(limit);
+      }
       return await batchRepository.findAll();
+    },
+  });
+}
+
+/**
+ * Hook phân trang Lô sản xuất Server-side
+ */
+export function useBatchesPaginatedQuery(
+  options?: PaginationOptions<Batch>,
+  filters?: QueryFilter<Batch>[]
+) {
+  return useQuery<PaginatedResult<Batch>>({
+    queryKey: BATCH_QUERY_KEYS.paginated(options, filters),
+    queryFn: async () => {
+      return await batchRepository.findPaginated(options, filters);
     },
   });
 }

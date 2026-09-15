@@ -100,17 +100,27 @@ export const createTestResultSlice: StoreSlice<TestResultSlice> = (set, get) => 
         return;
       }
       const list = await testResultRepository.findRecent(200);
-      queryClient.setQueryData(TEST_RESULT_QUERY_KEYS.all, list);
+      const existingInCache =
+        queryClient.getQueryData<TestResult[]>(TEST_RESULT_QUERY_KEYS.all) || [];
+      const map = new Map<string, TestResult>();
+      list.forEach((item) => map.set(item.id, item));
+      existingInCache.forEach((item) => map.set(item.id, item));
+      const merged = Array.from(map.values()).sort(
+        (a, b) =>
+          new Date(b.testDate || b.createdAt || 0).getTime() -
+          new Date(a.testDate || a.createdAt || 0).getTime()
+      );
+      queryClient.setQueryData(TEST_RESULT_QUERY_KEYS.all, merged);
       set(
         {
-          allTestResults: list,
+          allTestResults: merged,
           _lastFetchTestResultsTime: Date.now(),
         } as any,
         false,
         'fetchAllTestResultsForDashboard'
       );
     } catch (e) {
-      console.error('Lỗi tải toàn bộ dữ liệu cho Dashboard:', e);
+      console.error('Lỗi tải dữ liệu cho Dashboard:', e);
     }
   },
 });

@@ -31,6 +31,15 @@ export class FirebaseBatchRepository
     return this.findByRelation('status', status);
   }
 
+  async findRecent(limitCount: number): Promise<Batch[]> {
+    const result = await this.findPaginated({
+      pageSize: limitCount,
+      orderBy: 'mfgDate',
+      orderDirection: 'desc',
+    });
+    return result.items;
+  }
+
   async updateStatus(batchId: string, status: Batch['status'], reason?: string): Promise<void> {
     if (!batchId) throw new Error('Yêu cầu ID lô sản xuất');
     const updates: Record<string, any> = {

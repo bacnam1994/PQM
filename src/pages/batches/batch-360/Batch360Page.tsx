@@ -1,48 +1,53 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { 
-  ArrowLeftIcon, 
-  Square3Stack3DIcon, 
-  ShareIcon, 
-  ClockIcon, 
-  CheckCircleIcon, 
-  XCircleIcon, 
-  ExclamationTriangleIcon, 
-  ShieldCheckIcon, 
-  ClipboardDocumentCheckIcon, 
-  PrinterIcon, 
-  ArrowTopRightOnSquareIcon, 
-  SparklesIcon, 
-  ChartBarSquareIcon, 
-  DocumentTextIcon, 
-  BeakerIcon 
+import {
+  ArrowLeftIcon,
+  Square3Stack3DIcon,
+  ShareIcon,
+  ClockIcon,
+  CheckCircleIcon,
+  XCircleIcon,
+  ExclamationTriangleIcon,
+  ShieldCheckIcon,
+  ClipboardDocumentCheckIcon,
+  PrinterIcon,
+  ArrowTopRightOnSquareIcon,
+  SparklesIcon,
+  ChartBarSquareIcon,
+  DocumentTextIcon,
+  BeakerIcon,
 } from '@heroicons/react/24/outline';
 import { useDataGraph } from '../../../hooks/useDataGraph';
 import { useAppStore } from '../../../store/useAppStore';
 import { formatDateStandard, ensureArray } from '../../../utils';
-import { buildBatchGenealogy, BatchGenealogyReport } from '../../../services/ai/batchGenealogyService';
+import {
+  buildBatchGenealogy,
+  BatchGenealogyReport,
+} from '../../../services/ai/batchGenealogyService';
 import { SignatureService } from '../../../services/signatureService';
 import { ElectronicSignature } from '../../../types/signature';
-import { QualityDeviation } from '../../../types/deviation';
-import { firebaseDeviationRepository } from '../../../repositories/firebase/FirebaseDeviationRepository';
+import { useDeviationsByBatchQuery } from '../../../hooks/queries/useDeviationQueries';
 import { BatchGenealogyTree } from './components/BatchGenealogyTree';
-import { BatchAuditHistoryTimeline, BatchTimelineEvent } from './components/BatchAuditHistoryTimeline';
+import {
+  BatchAuditHistoryTimeline,
+  BatchTimelineEvent,
+} from './components/BatchAuditHistoryTimeline';
 
 export const Batch360Page: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { batches, rawMaterials, testResults } = useDataGraph();
-  const rawMaterialsList = useAppStore(s => s.rawMaterials);
+  const rawMaterialsList = useAppStore((s) => s.rawMaterials);
 
   const [activeTab, setActiveTab] = useState<'GENEALOGY' | 'TIMELINE' | 'CQAS'>('GENEALOGY');
   const [signatures, setSignatures] = useState<ElectronicSignature[]>([]);
-  const [deviations, setDeviations] = useState<QualityDeviation[]>([]);
+  const { data: deviations = [] } = useDeviationsByBatchQuery(id);
   const [isLoadingAsync, setIsLoadingAsync] = useState(true);
 
   // Lấy dữ liệu lô đã được hydrate từ graph
   const batch = useMemo(() => {
     if (!id) return null;
-    return batches.find(b => b.id === id) || null;
+    return batches.find((b) => b.id === id) || null;
   }, [id, batches]);
 
   // Tải danh sách chữ ký số và sai lệch liên quan đến lô
@@ -53,13 +58,9 @@ export const Batch360Page: React.FC = () => {
       setIsLoadingAsync(true);
       try {
         const sigService = new SignatureService();
-        const [loadedSigs, loadedDevs] = await Promise.all([
-          sigService.getSignaturesForDocument('BATCH', id).catch(() => []),
-          firebaseDeviationRepository.findByRelation('batchId', id).catch(() => [])
-        ]);
+        const loadedSigs = await sigService.getSignaturesForDocument('BATCH', id).catch(() => []);
         if (isMounted) {
           setSignatures(loadedSigs);
-          setDeviations(loadedDevs);
         }
       } catch (err) {
         console.error('Lỗi khi tải thông tin bổ sung Batch 360:', err);
@@ -68,13 +69,15 @@ export const Batch360Page: React.FC = () => {
       }
     };
     loadExtraData();
-    return () => { isMounted = false; };
+    return () => {
+      isMounted = false;
+    };
   }, [id]);
 
   // Lấy danh sách phiếu kiểm nghiệm của lô này
   const batchTestResults = useMemo(() => {
     if (!id || !testResults) return [];
-    return testResults.filter(tr => tr.batchId === id);
+    return testResults.filter((tr) => tr.batchId === id);
   }, [id, testResults]);
 
   // Xây dựng báo cáo gia phả lô bằng service chuẩn
@@ -88,7 +91,7 @@ export const Batch360Page: React.FC = () => {
         formula: batch.formula,
         rawMaterials: rawMaterialsList || [],
         testResults: batchTestResults,
-        allBatches: batches || []
+        allBatches: batches || [],
       });
     } catch (err) {
       console.error('Lỗi khi tạo báo cáo phả hệ:', err);
@@ -113,34 +116,35 @@ export const Batch360Page: React.FC = () => {
         details: {
           'Ngày sản xuất': formatDateStandard(batch.mfgDate),
           'Hạn sử dụng': formatDateStandard(batch.expDate),
-          'Quy cách bao gói': batch.packaging || 'N/A'
-        }
+          'Quy cách bao gói': batch.packaging || 'N/A',
+        },
       });
     }
 
     // 2. Mốc các phiếu kiểm nghiệm
-    batchTestResults.forEach(tr => {
-      const passCount = ensureArray(tr.results).filter(r => r.isPass).length;
-      const failCount = ensureArray(tr.results).filter(r => !r.isPass).length;
+    batchTestResults.forEach((tr) => {
+      const passCount = ensureArray(tr.results).filter((r) => r.isPass).length;
+      const failCount = ensureArray(tr.results).filter((r) => !r.isPass).length;
       events.push({
         id: `evt-tr-${tr.id}`,
         timestamp: tr.testDate || tr.createdAt || new Date().toISOString(),
         type: 'TEST_RESULT',
         title: `Phiếu kiểm nghiệm tại ${tr.labName || 'Phòng Lab'}`,
-        description: tr.overallStatus === 'PASS' 
-          ? `Tất cả ${passCount} chỉ tiêu đạt chuẩn quy định TCCS.`
-          : `Phát hiện ${failCount} chỉ tiêu không đạt tiêu chuẩn.`,
+        description:
+          tr.overallStatus === 'PASS'
+            ? `Tất cả ${passCount} chỉ tiêu đạt chuẩn quy định TCCS.`
+            : `Phát hiện ${failCount} chỉ tiêu không đạt tiêu chuẩn.`,
         status: tr.overallStatus === 'PASS' ? 'PASS' : 'FAIL',
         badge: tr.overallStatus === 'PASS' ? 'ĐẠT (PASS)' : 'KHÔNG ĐẠT (OOS)',
         details: {
           'Số chỉ tiêu kiểm nghiệm': ensureArray(tr.results).length,
-          'Ghi chú': tr.notes || undefined
-        }
+          'Ghi chú': tr.notes || undefined,
+        },
       });
     });
 
     // 3. Mốc các sai lệch phát sinh
-    deviations.forEach(dev => {
+    deviations.forEach((dev) => {
       events.push({
         id: `evt-dev-${dev.id}`,
         timestamp: dev.loggedAt || new Date().toISOString(),
@@ -152,13 +156,13 @@ export const Batch360Page: React.FC = () => {
         details: {
           'Mã sai lệch': dev.deviationNo,
           'Mức độ': dev.severity,
-          'Trạng thái': dev.status
-        }
+          'Trạng thái': dev.status,
+        },
       });
     });
 
     // 4. Mốc chữ ký điện tử
-    signatures.forEach(sig => {
+    signatures.forEach((sig) => {
       events.push({
         id: `evt-sig-${sig.id}`,
         timestamp: sig.signedAt,
@@ -171,8 +175,8 @@ export const Batch360Page: React.FC = () => {
         details: {
           'Vai trò': sig.role,
           'Mã chữ ký': sig.id,
-          'Ý nghĩa': sig.meaning
-        }
+          'Ý nghĩa': sig.meaning,
+        },
       });
     });
 
@@ -186,7 +190,9 @@ export const Batch360Page: React.FC = () => {
           <Square3Stack3DIcon className="w-8 h-8 text-ink-muted" />
         </div>
         <h2 className="text-xl font-bold text-ink">Không tìm thấy lô sản xuất</h2>
-        <p className="text-ink-muted text-sm mt-1">Lô hàng không tồn tại hoặc đã bị xóa khỏi hệ thống.</p>
+        <p className="text-ink-muted text-sm mt-1">
+          Lô hàng không tồn tại hoặc đã bị xóa khỏi hệ thống.
+        </p>
         <Link
           to="/batches"
           className="inline-flex items-center gap-2 mt-4 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-medium transition-colors shadow-sm"
@@ -214,11 +220,15 @@ export const Batch360Page: React.FC = () => {
               <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-blue-500/10 text-blue-700 dark:text-blue-400 border border-blue-500/20">
                 BATCH 360° QUALITY COCKPIT
               </span>
-              <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full ${
-                batch.status === 'RELEASED' ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20' :
-                batch.status === 'REJECTED' ? 'bg-rose-500/10 text-rose-700 dark:text-rose-400 border border-rose-500/20' :
-                'bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20'
-              }`}>
+              <span
+                className={`text-xs font-semibold px-2.5 py-0.5 rounded-full ${
+                  batch.status === 'RELEASED'
+                    ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20'
+                    : batch.status === 'REJECTED'
+                      ? 'bg-rose-500/10 text-rose-700 dark:text-rose-400 border border-rose-500/20'
+                      : 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20'
+                }`}
+              >
                 {batch.status}
               </span>
             </div>
@@ -226,7 +236,8 @@ export const Batch360Page: React.FC = () => {
               Lô {batch.batchNo} — {batch.product?.name || 'Sản phẩm'}
             </h1>
             <p className="text-xs text-ink-muted mt-0.5">
-              Hồ sơ chất lượng toàn diện, gia phả truy xuất nguồn gốc và lịch sử tuân thủ 21 CFR Part 11
+              Hồ sơ chất lượng toàn diện, gia phả truy xuất nguồn gốc và lịch sử tuân thủ 21 CFR
+              Part 11
             </p>
           </div>
         </div>
@@ -326,10 +337,10 @@ export const Batch360Page: React.FC = () => {
       )}
 
       {activeTab === 'TIMELINE' && (
-        <BatchAuditHistoryTimeline 
-          events={timelineEvents} 
-          signatures={signatures} 
-          deviations={deviations} 
+        <BatchAuditHistoryTimeline
+          events={timelineEvents}
+          signatures={signatures}
+          deviations={deviations}
         />
       )}
 
@@ -368,32 +379,34 @@ export const Batch360Page: React.FC = () => {
                 </thead>
                 <tbody className="divide-y divide-border">
                   {batchTestResults.map((tr) => {
-                    const passCount = ensureArray(tr.results).filter(r => r.isPass).length;
+                    const passCount = ensureArray(tr.results).filter((r) => r.isPass).length;
                     const totalCount = ensureArray(tr.results).length;
                     return (
                       <tr key={tr.id} className="hover:bg-surface-2/60 transition-colors">
                         <td className="p-3 font-medium text-ink">
                           {formatDateStandard(tr.testDate)}
                         </td>
-                        <td className="p-3 text-ink-soft">
-                          {tr.labName || 'Phòng Lab'}
-                        </td>
+                        <td className="p-3 text-ink-soft">{tr.labName || 'Phòng Lab'}</td>
                         <td className="p-3">
-                          <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${
-                            tr.overallStatus === 'PASS'
-                              ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20'
-                              : 'bg-rose-500/10 text-rose-700 dark:text-rose-400 border border-rose-500/20'
-                          }`}>
-                            {tr.overallStatus === 'PASS' ? <CheckCircleIcon className="w-3.5 h-3.5 text-emerald-600" /> : <XCircleIcon className="w-3.5 h-3.5 text-rose-600" />}
+                          <span
+                            className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${
+                              tr.overallStatus === 'PASS'
+                                ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20'
+                                : 'bg-rose-500/10 text-rose-700 dark:text-rose-400 border border-rose-500/20'
+                            }`}
+                          >
+                            {tr.overallStatus === 'PASS' ? (
+                              <CheckCircleIcon className="w-3.5 h-3.5 text-emerald-600" />
+                            ) : (
+                              <XCircleIcon className="w-3.5 h-3.5 text-rose-600" />
+                            )}
                             {tr.overallStatus === 'PASS' ? 'ĐẠT' : 'KHÔNG ĐẠT'}
                           </span>
                         </td>
                         <td className="p-3 text-ink-muted">
                           {passCount} / {totalCount} chỉ tiêu
                         </td>
-                        <td className="p-3 text-ink-muted max-w-xs truncate">
-                          {tr.notes || '—'}
-                        </td>
+                        <td className="p-3 text-ink-muted max-w-xs truncate">{tr.notes || '—'}</td>
                         <td className="p-3 text-right">
                           <Link
                             to={`/test-results/print/${tr.id}`}
@@ -414,4 +427,3 @@ export const Batch360Page: React.FC = () => {
     </div>
   );
 };
-

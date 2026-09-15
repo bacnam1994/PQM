@@ -23,6 +23,7 @@
 
     "products": {
       ".read": "auth != null",
+      ".indexOn": ["code", "status", "name"],
       "$item_id": {
         ".write": "auth != null && (auth.token.isAdmin === true || auth.token.role === 'ADMIN' || root.child('users/admins/' + auth.uid).exists() || root.child('users/' + auth.uid + '/role').val() === 'ADMIN')"
       }
@@ -30,7 +31,7 @@
 
     "batches": {
       ".read": "auth != null",
-      ".indexOn": ["createdAt", "status", "productId"],
+      ".indexOn": ["createdAt", "status", "productId", "batchNo", "mfgDate"],
       "$item_id": {
         ".write": "auth != null && (auth.token.isAdmin === true || auth.token.role === 'ADMIN' || root.child('users/admins/' + auth.uid).exists() || root.child('users/' + auth.uid + '/role').val() === 'ADMIN' || ((auth.token.role === 'QA' || root.child('users/' + auth.uid + '/role').val() === 'QA') && (newData.child('status').val() === 'RELEASED' || newData.child('status').val() === 'REJECTED' || data.child('status').val() !== 'RELEASED')) || ((auth.token.role === 'USER' || auth.token.role === 'PRODUCTION' || root.child('users/' + auth.uid + '/role').val() === 'USER' || root.child('users/' + auth.uid + '/role').val() === 'PRODUCTION') && newData.exists() && (!data.exists() || (data.child('status').val() !== 'RELEASED' && data.child('status').val() !== 'REJECTED')) && (newData.child('status').val() !== 'RELEASED')))"
       }
@@ -38,7 +39,7 @@
 
     "tccs": {
       ".read": "auth != null",
-      ".indexOn": ["productId"],
+      ".indexOn": ["productId", "status"],
       "$item_id": {
         ".write": "auth != null && (auth.token.isAdmin === true || auth.token.role === 'ADMIN' || auth.token.role === 'QA' || root.child('users/admins/' + auth.uid).exists() || root.child('users/' + auth.uid + '/role').val() === 'ADMIN' || root.child('users/' + auth.uid + '/role').val() === 'QA')"
       }
@@ -66,7 +67,7 @@
 
     "testResults": {
       ".read": "auth != null",
-      ".indexOn": ["createdAt", "batchId"],
+      ".indexOn": ["createdAt", "batchId", "overallStatus", "testDate"],
       "$item_id": {
         ".write": "auth != null && (auth.token.isAdmin === true || auth.token.role === 'ADMIN' || auth.token.role === 'QA' || root.child('users/admins/' + auth.uid).exists() || root.child('users/' + auth.uid + '/role').val() === 'ADMIN' || root.child('users/' + auth.uid + '/role').val() === 'QA' || ((auth.token.role === 'USER' || auth.token.role === 'LAB' || auth.token.role === 'QC' || root.child('users/' + auth.uid + '/role').val() === 'USER' || root.child('users/' + auth.uid + '/role').val() === 'LAB' || root.child('users/' + auth.uid + '/role').val() === 'QC') && newData.exists() && (!data.exists() || (data.child('overallStatus').val() !== 'APPROVED' && data.child('status').val() !== 'LOCKED'))))"
       }
@@ -105,6 +106,14 @@
       ".indexOn": ["targetId", "targetType", "timestamp"],
       "$sig_id": {
         ".write": "auth != null && !data.exists() && newData.exists() && (newData.child('signerId').val() === auth.uid || newData.child('signerEmail').val() === auth.token.email || auth.token.isAdmin === true || auth.token.role === 'ADMIN' || root.child('users/admins/' + auth.uid).exists() || root.child('users/' + auth.uid + '/role').val() === 'ADMIN')"
+      }
+    },
+
+    "testing_laboratories": {
+      ".read": "auth != null",
+      ".indexOn": ["code", "status"],
+      "$lab_id": {
+        ".write": "auth != null && (auth.token.isAdmin === true || auth.token.role === 'ADMIN' || root.child('users/admins/' + auth.uid).exists() || root.child('users/' + auth.uid + '/role').val() === 'ADMIN')"
       }
     }
   }

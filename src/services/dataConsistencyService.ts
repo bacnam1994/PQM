@@ -37,6 +37,11 @@ import {
   isValidTestResultForBatch,
   DataFreshnessState,
 } from '../domain/batch/batchIntegrityValidator';
+import {
+  detectTestResultStatusMismatch,
+  resolveTestResultStatus,
+  normalizeTestResultStatus,
+} from '../domain/test-result/testResultStatusResolver';
 
 export type ConsistencyIssueType =
   | 'ORPHAN_BATCH'
@@ -387,28 +392,44 @@ export const auditDataConsistency = (data: SystemDataSnapshot): ConsistencyRepor
   // =========================================================================
 
   // 3.1 Trạng thái Phiếu kiểm nghiệm không khớp với kết quả đánh giá chỉ tiêu
+  // Sử dụng Canonical Mismatch Detector (Data Freshness Aware + Normalization + Multi-Test Context)
   testResults.forEach((r) => {
     if (r.results && r.results.length > 0) {
       const match = testResultIndex.getBatchForTestResult(r);
       const rawBatch = match.batch;
       const boundTccs = rawBatch?.tccsId ? tccsMap.get(rawBatch.tccsId) : undefined;
-      const computedStatus = calculateOverallStatus(r.results, boundTccs || null);
+      const batchCandidateResults = rawBatch
+        ? [
+            ...(testResultIndex.primaryMap.get(rawBatch.id) || []),
+            ...(testResultIndex.legacyMap.get(rawBatch.id) || []),
+          ]
+        : undefined;
 
-      if (r.overallStatus !== computedStatus) {
+      const mismatch = detectTestResultStatusMismatch({
+        testResult: r,
+        batch: rawBatch,
+        boundTccs: boundTccs || null,
+        allTestResultsForBatch: batchCandidateResults,
+        dataFreshness: data.dataFreshness,
+      });
+
+      if (mismatch.shouldAlert && mismatch.hasMismatch) {
         issues.push({
           id: `status_mismatch_test_${r.id}`,
           type: 'TEST_RESULT_STATUS_MISMATCH',
           category: 'LOGICAL_STATUS_INCONSISTENCY',
-          severity: 'CRITICAL',
+          severity: mismatch.alertType || 'CRITICAL',
           title: `Sai lệch Đạt/Không Đạt phiếu kiểm nghiệm: ${r.labName}`,
-          description: `Phiếu kiểm nghiệm (Lô: ${rawBatch?.batchNo || r.batchId}) đang lưu là "${r.overallStatus}" nhưng tính toán theo các chỉ tiêu thực tế là "${computedStatus}".`,
+          description: `Phiếu kiểm nghiệm (Lô: ${rawBatch?.batchNo || r.batchId}) đang lưu là "${mismatch.actualStatus}" nhưng tính toán theo các chỉ tiêu thực tế là "${mismatch.expectedStatus}".`,
           entityType: 'TEST_RESULT',
           entityId: r.id,
           entityName: `${r.labName} - ${rawBatch?.batchNo || ''}`,
-          suggestedAction: `Cập nhật lại trạng thái phiếu thành "${computedStatus}".`,
-          autoHealable: true,
+          suggestedAction:
+            mismatch.suggestedAction ||
+            `Cập nhật lại trạng thái phiếu thành "${mismatch.expectedStatus}".`,
+          autoHealable: mismatch.isAutoHealable,
           autoHealAction: 'FIX_TEST_STATUS',
-          healPayload: { testResultId: r.id, correctStatus: computedStatus },
+          healPayload: mismatch.autoHealPayload,
         });
       }
     }

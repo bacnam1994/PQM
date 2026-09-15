@@ -18,6 +18,7 @@
 import { Batch, TestResult, TCCS } from '../../types';
 import { BatchTestResolutionResult } from './batchTestResultResolver';
 import { calculateOverallStatus } from '../../utils/evaluation';
+import { resolveTestResultStatus } from '../test-result/testResultStatusResolver';
 
 export type BatchIntegrityStatus =
   | 'PASS'
@@ -183,12 +184,15 @@ export function evaluateBatchReleaseIntegrity(
         ? calculateOverallStatus(consolidatedResults, boundTccs || null)
         : undefined;
 
-    const hasPassTest = validPrimary.some((t) => t.overallStatus === 'PASS');
-    const isLatestPass = latestTest.overallStatus === 'PASS' || consolidatedStatus === 'PASS';
+    const hasPassTest = validPrimary.some((t) => resolveTestResultStatus(t) === 'PASS');
+    const isLatestPass =
+      resolveTestResultStatus(latestTest) === 'PASS' || consolidatedStatus === 'PASS';
 
     if (hasPassTest || isLatestPass) {
       // ĐẠT: Có ít nhất 1 phiếu kiểm nghiệm đạt hoặc hợp nhất đạt
-      const validPassCount = validPrimary.filter((t) => t.overallStatus === 'PASS').length;
+      const validPassCount = validPrimary.filter(
+        (t) => resolveTestResultStatus(t) === 'PASS'
+      ).length;
       return {
         batchId: batch.id,
         batchNo: batch.batchNo,
@@ -238,7 +242,7 @@ export function evaluateBatchReleaseIntegrity(
       candidateCount: resolution.legacyResults.length,
       primaryCount: 0,
       legacyCount: resolution.legacyResults.length,
-      validPassCount: legacyValid.filter((r) => r.overallStatus === 'PASS').length,
+      validPassCount: legacyValid.filter((r) => resolveTestResultStatus(r) === 'PASS').length,
       matchedTestIds: resolution.legacyResults.map((r) => r.id),
       relationshipType: 'LEGACY',
       summaryMessage: `Lô "${batch.batchNo}" đã có ${resolution.legacyResults.length} phiếu kiểm nghiệm nhưng liên kết qua số lô (Legacy) thay vì ID kỹ thuật.`,

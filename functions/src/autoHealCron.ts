@@ -90,17 +90,30 @@ export async function runAutoHealDatabase(db: admin.database.Database): Promise<
         );
       }
 
-      // Kiểm tra overallStatus logic
-      if (Array.isArray(trVal.results) && trVal.results.length > 0) {
-        const hasFailedCriterion = trVal.results.some((r: any) => r && r.isPass === false);
-        const expectedStatus = hasFailedCriterion ? 'FAIL' : 'PASS';
-        if (trVal.overallStatus !== expectedStatus) {
-          updates[`testResults/${trId}/overallStatus`] = expectedStatus;
-          summary.testStatusCorrected++;
-          summary.details.push(
-            `Tự động sửa trạng thái Phiếu KN [${trVal.reportNumber || trId}] từ ${trVal.overallStatus} sang ${expectedStatus}`
-          );
-        }
+      // Kiểm tra overallStatus logic: Chỉ chuẩn hóa định dạng chuỗi (Normalization) an toàn
+      const rawStatus = trVal.overallStatus || trVal.status;
+      const strUpper = String(rawStatus || '')
+        .trim()
+        .toUpperCase();
+      const isVietnamesePass = strUpper === 'ĐẠT' || strUpper === 'DAT' || strUpper === 'PASSED';
+      const isVietnameseFail =
+        strUpper === 'KHÔNG ĐẠT' ||
+        strUpper === 'KHONG DAT' ||
+        strUpper === 'KHONG_DAT' ||
+        strUpper === 'FAILED';
+
+      if (isVietnamesePass) {
+        updates[`testResults/${trId}/overallStatus`] = 'PASS';
+        summary.testStatusCorrected++;
+        summary.details.push(
+          `Tự động chuẩn hóa định dạng trạng thái Phiếu KN [${trVal.reportNumber || trId}] từ ${trVal.overallStatus} sang PASS`
+        );
+      } else if (isVietnameseFail) {
+        updates[`testResults/${trId}/overallStatus`] = 'FAIL';
+        summary.testStatusCorrected++;
+        summary.details.push(
+          `Tự động chuẩn hóa định dạng trạng thái Phiếu KN [${trVal.reportNumber || trId}] từ ${trVal.overallStatus} sang FAIL`
+        );
       }
     }
 

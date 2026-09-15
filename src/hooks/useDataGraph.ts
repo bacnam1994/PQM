@@ -7,6 +7,7 @@ import {
   useTCCSListQuery,
   useCriteriaAliasesQuery,
   useTestResultsQuery,
+  useTestingLaboratoriesQuery,
 } from './queries';
 import {
   Batch,
@@ -100,8 +101,8 @@ export const useDataGraph = () => {
   const { data: rawRawMaterials = EMPTY_ARRAY } = useRawMaterialsQuery();
   const { data: rawCriteriaAliases = EMPTY_ARRAY } = useCriteriaAliasesQuery();
   const rawAllTestResults = rawTestResults;
-  const testingLaboratories =
-    useAppStore((state) => state.testingLaboratories) || DEFAULT_TESTING_LABORATORIES;
+  const { data: testingLaboratories = DEFAULT_TESTING_LABORATORIES } =
+    useTestingLaboratoriesQuery();
 
   // ==========================================
   // 1. PRIMARY MAPS (By ID & Unique Keys) - O(N)

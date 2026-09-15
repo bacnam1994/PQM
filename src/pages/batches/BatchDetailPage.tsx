@@ -32,8 +32,7 @@ import { DeviationReportModal } from '../../components/features/DeviationReportM
 import { BatchGenealogyModal } from '../../components/features/BatchGenealogyModal';
 import { ESignatureModal } from '../../components/features/ESignatureModal';
 import { ElectronicSignature } from '../../types/signature';
-import { QualityDeviation } from '../../types/deviation';
-import { firebaseDeviationRepository } from '../../repositories/firebase/FirebaseDeviationRepository';
+import { useDeviationsByBatchQuery } from '../../hooks/queries/useDeviationQueries';
 import { Surface, PageHeader, StatusBadge } from '../../components/ui';
 
 // Helper tính tiến độ lô
@@ -142,7 +141,7 @@ const BatchDetailPage = () => {
   const [deviationData, setDeviationData] = useState<any>(null);
   const [isGenealogyOpen, setIsGenealogyOpen] = useState(false);
   const [isSignReleaseOpen, setIsSignReleaseOpen] = useState(false);
-  const [batchDeviations, setBatchDeviations] = useState<QualityDeviation[]>([]);
+  const { data: batchDeviations = [] } = useDeviationsByBatchQuery(id);
 
   const batch = useMemo(() => batches.find((b) => b.id === id), [batches, id]);
   const resolver = useCriteriaResolver((batch as any)?.tccs);
@@ -302,11 +301,6 @@ const BatchDetailPage = () => {
         .then((res) => setViewBatchResults(res))
         .catch((err) => console.error(err))
         .finally(() => setIsLoadingHistory(false));
-
-      firebaseDeviationRepository
-        .findByBatchId(id)
-        .then((devs) => setBatchDeviations(devs || []))
-        .catch((err) => console.error('Lỗi nạp sai lệch của lô:', err));
     }
   }, [id]);
 

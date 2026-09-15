@@ -11,6 +11,7 @@ vi.mock('./queries', () => ({
   useProductFormulasQuery: vi.fn(),
   useRawMaterialsQuery: vi.fn(),
   useCriteriaAliasesQuery: vi.fn(),
+  useTestingLaboratoriesQuery: vi.fn(() => ({ data: [] })),
 }));
 
 describe('Phase 5: Data Graph & Indexing', () => {

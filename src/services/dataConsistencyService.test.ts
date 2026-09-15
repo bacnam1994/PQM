@@ -585,4 +585,115 @@ describe('dataConsistencyService - Data Linkage & Consistency Engine', () => {
     expect(releasedIssue).toBeUndefined();
     expect(report.criticalCount).toBe(0);
   });
+
+  it('12. Regression Test: Phiếu kiểm nghiệm có overallStatus lưu dạng tiếng Việt "Đạt" KHÔNG tạo cảnh báo false positive "Sai lệch Đạt/Không Đạt"', () => {
+    const testWithVietnamesePass: any = {
+      id: 'tr_vietnamese_pass',
+      batchId: sampleBatch.id,
+      labName: 'Trung tâm Kiểm nghiệm CASE',
+      testDate: '2024-01-05',
+      overallStatus: 'Đạt', // Lưu tiếng Việt "Đạt" thay vì "PASS"
+      results: [
+        { criteriaName: 'Định lượng Ginkgo Biloba', value: 100, isPass: true, unit: 'mg/viên' },
+      ],
+      createdAt: '2024-01-05',
+    };
+
+    const data: SystemDataSnapshot = {
+      products: [sampleProduct],
+      rawMaterials: [sampleRawMaterial],
+      tccsList: [sampleTCCS],
+      productFormulas: [sampleFormula],
+      batches: [sampleBatch],
+      testResults: [testWithVietnamesePass],
+      dataFreshness: {
+        isTestResultsLoading: false,
+        testResultsLoaded: true,
+      },
+    };
+
+    const report = auditDataConsistency(data);
+    const statusMismatch = report.issues.find((i) => i.type === 'TEST_RESULT_STATUS_MISMATCH');
+
+    // Không được coi "Đạt" là sai lệch so với PASS
+    expect(statusMismatch).toBeUndefined();
+  });
+
+  it('13. Data Freshness Guard: Khi isTestResultsLoading=true, KHÔNG tạo false positive TEST_RESULT_STATUS_MISMATCH', () => {
+    const incompleteLoadingTest: any = {
+      id: 'tr_incomplete',
+      batchId: sampleBatch.id,
+      labName: 'Lab Y',
+      testDate: '2024-01-05',
+      overallStatus: 'PASS',
+      results: [
+        { criteriaName: 'Định lượng Ginkgo Biloba', value: 80, isPass: false, unit: 'mg/viên' },
+      ],
+      createdAt: '2024-01-05',
+    };
+
+    const data: SystemDataSnapshot = {
+      products: [sampleProduct],
+      rawMaterials: [sampleRawMaterial],
+      tccsList: [sampleTCCS],
+      productFormulas: [sampleFormula],
+      batches: [sampleBatch],
+      testResults: [incompleteLoadingTest],
+      dataFreshness: {
+        isTestResultsLoading: true,
+        testResultsLoaded: false,
+      },
+    };
+
+    const report = auditDataConsistency(data);
+    const statusMismatch = report.issues.find((i) => i.type === 'TEST_RESULT_STATUS_MISMATCH');
+
+    expect(statusMismatch).toBeUndefined();
+  });
+
+  it('14. Multiple Test Results: Khi có phiếu kiểm nghiệm cũ FAIL nhưng có phiếu mới FINAL=PASS, không tạo cảnh báo sai lệch cho phiếu đạt', () => {
+    const testOldFail: any = {
+      id: 'tr_old_fail',
+      batchId: sampleBatch.id,
+      labName: 'Lab Internal',
+      testDate: '2024-01-02',
+      overallStatus: 'FAIL',
+      version: 1,
+      results: [
+        { criteriaName: 'Định lượng Ginkgo Biloba', value: 70, isPass: false, unit: 'mg/viên' },
+      ],
+      createdAt: '2024-01-02',
+    };
+
+    const testNewFinalPass: any = {
+      id: 'tr_new_pass',
+      batchId: sampleBatch.id,
+      labName: 'Quatest 3',
+      testDate: '2024-01-05',
+      overallStatus: 'PASS',
+      status: 'FINAL',
+      version: 2,
+      results: [
+        { criteriaName: 'Định lượng Ginkgo Biloba', value: 100, isPass: true, unit: 'mg/viên' },
+      ],
+      createdAt: '2024-01-05',
+    };
+
+    const data: SystemDataSnapshot = {
+      products: [sampleProduct],
+      rawMaterials: [sampleRawMaterial],
+      tccsList: [sampleTCCS],
+      productFormulas: [sampleFormula],
+      batches: [sampleBatch],
+      testResults: [testOldFail, testNewFinalPass],
+      dataFreshness: {
+        isTestResultsLoading: false,
+        testResultsLoaded: true,
+      },
+    };
+
+    const report = auditDataConsistency(data);
+    const releasedAlert = report.issues.find((i) => i.type === 'RELEASED_BATCH_NO_PASSING_TEST');
+    expect(releasedAlert).toBeUndefined();
+  });
 });
