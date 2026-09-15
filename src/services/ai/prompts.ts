@@ -275,11 +275,11 @@ export const buildExtractionPrompt = (
 
   const tccsSection = hasTccsContext
     ? `
-DANH SÁCH TÊN CHỈ TIÊU CHUẨN TRONG HỆ THỐNG (TCCS):
+DANH SÁCH TÊN CHỈ TIÊU CHUẨN TRONG HỆ THỐNG (TCCS & MASTER CRITERIA):
 ${tccsNames.map((n, i) => `  ${i + 1}. "${n}"`).join('\n')}
 
 NHIỆM VỤ MAP TÊN & SUY LUẬN SẮC BÉN:
-- Với mỗi chỉ tiêu đọc được từ phiếu, hãy thực hiện suy luận ngữ nghĩa và đối chiếu viết tắt, từ đồng nghĩa tiếng Anh/Việt để tìm tên tương ứng TRONG DANH SÁCH TCCS trên.
+- Với mỗi chỉ tiêu đọc được từ phiếu, hãy thực hiện suy luận ngữ nghĩa và đối chiếu viết tắt, từ đồng nghĩa tiếng Anh/Việt để tìm tên tương ứng TRONG DANH SÁCH CHỈ TIÊU CHUẨN (TCCS / Master Data) trên.
 - Áp dụng BẢNG QUY ƯỚC VÀ VIẾT TẮT để nhận diện thuật ngữ tương đương.
 - QUY TẮC NGUYÊN TỐ & DẠNG MUỐI (Elemental vs Salt form):
   * Nếu Phiếu ghi dạng nguyên tố (ví dụ: "Kẽm (Zn)", "Hàm lượng Kẽm", "Zinc") nhưng TCCS ghi dạng "Kẽm (Kẽm gluconat)" hoặc "Kẽm gluconat (tính theo Kẽm)" -> Map ngay về chỉ tiêu đó trong TCCS (confidence = "high").

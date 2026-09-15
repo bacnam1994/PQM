@@ -1,16 +1,167 @@
-import React from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   ChartBarSquareIcon,
   PlusIcon,
   XMarkIcon,
   ExclamationCircleIcon,
   ArrowDownRightIcon,
+  LinkIcon,
 } from '@heroicons/react/24/outline';
 import { CriterionType, Criterion } from '../../../types';
 import {
   DosageFormType,
   checkTCCSFormulaConflicts,
 } from '../../../services/ai/tccsAssistantService';
+import { useMasterCriteriaActiveQuery } from '../../../hooks/queries/useMasterCriterionQueries';
+import { MasterCriterion } from '../../../types';
+
+// ─── Autocomplete Combobox cho tên chỉ tiêu ──────────────────────────────────
+
+interface CriterionNameAutocompleteProps {
+  value: string;
+  onChange: (name: string, masterCriterionId?: string, defaultUnit?: string) => void;
+  placeholder?: string;
+  className?: string;
+}
+
+/**
+ * Autocomplete combobox cho ô "Tên chỉ tiêu" trong TCCS Form.
+ * - Gợi ý từ master_criteria/ (chỉ active) theo fuzzy match canonicalName.
+ * - Khi chọn: tự động điền masterCriterionId + defaultUnit.
+ * - Fallback: vẫn cho phép gõ tự do (tương thích ngược).
+ */
+const CriterionNameAutocomplete: React.FC<CriterionNameAutocompleteProps> = ({
+  value,
+  onChange,
+  placeholder = 'Tên chỉ tiêu',
+  className = '',
+}) => {
+  const { data: masterCriteria = [] } = useMasterCriteriaActiveQuery();
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState(value);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Sync nếu value thay đổi từ bên ngoài (VD: reset form)
+  useEffect(() => {
+    setQuery(value);
+  }, [value]);
+
+  // Đóng dropdown khi click ra ngoài
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  // Fuzzy filter: ưu tiên startsWith, sau đó includes
+  const suggestions = React.useMemo(() => {
+    if (!query || query.length < 1) return masterCriteria.slice(0, 8);
+    const q = query.toLowerCase().trim();
+    const starts = masterCriteria.filter((c) => c.canonicalName.toLowerCase().startsWith(q));
+    const includes = masterCriteria.filter(
+      (c) =>
+        !c.canonicalName.toLowerCase().startsWith(q) && c.canonicalName.toLowerCase().includes(q)
+    );
+    return [...starts, ...includes].slice(0, 8);
+  }, [query, masterCriteria]);
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const v = e.target.value;
+    setQuery(v);
+    setOpen(true);
+    // Gõ tự do → truyền lên không kèm masterCriterionId
+    onChange(v, undefined, undefined);
+  };
+
+  const handleSelect = useCallback(
+    (item: MasterCriterion) => {
+      setQuery(item.canonicalName);
+      setOpen(false);
+      onChange(item.canonicalName, item.id, item.defaultUnit);
+    },
+    [onChange]
+  );
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Escape') setOpen(false);
+    if (e.key === 'Enter' && suggestions.length === 1) {
+      e.preventDefault();
+      handleSelect(suggestions[0]);
+    }
+  };
+
+  return (
+    <div ref={containerRef} className={`relative ${className}`}>
+      <input
+        ref={inputRef}
+        type="text"
+        placeholder={placeholder}
+        value={query}
+        onChange={handleInputChange}
+        onFocus={() => setOpen(true)}
+        onKeyDown={handleKeyDown}
+        className="w-full px-3 py-2 bg-surface text-ink placeholder:text-ink-muted rounded-lg text-xs font-semibold outline-none border border-border shadow-xs focus:border-amber-400 dark:focus:border-amber-600 transition-colors"
+      />
+      {open && suggestions.length > 0 && (
+        <div className="absolute z-50 left-0 right-0 top-full mt-1 bg-surface border border-border rounded-xl shadow-xl overflow-hidden max-h-52 overflow-y-auto">
+          {suggestions.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              onMouseDown={() => handleSelect(item)}
+              className="w-full flex items-center gap-2.5 px-3 py-2.5 hover:bg-surface-2 transition-colors text-left group"
+            >
+              <LinkIcon className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+              <div className="flex flex-col min-w-0">
+                <span className="text-xs font-semibold text-ink truncate">
+                  {item.canonicalName}
+                </span>
+                <span className="text-[10px] text-ink-muted">
+                  {item.defaultUnit && <span className="font-mono">{item.defaultUnit}</span>}
+                  {item.defaultUnit && item.category && ' · '}
+                  {item.category && (
+                    <span
+                      className={
+                        item.category === 'SAFETY'
+                          ? 'text-rose-500'
+                          : item.category === 'MICROBIO'
+                            ? 'text-violet-500'
+                            : item.category === 'SENSORY'
+                              ? 'text-sky-500'
+                              : 'text-amber-600'
+                      }
+                    >
+                      {item.category}
+                    </span>
+                  )}
+                </span>
+              </div>
+            </button>
+          ))}
+          {/* Gợi ý tạo MasterCriterion mới nếu không match hoàn toàn */}
+          {query.trim() &&
+            !masterCriteria.some((c) => c.canonicalName.toLowerCase() === query.toLowerCase()) && (
+              <div className="px-3 py-2 border-t border-border">
+                <p className="text-[10px] text-ink-muted italic">
+                  💡 Không tìm thấy trong Master Data. Tên sẽ được lưu tự do (fallback).{' '}
+                  <a href="/criteria" className="text-emerald-600 hover:underline">
+                    Vào Master Data để tạo chuẩn hóa
+                  </a>
+                </p>
+              </div>
+            )}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ─── Props ────────────────────────────────────────────────────────────────────
 
 interface TccsMainCriteriaTableProps {
   mainCriteria: Criterion[];
@@ -43,6 +194,30 @@ export const TccsMainCriteriaTable: React.FC<TccsMainCriteriaTableProps> = ({
 }) => {
   const conflicts =
     productId && selectedFormula ? checkTCCSFormulaConflicts(mainCriteria, selectedFormula) : [];
+
+  /**
+   * Xử lý khi người dùng chọn tên từ Autocomplete.
+   * - Cập nhật name
+   * - Nếu có masterCriterionId: lưu FK + auto-điền unit từ defaultUnit
+   */
+  const handleNameChange = useCallback(
+    (index: number, name: string, masterCriterionId?: string, defaultUnit?: string) => {
+      onUpdateCriterion(index, 'name', name);
+      if (masterCriterionId) {
+        onUpdateCriterion(index, 'masterCriterionId', masterCriterionId);
+        // Auto-điền unit chỉ khi ô unit đang trống hoặc chưa chỉnh sửa
+        if (defaultUnit && !mainCriteria[index]?.unit) {
+          onUpdateCriterion(index, 'unit', defaultUnit);
+        }
+      } else {
+        // Gõ tự do → xóa FK cũ nếu có (tránh stale FK)
+        if (mainCriteria[index]?.masterCriterionId) {
+          onUpdateCriterion(index, 'masterCriterionId', undefined);
+        }
+      }
+    },
+    [onUpdateCriterion, mainCriteria]
+  );
 
   return (
     <div className="space-y-3">
@@ -130,6 +305,8 @@ export const TccsMainCriteriaTable: React.FC<TccsMainCriteriaTableProps> = ({
           c.max !== null &&
           Number(c.min) > Number(c.max);
 
+        const isLinked = !!c.masterCriterionId;
+
         return (
           <div
             key={i}
@@ -148,12 +325,26 @@ export const TccsMainCriteriaTable: React.FC<TccsMainCriteriaTableProps> = ({
                 <option value="NUMBER">Số</option>
                 <option value="TEXT">Chữ</option>
               </select>
-              <input
-                placeholder="Tên chỉ tiêu"
-                value={c.name}
-                onChange={(e) => onUpdateCriterion(i, 'name', e.target.value)}
-                className="flex-[2] px-3 py-2 bg-surface text-ink placeholder:text-ink-muted rounded-lg text-xs font-semibold outline-none border border-border shadow-xs"
-              />
+
+              {/* ── Autocomplete thay thế input text thô ── */}
+              <div className="flex-[2] relative">
+                <CriterionNameAutocomplete
+                  value={c.name}
+                  onChange={(name, masterCriterionId, defaultUnit) =>
+                    handleNameChange(i, name, masterCriterionId, defaultUnit)
+                  }
+                />
+                {/* Badge hiển thị khi đã liên kết Master */}
+                {isLinked && (
+                  <span
+                    className="absolute -top-1.5 right-1 inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400 border border-emerald-200/60 pointer-events-none"
+                    title={`Đã liên kết: ${c.masterCriterionId}`}
+                  >
+                    <LinkIcon className="w-2.5 h-2.5" /> Master
+                  </span>
+                )}
+              </div>
+
               <input
                 placeholder="ĐVT"
                 value={c.unit}

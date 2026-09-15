@@ -1,10 +1,17 @@
 import { Batch, TestResult, TCCS, ProductFormula, Product, Criterion } from '../../types';
 import { ensureArray, parseNumberFromText, formatDateStandard } from '../../utils';
+import { EVALUATION_RULE } from '../../utils/constants';
 import { isCriteriaMatch } from '../../utils/aiMapping';
+import { CriterionEvaluator } from '../../domain/evaluation/CriterionEvaluator';
+import { normalizeCriterionPassStatus } from '../../domain/test-result/testResultStatusResolver';
+import { normalizeName } from '../../services/criteriaAliasService';
 import { getApiKey, geminiService } from './geminiService';
 import { SchemaType } from '@google/generative-ai';
 
-export type ClearanceVerdict = 'READY_FOR_RELEASE' | 'CONDITIONAL_RELEASE' | 'HOLD_FOR_INVESTIGATION';
+export type ClearanceVerdict =
+  | 'READY_FOR_RELEASE'
+  | 'CONDITIONAL_RELEASE'
+  | 'HOLD_FOR_INVESTIGATION';
 
 export interface CriterionClearanceItem {
   criteriaName: string;
@@ -52,17 +59,19 @@ export const evaluateBatchQualityClearance = (
 
   // 1. Tập hợp các chỉ tiêu bắt buộc từ TCCS
   const requiredCriteriaList: Criterion[] = tccs
-    ? [...ensureArray(tccs.mainQualityCriteria), ...ensureArray(tccs.safetyCriteria)].filter(c => c && c.name && c.name.trim() !== '')
+    ? [...ensureArray(tccs.mainQualityCriteria), ...ensureArray(tccs.safetyCriteria)].filter(
+        (c) => c && c.name && c.name.trim() !== ''
+      )
     : [];
 
   // 2. Gom kết quả kiểm nghiệm của Lô
   const flatResults = batchTestResults
-    .filter(r => r.batchId === batchId)
-    .flatMap(r => ensureArray(r.results))
+    .filter((r) => r.batchId === batchId)
+    .flatMap((r) => ensureArray(r.results))
     .filter(Boolean);
 
   const testedMap = new Map<string, any>();
-  flatResults.forEach(res => {
+  flatResults.forEach((res) => {
     if (res && res.criteriaName) {
       testedMap.set(res.criteriaName.trim().toLowerCase(), res);
     }
@@ -77,7 +86,9 @@ export const evaluateBatchQualityClearance = (
   let passedCount = 0;
   let failedCount = 0;
 
-  requiredCriteriaList.forEach(crit => {
+  const rules = tccs?.alternateRules || [];
+
+  requiredCriteriaList.forEach((crit) => {
     const cName = crit.name.trim();
     // Tìm trong kết quả đã test
     let matchedRes = testedMap.get(cName.toLowerCase());
@@ -93,18 +104,92 @@ export const evaluateBatchQualityClearance = (
 
     const minNum = crit.min !== undefined && crit.min !== null ? Number(crit.min) : undefined;
     const maxNum = crit.max !== undefined && crit.max !== null ? Number(crit.max) : undefined;
-    const limitText = minNum !== undefined && maxNum !== undefined 
-      ? `${minNum} ~ ${maxNum}` 
-      : minNum !== undefined 
-      ? `≥ ${minNum}` 
-      : maxNum !== undefined 
-      ? `≤ ${maxNum}` 
-      : crit.expectedText || 'Theo TCCS';
+    const limitText =
+      minNum !== undefined && maxNum !== undefined
+        ? `${minNum} ~ ${maxNum}`
+        : minNum !== undefined
+          ? `≥ ${minNum}`
+          : maxNum !== undefined
+            ? `≤ ${maxNum}`
+            : crit.expectedText || 'Theo TCCS';
 
     if (!matchedRes) {
-      missingCriteria.push(cName);
+      // CONDITIONAL_CHECK: Kiểm tra xem chỉ tiêu chưa kiểm tra này có thuộc chỉ tiêu phụ được miễn kiểm không?
+      const condRuleWhereThisIsAlt = rules.find(
+        (r) =>
+          r.type === EVALUATION_RULE.CONDITIONAL_CHECK &&
+          (isCriteriaMatch(cName, r.alt, []) || normalizeName(cName) === normalizeName(r.alt))
+      );
+
+      let isExempted = false;
+      if (condRuleWhereThisIsAlt) {
+        const mainRes =
+          testedMap.get(condRuleWhereThisIsAlt.main.toLowerCase()) ||
+          Array.from(testedMap.values()).find((res) =>
+            isCriteriaMatch(condRuleWhereThisIsAlt.main, res.criteriaName, [])
+          );
+        if (mainRes && mainRes.value !== undefined && mainRes.value !== '') {
+          const isTriggered = CriterionEvaluator.checkRange(
+            condRuleWhereThisIsAlt.conditionValue || '',
+            String(mainRes.value)
+          );
+          if (isTriggered !== true) {
+            isExempted = true; // Điều kiện không kích hoạt -> Miễn kiểm theo Dược điển
+          }
+        }
+      }
+
+      if (!isExempted) {
+        missingCriteria.push(cName);
+      }
     } else {
-      const isPass = matchedRes.isPass !== false;
+      let isPass = normalizeCriterionPassStatus(matchedRes.isPass) !== false;
+
+      // Nếu rớt, kiểm tra xem có quy tắc alternateRules nào cứu không
+      if (!isPass) {
+        // 1. CONDITIONAL_CHECK: Nếu chỉ tiêu phụ này được miễn kiểm
+        const condRule = rules.find(
+          (r) =>
+            r.type === EVALUATION_RULE.CONDITIONAL_CHECK &&
+            (isCriteriaMatch(cName, r.alt, []) || normalizeName(cName) === normalizeName(r.alt))
+        );
+        if (condRule) {
+          const mainRes =
+            testedMap.get(condRule.main.toLowerCase()) ||
+            Array.from(testedMap.values()).find((res) =>
+              isCriteriaMatch(condRule.main, res.criteriaName, [])
+            );
+          if (mainRes && mainRes.value !== undefined && mainRes.value !== '') {
+            const isTriggered = CriterionEvaluator.checkRange(
+              condRule.conditionValue || '',
+              String(mainRes.value)
+            );
+            if (isTriggered !== true) {
+              isPass = true; // Được miễn kiểm
+            }
+          }
+        }
+
+        // 2. FAIL_RETRY: Nếu có chỉ tiêu thử lại đạt
+        if (!isPass) {
+          const retryRule = rules.find(
+            (r) =>
+              (!r.type || r.type === EVALUATION_RULE.FAIL_RETRY) &&
+              (isCriteriaMatch(cName, r.main, []) || normalizeName(cName) === normalizeName(r.main))
+          );
+          if (retryRule) {
+            const altRes =
+              testedMap.get(retryRule.alt.toLowerCase()) ||
+              Array.from(testedMap.values()).find((res) =>
+                isCriteriaMatch(retryRule.alt, res.criteriaName, [])
+              );
+            if (altRes && normalizeCriterionPassStatus(altRes.isPass) === true) {
+              isPass = true; // Đã được cứu bởi kết quả thử lại đạt
+            }
+          }
+        }
+      }
+
       if (isPass) passedCount++;
       else failedCount++;
 
@@ -141,7 +226,7 @@ export const evaluateBatchQualityClearance = (
         unit: crit.unit || matchedRes.unit,
         isPass,
         isNearLimit,
-        nearLimitWarning
+        nearLimitWarning,
       };
 
       testedItems.push(clearanceItem);
@@ -155,11 +240,16 @@ export const evaluateBatchQualityClearance = (
   let readinessScore = 100;
 
   if (requiredCriteriaList.length > 0) {
-    const testedRatio = (requiredCriteriaList.length - missingCriteria.length) / requiredCriteriaList.length;
+    const testedRatio =
+      (requiredCriteriaList.length - missingCriteria.length) / requiredCriteriaList.length;
     if (testedRatio < 1) {
       readinessScore -= Math.round((1 - testedRatio) * 40);
-      riskFactors.push(`Chưa kiểm tra đầy đủ ${missingCriteria.length}/${requiredCriteriaList.length} chỉ tiêu theo TCCS.`);
-      recommendations.push(`Cần bổ sung kết quả kiểm nghiệm cho các chỉ tiêu còn thiếu: ${missingCriteria.join(', ')}.`);
+      riskFactors.push(
+        `Chưa kiểm tra đầy đủ ${missingCriteria.length}/${requiredCriteriaList.length} chỉ tiêu theo TCCS.`
+      );
+      recommendations.push(
+        `Cần bổ sung kết quả kiểm nghiệm cho các chỉ tiêu còn thiếu: ${missingCriteria.join(', ')}.`
+      );
     }
   }
 
@@ -171,8 +261,12 @@ export const evaluateBatchQualityClearance = (
 
   if (nearLimitItems.length > 0) {
     readinessScore -= nearLimitItems.length * 5;
-    riskFactors.push(`Có ${nearLimitItems.length} chỉ tiêu đạt nhưng ở vùng ranh giới tiệm cận ngưỡng giới hạn.`);
-    recommendations.push(`Theo dõi chặt chẽ độ ổn định các chỉ tiêu cận ngưỡng: ${nearLimitItems.map(i => i.criteriaName).join(', ')}.`);
+    riskFactors.push(
+      `Có ${nearLimitItems.length} chỉ tiêu đạt nhưng ở vùng ranh giới tiệm cận ngưỡng giới hạn.`
+    );
+    recommendations.push(
+      `Theo dõi chặt chẽ độ ổn định các chỉ tiêu cận ngưỡng: ${nearLimitItems.map((i) => i.criteriaName).join(', ')}.`
+    );
   }
 
   readinessScore = Math.max(0, Math.min(100, readinessScore));
@@ -213,7 +307,7 @@ export const evaluateBatchQualityClearance = (
     riskFactors,
     recommendations,
     executiveSummary: summary,
-    generatedAt: new Date().toISOString()
+    generatedAt: new Date().toISOString(),
   };
 };
 
@@ -223,7 +317,8 @@ const CLEARANCE_AI_SCHEMA = {
   properties: {
     executiveSummary: {
       type: SchemaType.STRING,
-      description: 'Đoạn văn ngắn 3-4 câu nhận xét tổng quan chất lượng lô và khuyến nghị xuất xưởng chính thức theo tiêu chuẩn GMP-WHO',
+      description:
+        'Đoạn văn ngắn 3-4 câu nhận xét tổng quan chất lượng lô và khuyến nghị xuất xưởng chính thức theo tiêu chuẩn GMP-WHO',
     },
     riskFactors: {
       type: SchemaType.ARRAY,
@@ -257,7 +352,7 @@ Hãy thẩm định và đưa ra nhận xét chuyên môn cho hồ sơ lô sản
 - Số lô: ${dossier.batchNo} (Ngày SX: ${dossier.mfgDate || 'N/A'}, Hạn dùng: ${dossier.expDate || 'N/A'})
 - Tổng số chỉ tiêu TCCS: ${dossier.totalRequiredCriteria} (Đã kiểm: ${dossier.testedCriteriaCount}, Chưa kiểm: ${dossier.missingCriteria.join(', ') || '0'})
 - Kết quả: ${dossier.passedCount} Đạt / ${dossier.failedCount} Không Đạt
-- Chỉ tiêu sát ngưỡng giới hạn: ${dossier.nearLimitItems.map(i => `${i.criteriaName}: ${i.actualValue} (Ngưỡng: ${i.expectedLimit})`).join('; ') || 'Không có'}
+- Chỉ tiêu sát ngưỡng giới hạn: ${dossier.nearLimitItems.map((i) => `${i.criteriaName}: ${i.actualValue} (Ngưỡng: ${i.expectedLimit})`).join('; ') || 'Không có'}
 - Điểm đánh giá sẵn sàng: ${dossier.readinessScore}/100
 - Đề xuất sơ bộ: ${dossier.verdict}
 
@@ -272,8 +367,14 @@ Hãy viết nhận xét chuyên môn, đưa ra các rủi ro tiềm ẩn và cá
     return {
       ...dossier,
       executiveSummary: parsed.executiveSummary || dossier.executiveSummary,
-      riskFactors: Array.isArray(parsed.riskFactors) && parsed.riskFactors.length > 0 ? parsed.riskFactors : dossier.riskFactors,
-      recommendations: Array.isArray(parsed.recommendations) && parsed.recommendations.length > 0 ? parsed.recommendations : dossier.recommendations
+      riskFactors:
+        Array.isArray(parsed.riskFactors) && parsed.riskFactors.length > 0
+          ? parsed.riskFactors
+          : dossier.riskFactors,
+      recommendations:
+        Array.isArray(parsed.recommendations) && parsed.recommendations.length > 0
+          ? parsed.recommendations
+          : dossier.recommendations,
     };
   } catch (err) {
     console.warn('AI clearance enrichment error:', err);

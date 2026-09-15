@@ -14,3 +14,4 @@ export * from './approvalWorkflow';
 export * from './changeControl';
 export * from './operational';
 export * from './laboratory';
+export * from './masterData';

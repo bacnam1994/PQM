@@ -103,4 +103,48 @@ describe('AnalyticsAggregationService - Enterprise SPC & Trend Aggregation', () 
     expect(report.downsampledPoints?.length).toBe(500);
     expect(elapsed).toBeLessThan(600); // 50.000 điểm tính toán toàn diện dưới 600ms khi chạy full test suite
   });
+
+  describe('Criteria Grouping (MasterCriterion Architecture)', () => {
+    it('ưu tiên masterCriterionId khi có để chống phân mảnh tên text', () => {
+      const itemWithMaster = {
+        masterCriterionId: 'mc-do-am-01',
+        criteriaName: 'Độ ẩm (105°C)',
+      };
+      const itemWithMasterTypo = {
+        masterCriterionId: 'mc-do-am-01',
+        criteriaName: 'Độ  Ẩm (LOD) ',
+      };
+
+      const key1 = AnalyticsAggregationService.getCriteriaGroupKey(itemWithMaster);
+      const key2 = AnalyticsAggregationService.getCriteriaGroupKey(itemWithMasterTypo);
+
+      expect(key1).toBe('master:mc-do-am-01');
+      expect(key1).toBe(key2);
+    });
+
+    it('fallback về normalizeName(name) khi không có masterCriterionId', () => {
+      const item1 = { criteriaName: 'Hàm Lượng Curcumin: ' };
+      const item2 = { criteriaName: 'hàm lượng curcumin' };
+
+      const key1 = AnalyticsAggregationService.getCriteriaGroupKey(item1);
+      const key2 = AnalyticsAggregationService.getCriteriaGroupKey(item2);
+
+      expect(key1).toBe('text:hàm lượng curcumin');
+      expect(key1).toBe(key2);
+    });
+
+    it('groupSeriesByCriteria gom nhóm chính xác các bản ghi', () => {
+      const items = [
+        { masterCriterionId: 'mc-1', criteriaName: 'Độ ẩm', value: 5.2 },
+        { masterCriterionId: 'mc-1', criteriaName: 'Độ ẩm sấy khô', value: 5.4 },
+        { criteriaName: 'Định lượng', value: 99.5 },
+        { criteriaName: 'định lượng ', value: 100.1 },
+      ];
+
+      const grouped = AnalyticsAggregationService.groupSeriesByCriteria(items);
+      expect(grouped.size).toBe(2);
+      expect(grouped.get('master:mc-1')?.length).toBe(2);
+      expect(grouped.get('text:định lượng')?.length).toBe(2);
+    });
+  });
 });

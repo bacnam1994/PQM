@@ -52,3 +52,10 @@ export const DEVIATION_QUERY_KEYS = {
   paginated: (options?: any, filters?: any) =>
     ['deviations', 'paginated', options, filters] as const,
 };
+
+export const MASTER_CRITERION_QUERY_KEYS = {
+  all: ['masterCriteria'] as const,
+  detail: (id: string) => ['masterCriteria', id] as const,
+  active: ['masterCriteria', 'active'] as const,
+  byCategory: (category: string) => ['masterCriteria', 'category', category] as const,
+};

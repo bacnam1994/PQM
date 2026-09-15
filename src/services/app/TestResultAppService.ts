@@ -15,6 +15,10 @@ import { can } from '../permissionService';
 import { logAuditAction } from '../auditService';
 import { validateOptimisticLock, nextVersion } from '../../utils/concurrency';
 import { buildEvaluationSnapshot } from '../../domain/evaluation';
+import {
+  resolveTestResultStatus,
+  calculateOverallStatusForTestResult,
+} from '../../domain/test-result/testResultStatusResolver';
 
 export class TestResultAppService {
   constructor(
@@ -68,7 +72,7 @@ export class TestResultAppService {
     await this.repo.save(cleanResult);
 
     // Chuẩn GMP: Tự động ghi nhận Hồ sơ Sai lệch (Deviation/OOS) khi kết quả kiểm nghiệm không đạt (FAIL)
-    if (cleanResult.overallStatus === 'FAIL') {
+    if (resolveTestResultStatus(cleanResult) === 'FAIL') {
       try {
         await this.deviationService.autoLogFromOOS(cleanResult, options?.batch, currentUser);
       } catch (err) {
@@ -116,10 +120,12 @@ export class TestResultAppService {
       throw new Error('Ngày kiểm nghiệm không được để trống.');
     }
 
-    let evaluatedStatus: 'PASS' | 'FAIL' = testResult.overallStatus || 'PASS';
+    let evaluatedStatus: 'PASS' | 'FAIL' =
+      resolveTestResultStatus(testResult) === 'FAIL' ? 'FAIL' : 'PASS';
     if (testResult.results && testResult.results.length > 0) {
-      const hasFailedEntry = testResult.results.some((r) => r.isPass === false);
-      evaluatedStatus = hasFailedEntry ? 'FAIL' : 'PASS';
+      const calc = calculateOverallStatusForTestResult(testResult);
+      if (calc === 'FAIL') evaluatedStatus = 'FAIL';
+      else if (calc === 'PASS') evaluatedStatus = 'PASS';
     }
 
     const newVersion = nextVersion(oldTestResult?.version ?? testResult.version);
@@ -139,7 +145,7 @@ export class TestResultAppService {
     await this.repo.update(cleanResult);
 
     // Chuẩn GMP: Tự động ghi nhận Hồ sơ Sai lệch (Deviation/OOS) khi kết quả kiểm nghiệm cập nhật thành FAIL
-    if (cleanResult.overallStatus === 'FAIL') {
+    if (resolveTestResultStatus(cleanResult) === 'FAIL') {
       try {
         await this.deviationService.autoLogFromOOS(cleanResult, undefined, currentUser);
       } catch (err) {

@@ -39,6 +39,7 @@ import {
   resolveTestResultStatus,
   resolveAuthoritativeTestResultForBatch,
   detectTestResultStatusMismatch,
+  calculateOverallStatusForTestResult,
   CanonicalTestStatus,
 } from '../test-result/testResultStatusResolver';
 import { isValidTestResultForBatch } from '../batch/batchIntegrityValidator';
@@ -140,25 +141,55 @@ export class CanonicalStatusResolver {
 
   /**
    * Bước 4: Tính trạng thái chuẩn của Phiếu kiểm nghiệm (Calculate Canonical Test Status)
+   * Tôn trọng AlternateRuleEvaluator và xử lý đúng các chỉ tiêu cảm quan/thông tin (isPass: null)
    */
-  public static calculateCanonicalTestStatus(testResult: TestResult): TestResultStatus {
+  public static calculateCanonicalTestStatus(
+    testResult: TestResult,
+    boundTccs?: TCCS | null,
+    allBatchResults?: TestResult[]
+  ): TestResultStatus {
     const norm = normalizeTestResultStatus(testResult.overallStatus);
-    const { total, fail, pending, allPass } = this.evaluateCriteria(testResult.results || []);
+    const { total, pass, fail, pending, allPass } = this.evaluateCriteria(testResult.results || []);
 
     if (total === 0) {
       return norm === 'PENDING' ? 'PENDING' : 'INVALID';
     }
 
+    // 1. Nếu có TCCS / alternateRules, phân giải qua calculateOverallStatusForTestResult
+    // để hỗ trợ đầy đủ các quy tắc thay thế (FAIL_RETRY, CONDITIONAL_CHECK)
+    if (boundTccs?.alternateRules && boundTccs.alternateRules.length > 0) {
+      const overallFromRules = calculateOverallStatusForTestResult(
+        testResult,
+        boundTccs,
+        allBatchResults
+      );
+      if (overallFromRules === 'PASS') {
+        return 'PASS';
+      }
+      if (overallFromRules === 'FAIL') {
+        return 'FAIL';
+      }
+    }
+
+    // 2. Nếu có chỉ tiêu không đạt thực sự
     if (fail > 0) {
       return 'FAIL';
     }
 
-    if (pending > 0) {
-      return 'PENDING';
-    }
-
+    // 3. Nếu 100% chỉ tiêu đều pass
     if (allPass) {
       return 'PASS';
+    }
+
+    // 4. Nếu fail === 0, có ít nhất 1 chỉ tiêu đạt (pass > 0), và phiếu được xác nhận là PASS:
+    // (Xử lý các phiếu có chỉ tiêu cảm quan / thông tin dạng text có isPass: null)
+    if (fail === 0 && pass > 0 && (norm === 'PASS' || pending === 0)) {
+      return 'PASS';
+    }
+
+    // 5. Nếu chưa có chỉ tiêu nào được kiểm nghiệm hoặc norm là PENDING
+    if (pending > 0 && (pass === 0 || norm === 'PENDING')) {
+      return 'PENDING';
     }
 
     return norm === 'PASS' ? 'PASS' : norm === 'FAIL' ? 'FAIL' : 'PENDING';
@@ -166,6 +197,7 @@ export class CanonicalStatusResolver {
 
   /**
    * Bước 5: Tính trạng thái chất lượng chuẩn của Lô sản xuất (Calculate Canonical Batch Quality Status)
+   * Hỗ trợ hợp nhất đa phiếu (Hóa lý vs Vi sinh)
    */
   public static calculateCanonicalBatchQualityStatus(
     batch: Batch,
@@ -190,13 +222,33 @@ export class CanonicalStatusResolver {
       return 'NOT_TESTED';
     }
 
-    // Chọn phiếu authoritative
+    // Đánh giá từng phiếu kiểm nghiệm của lô
+    const testStatuses = validTests.map((tr) =>
+      this.calculateCanonicalTestStatus(tr, boundTccs, validTests)
+    );
+
+    // Nếu có bất kỳ phiếu nào FAIL thực sự -> Lô FAIL
+    if (testStatuses.some((s) => s === 'FAIL')) {
+      return 'FAIL';
+    }
+
+    // Nếu tất cả phiếu đều PASS -> Lô PASS
+    if (testStatuses.length > 0 && testStatuses.every((s) => s === 'PASS')) {
+      return 'PASS';
+    }
+
+    // Nếu có phiếu đang PENDING/TESTING
+    if (testStatuses.some((s) => s === 'PENDING')) {
+      return 'TESTING';
+    }
+
+    // Chọn phiếu authoritative đại diện
     const authoritative = this.selectAuthoritativeResult(batch, validTests);
     if (!authoritative) {
       return 'INCOMPLETE';
     }
 
-    const testStatus = this.calculateCanonicalTestStatus(authoritative);
+    const testStatus = this.calculateCanonicalTestStatus(authoritative, boundTccs, validTests);
 
     if (testStatus === 'PASS') {
       return 'PASS';
@@ -230,7 +282,7 @@ export class CanonicalStatusResolver {
     let criteriaSummary = { total: 0, pass: 0, fail: 0, pending: 0 };
 
     if (authoritative) {
-      testStatus = this.calculateCanonicalTestStatus(authoritative);
+      testStatus = this.calculateCanonicalTestStatus(authoritative, boundTccs, testResults);
       const evalCrit = this.evaluateCriteria(authoritative.results || []);
       criteriaSummary = {
         total: evalCrit.total,

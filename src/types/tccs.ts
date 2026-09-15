@@ -18,6 +18,12 @@ export interface Criterion {
   declaredContent?: string | number;
   formulaIngredientId?: string;
   calculationBasis?: 'DECLARED' | 'ELEMENTAL';
+  /**
+   * Khóa ngoại liên kết về MasterCriterion (`master_criteria/`).
+   * Optional — tương thích ngược với dữ liệu TCCS cũ không có liên kết.
+   * Khi có, Analytics sẽ Group By ID này thay vì chuỗi `name`.
+   */
+  masterCriterionId?: string;
 }
 
 export interface SensoryCharacteristics {

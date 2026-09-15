@@ -10,7 +10,9 @@ vi.mock('../auditService', () => ({
 
 vi.mock('../signatureService', () => ({
   signatureService: {
-    verifySignatureIntegrity: vi.fn().mockImplementation(async (sig: any) => sig?.checksum === 'valid-checksum'),
+    verifySignatureIntegrity: vi
+      .fn()
+      .mockImplementation(async (sig: any) => sig?.checksum === 'valid-checksum'),
   },
 }));
 
@@ -59,22 +61,30 @@ describe('BatchAppService', () => {
 
     it('should reject missing batchNo', async () => {
       const invalid = { ...validBatch, batchNo: '' };
-      await expect(service.createBatch(invalid, prodUser)).rejects.toThrow(/Số lô sản xuất không được để trống/);
+      await expect(service.createBatch(invalid, prodUser)).rejects.toThrow(
+        /Số lô sản xuất không được để trống/
+      );
     });
 
     it('should reject missing productId', async () => {
       const invalid = { ...validBatch, productId: '' };
-      await expect(service.createBatch(invalid, prodUser)).rejects.toThrow(/Vui lòng chọn sản phẩm/);
+      await expect(service.createBatch(invalid, prodUser)).rejects.toThrow(
+        /Vui lòng chọn sản phẩm/
+      );
     });
 
     it('should reject duplicate batchNo within existing batches', async () => {
       const existing: Batch[] = [{ ...validBatch, id: 'batch-old', batchNo: 'LOT-2026-001' }];
-      await expect(service.createBatch(validBatch, prodUser, existing)).rejects.toThrow(/đã tồn tại/);
+      await expect(service.createBatch(validBatch, prodUser, existing)).rejects.toThrow(
+        /đã tồn tại/
+      );
     });
 
     it('should reject expDate earlier than mfgDate', async () => {
       const invalid = { ...validBatch, mfgDate: '2026-06-01', expDate: '2026-01-01' };
-      await expect(service.createBatch(invalid, prodUser)).rejects.toThrow(/Hạn dùng không được trước ngày sản xuất/);
+      await expect(service.createBatch(invalid, prodUser)).rejects.toThrow(
+        /Hạn dùng không được trước ngày sản xuất/
+      );
     });
 
     it('should reject negative yields', async () => {
@@ -84,12 +94,14 @@ describe('BatchAppService', () => {
 
     it('should successfully create batch for authorized user and set default version 1', async () => {
       await service.createBatch(validBatch, prodUser);
-      expect(mockRepo.save).toHaveBeenCalledWith(expect.objectContaining({
-        id: 'batch-001',
-        batchNo: 'LOT-2026-001',
-        status: 'PENDING',
-        version: 1,
-      }));
+      expect(mockRepo.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: 'batch-001',
+          batchNo: 'LOT-2026-001',
+          status: 'PENDING',
+          version: 1,
+        })
+      );
     });
 
     it('should capture schema snapshots (TCCS & Formula) during batch creation', async () => {
@@ -101,19 +113,23 @@ describe('BatchAppService', () => {
         productFormula: mockFormula,
       });
 
-      expect(mockRepo.save).toHaveBeenCalledWith(expect.objectContaining({
-        id: 'batch-001',
-        version: 1,
-        tccsSnapshot: mockTCCS,
-        formulaSnapshot: mockFormula,
-      }));
+      expect(mockRepo.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: 'batch-001',
+          version: 1,
+          tccsSnapshot: mockTCCS,
+          formulaSnapshot: mockFormula,
+        })
+      );
     });
   });
 
   describe('updateBatch & Optimistic Concurrency Control (OCC)', () => {
     it('should reject editing a RELEASED batch if not ADMIN', async () => {
       const releasedBatch: Batch = { ...validBatch, status: 'RELEASED' };
-      await expect(service.updateBatch(releasedBatch, prodUser, releasedBatch)).rejects.toThrow(/Từ chối quyền/);
+      await expect(service.updateBatch(releasedBatch, prodUser, releasedBatch)).rejects.toThrow(
+        /Từ chối quyền/
+      );
       expect(mockRepo.update).not.toHaveBeenCalled();
     });
 
@@ -127,9 +143,9 @@ describe('BatchAppService', () => {
       const serverBatch: Batch = { ...validBatch, version: 3 };
       const staleIncomingBatch: Batch = { ...validBatch, version: 1 };
 
-      await expect(
-        service.updateBatch(staleIncomingBatch, prodUser, serverBatch)
-      ).rejects.toThrow(/đã được cập nhật bởi một phiên làm việc khác/);
+      await expect(service.updateBatch(staleIncomingBatch, prodUser, serverBatch)).rejects.toThrow(
+        /đã được cập nhật bởi một phiên làm việc khác/
+      );
       expect(mockRepo.update).not.toHaveBeenCalled();
     });
 
@@ -138,10 +154,12 @@ describe('BatchAppService', () => {
       const incomingBatch: Batch = { ...validBatch, version: 2, batchNo: 'LOT-2026-001-REV' };
 
       await service.updateBatch(incomingBatch, prodUser, currentBatch);
-      expect(mockRepo.update).toHaveBeenCalledWith(expect.objectContaining({
-        version: 3,
-        batchNo: 'LOT-2026-001-REV',
-      }));
+      expect(mockRepo.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          version: 3,
+          batchNo: 'LOT-2026-001-REV',
+        })
+      );
     });
   });
 
@@ -169,7 +187,7 @@ describe('BatchAppService', () => {
           currentBatch: validBatch,
           batchTestResults: [failedTestResult],
         })
-      ).rejects.toThrow(/Không thể duyệt xuất xưởng lô có kết quả kiểm nghiệm KHÔNG ĐẠT/);
+      ).rejects.toThrow(/Quy chuẩn GMP & Release Guard.*chưa đạt chuẩn PASS/);
       expect(mockRepo.updateStatus).not.toHaveBeenCalled();
     });
 
@@ -217,6 +235,16 @@ describe('BatchAppService', () => {
     });
 
     it('should allow release when valid electronic signature is provided', async () => {
+      const passedTestResult: TestResult = {
+        id: 'tr-01',
+        batchId: 'batch-001',
+        labName: 'Lab QC',
+        testDate: '2026-01-10',
+        overallStatus: 'PASS',
+        results: [{ criteriaName: 'Độ ẩm', value: '4%', isPass: true }],
+        createdAt: '2026-01-10T00:00:00Z',
+      };
+
       const validSig: any = {
         id: 'sig-01',
         documentType: 'BATCH_RELEASE',
@@ -227,6 +255,7 @@ describe('BatchAppService', () => {
 
       await service.updateStatus('batch-001', 'RELEASED', qaUser, {
         currentBatch: validBatch,
+        batchTestResults: [passedTestResult],
         signature: validSig,
       });
 

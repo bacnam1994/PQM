@@ -11,6 +11,7 @@ import { can } from '../permissionService';
 import { logAuditAction } from '../auditService';
 import { validateOptimisticLock, nextVersion } from '../../utils/concurrency';
 import { signatureService } from '../signatureService';
+import { BatchRules } from '../../domain/rules';
 
 export interface BatchCreationContext {
   activeTCCS?: TCCS;
@@ -26,8 +27,8 @@ export class BatchAppService {
    * Tạo mới Lô sản xuất có chụp phiên bản Schema Snapshotting (TCCS & Formula)
    */
   async createBatch(
-    batch: Batch, 
-    currentUser: any, 
+    batch: Batch,
+    currentUser: any,
     existingBatches?: Batch[],
     context?: BatchCreationContext
   ): Promise<void> {
@@ -45,7 +46,7 @@ export class BatchAppService {
     if (existingBatches && existingBatches.length > 0) {
       const cleanNo = batch.batchNo.trim().toLowerCase();
       const duplicate = existingBatches.find(
-        b => b.id !== batch.id && b.batchNo?.trim().toLowerCase() === cleanNo
+        (b) => b.id !== batch.id && b.batchNo?.trim().toLowerCase() === cleanNo
       );
       if (duplicate) {
         throw new Error(`Số lô "${batch.batchNo}" đã tồn tại trên hệ thống.`);
@@ -66,12 +67,14 @@ export class BatchAppService {
     // --- SCHEMA SNAPSHOTTING (Đóng băng tiêu chuẩn & công thức tại thời điểm tạo lô) ---
     let tccsSnapshot = batch.tccsSnapshot;
     if (!tccsSnapshot && context) {
-      tccsSnapshot = context.activeTCCS || context.tccsList?.find(t => t.id === batch.tccsId);
+      tccsSnapshot = context.activeTCCS || context.tccsList?.find((t) => t.id === batch.tccsId);
     }
 
     let formulaSnapshot = batch.formulaSnapshot;
     if (!formulaSnapshot && context) {
-      formulaSnapshot = context.productFormula || context.productFormulas?.find(f => f.productId === batch.productId);
+      formulaSnapshot =
+        context.productFormula ||
+        context.productFormulas?.find((f) => f.productId === batch.productId);
     }
 
     const cleanBatch: Batch = {
@@ -80,7 +83,7 @@ export class BatchAppService {
       version: batch.version && batch.version > 0 ? batch.version : 1,
       tccsSnapshot,
       formulaSnapshot,
-      createdAt: batch.createdAt || new Date().toISOString()
+      createdAt: batch.createdAt || new Date().toISOString(),
     };
 
     await this.repo.save(cleanBatch);
@@ -90,7 +93,7 @@ export class BatchAppService {
       collection: 'BATCHES',
       documentId: cleanBatch.id,
       details: `Tạo lô hàng: ${cleanBatch.batchNo} (${cleanBatch.status}) v${cleanBatch.version}${tccsSnapshot ? ` [Frozen TCCS: ${tccsSnapshot.code}]` : ''}`,
-      performedBy: currentUser?.email || 'unknown'
+      performedBy: currentUser?.email || 'unknown',
     });
   }
 
@@ -99,11 +102,17 @@ export class BatchAppService {
    */
   async updateBatch(batch: Batch, currentUser: any, oldBatch?: Batch): Promise<void> {
     if (!can(currentUser, 'batch:update', oldBatch || batch)) {
-      throw new Error('Từ chối quyền: Không thể cập nhật lô sản xuất (có thể do quyền hạn hoặc lô đã đóng/xuất xưởng).');
+      throw new Error(
+        'Từ chối quyền: Không thể cập nhật lô sản xuất (có thể do quyền hạn hoặc lô đã đóng/xuất xưởng).'
+      );
     }
 
     // Kiểm tra xung đột khóa lạc quan (OCC)
-    validateOptimisticLock(oldBatch?.version, batch.version, `Lô sản xuất ${batch.batchNo || batch.id}`);
+    validateOptimisticLock(
+      oldBatch?.version,
+      batch.version,
+      `Lô sản xuất ${batch.batchNo || batch.id}`
+    );
 
     if (!batch.batchNo?.trim()) {
       throw new Error('Số lô sản xuất không được để trống.');
@@ -131,7 +140,7 @@ export class BatchAppService {
       tccsSnapshot: batch.tccsSnapshot || oldBatch?.tccsSnapshot,
       formulaSnapshot: batch.formulaSnapshot || oldBatch?.formulaSnapshot,
       version: newVersion,
-      updatedAt: new Date().toISOString()
+      updatedAt: new Date().toISOString(),
     };
 
     await this.repo.update(cleanBatch);
@@ -141,7 +150,7 @@ export class BatchAppService {
       collection: 'BATCHES',
       documentId: cleanBatch.id,
       details: `Cập nhật lô hàng: ${cleanBatch.batchNo} -> trạng thái: ${cleanBatch.status} (v${cleanBatch.version})`,
-      performedBy: currentUser?.email || 'unknown'
+      performedBy: currentUser?.email || 'unknown',
     });
   }
 
@@ -149,13 +158,13 @@ export class BatchAppService {
    * Chuyển trạng thái Lô sản xuất (State Machine & Release Guard)
    */
   async updateStatus(
-    batchId: string, 
-    status: Batch['status'], 
-    currentUser: any, 
-    options?: { 
-      reason?: string; 
-      currentBatch?: Batch; 
-      batchTestResults?: TestResult[]; 
+    batchId: string,
+    status: Batch['status'],
+    currentUser: any,
+    options?: {
+      reason?: string;
+      currentBatch?: Batch;
+      batchTestResults?: TestResult[];
       signature?: ElectronicSignature;
       requireSignature?: boolean;
     }
@@ -163,7 +172,9 @@ export class BatchAppService {
     // 1. Phân quyền chuyển đổi trạng thái
     if (status === 'RELEASED') {
       if (!can(currentUser, 'batch:release', options?.currentBatch)) {
-        throw new Error('Từ chối quyền: Chỉ bộ phận QA hoặc Quản trị viên mới có thẩm quyền phê duyệt xuất xưởng (Release) lô.');
+        throw new Error(
+          'Từ chối quyền: Chỉ bộ phận QA hoặc Quản trị viên mới có thẩm quyền phê duyệt xuất xưởng (Release) lô.'
+        );
       }
     } else if (status === 'REJECTED') {
       if (!can(currentUser, 'batch:reject', options?.currentBatch)) {
@@ -178,10 +189,15 @@ export class BatchAppService {
     // 2. Kiểm tra chữ ký điện tử (FDA 21 CFR Part 11 Compliance)
     if (status === 'RELEASED') {
       if (options?.requireSignature && !options?.signature) {
-        throw new Error('Quy định 21 CFR Part 11: Yêu cầu chữ ký điện tử hợp lệ của QA/Admin trước khi xuất xưởng Lô.');
+        throw new Error(
+          'Quy định 21 CFR Part 11: Yêu cầu chữ ký điện tử hợp lệ của QA/Admin trước khi xuất xưởng Lô.'
+        );
       }
       if (options?.signature) {
-        if (options.signature.documentType !== 'BATCH_RELEASE' || options.signature.documentId !== batchId) {
+        if (
+          options.signature.documentType !== 'BATCH_RELEASE' ||
+          options.signature.documentId !== batchId
+        ) {
           throw new Error('Chữ ký điện tử không khớp với Lô sản xuất đang phê duyệt.');
         }
         const isValid = await signatureService.verifySignatureIntegrity(options.signature);
@@ -192,13 +208,18 @@ export class BatchAppService {
     }
 
     // 3. Ràng buộc bảo toàn dữ liệu & GMP Release Guard:
-    // Tuyệt đối không cho phép RELEASED lô nếu có bất kỳ phiếu kiểm nghiệm nào FAILED / OOS
-    if (status === 'RELEASED' && options?.batchTestResults && options.batchTestResults.length > 0) {
-      const hasFailed = options.batchTestResults.some(
-        r => r.overallStatus === 'FAIL' || r.results?.some(entry => !entry.isPass)
+    // Thẩm định qua Domain BatchRules & Canonical Quality Resolver
+    if (status === 'RELEASED' && options?.currentBatch) {
+      const releaseDecision = BatchRules.canRelease(
+        options.currentBatch,
+        options?.batchTestResults || [],
+        currentUser?.role,
+        (options?.currentBatch as any)?.tccs
       );
-      if (hasFailed) {
-        throw new Error('Quy chuẩn GMP: Không thể duyệt xuất xưởng lô có kết quả kiểm nghiệm KHÔNG ĐẠT (OOS).');
+      if (!releaseDecision.allowed) {
+        throw new Error(
+          `Quy chuẩn GMP & Release Guard: ${releaseDecision.reason || 'Lô không đủ điều kiện xuất xưởng.'}`
+        );
       }
     }
 
@@ -209,7 +230,7 @@ export class BatchAppService {
       collection: 'BATCHES',
       documentId: batchId,
       details: `Chuyển trạng thái lô: ${options?.currentBatch?.batchNo || batchId} -> ${status}${options?.reason ? ` (Lý do: ${options.reason})` : ''}${options?.signature ? ` [Đã ký điện tử: ${options.signature.signerEmail}]` : ''}`,
-      performedBy: currentUser?.email || 'unknown'
+      performedBy: currentUser?.email || 'unknown',
     });
   }
 
@@ -238,7 +259,7 @@ export class BatchAppService {
       collection: 'BATCHES',
       documentId: id,
       details: `Xóa lô hàng: ${batchNo || id}`,
-      performedBy: currentUser?.email || 'unknown'
+      performedBy: currentUser?.email || 'unknown',
     });
   }
 }

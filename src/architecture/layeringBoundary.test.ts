@@ -128,4 +128,29 @@ describe('Phase 8: Architecture Layering Boundary & Reliability', () => {
     });
     expect(qaRelease.allowed).toBe(true);
   });
+
+  it('UI Components & Pages KHÔNG ĐƯỢC tự tính toán xuất xưởng bằng cú pháp thô (!entry.isPass)', () => {
+    const uiFiles = [
+      ...findFiles(pagesDir, ['.ts', '.tsx']),
+      ...findFiles(componentsDir, ['.ts', '.tsx']),
+    ];
+
+    const forbiddenPatterns = [/!entry\.isPass/, /!r\.isPass/, /!res\.isPass/];
+
+    const violations: { file: string; pattern: string }[] = [];
+
+    for (const file of uiFiles) {
+      const content = fs.readFileSync(file, 'utf-8');
+      for (const pattern of forbiddenPatterns) {
+        if (pattern.test(content)) {
+          violations.push({
+            file: path.relative(rootDir, file).replace(/\\/g, '/'),
+            pattern: pattern.toString(),
+          });
+        }
+      }
+    }
+
+    expect(violations).toEqual([]);
+  });
 });

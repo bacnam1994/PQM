@@ -34,6 +34,8 @@ import { ESignatureModal } from '../../components/features/ESignatureModal';
 import { ElectronicSignature } from '../../types/signature';
 import { useDeviationsByBatchQuery } from '../../hooks/queries/useDeviationQueries';
 import { Surface, PageHeader, StatusBadge } from '../../components/ui';
+import { ReleaseRules } from '../../domain/rules';
+import { normalizeCriterionPassStatus } from '../../domain/test-result/testResultStatusResolver';
 
 // Helper tính tiến độ lô
 const calculateBatchProgress = (batch: any, batchResults: TestResult[]) => {
@@ -149,25 +151,20 @@ const BatchDetailPage = () => {
 
   const handleOpenSignRelease = () => {
     if (!batch) return;
-    const hasFailed = viewBatchResults.some(
-      (r) => r.overallStatus === 'FAIL' || r.results?.some((entry) => !entry.isPass)
-    );
-    if (hasFailed) {
+
+    const releaseEval = ReleaseRules.evaluateReleasePrerequisites({
+      batch,
+      testResults: viewBatchResults,
+      deviations: batchDeviations,
+      userRole: role,
+      boundTccs: (batch as any)?.tccs,
+    });
+
+    if (!releaseEval.isEligibleForRelease) {
       notify({
         type: 'ERROR',
         title: 'Quy chuẩn GMP & Release Guard',
-        message: 'Không thể duyệt xuất xưởng lô có kết quả kiểm nghiệm KHÔNG ĐẠT (OOS).',
-      });
-      return;
-    }
-
-    const hasOpenDeviations = batchDeviations.some((d) => d.status !== 'CLOSED');
-    if (hasOpenDeviations) {
-      notify({
-        type: 'ERROR',
-        title: 'Quy chuẩn GMP & Deviation Guard',
-        message:
-          'Lô sản xuất đang có hồ sơ Sai lệch/CAPA chưa đóng (Open Deviation). Yêu cầu hoàn tất điều tra và đóng hồ sơ trước khi ký duyệt xuất xưởng.',
+        message: releaseEval.blockers[0] || 'Lô chưa đủ điều kiện xuất xưởng.',
       });
       return;
     }
@@ -613,7 +610,9 @@ const BatchDetailPage = () => {
                                   (f: any) => f.productId === batch.productId
                                 );
                                 const failed = ensureArray(res.results)
-                                  .filter((r: any) => !r.isPass)
+                                  .filter(
+                                    (r: any) => normalizeCriterionPassStatus(r.isPass) === false
+                                  )
                                   .map((r: any) => ({
                                     name: r.criteriaName,
                                     actualValue: r.value,

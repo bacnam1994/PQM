@@ -19,6 +19,7 @@ import {
   DEFAULT_GEMINI_MODEL,
 } from '../../services/ai/geminiService';
 import { buildExtractionPrompt } from '../../services/ai/prompts';
+import { useMasterCriteriaActiveQuery } from '../../hooks/queries/useMasterCriterionQueries';
 import { writeAIDraft } from '../../services/ai/aiDraftManager';
 import { useAppStore } from '../../store/useAppStore';
 import { useDataGraph } from '../../hooks/useDataGraph';
@@ -463,10 +464,14 @@ export const AIAssistantChat: React.FC<AIAssistantChatProps> = ({
       );
   };
 
-  // --- Lấy danh sách tên chỉ tiêu từ TCCS đang hiệu lực ---
-  // Gom tất cả tên chỉ tiêu từ mọi TCCS active (dùng Set để dedup)
+  const { data: activeMasterCriteria = [] } = useMasterCriteriaActiveQuery();
+
+  // --- Lấy danh sách tên chỉ tiêu từ TCCS đang hiệu lực & Master Data ---
+  // Gom tất cả tên chỉ tiêu từ Master Criteria và mọi TCCS active (dùng Set để dedup)
   const allActiveTccsNames = useMemo(() => {
     const names = new Set<string>();
+    // Ưu tiên Master Data chuẩn toàn hệ thống
+    activeMasterCriteria.forEach((mc) => mc?.canonicalName && names.add(mc.canonicalName));
     tccsList
       .filter((t) => t.isActive)
       .forEach((tccs) => {
@@ -474,7 +479,7 @@ export const AIAssistantChat: React.FC<AIAssistantChatProps> = ({
         (tccs.safetyCriteria || []).forEach((c) => c?.name && names.add(c.name));
       });
     return Array.from(names).sort();
-  }, [tccsList]);
+  }, [tccsList, activeMasterCriteria]);
 
   const processFile = async (file: File) => {
     // [SECURITY] Dùng hàm validateOCRFile đã chuẩn hóa (kiểm tra kích thước + MIME type)

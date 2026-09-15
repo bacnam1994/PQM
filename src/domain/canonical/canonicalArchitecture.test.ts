@@ -265,6 +265,105 @@ describe('12 Core Canonical Models Architecture Suite', () => {
       expect(prereq.score).toBe(100);
     });
 
+    it('ReleaseRules: cho phép xuất xưởng khi phiếu có chỉ tiêu cảm quan/text (isPass: null)', () => {
+      const testResultWithSensory: TestResult = {
+        ...mockTestResultPass,
+        id: 'tr-sensory',
+        overallStatus: 'PASS',
+        results: [
+          { criteriaName: 'Định lượng', value: 99.5, isPass: true },
+          { criteriaName: 'Cảm quan', value: 'Bột màu trắng', isPass: null as any },
+          { criteriaName: 'Ghi chú', value: 'Đạt yêu cầu', isPass: undefined },
+        ],
+      };
+
+      const prereq = ReleaseRules.evaluateReleasePrerequisites({
+        batch: mockBatch,
+        testResults: [testResultWithSensory],
+        userRole: 'QA',
+      });
+
+      expect(prereq.isEligibleForRelease).toBe(true);
+      expect(prereq.criteriaMet.allTestCriteriaPassed).toBe(true);
+    });
+
+    it('ReleaseRules: cho phép xuất xưởng khi chỉ tiêu rớt được cứu bởi alternateRules (FAIL_RETRY)', () => {
+      const tccsWithRetry: TCCS = {
+        ...mockTccs,
+        alternateRules: [
+          {
+            main: 'Độ rã',
+            alt: 'Độ rã lần 2',
+            type: 'FAIL_RETRY' as any,
+          },
+        ],
+      };
+
+      const testResultWithRetry: TestResult = {
+        ...mockTestResultPass,
+        id: 'tr-retry',
+        overallStatus: 'PASS',
+        results: [
+          { criteriaName: 'Độ rã', value: '18 phút', isPass: false },
+          { criteriaName: 'Độ rã lần 2', value: '12 phút', isPass: true },
+        ],
+      };
+
+      const prereq = ReleaseRules.evaluateReleasePrerequisites({
+        batch: mockBatch,
+        testResults: [testResultWithRetry],
+        userRole: 'QA',
+        boundTccs: tccsWithRetry,
+      });
+
+      expect(prereq.isEligibleForRelease).toBe(true);
+      expect(prereq.criteriaMet.allTestCriteriaPassed).toBe(true);
+    });
+
+    it('ReleaseRules: chặn xuất xưởng khi có chỉ tiêu OOS không đạt và không có luật cứu', () => {
+      const prereq = ReleaseRules.evaluateReleasePrerequisites({
+        batch: mockBatch,
+        testResults: [mockTestResultFail],
+        userRole: 'QA',
+      });
+
+      expect(prereq.isEligibleForRelease).toBe(false);
+      expect(prereq.criteriaMet.allTestCriteriaPassed).toBe(false);
+      expect(prereq.blockers.length).toBeGreaterThan(0);
+      expect(prereq.blockers[0]).toContain('chưa đạt chuẩn PASS');
+    });
+
+    it('ReleaseRules: cho phép xuất xưởng khi lô có nhiều phiếu kiểm nghiệm chia theo lab (Hóa lý + Vi sinh) cùng đạt', () => {
+      const chemistryTest: TestResult = {
+        ...mockTestResultPass,
+        id: 'tr-chem',
+        labName: 'Phòng Kiểm Nghiệm Hóa Lý',
+        results: [
+          { criteriaName: 'Định lượng', value: 100.2, isPass: true },
+          { criteriaName: 'Độ ẩm', value: 3.5, isPass: true },
+        ],
+      };
+
+      const microbiologyTest: TestResult = {
+        ...mockTestResultPass,
+        id: 'tr-micro',
+        labName: 'Phòng Kiểm Nghiệm Vi Sinh',
+        results: [
+          { criteriaName: 'Tổng số vi sinh vật hiếu khí', value: 10, isPass: true },
+          { criteriaName: 'E. coli', value: 'Âm tính', isPass: true },
+        ],
+      };
+
+      const prereq = ReleaseRules.evaluateReleasePrerequisites({
+        batch: mockBatch,
+        testResults: [chemistryTest, microbiologyTest],
+        userRole: 'QA',
+      });
+
+      expect(prereq.isEligibleForRelease).toBe(true);
+      expect(prereq.criteriaMet.allTestCriteriaPassed).toBe(true);
+    });
+
     it('TCCSRules: phát hiện lỗi thiếu TCCS hoặc trùng lặp nhiều TCCS hiệu lực', () => {
       const checkValid = TCCSRules.validateActiveStatus('prod-001', [mockTccs]);
       expect(checkValid.isValid).toBe(true);

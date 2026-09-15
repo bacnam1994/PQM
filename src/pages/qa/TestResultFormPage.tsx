@@ -26,6 +26,7 @@ import { AttachmentSection } from './test-result-form/components/AttachmentSecti
 import { GDFileSelectorModal } from './test-result-form/components/GDFileSelectorModal';
 import { BatchScanProgressModal } from './test-result-form/components/BatchScanProgressModal';
 import { useTestResultAIIntegration } from './test-result-form/hooks/useTestResultAIIntegration';
+import { useMasterCriteriaActiveQuery } from '../../hooks/queries/useMasterCriterionQueries';
 
 // Common Modals & Tools
 import { MappingConfirmModal } from '../../components/features/MappingConfirmModal';
@@ -112,9 +113,14 @@ const TestResultFormPage: React.FC = () => {
     return [...(activeTCCS.mainQualityCriteria || []), ...(activeTCCS.safetyCriteria || [])];
   }, [activeTCCS]);
 
-  // Unique criteria names across all active TCCS for OCR prompt
+  const { data: activeMasterCriteria = [] } = useMasterCriteriaActiveQuery();
+
+  // Unique criteria names across all active TCCS & Master Criteria for OCR prompt
   const allActiveTccsNames = useMemo(() => {
     const names = new Set<string>();
+    // Ưu tiên nạp Master Data chuẩn toàn hệ thống
+    activeMasterCriteria.forEach((mc) => mc?.canonicalName && names.add(mc.canonicalName));
+    // Nạp thêm tên chỉ tiêu từ các TCCS đang active
     tccsList
       .filter((t) => t.isActive)
       .forEach((tccs) => {
@@ -122,7 +128,7 @@ const TestResultFormPage: React.FC = () => {
         (tccs.safetyCriteria || []).forEach((c) => c?.name && names.add(c.name));
       });
     return Array.from(names).sort();
-  }, [tccsList]);
+  }, [tccsList, activeMasterCriteria]);
 
   // Integrated AI Hook
   const ai = useTestResultAIIntegration({

@@ -28,6 +28,7 @@ import {
   ProcessCapabilityResult,
   NelsonViolation,
 } from '../../utils/spcEngine';
+import { normalizeName } from '../criteriaAliasService';
 
 export interface DataPoint {
   value: number;
@@ -365,5 +366,41 @@ export class AnalyticsAggregationService {
 
     sampled.push(data[data.length - 1]);
     return sampled;
+  }
+
+  /**
+   * Tạo khóa gom nhóm (Grouping Key) chuẩn hóa cho chỉ tiêu:
+   * 1. Ưu tiên masterCriterionId nếu có -> giải quyết dứt điểm phân mảnh chuỗi text do lỗi gõ máy.
+   * 2. Fallback về normalizeName(name) để đảm bảo tương thích ngược 100% với dữ liệu cũ.
+   */
+  public static getCriteriaGroupKey(item: {
+    masterCriterionId?: string;
+    criteriaName?: string;
+    name?: string;
+  }): string {
+    if (item.masterCriterionId && item.masterCriterionId.trim()) {
+      return `master:${item.masterCriterionId.trim()}`;
+    }
+    const raw = item.criteriaName || item.name || '';
+    return `text:${normalizeName(raw)}`;
+  }
+
+  /**
+   * Gom nhóm danh sách kết quả thử nghiệm theo chỉ tiêu chuẩn hóa
+   */
+  public static groupSeriesByCriteria<
+    T extends { masterCriterionId?: string; criteriaName?: string; name?: string },
+  >(items: T[]): Map<string, T[]> {
+    const map = new Map<string, T[]>();
+    for (const item of items) {
+      const key = this.getCriteriaGroupKey(item);
+      const group = map.get(key);
+      if (group) {
+        group.push(item);
+      } else {
+        map.set(key, [item]);
+      }
+    }
+    return map;
   }
 }

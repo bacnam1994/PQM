@@ -131,8 +131,18 @@ export function normalizeTestResultStatus(value: unknown): CanonicalTestStatus {
     'HOÀN THÀNH',
     'APPROVED',
     'SUCCESS',
+    'ÂM TÍNH',
+    'AM TINH',
+    'NEGATIVE',
+    'NEG',
   ];
-  if (passKeywords.includes(str) || str.startsWith('ĐẠT') || str.startsWith('DAT')) {
+  if (
+    passKeywords.includes(str) ||
+    str.startsWith('ĐẠT') ||
+    str.startsWith('DAT') ||
+    str.startsWith('ÂM TÍNH') ||
+    str.startsWith('AM TINH')
+  ) {
     return 'PASS';
   }
 
@@ -153,12 +163,18 @@ export function normalizeTestResultStatus(value: unknown): CanonicalTestStatus {
     'LOẠI',
     'BỊ LOẠI',
     'ERROR',
+    'DƯƠNG TÍNH',
+    'DUONG TINH',
+    'POSITIVE',
+    'POS',
   ];
   if (
     failKeywords.includes(str) ||
     str.includes('KHÔNG ĐẠT') ||
     str.includes('KHONG DAT') ||
-    str.includes('KHONG_DAT')
+    str.includes('KHONG_DAT') ||
+    str.startsWith('DƯƠNG TÍNH') ||
+    str.startsWith('DUONG TINH')
   ) {
     return 'FAIL';
   }
@@ -200,6 +216,8 @@ export const resolveCanonicalTestStatus = normalizeTestResultStatus;
 
 /**
  * 2. Chuẩn hóa cờ đạt của từng chỉ tiêu riêng lẻ (isPass)
+ * Ép kiểu dứt khoát mọi biến thể chuỗi ("Đạt", "PASS", "Không đạt", "Âm tính", boolean...)
+ * về boolean hoặc null. Tuyệt đối không đánh đồng null/undefined với FAIL.
  */
 export function normalizeCriterionPassStatus(value: unknown): boolean | null {
   if (value === null || value === undefined || value === '') {
@@ -705,11 +723,14 @@ export function detectTestResultStatusMismatch(
       : 'STORED_FAIL_BUT_COMPUTED_PASS';
 
   // Chỉ Auto-Heal khi có rule chắc chắn và dữ liệu chỉ tiêu đầy đủ (Item 15)
+  // Nếu computedCanonical === 'PASS', cho phép SAFE_AUTO_HEAL (chỉ cập nhật overallStatus, tuyệt đối không chạm vào value chỉ tiêu)
   const isSafeToAutoHeal =
     results.length > 0 &&
     (computedCanonical === 'FAIL'
       ? failures.length > 0
-      : results.every((r) => normalizeCriterionPassStatus(r.isPass) === true));
+      : computedCanonical === 'PASS' &&
+        (failures.length === 0 ||
+          (boundTccs?.alternateRules && boundTccs.alternateRules.length > 0)));
 
   return {
     ...defaultDiagnostic,

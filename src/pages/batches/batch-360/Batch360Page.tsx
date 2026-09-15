@@ -32,6 +32,10 @@ import {
   BatchAuditHistoryTimeline,
   BatchTimelineEvent,
 } from './components/BatchAuditHistoryTimeline';
+import {
+  normalizeCriterionPassStatus,
+  resolveTestResultStatus,
+} from '../../../domain/test-result/testResultStatusResolver';
 
 export const Batch360Page: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -123,19 +127,24 @@ export const Batch360Page: React.FC = () => {
 
     // 2. Mốc các phiếu kiểm nghiệm
     batchTestResults.forEach((tr) => {
-      const passCount = ensureArray(tr.results).filter((r) => r.isPass).length;
-      const failCount = ensureArray(tr.results).filter((r) => !r.isPass).length;
+      const passCount = ensureArray(tr.results).filter(
+        (r) => normalizeCriterionPassStatus(r.isPass) === true
+      ).length;
+      const failCount = ensureArray(tr.results).filter(
+        (r) => normalizeCriterionPassStatus(r.isPass) === false
+      ).length;
+      const trStatus = resolveTestResultStatus(tr);
       events.push({
         id: `evt-tr-${tr.id}`,
         timestamp: tr.testDate || tr.createdAt || new Date().toISOString(),
         type: 'TEST_RESULT',
         title: `Phiếu kiểm nghiệm tại ${tr.labName || 'Phòng Lab'}`,
         description:
-          tr.overallStatus === 'PASS'
+          trStatus === 'PASS'
             ? `Tất cả ${passCount} chỉ tiêu đạt chuẩn quy định TCCS.`
             : `Phát hiện ${failCount} chỉ tiêu không đạt tiêu chuẩn.`,
-        status: tr.overallStatus === 'PASS' ? 'PASS' : 'FAIL',
-        badge: tr.overallStatus === 'PASS' ? 'ĐẠT (PASS)' : 'KHÔNG ĐẠT (OOS)',
+        status: trStatus === 'PASS' ? 'PASS' : 'FAIL',
+        badge: trStatus === 'PASS' ? 'ĐẠT (PASS)' : 'KHÔNG ĐẠT (OOS)',
         details: {
           'Số chỉ tiêu kiểm nghiệm': ensureArray(tr.results).length,
           'Ghi chú': tr.notes || undefined,

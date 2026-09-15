@@ -327,6 +327,13 @@ export const useTrendAnalyticsState = () => {
 
   const chartData = useMemo(() => {
     if (!selectedProductId || !selectedCriteriaName) return [];
+
+    // Lấy masterCriterionId của chỉ tiêu đang chọn (nếu có)
+    // để Group By ID chuẩn hóa thay vì chuỗi text (chống phân mảnh dữ liệu SPC)
+    const selectedMasterCriterionId = (selectedCriteria as any)?.masterCriterionId as
+      | string
+      | undefined;
+
     const filteredBatches = batches
       .filter((b) => {
         if (b.productId !== selectedProductId) return false;
@@ -340,6 +347,9 @@ export const useTrendAnalyticsState = () => {
       .map((batch) => {
         const batchResults = testResults.filter((r: any) => r.batchId === batch.id);
         const map = new Map<string, any>();
+        // Phụ: map theo masterCriterionId để Group By chính xác
+        const masterIdMap = new Map<string, any>();
+
         [...batchResults]
           .sort((a: any, b: any) => a.testDate.localeCompare(b.testDate))
           .forEach((r: any) => {
@@ -350,10 +360,27 @@ export const useTrendAnalyticsState = () => {
                 map.set(normalizeName(entry.criteriaName), entry);
                 map.set(entry.criteriaName.trim().toLowerCase(), entry);
               }
+              // Lưu thêm theo masterCriterionId nếu có
+              if (entry?.masterCriterionId) {
+                masterIdMap.set(entry.masterCriterionId, entry);
+              }
             });
           });
-        const targetKey = normalizeName(selectedCriteriaName);
-        let entry = map.get(targetKey) || map.get(selectedCriteriaName.trim().toLowerCase());
+
+        let entry: any = undefined;
+
+        // Ưu tiên 1: Match theo masterCriterionId — chống phân mảnh tên text
+        if (selectedMasterCriterionId) {
+          entry = masterIdMap.get(selectedMasterCriterionId);
+        }
+
+        // Ưu tiên 2: Fallback text matching (tương thích ngược dữ liệu cũ)
+        if (!entry) {
+          const targetKey = normalizeName(selectedCriteriaName);
+          entry = map.get(targetKey) || map.get(selectedCriteriaName.trim().toLowerCase());
+        }
+
+        // Ưu tiên 3: Fuzzy matching qua resolver (cuối cùng)
         if (!entry) {
           for (const [, e] of map.entries()) {
             if (
@@ -366,6 +393,7 @@ export const useTrendAnalyticsState = () => {
             }
           }
         }
+
         const val =
           entry?.value !== undefined && entry?.value !== null
             ? parseNumberFromText(entry.value)
@@ -388,6 +416,7 @@ export const useTrendAnalyticsState = () => {
   }, [
     selectedProductId,
     selectedCriteriaName,
+    selectedCriteria,
     batches,
     testResults,
     dateFrom,
