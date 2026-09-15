@@ -27,6 +27,16 @@ import {
 import { normalizeName } from './criteriaAliasService';
 import { calculateOverallStatus } from '../utils/evaluation';
 import { matchLaboratory, DEFAULT_TESTING_LABORATORIES } from './laboratoryService';
+import {
+  buildTestResultIndex,
+  resolveTestResultsForBatch,
+  TestResultIndexSnapshot,
+} from '../domain/batch/batchTestResultResolver';
+import {
+  evaluateBatchReleaseIntegrity,
+  isValidTestResultForBatch,
+  DataFreshnessState,
+} from '../domain/batch/batchIntegrityValidator';
 
 export type ConsistencyIssueType =
   | 'ORPHAN_BATCH'
@@ -39,6 +49,7 @@ export type ConsistencyIssueType =
   | 'NO_ACTIVE_TCCS'
   | 'TEST_RESULT_STATUS_MISMATCH'
   | 'RELEASED_BATCH_NO_PASSING_TEST'
+  | 'TEST_RESULT_RELATIONSHIP_INVALID'
   | 'REJECTED_BATCH_MISSING_REASON'
   | 'INVALID_DATE_SEQUENCE'
   | 'UNLINKED_FORMULA_MATERIAL'
@@ -76,6 +87,7 @@ export interface ConsistencyIssue {
   autoHealAction?:
     | 'LINK_MATERIAL'
     | 'FIX_TEST_STATUS'
+    | 'FIX_TEST_RELATIONSHIP'
     | 'FIX_ACTIVE_TCCS'
     | 'CLEAN_ORPHAN_ALIAS'
     | 'NORMALIZE_TEST_LAB';
@@ -112,6 +124,7 @@ export interface SystemDataSnapshot {
   testResults: TestResult[];
   criteriaAliases?: CriteriaAlias[];
   testingLaboratories?: TestingLaboratory[];
+  dataFreshness?: DataFreshnessState;
 }
 
 /**
@@ -146,7 +159,10 @@ export const auditDataConsistency = (data: SystemDataSnapshot): ConsistencyRepor
   const materialMap = new Map(rawMaterials.map((m) => [m.id, m]));
   const materialNameMap = new Map<string, RawMaterial>();
 
-  // Hàm tra cứu Lô linh hoạt (hỗ trợ cả ID, Số lô batchNo hoặc suffix)
+  // Xây dựng Snapshot Index O(1) chuẩn hóa quan hệ giữa Batches và TestResults
+  const testResultIndex = buildTestResultIndex(testResults, batches);
+
+  // Hàm tra cứu Lô linh hoạt cho tương thích ngược
   const getBatchForTestResult = (batchId: string): Batch | undefined => {
     if (!batchId) return undefined;
     if (batchMap.has(batchId)) return batchMap.get(batchId);
@@ -190,15 +206,6 @@ export const auditDataConsistency = (data: SystemDataSnapshot): ConsistencyRepor
     batchesByProduct.set(b.productId, list);
   });
 
-  const testResultsByBatch = new Map<string, TestResult[]>();
-  testResults.forEach((r) => {
-    const matchedBatch = getBatchForTestResult(r.batchId);
-    const key = matchedBatch ? matchedBatch.id : r.batchId;
-    const list = testResultsByBatch.get(key) || [];
-    list.push(r);
-    testResultsByBatch.set(key, list);
-  });
-
   // =========================================================================
   // 1. KIỂM TRA BẢN GHI MỒ CÔI (ORPHAN RECORDS)
   // =========================================================================
@@ -222,25 +229,22 @@ export const auditDataConsistency = (data: SystemDataSnapshot): ConsistencyRepor
     }
   });
 
-  // 1.2 Phiếu kiểm nghiệm không có Lô tương ứng
-  testResults.forEach((r) => {
-    const matchedBatch = getBatchForTestResult(r.batchId);
-    if (!matchedBatch) {
-      issues.push({
-        id: `orphan_test_${r.id}`,
-        type: 'ORPHAN_TEST_RESULT',
-        category: 'ORPHAN_RECORDS',
-        severity: 'CRITICAL',
-        title: `Phiếu kiểm nghiệm mồ côi: ${r.id}`,
-        description: `Phiếu kiểm nghiệm ngày ${r.testDate || 'N/A'} (Lab: ${r.labName}) tham chiếu đến Batch ID "${r.batchId}" không tồn tại.`,
-        entityType: 'TEST_RESULT',
-        entityId: r.id,
-        entityName: `${r.labName} (${r.testDate})`,
-        suggestedAction:
-          'Xác minh số lô của phiếu kiểm nghiệm hoặc dọn dẹp bản ghi không còn hợp lệ.',
-        autoHealable: false,
-      });
-    }
+  // 1.2 Phiếu kiểm nghiệm không có Lô tương ứng (thực sự mồ côi, không khớp cả ID lẫn Số lô)
+  testResultIndex.orphanResults.forEach((r) => {
+    issues.push({
+      id: `orphan_test_${r.id}`,
+      type: 'ORPHAN_TEST_RESULT',
+      category: 'ORPHAN_RECORDS',
+      severity: 'CRITICAL',
+      title: `Phiếu kiểm nghiệm mồ côi: ${r.id}`,
+      description: `Phiếu kiểm nghiệm ngày ${r.testDate || 'N/A'} (Lab: ${r.labName}) tham chiếu đến Batch ID "${r.batchId}" không tồn tại.`,
+      entityType: 'TEST_RESULT',
+      entityId: r.id,
+      entityName: `${r.labName} (${r.testDate})`,
+      suggestedAction:
+        'Xác minh số lô của phiếu kiểm nghiệm hoặc dọn dẹp bản ghi không còn hợp lệ.',
+      autoHealable: false,
+    });
   });
 
   // 1.3 TCCS không có Sản phẩm tương ứng
@@ -385,7 +389,8 @@ export const auditDataConsistency = (data: SystemDataSnapshot): ConsistencyRepor
   // 3.1 Trạng thái Phiếu kiểm nghiệm không khớp với kết quả đánh giá chỉ tiêu
   testResults.forEach((r) => {
     if (r.results && r.results.length > 0) {
-      const rawBatch = getBatchForTestResult(r.batchId);
+      const match = testResultIndex.getBatchForTestResult(r);
+      const rawBatch = match.batch;
       const boundTccs = rawBatch?.tccsId ? tccsMap.get(rawBatch.tccsId) : undefined;
       const computedStatus = calculateOverallStatus(r.results, boundTccs || null);
 
@@ -409,67 +414,86 @@ export const auditDataConsistency = (data: SystemDataSnapshot): ConsistencyRepor
     }
   });
 
-  // 3.2 Lô hàng RELEASED nhưng không có phiếu kiểm nghiệm PASS
+  // 3.2 Lô hàng RELEASED: Đánh giá toàn vẹn xuất xưởng qua canonical validator
   batches.forEach((b) => {
     if (b.status === 'RELEASED') {
-      const batchTests = testResultsByBatch.get(b.id) || [];
+      const primary = testResultIndex.primaryMap.get(b.id) || [];
+      const legacy = testResultIndex.legacyMap.get(b.id) || [];
+      const invalid = testResultIndex.invalidLinkResults
+        .filter((item) => item.matchedBatchId === b.id)
+        .map((item) => item.testResult);
 
-      if (batchTests.length === 0) {
-        issues.push({
-          id: `released_no_pass_${b.id}`,
-          type: 'RELEASED_BATCH_NO_PASSING_TEST',
-          category: 'LOGICAL_STATUS_INCONSISTENCY',
-          severity: 'CRITICAL',
-          title: `Lô đã xuất xưởng nhưng chưa kiểm nghiệm: ${b.batchNo}`,
-          description: `Lô "${b.batchNo}" ở trạng thái ĐÃ XUẤT XƯỞNG (RELEASED) nhưng chưa có bất kỳ phiếu kiểm nghiệm nào.`,
-          entityType: 'BATCH',
-          entityId: b.id,
-          entityName: b.batchNo,
-          suggestedAction:
-            'Xem xét lại quyết định duyệt lô hoặc chuyển trạng thái sang ĐANG KIỂM TRA (TESTING).',
-          autoHealable: false,
-        });
-      } else {
-        // Sắp xếp các phiếu kiểm nghiệm theo ngày thử nghiệm tăng dần (phiếu mới nhất ở cuối)
-        const sortedTests = [...batchTests].sort((t1, t2) =>
-          (t1.testDate || '').localeCompare(t2.testDate || '')
-        );
-        const latestTest = sortedTests[sortedTests.length - 1];
+      const resolution = {
+        batch: b,
+        primaryResults: primary,
+        legacyResults: legacy,
+        invalidResults: invalid,
+        allCandidateResults: [...primary, ...legacy],
+        hasPrimaryMatch: primary.length > 0,
+        hasLegacyMatch: legacy.length > 0,
+        hasInvalidMatch: invalid.length > 0,
+      };
 
-        // Hợp nhất các chỉ tiêu kiểm nghiệm (kết quả kiểm tra lại lần sau sẽ cập nhật/ghi đè chỉ tiêu lần trước)
-        const consolidatedMap = new Map<string, any>();
-        sortedTests.forEach((t) => {
-          (t.results || []).forEach((r) => {
-            if (r && r.criteriaName) {
-              consolidatedMap.set(r.criteriaName.trim().toLowerCase(), r);
-            }
+      const boundTccs = b.tccsId ? tccsMap.get(b.tccsId) : undefined;
+      const evaluation = evaluateBatchReleaseIntegrity(
+        b,
+        resolution,
+        data.dataFreshness,
+        boundTccs
+      );
+
+      if (evaluation.shouldAlert) {
+        if (evaluation.integrityStatus === 'MISSING_TEST_RESULT') {
+          issues.push({
+            id: `released_no_pass_${b.id}`,
+            type: 'RELEASED_BATCH_NO_PASSING_TEST',
+            category: 'LOGICAL_STATUS_INCONSISTENCY',
+            severity: 'CRITICAL',
+            title: `Lô đã xuất xưởng nhưng chưa kiểm nghiệm: ${b.batchNo}`,
+            description: evaluation.summaryMessage,
+            entityType: 'BATCH',
+            entityId: b.id,
+            entityName: b.batchNo,
+            suggestedAction:
+              evaluation.suggestedAction ||
+              'Xem xét lại quyết định duyệt lô hoặc chuyển trạng thái sang ĐANG KIỂM TRA (TESTING).',
+            autoHealable: false,
           });
-        });
-        const consolidatedResults = Array.from(consolidatedMap.values());
-        const boundTccs = b.tccsId ? tccsMap.get(b.tccsId) : undefined;
-        const consolidatedStatus =
-          consolidatedResults.length > 0
-            ? calculateOverallStatus(consolidatedResults, boundTccs || null)
-            : undefined;
-
-        const hasPassTest = batchTests.some((t) => t.overallStatus === 'PASS');
-        const isLatestPass = latestTest.overallStatus === 'PASS' || consolidatedStatus === 'PASS';
-
-        // Lô chỉ bị xem là lỗi xuất xưởng nếu:
-        // 1. Không có bất kỳ phiếu kiểm nghiệm Đạt nào, HOẶC
-        // 2. Kết quả kiểm nghiệm cuối cùng vẫn là KHÔNG ĐẠT (FAIL) và kết quả hợp nhất cũng không đạt
-        if (!hasPassTest || (!isLatestPass && latestTest.overallStatus === 'FAIL')) {
+        } else if (evaluation.integrityStatus === 'RELATIONSHIP_ERROR') {
+          issues.push({
+            id: `relationship_err_${b.id}`,
+            type: 'TEST_RESULT_RELATIONSHIP_INVALID',
+            category: 'CROSS_ENTITY_MISMATCH',
+            severity: 'WARNING',
+            title: `Lỗi liên kết phiếu kiểm nghiệm: ${b.batchNo}`,
+            description: evaluation.summaryMessage,
+            entityType: 'BATCH',
+            entityId: b.id,
+            entityName: b.batchNo,
+            relatedEntityId: resolution.legacyResults[0]?.id,
+            suggestedAction:
+              evaluation.suggestedAction ||
+              'Cập nhật khóa liên kết kỹ thuật (batchId = batch.id) cho phiếu kiểm nghiệm.',
+            autoHealable: true,
+            autoHealAction: 'FIX_TEST_RELATIONSHIP',
+            healPayload: {
+              batchId: b.id,
+              testResultIds: resolution.legacyResults.map((r) => r.id),
+            },
+          });
+        } else if (evaluation.integrityStatus === 'TEST_RESULT_INVALID_STATUS') {
           issues.push({
             id: `released_no_pass_${b.id}`,
             type: 'RELEASED_BATCH_NO_PASSING_TEST',
             category: 'LOGICAL_STATUS_INCONSISTENCY',
             severity: 'CRITICAL',
             title: `Lô đã xuất xưởng nhưng kết quả kiểm nghiệm không đạt: ${b.batchNo}`,
-            description: `Lô "${b.batchNo}" ở trạng thái ĐÃ XUẤT XƯỞNG (RELEASED) nhưng kết quả kiểm nghiệm cuối cùng là KHÔNG ĐẠT (FAIL) và chưa có phiếu kiểm nghiệm lại đạt.`,
+            description: evaluation.summaryMessage,
             entityType: 'BATCH',
             entityId: b.id,
             entityName: b.batchNo,
             suggestedAction:
+              evaluation.suggestedAction ||
               'Xem xét lại quyết định duyệt lô, thực hiện kiểm nghiệm lại hoặc chuyển trạng thái sang BỊ LOẠI (REJECTED) / ĐANG KIỂM TRA (TESTING).',
             autoHealable: false,
           });
@@ -866,6 +890,7 @@ export const auditDataConsistency = (data: SystemDataSnapshot): ConsistencyRepor
 export const generateAutoHealPlan = (report: ConsistencyReport, data: SystemDataSnapshot) => {
   const formulaUpdates: Record<string, ProductFormula> = {};
   const testResultStatusUpdates: Record<string, 'PASS' | 'FAIL'> = {};
+  const testResultBatchIdUpdates: Record<string, string> = {};
   const testResultLabUpdates: Record<string, { labId: string; labName: string }> = {};
   const tccsActiveUpdates: Record<string, { tccsId: string; isActive: boolean }[]> = {};
   const orphanAliasIdsToDelete: string[] = [];
@@ -914,6 +939,13 @@ export const generateAutoHealPlan = (report: ConsistencyReport, data: SystemData
     } else if (issue.autoHealAction === 'FIX_TEST_STATUS' && issue.healPayload) {
       const { testResultId, correctStatus } = issue.healPayload;
       testResultStatusUpdates[testResultId] = correctStatus;
+    } else if (issue.autoHealAction === 'FIX_TEST_RELATIONSHIP' && issue.healPayload) {
+      const { batchId, testResultIds } = issue.healPayload;
+      if (batchId && Array.isArray(testResultIds)) {
+        testResultIds.forEach((trId: string) => {
+          testResultBatchIdUpdates[trId] = batchId;
+        });
+      }
     } else if (issue.autoHealAction === 'FIX_ACTIVE_TCCS' && issue.healPayload) {
       const { productId, targetTccsId } = issue.healPayload;
       const pTccs = data.tccsList.filter((t) => t.productId === productId);
@@ -936,12 +968,14 @@ export const generateAutoHealPlan = (report: ConsistencyReport, data: SystemData
   return {
     formulaUpdates,
     testResultStatusUpdates,
+    testResultBatchIdUpdates,
     testResultLabUpdates,
     tccsActiveUpdates,
     orphanAliasIdsToDelete,
     totalActionsCount:
       Object.keys(formulaUpdates).length +
       Object.keys(testResultStatusUpdates).length +
+      Object.keys(testResultBatchIdUpdates).length +
       Object.keys(testResultLabUpdates).length +
       Object.keys(tccsActiveUpdates).length +
       orphanAliasIdsToDelete.length,
@@ -975,6 +1009,18 @@ export const executeAutoHealPlan = async (
     const tr = actions.testResults.find((t) => t.id === trId);
     if (tr) {
       await actions.updateTestResult({ ...tr, overallStatus: plan.testResultStatusUpdates[trId] });
+      successCount++;
+    }
+  }
+
+  // 2b. Cập nhật Test Result Batch ID (hàn gắn quan hệ liên kết kỹ thuật chính xác)
+  for (const trId of Object.keys(plan.testResultBatchIdUpdates || {})) {
+    const tr = actions.testResults.find((t) => t.id === trId);
+    if (tr) {
+      await actions.updateTestResult({
+        ...tr,
+        batchId: plan.testResultBatchIdUpdates[trId],
+      });
       successCount++;
     }
   }

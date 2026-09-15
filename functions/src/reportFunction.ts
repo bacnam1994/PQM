@@ -58,20 +58,23 @@ export async function generateQualityReportBackend(
     testResults = req.reportData.testResults;
     products = req.reportData.products || [];
   } else {
-    // Đọc trực tiếp từ Firebase RTDB nếu client không truyền data
-    const [bSnap, trSnap, pSnap] = await Promise.all([
+    // Đọc trực tiếp từ Firebase RTDB nếu client không truyền data (ưu tiên testResults chuẩn)
+    const [bSnap, primaryTrSnap, legacyTrSnap, pSnap] = await Promise.all([
       db.ref('batches').once('value'),
+      db.ref('testResults').once('value'),
       db.ref('test_results').once('value'),
-      db.ref('products').once('value')
+      db.ref('products').once('value'),
     ]);
     batches = Object.values(bSnap.val() || {});
-    testResults = Object.values(trSnap.val() || {});
+    const primaryTestResults = primaryTrSnap.val() || {};
+    const legacyTestResults = legacyTrSnap.val() || {};
+    testResults = Object.values({ ...legacyTestResults, ...primaryTestResults });
     products = Object.values(pSnap.val() || {});
   }
 
   const now = new Date();
   const year = req.year || now.getFullYear();
-  const month = req.month || (now.getMonth() + 1);
+  const month = req.month || now.getMonth() + 1;
   const quarter = req.quarter || Math.ceil((now.getMonth() + 1) / 3);
 
   let periodLabel = 'Toàn bộ';
@@ -82,10 +85,15 @@ export async function generateQualityReportBackend(
     filterFn = (tr: any) => {
       if (!tr.testDate) return false;
       const d = new Date(tr.testDate);
-      return d.getFullYear() === year && (d.getMonth() + 1) === month;
+      return d.getFullYear() === year && d.getMonth() + 1 === month;
     };
   } else if (req.period === 'quarter') {
-    const qMonths: Record<number, number[]> = { 1: [1, 2, 3], 2: [4, 5, 6], 3: [7, 8, 9], 4: [10, 11, 12] };
+    const qMonths: Record<number, number[]> = {
+      1: [1, 2, 3],
+      2: [4, 5, 6],
+      3: [7, 8, 9],
+      4: [10, 11, 12],
+    };
     periodLabel = `Quý ${quarter}/${year}`;
     filterFn = (tr: any) => {
       if (!tr.testDate) return false;
@@ -94,20 +102,20 @@ export async function generateQualityReportBackend(
     };
   }
 
-  const productMap = new Map(products.map(p => [p.id, p]));
-  const batchMap = new Map(batches.map(b => [b.id, b]));
+  const productMap = new Map(products.map((p) => [p.id, p]));
+  const batchMap = new Map(batches.map((b) => [b.id, b]));
 
   let filteredResults = testResults.filter(filterFn);
   if (req.productId) {
-    filteredResults = filteredResults.filter(tr => {
+    filteredResults = filteredResults.filter((tr) => {
       const b = batchMap.get(tr.batchId);
       return b && b.productId === req.productId;
     });
   }
 
   const total = filteredResults.length;
-  const pass = filteredResults.filter(r => r.overallStatus === 'PASS').length;
-  const fail = filteredResults.filter(r => r.overallStatus === 'FAIL').length;
+  const pass = filteredResults.filter((r) => r.overallStatus === 'PASS').length;
+  const fail = filteredResults.filter((r) => r.overallStatus === 'FAIL').length;
   const passRate = total > 0 ? `${((pass / total) * 100).toFixed(1)}%` : '0%';
 
   // Tạo hàng dữ liệu
@@ -125,18 +133,19 @@ export async function generateQualityReportBackend(
       'Tên sản phẩm': product.name || '---',
       'Mã sản phẩm': product.code || '---',
       'Đơn vị KN': tr.labType === 'INTERNAL' ? 'Nội bộ' : tr.externalLabName || 'Thuê ngoài',
-      'Kết quả tổng': tr.overallStatus === 'PASS' ? 'ĐẠT' : tr.overallStatus === 'FAIL' ? 'KHÔNG ĐẠT' : 'CHỜ',
+      'Kết quả tổng':
+        tr.overallStatus === 'PASS' ? 'ĐẠT' : tr.overallStatus === 'FAIL' ? 'KHÔNG ĐẠT' : 'CHỜ',
       'Số CT đạt': passCount,
       'Số CT không đạt': failCount,
       'Ngày SX': fmtDate(batch.mfgDate),
       'Hạn dùng': fmtDate(batch.expDate),
-      'Ghi chú': tr.note || ''
+      'Ghi chú': tr.note || '',
     };
   };
 
   const allRows = filteredResults.map(buildRow);
-  const passRows = filteredResults.filter(r => r.overallStatus === 'PASS').map(buildRow);
-  const failRows = filteredResults.filter(r => r.overallStatus === 'FAIL').map(buildRow);
+  const passRows = filteredResults.filter((r) => r.overallStatus === 'PASS').map(buildRow);
+  const failRows = filteredResults.filter((r) => r.overallStatus === 'FAIL').map(buildRow);
 
   // Sheet Tóm tắt
   const summaryData = [
@@ -146,7 +155,10 @@ export async function generateQualityReportBackend(
     { 'CHỈ SỐ': 'Số phiếu ĐẠT', 'GIÁ TRỊ': pass },
     { 'CHỈ SỐ': 'Số phiếu KHÔNG ĐẠT (OOS)', 'GIÁ TRỊ': fail },
     { 'CHỈ SỐ': 'Tỷ lệ đạt chuẩn', 'GIÁ TRỊ': passRate },
-    { 'CHỈ SỐ': 'Sản phẩm lọc', 'GIÁ TRỊ': req.productId ? (productMap.get(req.productId)?.name || req.productId) : 'Tất cả' }
+    {
+      'CHỈ SỐ': 'Sản phẩm lọc',
+      'GIÁ TRỊ': req.productId ? productMap.get(req.productId)?.name || req.productId : 'Tất cả',
+    },
   ];
 
   const wb = XLSX.utils.book_new();
@@ -168,16 +180,16 @@ export async function generateQualityReportBackend(
       contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       metadata: {
         generatedBy: 'PQM-Cloud-Function',
-        period: periodLabel
-      }
-    }
+        period: periodLabel,
+      },
+    },
   });
 
   // Tạo Signed URL có thời hạn 60 phút
   const expiresAtMs = Date.now() + 60 * 60 * 1000;
   const [signedUrl] = await file.getSignedUrl({
     action: 'read',
-    expires: expiresAtMs
+    expires: expiresAtMs,
   });
 
   return {
@@ -189,8 +201,8 @@ export async function generateQualityReportBackend(
       pass,
       fail,
       passRate,
-      periodLabel
+      periodLabel,
     },
-    expiresAt: new Date(expiresAtMs).toISOString()
+    expiresAt: new Date(expiresAtMs).toISOString(),
   };
 }

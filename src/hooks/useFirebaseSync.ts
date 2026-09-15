@@ -101,7 +101,7 @@ const COLLECTION_CONFIGS: Record<string, CollectionConfig> = {
     storeName: 'testResults',
     firebasePath: 'testResults',
     queryKey: TEST_RESULT_QUERY_KEYS.all,
-    getInitialQuery: (reference) => query(reference, limitToLast(100)),
+    getInitialQuery: (reference) => query(reference, limitToLast(500)),
     sortFn: (a, b) =>
       new Date(b.testDate || b.createdAt || 0).getTime() -
       new Date(a.testDate || a.createdAt || 0).getTime(),

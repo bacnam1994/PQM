@@ -45,7 +45,12 @@ export const DataConsistencyCenter: React.FC = () => {
   const [selectedCategory, setSelectedCategory] = useState<ConsistencyCategory | 'ALL'>('ALL');
   const [expandedIssueId, setExpandedIssueId] = useState<string | null>(null);
 
-  // Lấy dữ liệu hệ thống hiện tại
+  const syncStatus = useAppStore((state) => state.syncStatus);
+  const isTestResultsLoading = syncStatus === 'SAVING';
+  const testResultsLoaded =
+    (testResults && testResults.length > 0) || syncStatus === 'SAVED' || syncStatus === 'IDLE';
+
+  // Lấy dữ liệu hệ thống hiện tại kèm trạng thái Freshness
   const systemSnapshot: SystemDataSnapshot = useMemo(
     () => ({
       products: products || [],
@@ -56,6 +61,12 @@ export const DataConsistencyCenter: React.FC = () => {
       testResults: testResults || [],
       criteriaAliases: criteriaAliases || [],
       testingLaboratories: testingLaboratories || [],
+      dataFreshness: {
+        isTestResultsLoading,
+        testResultsLoaded,
+        isOffline: syncStatus === 'OFFLINE',
+        isError: syncStatus === 'ERROR',
+      },
     }),
     [
       products,
@@ -66,6 +77,9 @@ export const DataConsistencyCenter: React.FC = () => {
       testResults,
       criteriaAliases,
       testingLaboratories,
+      isTestResultsLoading,
+      testResultsLoaded,
+      syncStatus,
     ]
   );
 
@@ -131,6 +145,19 @@ export const DataConsistencyCenter: React.FC = () => {
           if (testRes) {
             await updateTestResult({ ...testRes, overallStatus: correctStatus });
             toast.success(`Đã cập nhật trạng thái phiếu kiểm nghiệm thành ${correctStatus}`);
+          }
+        } else if (issue.autoHealAction === 'FIX_TEST_RELATIONSHIP') {
+          const { batchId, testResultIds } = issue.healPayload;
+          if (batchId && Array.isArray(testResultIds)) {
+            for (const trId of testResultIds) {
+              const testRes = testResults.find((t) => t.id === trId);
+              if (testRes) {
+                await updateTestResult({ ...testRes, batchId });
+              }
+            }
+            toast.success(
+              `Đã chuẩn hóa liên kết kỹ thuật cho ${testResultIds.length} phiếu kiểm nghiệm`
+            );
           }
         } else if (issue.autoHealAction === 'FIX_ACTIVE_TCCS') {
           const { productId, targetTccsId } = issue.healPayload;

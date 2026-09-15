@@ -344,7 +344,7 @@ describe('dataConsistencyService - Data Linkage & Consistency Engine', () => {
     expect(dupBatch).toBeDefined();
   });
 
-  it('7. should resolve test results linked by batchNo or suffix and recognize RELEASED batch as PASS', () => {
+  it('7. should resolve test results linked by batchNo as LEGACY_RELATIONSHIP (not missing test) and support auto-healing', async () => {
     const batchWithNo: Batch = {
       ...sampleBatch,
       id: 'batch_uuid_042605',
@@ -377,10 +377,37 @@ describe('dataConsistencyService - Data Linkage & Consistency Engine', () => {
     const report = auditDataConsistency(data);
     const releasedIssue = report.issues.find((i) => i.type === 'RELEASED_BATCH_NO_PASSING_TEST');
     const orphanTestIssue = report.issues.find((i) => i.type === 'ORPHAN_TEST_RESULT');
+    const legacyIssue = report.issues.find((i) => i.type === 'TEST_RESULT_RELATIONSHIP_INVALID');
 
+    // Không được kết luận sai là Lô chưa kiểm nghiệm hoặc Phiếu mồ côi
     expect(releasedIssue).toBeUndefined();
     expect(orphanTestIssue).toBeUndefined();
-    expect(report.totalIssuesCount).toBe(0);
+
+    // Phải phát hiện đúng quan hệ liên kết bằng batchNo cần chuẩn hóa
+    expect(legacyIssue).toBeDefined();
+    expect(legacyIssue?.autoHealable).toBe(true);
+    expect(legacyIssue?.autoHealAction).toBe('FIX_TEST_RELATIONSHIP');
+
+    // Kiểm tra Auto-Heal hàn gắn quan hệ ID
+    const plan = generateAutoHealPlan(report, data);
+    expect(plan.testResultBatchIdUpdates['test_custom_1']).toBe('batch_uuid_042605');
+
+    const updateTestMock = vi.fn();
+    await executeAutoHealPlan(plan, {
+      updateProductFormula: vi.fn(),
+      updateTestResult: updateTestMock,
+      updateTCCS: vi.fn(),
+      deleteCriteriaAlias: vi.fn(),
+      testResults: [testWithBatchNo],
+      tccsList: [sampleTCCS],
+    });
+
+    expect(updateTestMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: 'test_custom_1',
+        batchId: 'batch_uuid_042605',
+      })
+    );
   });
 
   it('8. should accept RELEASED batch if initial test was FAIL but re-test/subsequent test was PASS', () => {
@@ -482,5 +509,80 @@ describe('dataConsistencyService - Data Linkage & Consistency Engine', () => {
         labName: 'Trung tâm Kỹ thuật Tiêu chuẩn Đo lường Chất lượng 3',
       })
     );
+  });
+
+  it('10. Regression Test Lô 272501: Batch 272501 đã có TestResult hợp lệ liên kết batchId -> TUYỆT ĐỐI KHÔNG CẢNH BÁO', () => {
+    const batch272501: Batch = {
+      id: '-Nx_real_batch_id_272501',
+      productId: 'prod_1',
+      tccsId: 'tccs_1',
+      batchNo: '272501',
+      mfgDate: '2025-01-10',
+      expDate: '2028-01-10',
+      theoreticalYield: 10000,
+      actualYield: 9950,
+      yieldUnit: 'viên',
+      status: 'RELEASED',
+      createdAt: '2025-01-10T00:00:00Z',
+    };
+
+    const testResult272501: TestResult = {
+      id: '-Ny_real_test_id_for_272501',
+      batchId: '-Nx_real_batch_id_272501', // Technical ID mapping chuẩn xác
+      labId: 'lab_internal',
+      labName: 'Phòng Kiểm nghiệm Nội bộ V-BIOTECH',
+      testDate: '2025-01-14',
+      overallStatus: 'PASS',
+      results: [
+        { criteriaName: 'Định lượng Ginkgo Biloba', value: 100.5, isPass: true, unit: 'mg/viên' },
+        { criteriaName: 'Tổng số vi sinh vật hiếu khí', value: 20, isPass: true, unit: 'CFU/g' },
+      ],
+      createdAt: '2025-01-14T00:00:00Z',
+    };
+
+    const data: SystemDataSnapshot = {
+      products: [sampleProduct],
+      rawMaterials: [sampleRawMaterial],
+      tccsList: [sampleTCCS],
+      productFormulas: [sampleFormula],
+      batches: [batch272501],
+      testResults: [testResult272501],
+      dataFreshness: {
+        isTestResultsLoading: false,
+        testResultsLoaded: true,
+      },
+    };
+
+    const report = auditDataConsistency(data);
+    const releasedAlert = report.issues.find(
+      (i) => i.entityId === batch272501.id || i.title.includes('272501')
+    );
+
+    expect(releasedAlert).toBeUndefined();
+    expect(report.criticalCount).toBe(0);
+    expect(report.grade).toBe('EXCELLENT');
+    expect(report.overallScore).toBe(100);
+  });
+
+  it('11. Data Freshness Guard: Khi testResults đang tải (isTestResultsLoading=true), KHÔNG tạo false positive alert cho các lô đã xuất xưởng', () => {
+    const data: SystemDataSnapshot = {
+      products: [sampleProduct],
+      rawMaterials: [sampleRawMaterial],
+      tccsList: [sampleTCCS],
+      productFormulas: [sampleFormula],
+      batches: [sampleBatch], // sampleBatch status: RELEASED
+      testResults: [], // Chưa nạp xong từ máy chủ
+      dataFreshness: {
+        isTestResultsLoading: true,
+        testResultsLoaded: false,
+      },
+    };
+
+    const report = auditDataConsistency(data);
+    const releasedIssue = report.issues.find((i) => i.type === 'RELEASED_BATCH_NO_PASSING_TEST');
+
+    // Tuyệt đối không phát sinh cảnh báo thiếu kiểm nghiệm khi dữ liệu đang tải
+    expect(releasedIssue).toBeUndefined();
+    expect(report.criticalCount).toBe(0);
   });
 });
