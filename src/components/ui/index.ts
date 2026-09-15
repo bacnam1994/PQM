@@ -8,3 +8,4 @@ export * from './FilterBar';
 export * from './CommonUI';
 export * from './DesignSystem';
 export * from './ErrorBoundary';
+export * from './VirtualizedTableBody';

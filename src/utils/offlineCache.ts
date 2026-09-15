@@ -128,6 +128,30 @@ export const getFromCache = async (storeName: string): Promise<any[]> => {
 };
 
 /**
+ * Đọc tối đa số lượng bản ghi gần nhất từ IndexedDB (On-demand/Bounded Cache Read)
+ */
+export const getFromCacheRecent = async (
+  storeName: string,
+  limit: number = 100
+): Promise<any[]> => {
+  try {
+    const db = await initDB();
+    const tx = db.transaction(storeName, 'readonly');
+    const store = tx.objectStore(storeName);
+
+    return new Promise((resolve, reject) => {
+      // IDBObjectStore.getAll(query, count)
+      const request = (store as any).getAll(null, limit);
+      request.onsuccess = () => resolve(request.result || []);
+      request.onerror = () => reject(request.error);
+    });
+  } catch (error) {
+    console.warn(`Lỗi đọc cache recent [${storeName}]:`, error);
+    return [];
+  }
+};
+
+/**
  * Xóa toàn bộ dữ liệu trong IndexedDB (Sử dụng khi người dùng Đăng xuất)
  */
 export const clearEntireCache = async (): Promise<void> => {

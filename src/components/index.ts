@@ -13,6 +13,5 @@ export { default as Layout } from './layout/Layout';
 
 export { default as BatchCriteriaHistory } from './features/BatchCriteriaHistory';
 export { default as CriteriaInputGroup } from './features/CriteriaInputGroup';
-export { AIAssistantChat } from './features/AIAssistantChat';
 export { default as MappingConfirmModal } from './features/MappingConfirmModal';
-export type { AIExtractedItem, ConfirmedMapping } from './features/MappingConfirmModal';
+export type { AIExtractedItem, ConfirmedMapping } from './features/MappingConfirmModal';

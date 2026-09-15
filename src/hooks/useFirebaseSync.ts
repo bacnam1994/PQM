@@ -50,6 +50,10 @@ const COLLECTION_CONFIGS: Record<string, CollectionConfig> = {
     storeName: 'batches',
     firebasePath: 'batches',
     queryKey: BATCH_QUERY_KEYS.all,
+    getInitialQuery: (reference) => query(reference, limitToLast(100)),
+    sortFn: (a, b) =>
+      new Date(b.mfgDate || b.createdAt || 0).getTime() -
+      new Date(a.mfgDate || a.createdAt || 0).getTime(),
     getScopedInvalidations: (item, id) => {
       queryClient.invalidateQueries({ queryKey: BATCH_QUERY_KEYS.detail(id) });
       queryClient.invalidateQueries({ queryKey: TEST_RESULT_QUERY_KEYS.byBatch(id) });
@@ -157,61 +161,81 @@ export const useFirebaseSync = () => {
     window.addEventListener('offline', handleOffline);
 
     const initializeData = async () => {
-      // BƯỚC 1: Tải nhanh dữ liệu từ IndexedDB Offline Cache
+      // BƯỚC 1: Tải nhanh dữ liệu từ IndexedDB Offline Cache (Tiered Hydration)
       try {
+        // Tầng 1: Dữ liệu CRITICAL cần ngay để render App Shell, Dashboard & danh mục chính
         const [
           cachedProducts,
           cachedBatches,
           cachedTccs,
-          cachedFormulas,
-          cachedMaterials,
-          cachedTestResults,
-          cachedAiMappings,
-          cachedQualityAlerts,
-          cachedCriteriaAliases,
           cachedTestingLaboratories,
+          cachedQualityAlerts,
         ] = await Promise.all([
           getFromCache('products'),
           getFromCache('batches'),
           getFromCache('tccs'),
-          getFromCache('productFormulas'),
-          getFromCache('rawMaterials'),
-          getFromCache('testResults'),
-          getFromCache('aiLearnedMappings'),
-          getFromCache('qualityAlerts'),
-          getFromCache('criteriaAliases'),
           getFromCache('testingLaboratories'),
+          getFromCache('qualityAlerts'),
         ]);
 
         if (!isMounted) return;
 
-        // Nạp cache IndexedDB vào TanStack Query Cache
         if (cachedProducts?.length > 0)
           queryClient.setQueryData(PRODUCT_QUERY_KEYS.all, cachedProducts);
         if (cachedBatches?.length > 0)
           queryClient.setQueryData(BATCH_QUERY_KEYS.all, cachedBatches);
         if (cachedTccs?.length > 0) queryClient.setQueryData(TCCS_QUERY_KEYS.all, cachedTccs);
-        if (cachedFormulas?.length > 0)
-          queryClient.setQueryData(PRODUCT_QUERY_KEYS.formulas, cachedFormulas);
-        if (cachedMaterials?.length > 0)
-          queryClient.setQueryData(PRODUCT_QUERY_KEYS.materials, cachedMaterials);
-        if (cachedTestResults?.length > 0)
-          queryClient.setQueryData(TEST_RESULT_QUERY_KEYS.all, cachedTestResults);
-        if (cachedCriteriaAliases?.length > 0)
-          queryClient.setQueryData(TCCS_QUERY_KEYS.aliases, cachedCriteriaAliases);
-        if (cachedAiMappings?.length > 0)
-          queryClient.setQueryData(TCCS_QUERY_KEYS.aiMappings, cachedAiMappings);
         if (cachedTestingLaboratories?.length > 0) {
           queryClient.setQueryData(LABORATORY_QUERY_KEYS.all, cachedTestingLaboratories);
         } else {
           queryClient.setQueryData(LABORATORY_QUERY_KEYS.all, DEFAULT_TESTING_LABORATORIES);
         }
 
-        // Đánh dấu trạng thái đã đồng bộ dữ liệu ngoại tuyến
+        // Đánh dấu trạng thái sẵn sàng cho tầng 1
         useAppStore.getState().setSyncStatus('SAVED');
         useAppStore.getState().setAppState({
           lastSync: new Date().toISOString(),
         });
+
+        // Tầng 2: Dữ liệu SECONDARY nạp bất đồng bộ không block UI
+        const hydrateSecondary = async () => {
+          try {
+            const [
+              cachedFormulas,
+              cachedMaterials,
+              cachedTestResults,
+              cachedCriteriaAliases,
+              cachedAiMappings,
+            ] = await Promise.all([
+              getFromCache('productFormulas'),
+              getFromCache('rawMaterials'),
+              getFromCache('testResults'),
+              getFromCache('criteriaAliases'),
+              getFromCache('aiLearnedMappings'),
+            ]);
+
+            if (!isMounted) return;
+
+            if (cachedFormulas?.length > 0)
+              queryClient.setQueryData(PRODUCT_QUERY_KEYS.formulas, cachedFormulas);
+            if (cachedMaterials?.length > 0)
+              queryClient.setQueryData(PRODUCT_QUERY_KEYS.materials, cachedMaterials);
+            if (cachedTestResults?.length > 0)
+              queryClient.setQueryData(TEST_RESULT_QUERY_KEYS.all, cachedTestResults);
+            if (cachedCriteriaAliases?.length > 0)
+              queryClient.setQueryData(TCCS_QUERY_KEYS.aliases, cachedCriteriaAliases);
+            if (cachedAiMappings?.length > 0)
+              queryClient.setQueryData(TCCS_QUERY_KEYS.aiMappings, cachedAiMappings);
+          } catch (e) {
+            console.warn('[SyncEngine] Lỗi nạp cache tầng 2:', e);
+          }
+        };
+
+        if ('requestIdleCallback' in window) {
+          (window as any).requestIdleCallback(() => hydrateSecondary());
+        } else {
+          setTimeout(hydrateSecondary, 10);
+        }
       } catch (error) {
         console.error('[SyncEngine] Lỗi nạp cache IndexedDB:', error);
       }
@@ -260,7 +284,7 @@ export const useFirebaseSync = () => {
         isInitialSnapshotLoaded[config.key] = true;
         if (!isMounted) return;
 
-        // 2.2. Lắng nghe thay đổi Vi mô: onChildChanged (Granular Update)
+        // 2.2. Lắng nghe thay đổi Vi mô: onChildChanged (Granular Update không clone/sort vô tội vạ)
         const unsubChanged = onChildChanged(reference, (snapshot) => {
           if (!isMounted) return;
           const updatedEntity = snapshot.val();
@@ -270,11 +294,22 @@ export const useFirebaseSync = () => {
           // Cập nhật in-place vào TanStack Query Cache
           queryClient.setQueryData<any[]>(config.queryKey, (old = []) => {
             const index = old.findIndex((item) => item.id === id);
-            if (index === -1) return [...old, updatedEntity];
+            if (index === -1) {
+              const next = [updatedEntity, ...old];
+              if (config.sortFn) next.sort(config.sortFn);
+              return next;
+            }
             const next = [...old];
             next[index] = updatedEntity;
-            if (config.sortFn) {
-              next.sort(config.sortFn);
+
+            // Kiểm tra O(1) thứ tự: chỉ re-sort khi vị trí với phần tử lân cận bị vi phạm
+            if (config.sortFn && next.length > 1) {
+              const prevBroken = index > 0 && config.sortFn(next[index - 1], next[index]) > 0;
+              const nextBroken =
+                index < next.length - 1 && config.sortFn(next[index], next[index + 1]) > 0;
+              if (prevBroken || nextBroken) {
+                next.sort(config.sortFn);
+              }
             }
             return next;
           });
@@ -287,7 +322,7 @@ export const useFirebaseSync = () => {
         });
         unsubscribes.push(unsubChanged);
 
-        // 2.3. Lắng nghe thêm mới Vi mô: onChildAdded
+        // 2.3. Lắng nghe thêm mới Vi mô: onChildAdded (O(1) prepend nếu mới nhất)
         const unsubAdded = onChildAdded(reference, (snapshot) => {
           if (!isMounted || !isInitialSnapshotLoaded[config.key]) return;
           const newEntity = snapshot.val();
@@ -297,6 +332,10 @@ export const useFirebaseSync = () => {
           // Thêm in-place vào TanStack Query Cache nếu chưa có
           queryClient.setQueryData<any[]>(config.queryKey, (old = []) => {
             if (old.some((item) => item.id === id)) return old;
+            // Nếu phần tử mới nhất thỏa mãn thứ tự đứng đầu, chỉ việc chèn đầu O(1)
+            if (config.sortFn && old.length > 0 && config.sortFn(newEntity, old[0]) <= 0) {
+              return [newEntity, ...old];
+            }
             const next = [...old, newEntity];
             if (config.sortFn) {
               next.sort(config.sortFn);

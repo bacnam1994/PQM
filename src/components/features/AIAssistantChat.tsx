@@ -1,17 +1,23 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
-import { 
-  CloudArrowUpIcon, 
-  ArrowPathIcon, 
-  SparklesIcon, 
-  PaperAirplaneIcon, 
-  CheckCircleIcon, 
-  ExclamationCircleIcon, 
-  XMarkIcon, 
-  Cog6ToothIcon, 
-  CpuChipIcon, 
-  TrashIcon 
+import {
+  CloudArrowUpIcon,
+  ArrowPathIcon,
+  SparklesIcon,
+  PaperAirplaneIcon,
+  CheckCircleIcon,
+  ExclamationCircleIcon,
+  XMarkIcon,
+  Cog6ToothIcon,
+  CpuChipIcon,
+  TrashIcon,
 } from '@heroicons/react/24/outline';
-import { geminiService, validateOCRFile, formatGeminiError, AVAILABLE_GEMINI_MODELS, DEFAULT_GEMINI_MODEL } from '../../services/ai/geminiService';
+import {
+  geminiService,
+  validateOCRFile,
+  formatGeminiError,
+  AVAILABLE_GEMINI_MODELS,
+  DEFAULT_GEMINI_MODEL,
+} from '../../services/ai/geminiService';
 import { buildExtractionPrompt } from '../../services/ai/prompts';
 import { writeAIDraft } from '../../services/ai/aiDraftManager';
 import { useAppStore } from '../../store/useAppStore';
@@ -48,7 +54,7 @@ interface ChatMessage {
 const WELCOME_MESSAGE: ChatMessage = {
   id: 'msg_welcome',
   sender: 'ai',
-  text: 'Xin chào! Tôi là trợ lý AI của V-Biotech QMS. Tôi có thể:\n\n📄 **Nhập liệu:** Tải lên Phiếu Kiểm Nghiệm để tự động trích xuất dữ liệu.\n\n📊 **Phân tích:** Hỏi tôi về xu hướng chất lượng, tỷ lệ đạt/lỗi theo sản phẩm.\n\n⚠️ **Cảnh báo:** "Có cảnh báo chất lượng nào không?"\n\n🔬 **Dược điển:** "Giới hạn vi sinh vật cho thuốc uống là bao nhiêu?"\n\n📥 **Xuất báo cáo:** "Xuất báo cáo tháng 5 năm 2026 ra Excel"\n\nBạn muốn bắt đầu với điều gì?'
+  text: 'Xin chào! Tôi là trợ lý AI của V-Biotech QMS. Tôi có thể:\n\n📄 **Nhập liệu:** Tải lên Phiếu Kiểm Nghiệm để tự động trích xuất dữ liệu.\n\n📊 **Phân tích:** Hỏi tôi về xu hướng chất lượng, tỷ lệ đạt/lỗi theo sản phẩm.\n\n⚠️ **Cảnh báo:** "Có cảnh báo chất lượng nào không?"\n\n🔬 **Dược điển:** "Giới hạn vi sinh vật cho thuốc uống là bao nhiêu?"\n\n📥 **Xuất báo cáo:** "Xuất báo cáo tháng 5 năm 2026 ra Excel"\n\nBạn muốn bắt đầu với điều gì?',
 };
 
 const CHAT_HISTORY_KEY = 'pqm_ai_chat_history';
@@ -57,7 +63,9 @@ const saveChatHistory = (msgs: ChatMessage[]) => {
     // Chỉ lưu tối đa 50 tin nhắn gần nhất để tránh tốn bộ nhớ
     const toSave = msgs.slice(-50);
     sessionStorage.setItem(CHAT_HISTORY_KEY, JSON.stringify(toSave));
-  } catch { /* Bỏ qua nếu sessionStorage đầy */ }
+  } catch {
+    /* Bỏ qua nếu sessionStorage đầy */
+  }
 };
 /** Khôi phục messages từ sessionStorage */
 const loadChatHistory = (): ChatMessage[] => {
@@ -67,20 +75,56 @@ const loadChatHistory = (): ChatMessage[] => {
       const parsed = JSON.parse(saved) as ChatMessage[];
       if (parsed.length > 0) return parsed;
     }
-  } catch { /* Bỏ qua lỗi parse */ }
+  } catch {
+    /* Bỏ qua lỗi parse */
+  }
   return [WELCOME_MESSAGE];
 };
 
-export const AIAssistantChat: React.FC = () => {
-  const [isOpen, setIsOpen] = useState(false);
+export interface AIAssistantChatProps {
+  isOpen?: boolean;
+  onClose?: () => void;
+}
+
+export const AIAssistantChat: React.FC<AIAssistantChatProps> = ({
+  isOpen: controlledIsOpen,
+  onClose,
+}) => {
+  const [internalIsOpen, setInternalIsOpen] = useState(controlledIsOpen ?? false);
+  const isOpen = controlledIsOpen !== undefined ? controlledIsOpen : internalIsOpen;
+  const setIsOpen = useCallback(
+    (val: boolean) => {
+      setInternalIsOpen(val);
+      if (!val) onClose?.();
+    },
+    [onClose]
+  );
+
+  useEffect(() => {
+    if (controlledIsOpen !== undefined) {
+      setInternalIsOpen(controlledIsOpen);
+    }
+  }, [controlledIsOpen]);
+
   const [messages, setMessages] = useState<ChatMessage[]>(loadChatHistory);
-  
+
   const [isDragging, setIsDragging] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const { products, tccsList, testResults, addBatch, isAdmin, aiLearnedMappings, addAiLearnedMapping, productFormulas, rawMaterials, user } = useAppStore();
+  const {
+    products,
+    tccsList,
+    testResults,
+    addBatch,
+    isAdmin,
+    aiLearnedMappings,
+    addAiLearnedMapping,
+    productFormulas,
+    rawMaterials,
+    user,
+  } = useAppStore();
   const { batches: hydratedBatches } = useDataGraph();
   const navigate = useNavigate();
   const location = useLocation();
@@ -89,26 +133,33 @@ export const AIAssistantChat: React.FC = () => {
   const [isCreatingBatch, setIsCreatingBatch] = useState(false);
   const [chatInputText, setChatInputText] = useState('');
   const [showConfig, setShowConfig] = useState(false);
-  const [currentModel, setCurrentModel] = useState(() => localStorage.getItem('GEMINI_MODEL') || DEFAULT_GEMINI_MODEL);
-  const [thinkingEnabled, setThinkingEnabled] = useState(() => localStorage.getItem('GEMINI_THINKING_ENABLED') !== 'false');
+  const [currentModel, setCurrentModel] = useState(
+    () => localStorage.getItem('GEMINI_MODEL') || DEFAULT_GEMINI_MODEL
+  );
+  const [thinkingEnabled, setThinkingEnabled] = useState(
+    () => localStorage.getItem('GEMINI_THINKING_ENABLED') !== 'false'
+  );
 
   // Xác định thực thể đang xem theo URL hiện tại để nhúng ngữ cảnh AI
   const currentContext = useMemo(() => {
     const path = location.pathname;
     if (path.startsWith('/batches/')) {
       const batchId = path.split('/')[2];
-      const b = hydratedBatches.find(item => item.id === batchId || item.batchNo === batchId);
+      const b = hydratedBatches.find((item) => item.id === batchId || item.batchNo === batchId);
       if (b) return { type: 'BATCH' as const, batch: b, label: `Lô: ${b.batchNo}` };
     }
     if (path.startsWith('/products/')) {
       const prodId = path.split('/')[2];
-      const p = products.find(item => item.id === prodId || item.code === prodId);
+      const p = products.find((item) => item.id === prodId || item.code === prodId);
       if (p) return { type: 'PRODUCT' as const, product: p, label: `SP: ${p.name}` };
     }
     if (path.includes('/tccs')) return { type: 'TCCS' as const, label: 'Hồ sơ TCCS' };
-    if (path.includes('/quality-summary-report')) return { type: 'PQR_REPORT' as const, label: 'Báo cáo PQR' };
-    if (path.includes('/trend-analysis')) return { type: 'TREND_SPC' as const, label: 'Kiểm soát SPC' };
-    if (path.includes('/audit-logs')) return { type: 'AUDIT_LOGS' as const, label: 'Kiểm toán ALCOA+' };
+    if (path.includes('/quality-summary-report'))
+      return { type: 'PQR_REPORT' as const, label: 'Báo cáo PQR' };
+    if (path.includes('/trend-analysis'))
+      return { type: 'TREND_SPC' as const, label: 'Kiểm soát SPC' };
+    if (path.includes('/audit-logs'))
+      return { type: 'AUDIT_LOGS' as const, label: 'Kiểm toán ALCOA+' };
     return { type: 'GENERAL' as const, label: 'Toàn hệ thống' };
   }, [location.pathname, hydratedBatches, products]);
 
@@ -116,46 +167,128 @@ export const AIAssistantChat: React.FC = () => {
     if (currentContext.type === 'BATCH' && currentContext.batch) {
       const b = currentContext.batch;
       return [
-        { icon: '🔬', text: `Thẩm định Lô ${b.batchNo}`, prompt: `Thẩm định hồ sơ chất lượng lô ${b.batchNo} và đưa ra khuyến nghị duyệt xuất xưởng` },
-        { icon: '⚠️', text: 'Chỉ tiêu cận ngưỡng', prompt: `Kiểm tra xem lô ${b.batchNo} có chỉ tiêu nào sát ngưỡng giới hạn không?` },
-        { icon: '📉', text: 'Dự báo độ ổn định', prompt: `Phân tích độ ổn định và hạn dùng dự báo của lô ${b.batchNo}` },
-        { icon: '🛡️', text: 'Kiểm tra Audit Trail', prompt: `Rà soát lịch sử sửa đổi kết quả của lô ${b.batchNo}` }
+        {
+          icon: '🔬',
+          text: `Thẩm định Lô ${b.batchNo}`,
+          prompt: `Thẩm định hồ sơ chất lượng lô ${b.batchNo} và đưa ra khuyến nghị duyệt xuất xưởng`,
+        },
+        {
+          icon: '⚠️',
+          text: 'Chỉ tiêu cận ngưỡng',
+          prompt: `Kiểm tra xem lô ${b.batchNo} có chỉ tiêu nào sát ngưỡng giới hạn không?`,
+        },
+        {
+          icon: '📉',
+          text: 'Dự báo độ ổn định',
+          prompt: `Phân tích độ ổn định và hạn dùng dự báo của lô ${b.batchNo}`,
+        },
+        {
+          icon: '🛡️',
+          text: 'Kiểm tra Audit Trail',
+          prompt: `Rà soát lịch sử sửa đổi kết quả của lô ${b.batchNo}`,
+        },
       ];
     }
     if (currentContext.type === 'PRODUCT' && currentContext.product) {
       const p = currentContext.product;
       return [
-        { icon: '📊', text: `Xu hướng Cpk ${p.code || ''}`, prompt: `Đánh giá năng lực quá trình Cpk và độ ổn định của sản phẩm ${p.name}` },
-        { icon: '📦', text: 'Tổng hợp các lô', prompt: `Cho tôi xem thống kê tất cả các lô đã sản xuất của sản phẩm ${p.name}` },
-        { icon: '🧪', text: 'Đối chiếu TCCS & Công thức', prompt: `Kiểm tra TCCS và công thức định lượng của sản phẩm ${p.name}` }
+        {
+          icon: '📊',
+          text: `Xu hướng Cpk ${p.code || ''}`,
+          prompt: `Đánh giá năng lực quá trình Cpk và độ ổn định của sản phẩm ${p.name}`,
+        },
+        {
+          icon: '📦',
+          text: 'Tổng hợp các lô',
+          prompt: `Cho tôi xem thống kê tất cả các lô đã sản xuất của sản phẩm ${p.name}`,
+        },
+        {
+          icon: '🧪',
+          text: 'Đối chiếu TCCS & Công thức',
+          prompt: `Kiểm tra TCCS và công thức định lượng của sản phẩm ${p.name}`,
+        },
       ];
     }
     if (currentContext.type === 'PQR_REPORT') {
       return [
-        { icon: '📝', text: 'Viết kết luận PQR', prompt: 'Soạn thảo nhận xét và đánh giá tổng thể chất lượng (Executive PQR Conclusion) cho kỳ báo cáo này' },
-        { icon: '📊', text: 'Tóm tắt rủi ro Cpk', prompt: 'Tổng hợp các chỉ tiêu có Cpk dưới 1.33 và nguy cơ trong kỳ' },
-        { icon: '💡', text: 'Đề xuất CAPA', prompt: 'Đề xuất các hành động khắc phục phòng ngừa CAPA cho các sự cố chất lượng' }
+        {
+          icon: '📝',
+          text: 'Viết kết luận PQR',
+          prompt:
+            'Soạn thảo nhận xét và đánh giá tổng thể chất lượng (Executive PQR Conclusion) cho kỳ báo cáo này',
+        },
+        {
+          icon: '📊',
+          text: 'Tóm tắt rủi ro Cpk',
+          prompt: 'Tổng hợp các chỉ tiêu có Cpk dưới 1.33 và nguy cơ trong kỳ',
+        },
+        {
+          icon: '💡',
+          text: 'Đề xuất CAPA',
+          prompt: 'Đề xuất các hành động khắc phục phòng ngừa CAPA cho các sự cố chất lượng',
+        },
       ];
     }
     if (currentContext.type === 'AUDIT_LOGS') {
       return [
-        { icon: '🛡️', text: 'Rà soát ALCOA+', prompt: 'Đánh giá mức độ tuân thủ toàn vẹn dữ liệu ALCOA+ và phát hiện các rủi ro' },
-        { icon: '⏰', text: 'Thao tác ngoài giờ', prompt: 'Kiểm tra xem có thao tác sửa đổi dữ liệu nào thực hiện ngoài giờ hành chính hoặc cuối tuần không?' },
-        { icon: '🔄', text: 'Sửa kết quả nhiều lần', prompt: 'Tìm các phiếu kiểm nghiệm bị sửa đổi nhiều lần sau khi tạo' }
+        {
+          icon: '🛡️',
+          text: 'Rà soát ALCOA+',
+          prompt: 'Đánh giá mức độ tuân thủ toàn vẹn dữ liệu ALCOA+ và phát hiện các rủi ro',
+        },
+        {
+          icon: '⏰',
+          text: 'Thao tác ngoài giờ',
+          prompt:
+            'Kiểm tra xem có thao tác sửa đổi dữ liệu nào thực hiện ngoài giờ hành chính hoặc cuối tuần không?',
+        },
+        {
+          icon: '🔄',
+          text: 'Sửa kết quả nhiều lần',
+          prompt: 'Tìm các phiếu kiểm nghiệm bị sửa đổi nhiều lần sau khi tạo',
+        },
       ];
     }
     if (currentContext.type === 'TCCS') {
       return [
-        { icon: '🧪', text: 'Soát lỗi TCCS', prompt: 'Kiểm tra các quy chuẩn Min/Max và đơn vị đo trong TCCS' },
-        { icon: '📖', text: 'Đối chiếu Dược điển VN', prompt: 'Gợi ý các chỉ tiêu kiểm nghiệm bắt buộc theo Dược điển Việt Nam V' },
-        { icon: '💊', text: 'Đồng bộ từ công thức', prompt: 'Hướng dẫn đồng bộ chỉ tiêu hàm lượng từ công thức sản phẩm' }
+        {
+          icon: '🧪',
+          text: 'Soát lỗi TCCS',
+          prompt: 'Kiểm tra các quy chuẩn Min/Max và đơn vị đo trong TCCS',
+        },
+        {
+          icon: '📖',
+          text: 'Đối chiếu Dược điển VN',
+          prompt: 'Gợi ý các chỉ tiêu kiểm nghiệm bắt buộc theo Dược điển Việt Nam V',
+        },
+        {
+          icon: '💊',
+          text: 'Đồng bộ từ công thức',
+          prompt: 'Hướng dẫn đồng bộ chỉ tiêu hàm lượng từ công thức sản phẩm',
+        },
       ];
     }
     return [
-      { icon: '⚠️', text: 'Cảnh báo chất lượng', prompt: 'Kiểm tra xem có bất thường chất lượng nào không?' },
-      { icon: '📊', text: 'Phân tích xu hướng', prompt: 'Phân tích xu hướng chất lượng tổng thể của tất cả sản phẩm' },
-      { icon: '📥', text: 'Xuất báo cáo tháng', prompt: 'Xuất báo cáo chất lượng tháng này ra file Excel' },
-      { icon: '📦', text: 'Tổng quan lô hàng', prompt: 'Cho tôi xem tổng quan tình trạng tất cả lô hàng hiện tại' },
+      {
+        icon: '⚠️',
+        text: 'Cảnh báo chất lượng',
+        prompt: 'Kiểm tra xem có bất thường chất lượng nào không?',
+      },
+      {
+        icon: '📊',
+        text: 'Phân tích xu hướng',
+        prompt: 'Phân tích xu hướng chất lượng tổng thể của tất cả sản phẩm',
+      },
+      {
+        icon: '📥',
+        text: 'Xuất báo cáo tháng',
+        prompt: 'Xuất báo cáo chất lượng tháng này ra file Excel',
+      },
+      {
+        icon: '📦',
+        text: 'Tổng quan lô hàng',
+        prompt: 'Cho tôi xem tổng quan tình trạng tất cả lô hàng hiện tại',
+      },
     ];
   }, [currentContext]);
 
@@ -167,13 +300,22 @@ export const AIAssistantChat: React.FC = () => {
   // SESSION MEMORY: Tom tat va luu khi dong chat
   const handleCloseChat = useCallback(async () => {
     setIsOpen(false);
-    const realMessages = messages.filter(m => m.id !== 'msg_welcome' && (m.sender === 'user' || m.sender === 'ai'));
+    const realMessages = messages.filter(
+      (m) => m.id !== 'msg_welcome' && (m.sender === 'user' || m.sender === 'ai')
+    );
     if (realMessages.length >= 2 && user?.uid) {
       try {
-        const msgForSummary = realMessages.map(m => ({ sender: m.sender as string, text: m.text }));
-        const summary = await summarizeSessionWithAI(msgForSummary, (p: string, s?: string) => geminiService.generateText(p, s));
+        const msgForSummary = realMessages.map((m) => ({
+          sender: m.sender as string,
+          text: m.text,
+        }));
+        const summary = await summarizeSessionWithAI(msgForSummary, (p: string, s?: string) =>
+          geminiService.generateText(p, s)
+        );
         if (summary) saveSessionMemory(user.uid, summary, currentModel);
-      } catch { /* silent fail */ }
+      } catch {
+        /* silent fail */
+      }
     }
   }, [messages, user, currentModel]);
 
@@ -185,42 +327,65 @@ export const AIAssistantChat: React.FC = () => {
     if (hasBriefingBeenShown.current) return;
     if (sessionStorage.getItem(briefingShownKey)) return;
     const cachedInsights = loadCachedInsights();
-    const insightsToShow = cachedInsights.length > 0
-      ? cachedInsights
-      : generateRuleBasedInsights({ products, batches: hydratedBatches, testResults, aiLearnedMappings, productFormulas, rawMaterials });
+    const insightsToShow =
+      cachedInsights.length > 0
+        ? cachedInsights
+        : generateRuleBasedInsights({
+            products,
+            batches: hydratedBatches,
+            testResults,
+            aiLearnedMappings,
+            productFormulas,
+            rawMaterials,
+          });
     if (insightsToShow.length === 0) return;
-    const insightText = insightsToShow.slice(0, 3).map(i => {
-      const badge = i.severity === 'HIGH' ? '[CAO]' : i.severity === 'MEDIUM' ? '[TB]' : '[OK]';
-      return badge + ' **' + i.title + '**\n' + i.detail;
-    }).join('\n\n');
-    setMessages(prev => [
+    const insightText = insightsToShow
+      .slice(0, 3)
+      .map((i) => {
+        const badge = i.severity === 'HIGH' ? '[CAO]' : i.severity === 'MEDIUM' ? '[TB]' : '[OK]';
+        return badge + ' **' + i.title + '**\n' + i.detail;
+      })
+      .join('\n\n');
+    setMessages((prev) => [
       ...prev,
       {
         id: `msg_briefing_${Date.now()}`,
         sender: 'ai' as const,
         text: `AI Morning Briefing - ${new Date().toLocaleDateString('vi-VN')}\n\n${insightText}\n\n*Nhap "AI thay gi moi?" de xem toan bo phan tich chi tiet.*`,
-      }
+      },
     ]);
     sessionStorage.setItem(briefingShownKey, '1');
     hasBriefingBeenShown.current = true;
     if (cachedInsights.length === 0) saveCachedInsights(insightsToShow);
-  }, [products, hydratedBatches, testResults, aiLearnedMappings, productFormulas, rawMaterials, briefingShownKey]);
+  }, [
+    products,
+    hydratedBatches,
+    testResults,
+    aiLearnedMappings,
+    productFormulas,
+    rawMaterials,
+    briefingShownKey,
+  ]);
 
   const handleModelChange = (model: string) => {
     setCurrentModel(model);
     localStorage.setItem('GEMINI_MODEL', model);
-    const mInfo = AVAILABLE_GEMINI_MODELS.find(m => m.id === model);
+    const mInfo = AVAILABLE_GEMINI_MODELS.find((m) => m.id === model);
     toast.success(`Đã chuyển sang mô hình ${mInfo?.name || model}`);
   };
 
   const handleThinkingToggle = (enabled: boolean) => {
     setThinkingEnabled(enabled);
     localStorage.setItem('GEMINI_THINKING_ENABLED', String(enabled));
-    toast.success(enabled ? 'Đã bật hiển thị quy trình suy luận' : 'Đã tắt hiển thị quy trình suy luận');
+    toast.success(
+      enabled ? 'Đã bật hiển thị quy trình suy luận' : 'Đã tắt hiển thị quy trình suy luận'
+    );
   };
 
   const [isBatchProcessing, setIsBatchProcessing] = useState(false);
-  const [batchProgress, setBatchProgress] = useState<{ current: number; total: number } | null>(null);
+  const [batchProgress, setBatchProgress] = useState<{ current: number; total: number } | null>(
+    null
+  );
 
   const [isMappingModalOpen, setIsMappingModalOpen] = useState(false);
   const [pendingHighItems, setPendingHighItems] = useState<AIExtractedItem[]>([]);
@@ -251,7 +416,7 @@ export const AIAssistantChat: React.FC = () => {
   }, []);
 
   const addMessage = (msg: Omit<ChatMessage, 'id'>) => {
-    setMessages(prev => [...prev, { ...msg, id: `msg_${Date.now()}_${Math.random()}` }]);
+    setMessages((prev) => [...prev, { ...msg, id: `msg_${Date.now()}_${Math.random()}` }]);
   };
 
   const handleRedirect = (metadata: any) => {
@@ -269,9 +434,7 @@ export const AIAssistantChat: React.FC = () => {
 
       if (!draftId) {
         console.error('[AI] Không thể tạo AI draft trước khi điều hướng.');
-        toast.error(
-          'Không thể chuyển dữ liệu AI sang biểu mẫu. Vui lòng thử lại.'
-        );
+        toast.error('Không thể chuyển dữ liệu AI sang biểu mẫu. Vui lòng thử lại.');
         return;
       }
     }
@@ -294,7 +457,10 @@ export const AIAssistantChat: React.FC = () => {
   const formatMessageText = (text: string) => {
     return text
       .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-      .replace(/\[(.*?)\]\((.*?)\)/g, '<a href="$2" class="text-indigo-600 dark:text-indigo-400 hover:underline font-bold">$1</a>');
+      .replace(
+        /\[(.*?)\]\((.*?)\)/g,
+        '<a href="$2" class="text-indigo-600 dark:text-indigo-400 hover:underline font-bold">$1</a>'
+      );
   };
 
   // --- Lấy danh sách tên chỉ tiêu từ TCCS đang hiệu lực ---
@@ -302,10 +468,10 @@ export const AIAssistantChat: React.FC = () => {
   const allActiveTccsNames = useMemo(() => {
     const names = new Set<string>();
     tccsList
-      .filter(t => t.isActive)
-      .forEach(tccs => {
-        (tccs.mainQualityCriteria || []).forEach(c => c?.name && names.add(c.name));
-        (tccs.safetyCriteria || []).forEach(c => c?.name && names.add(c.name));
+      .filter((t) => t.isActive)
+      .forEach((tccs) => {
+        (tccs.mainQualityCriteria || []).forEach((c) => c?.name && names.add(c.name));
+        (tccs.safetyCriteria || []).forEach((c) => c?.name && names.add(c.name));
       });
     return Array.from(names).sort();
   }, [tccsList]);
@@ -320,7 +486,7 @@ export const AIAssistantChat: React.FC = () => {
 
     addMessage({
       sender: 'user',
-      text: `Đã tải lên file: **${file.name}**`
+      text: `Đã tải lên file: **${file.name}**`,
     });
 
     setIsLoading(true);
@@ -329,35 +495,34 @@ export const AIAssistantChat: React.FC = () => {
       // Tạo prompt động với danh sách tên TCCS
       const prompt = buildExtractionPrompt(allActiveTccsNames);
       const result = await geminiService.extractDataFromDocument(file, prompt);
-      
+
       const batchNo = result.batchNo || '';
-      
+
       if (!batchNo) {
-         addMessage({
-           sender: 'ai',
-           text: 'Tôi đã đọc xong tài liệu, nhưng không tìm thấy Số Lô rõ ràng. Bạn có muốn đi tới Form để tự kiểm tra và lưu kết quả không?',
-           isActionable: true,
-           actionType: 'REDIRECT',
-           metadata: { extractedData: result }
-         });
-         // Vẫn mở mapping modal nếu có chỉ tiêu đọc được
-         openMappingStep(result, { batchNo: '', matchedBatch: null });
-         return;
+        addMessage({
+          sender: 'ai',
+          text: 'Tôi đã đọc xong tài liệu, nhưng không tìm thấy Số Lô rõ ràng. Bạn có muốn đi tới Form để tự kiểm tra và lưu kết quả không?',
+          isActionable: true,
+          actionType: 'REDIRECT',
+          metadata: { extractedData: result },
+        });
+        // Vẫn mở mapping modal nếu có chỉ tiêu đọc được
+        openMappingStep(result, { batchNo: '', matchedBatch: null });
+        return;
       }
 
       const cleanNo = batchNo.trim().toLowerCase();
-      const matchedBatch = hydratedBatches.find(b => {
+      const matchedBatch = hydratedBatches.find((b) => {
         if (!b.batchNo) return false;
         const bNo = b.batchNo.trim().toLowerCase();
         return bNo === cleanNo || bNo.includes(cleanNo) || cleanNo.includes(bNo);
       });
-      
-      openMappingStep(result, { batchNo, matchedBatch });
 
+      openMappingStep(result, { batchNo, matchedBatch });
     } catch (error: any) {
       addMessage({
-         sender: 'ai',
-         text: `Xin lỗi, đã có lỗi xảy ra khi phân tích tài liệu:\n\n${formatGeminiError(error)}`
+        sender: 'ai',
+        text: `Xin lỗi, đã có lỗi xảy ra khi phân tích tài liệu:\n\n${formatGeminiError(error)}`,
       });
       console.error(error);
     } finally {
@@ -370,12 +535,14 @@ export const AIAssistantChat: React.FC = () => {
     if (files.length === 0) return;
 
     // Kiểm tra toàn bộ file trước khi bắt đầu
-    const invalidFiles = files.filter(f => !validateOCRFile(f).valid);
+    const invalidFiles = files.filter((f) => !validateOCRFile(f).valid);
     if (invalidFiles.length > 0) {
-      const errors = invalidFiles.map(f => {
-        const v = validateOCRFile(f);
-        return `• ${f.name}: ${v.error}`;
-      }).join('\n');
+      const errors = invalidFiles
+        .map((f) => {
+          const v = validateOCRFile(f);
+          return `• ${f.name}: ${v.error}`;
+        })
+        .join('\n');
       toast.error(`Có ${invalidFiles.length} file không hợp lệ:\n${errors}`, { duration: 5000 });
       return;
     }
@@ -390,7 +557,7 @@ export const AIAssistantChat: React.FC = () => {
     setIsBatchProcessing(true);
     addMessage({
       sender: 'system',
-      text: `🗂️ **Batch OCR:** Bắt đầu xử lý **${files.length} file** phiếu kiểm nghiệm tuần tự...`
+      text: `🗂️ **Batch OCR:** Bắt đầu xử lý **${files.length} file** phiếu kiểm nghiệm tuần tự...`,
     });
 
     let successCount = 0;
@@ -401,7 +568,7 @@ export const AIAssistantChat: React.FC = () => {
       setBatchProgress({ current: i + 1, total: files.length });
       addMessage({
         sender: 'system',
-        text: `⏳ Đang xử lý file **${i + 1}/${files.length}**: ${file.name}`
+        text: `⏳ Đang xử lý file **${i + 1}/${files.length}**: ${file.name}`,
       });
 
       try {
@@ -411,22 +578,21 @@ export const AIAssistantChat: React.FC = () => {
         failCount++;
         addMessage({
           sender: 'ai',
-          text: `❌ Lỗi xử lý file **${file.name}**. Bỏ qua và tiếp tục...`
+          text: `❌ Lỗi xử lý file **${file.name}**. Bỏ qua và tiếp tục...`,
         });
       }
 
       // Delay nhỏ giữa các file để tránh rate limit
-      if (i < files.length - 1) await new Promise(r => setTimeout(r, 800));
+      if (i < files.length - 1) await new Promise((r) => setTimeout(r, 800));
     }
 
     setBatchProgress(null);
     setIsBatchProcessing(false);
     addMessage({
       sender: 'system',
-      text: `✅ **Hoàn tất Batch OCR:** ${successCount} thành công${failCount > 0 ? ` | ${failCount} lỗi` : ''}`
+      text: `✅ **Hoàn tất Batch OCR:** ${successCount} thành công${failCount > 0 ? ` | ${failCount} lỗi` : ''}`,
     });
   };
-
 
   const openMappingStep = (result: any, context: { batchNo: string; matchedBatch: any }) => {
     const rawItems: AIExtractedItem[] = (result.testResults || []).map((r: any) => ({
@@ -439,19 +605,19 @@ export const AIAssistantChat: React.FC = () => {
     }));
 
     // Cũng kiểm tra qua aiLearnedMappings để nâng confidence cho các item đã học
-    const enrichedItems = rawItems.map(item => {
+    const enrichedItems = rawItems.map((item) => {
       if (item.confidence === 'high' && item.mappedName) return item;
 
       // Tìm trong learned mappings
-      const learnedMatch = aiLearnedMappings.find(m =>
+      const learnedMatch = aiLearnedMappings.find((m) =>
         isCriteriaMatch(item.criteriaName, m.systemName, aiLearnedMappings)
       );
       if (learnedMatch) {
         return { ...item, mappedName: learnedMatch.systemName, confidence: 'high' };
       }
-      
+
       // Thử fuzzy match với tên TCCS
-      const fuzzyMatch = allActiveTccsNames.find(tccsName =>
+      const fuzzyMatch = allActiveTccsNames.find((tccsName) =>
         isCriteriaMatch(item.criteriaName, tccsName, aiLearnedMappings)
       );
       if (fuzzyMatch) {
@@ -461,8 +627,8 @@ export const AIAssistantChat: React.FC = () => {
       return item;
     });
 
-    const highItems = enrichedItems.filter(i => i.confidence === 'high' && i.mappedName);
-    const lowItems = enrichedItems.filter(i => i.confidence !== 'high' || !i.mappedName);
+    const highItems = enrichedItems.filter((i) => i.confidence === 'high' && i.mappedName);
+    const lowItems = enrichedItems.filter((i) => i.confidence !== 'high' || !i.mappedName);
 
     // Lưu context để dùng sau khi user xác nhận
     setPendingNavigateData({ result, context });
@@ -475,8 +641,8 @@ export const AIAssistantChat: React.FC = () => {
     } else {
       // Tất cả đã map được → điền thẳng & auto-learn high-confidence mappings
       const autoMappings = highItems
-        .filter(i => i.mappedName && i.criteriaName !== i.mappedName)
-        .map(i => ({ originalName: i.criteriaName, systemName: i.mappedName }));
+        .filter((i) => i.mappedName && i.criteriaName !== i.mappedName)
+        .map((i) => ({ originalName: i.criteriaName, systemName: i.mappedName }));
       if (autoMappings.length > 0) recordHighConfidenceOCRMappings(autoMappings);
       finalizeMappingAndNavigate(result, context, highItems, [], false);
     }
@@ -485,7 +651,10 @@ export const AIAssistantChat: React.FC = () => {
   /**
    * Sau khi user xác nhận trong modal → điền form + lưu learned mappings
    */
-  const handleMappingConfirmed = (confirmedMappings: ConfirmedMapping[], rememberMappings: boolean) => {
+  const handleMappingConfirmed = (
+    confirmedMappings: ConfirmedMapping[],
+    rememberMappings: boolean
+  ) => {
     setIsMappingModalOpen(false);
     if (!pendingNavigateData) return;
 
@@ -493,7 +662,7 @@ export const AIAssistantChat: React.FC = () => {
 
     // Lưu learned mappings nếu user tick "Nhớ lần sau"
     if (rememberMappings) {
-      confirmedMappings.forEach(m => {
+      confirmedMappings.forEach((m) => {
         if (m.originalName !== m.systemName) {
           addAiLearnedMapping(m.originalName, m.systemName);
         }
@@ -502,8 +671,8 @@ export const AIAssistantChat: React.FC = () => {
 
     // AUTO-LEARN: Tu dong ghi nhan high-confidence mappings
     const autoMappings = pendingHighItems
-      .filter(i => i.mappedName && i.criteriaName !== i.mappedName)
-      .map(i => ({ originalName: i.criteriaName, systemName: i.mappedName }));
+      .filter((i) => i.mappedName && i.criteriaName !== i.mappedName)
+      .map((i) => ({ originalName: i.criteriaName, systemName: i.mappedName }));
     if (autoMappings.length > 0) recordHighConfidenceOCRMappings(autoMappings);
 
     finalizeMappingAndNavigate(result, context, pendingHighItems, confirmedMappings, true);
@@ -518,14 +687,14 @@ export const AIAssistantChat: React.FC = () => {
   ) => {
     // Merge tất cả kết quả đã map thành chuẩn để truyền vào form
     const mergedResults = [
-      ...highItems.map(i => ({
+      ...highItems.map((i) => ({
         criteriaName: i.mappedName || i.criteriaName, // Dùng tên chuẩn TCCS hoặc giữ tên gốc
         aiOriginalName: i.criteriaName,
         value: i.value,
         unit: i.unit,
         limit: i.limit,
       })),
-      ...confirmedLowItems.map(m => ({
+      ...confirmedLowItems.map((m) => ({
         criteriaName: m.systemName || m.originalName,
         aiOriginalName: m.originalName,
         value: m.value,
@@ -538,7 +707,7 @@ export const AIAssistantChat: React.FC = () => {
     const enrichedResult = {
       ...result,
       batchId: matchedBatch ? matchedBatch.id : undefined,
-      testResults: mergedResults
+      testResults: mergedResults,
     };
 
     // Nếu AI đọc được LabName, giữ lại trong enrichedResult
@@ -563,7 +732,7 @@ export const AIAssistantChat: React.FC = () => {
         text: `Tuyệt vời! Đã tìm thấy lô **${batchNo}** của sản phẩm **${matchedBatch.product?.name || ''}**. Bấm vào nút bên dưới để mở form nhập liệu.`,
         isActionable: true,
         actionType: 'REDIRECT',
-        metadata: { extractedData: enrichedResult }
+        metadata: { extractedData: enrichedResult },
       });
     } else {
       if (isAdmin) {
@@ -572,13 +741,13 @@ export const AIAssistantChat: React.FC = () => {
           text: `Tôi đọc được Số lô là **${batchNo}**, nhưng lô này CHƯA CÓ trong hệ thống.\nBạn có muốn tự động tạo lô mới để tiếp tục không?`,
           isActionable: true,
           actionType: 'CREATE_BATCH',
-          metadata: { extractedData: enrichedResult }
+          metadata: { extractedData: enrichedResult },
         });
       } else {
         addMessage({
           sender: 'ai',
           text: `Tôi đọc được Số lô là **${batchNo}**, nhưng lô này CHƯA CÓ trong hệ thống.\n\nBạn không có quyền tạo Lô mới. Vui lòng nhờ Quản trị viên đăng ký lô **${batchNo}** vào hệ thống trước, sau đó quay lại đây để nhập kết quả kiểm nghiệm.`,
-          isActionable: false
+          isActionable: false,
         });
       }
     }
@@ -604,11 +773,12 @@ export const AIAssistantChat: React.FC = () => {
 
     try {
       const newBatchId = generateId('batch');
-      const product = products.find(p => p.id === selectedProductId);
+      const product = products.find((p) => p.id === selectedProductId);
       const mfgDate = parseDateToISO(extractedData.mfgDate || '') || '';
       const expDate = parseDateToISO(extractedData.expDate || '') || '';
-      const activeTccs = tccsList.find(t => t.productId === selectedProductId && t.isActive)
-        || tccsList.find(t => t.productId === selectedProductId);
+      const activeTccs =
+        tccsList.find((t) => t.productId === selectedProductId && t.isActive) ||
+        tccsList.find((t) => t.productId === selectedProductId);
 
       await addBatch({
         id: newBatchId,
@@ -621,19 +791,20 @@ export const AIAssistantChat: React.FC = () => {
         actualYield: 0,
         yieldUnit: 'kg',
         createdAt: new Date().toISOString(),
-        tccsId: activeTccs?.id || ''
+        tccsId: activeTccs?.id || '',
       });
 
-      setMessages(prev => prev.map(m => m.id === messageId ? { ...m, isActionable: false } : m));
+      setMessages((prev) =>
+        prev.map((m) => (m.id === messageId ? { ...m, isActionable: false } : m))
+      );
 
       addMessage({
         sender: 'system',
         text: `Đã tạo lô **${extractedData.batchNo}** cho sản phẩm **${product?.name}**. Bấm nút bên dưới để đi tới form.`,
         isActionable: true,
         actionType: 'REDIRECT',
-        metadata: { extractedData: { ...extractedData, batchId: newBatchId } }
+        metadata: { extractedData: { ...extractedData, batchId: newBatchId } },
       });
-
     } catch (error) {
       toast.error('Có lỗi xảy ra khi tạo lô!');
     } finally {
@@ -647,10 +818,10 @@ export const AIAssistantChat: React.FC = () => {
 
     const userText = chatInputText.trim();
     setChatInputText('');
-    
+
     addMessage({
       sender: 'user',
-      text: userText
+      text: userText,
     });
 
     setIsLoading(true);
@@ -666,43 +837,48 @@ export const AIAssistantChat: React.FC = () => {
         rawMaterials: rawMaterials || [],
         aiLearnedMappings: aiLearnedMappings || [],
       };
-      
+
       // FIX 4: Lọc history chặt hơn — chỉ lấy user/ai messages thuần text,
       // bỏ qua actionable messages (ví dụ: CREATE_BATCH, REDIRECT) để tránh rác context
       const history = messages
-        .filter(m =>
-          m.id !== 'msg_welcome' &&
-          (m.sender === 'user' || m.sender === 'ai') &&
-          !m.isActionable // Bỏ qua các message có action button
+        .filter(
+          (m) =>
+            m.id !== 'msg_welcome' && (m.sender === 'user' || m.sender === 'ai') && !m.isActionable // Bỏ qua các message có action button
         )
-        .map(m => ({
+        .map((m) => ({
           role: m.sender === 'user' ? 'user' : 'model',
-          parts: [{ text: m.text }]
+          parts: [{ text: m.text }],
         }));
-      
+
       const preferredModel = localStorage.getItem('GEMINI_MODEL') || 'gemini-2.5-flash';
       const sessionMemoryPrompt = user?.uid ? buildSessionMemoryPrompt(user.uid) : '';
-      const aiResponse = await geminiService.chatWithAppContext(userText, appContextData, history as any, preferredModel, sessionMemoryPrompt);
-      
+      const aiResponse = await geminiService.chatWithAppContext(
+        userText,
+        appContextData,
+        history as any,
+        preferredModel,
+        sessionMemoryPrompt
+      );
+
       addMessage({
         sender: 'ai',
         text: aiResponse.text,
-        thinking: aiResponse.thinking
+        thinking: aiResponse.thinking,
       });
     } catch (error: any) {
-      console.error("Chat Error:", error);
+      console.error('Chat Error:', error);
       addMessage({
         sender: 'ai',
-        text: `Xin lỗi, tôi gặp sự cố:\n\n${formatGeminiError(error)}`
+        text: `Xin lỗi, tôi gặp sự cố:\n\n${formatGeminiError(error)}`,
       });
     } finally {
       setIsLoading(false);
     }
   };
 
-   if (!isOpen) {
+  if (!isOpen) {
     return (
-      <button 
+      <button
         onClick={() => setIsOpen(true)}
         className="fixed bottom-6 right-6 w-14 h-14 bg-gradient-to-r from-emerald-600 to-teal-600 rounded-full flex items-center justify-center text-white shadow-lg shadow-emerald-500/25 hover:scale-105 hover:from-emerald-700 hover:to-teal-700 transition-all z-50 group cursor-pointer"
       >
@@ -726,20 +902,33 @@ export const AIAssistantChat: React.FC = () => {
         onConfirm={handleMappingConfirmed}
       />
 
-      <div className="fixed bottom-6 right-6 w-[380px] bg-surface rounded-2xl border border-border shadow-2xl flex flex-col overflow-hidden z-50 animate-in slide-in-from-bottom-8 duration-300" style={{ height: '600px', maxHeight: 'calc(100vh - 40px)' }}>
+      <div
+        className="fixed bottom-6 right-6 w-[380px] bg-surface rounded-2xl border border-border shadow-2xl flex flex-col overflow-hidden z-50 animate-in slide-in-from-bottom-8 duration-300"
+        style={{ height: '600px', maxHeight: 'calc(100vh - 40px)' }}
+      >
         {/* Header */}
         <div className="bg-gradient-to-r from-emerald-600 to-teal-600 px-4 py-3 flex items-center justify-between shadow-xs">
           <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-white overflow-hidden p-1 shadow-xs">
-                  <img src={`${import.meta.env.BASE_URL}logo.png`} alt="Logo" className="w-full h-full object-contain" onError={(e) => { e.currentTarget.style.display='none'; }} />
-              </div>
-              <div className="flex flex-col">
-                  <h3 className="font-bold text-white text-sm tracking-wide">V-Biotech AI</h3>
-                  <span className="text-[10px] font-medium text-emerald-100 flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 bg-emerald-300 rounded-full animate-pulse" />
-                    {AVAILABLE_GEMINI_MODELS.find(m => m.id === currentModel)?.name.replace('Gemini ', '') || currentModel}
-                  </span>
-              </div>
+            <div className="w-8 h-8 rounded-lg bg-white overflow-hidden p-1 shadow-xs">
+              <img
+                src={`${import.meta.env.BASE_URL}logo.png`}
+                alt="Logo"
+                className="w-full h-full object-contain"
+                onError={(e) => {
+                  e.currentTarget.style.display = 'none';
+                }}
+              />
+            </div>
+            <div className="flex flex-col">
+              <h3 className="font-bold text-white text-sm tracking-wide">V-Biotech AI</h3>
+              <span className="text-[10px] font-medium text-emerald-100 flex items-center gap-1">
+                <span className="w-1.5 h-1.5 bg-emerald-300 rounded-full animate-pulse" />
+                {AVAILABLE_GEMINI_MODELS.find((m) => m.id === currentModel)?.name.replace(
+                  'Gemini ',
+                  ''
+                ) || currentModel}
+              </span>
+            </div>
           </div>
           <div className="flex items-center gap-1.5">
             {/* Clear history button */}
@@ -754,14 +943,17 @@ export const AIAssistantChat: React.FC = () => {
             >
               <TrashIcon className="w-4 h-4" />
             </button>
-            <button 
+            <button
               onClick={() => setShowConfig(!showConfig)}
               className={`p-1.5 rounded-lg transition-colors cursor-pointer ${showConfig ? 'bg-white/20 text-white' : 'text-white/70 hover:text-white hover:bg-white/10'}`}
               title="Cấu hình AI nhanh"
             >
               <Cog6ToothIcon className="w-5 h-5" />
             </button>
-            <button onClick={handleCloseChat} className="text-white/70 hover:text-white hover:bg-white/10 p-1.5 rounded-lg transition-colors cursor-pointer">
+            <button
+              onClick={handleCloseChat}
+              className="text-white/70 hover:text-white hover:bg-white/10 p-1.5 rounded-lg transition-colors cursor-pointer"
+            >
               <XMarkIcon className="w-5 h-5" />
             </button>
           </div>
@@ -781,13 +973,17 @@ export const AIAssistantChat: React.FC = () => {
                 className="bg-surface border border-border text-[10px] font-bold text-ink px-2 py-1 rounded-lg outline-none focus:ring-1 focus:ring-emerald-500 cursor-pointer shadow-xs max-w-[200px]"
               >
                 <optgroup label="⚡ Gemini 2.5 (Tiêu chuẩn)">
-                  {AVAILABLE_GEMINI_MODELS.filter(m => m.group.includes('2.5')).map(m => (
-                    <option key={m.id} value={m.id}>{m.badge}</option>
+                  {AVAILABLE_GEMINI_MODELS.filter((m) => m.group.includes('2.5')).map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.badge}
+                    </option>
                   ))}
                 </optgroup>
                 <optgroup label="📦 Gemini 2.0">
-                  {AVAILABLE_GEMINI_MODELS.filter(m => m.group.includes('2.0')).map(m => (
-                    <option key={m.id} value={m.id}>{m.badge}</option>
+                  {AVAILABLE_GEMINI_MODELS.filter((m) => m.group.includes('2.0')).map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.badge}
+                    </option>
                   ))}
                 </optgroup>
               </select>
@@ -811,39 +1007,58 @@ export const AIAssistantChat: React.FC = () => {
         )}
 
         {/* Message List */}
-        <div 
+        <div
           className={`flex-1 overflow-y-auto p-4 space-y-4 relative transition-colors ${isDragging ? 'bg-emerald-500/10' : 'bg-surface-2/40'}`}
-          onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+          onDragOver={(e) => {
+            e.preventDefault();
+            setIsDragging(true);
+          }}
           onDragLeave={() => setIsDragging(false)}
           onDrop={handleDrop}
         >
           {isDragging && (
             <div className="absolute inset-0 z-10 flex items-center justify-center bg-emerald-500/10 backdrop-blur-xs border-2 border-dashed border-emerald-500 m-2 rounded-xl">
-               <div className="bg-surface px-6 py-4 rounded-2xl shadow-xl flex items-center gap-3 border border-border animate-bounce">
-                  <CloudArrowUpIcon className="w-8 h-8 text-emerald-600" />
-                  <span className="font-bold text-emerald-700 dark:text-emerald-300">Thả file vào đây...</span>
-               </div>
+              <div className="bg-surface px-6 py-4 rounded-2xl shadow-xl flex items-center gap-3 border border-border animate-bounce">
+                <CloudArrowUpIcon className="w-8 h-8 text-emerald-600" />
+                <span className="font-bold text-emerald-700 dark:text-emerald-300">
+                  Thả file vào đây...
+                </span>
+              </div>
             </div>
           )}
 
           {messages.map((msg) => (
-            <div key={msg.id} className={`flex gap-2.5 ${msg.sender === 'user' ? 'flex-row-reverse' : ''}`}>
+            <div
+              key={msg.id}
+              className={`flex gap-2.5 ${msg.sender === 'user' ? 'flex-row-reverse' : ''}`}
+            >
               {msg.sender === 'ai' && (
-                 <div className="w-7 h-7 rounded-full bg-white dark:bg-zinc-800 flex items-center justify-center flex-shrink-0 mt-1 shadow-sm border border-slate-100 dark:border-zinc-800 overflow-hidden p-0.5">
-                    <img src={`${import.meta.env.BASE_URL}logo.png`} alt="V-Biotech" className="w-full h-full object-contain" onError={(e) => { e.currentTarget.style.display='none'; }} />
-                 </div>
+                <div className="w-7 h-7 rounded-full bg-white dark:bg-zinc-800 flex items-center justify-center flex-shrink-0 mt-1 shadow-sm border border-slate-100 dark:border-zinc-800 overflow-hidden p-0.5">
+                  <img
+                    src={`${import.meta.env.BASE_URL}logo.png`}
+                    alt="V-Biotech"
+                    className="w-full h-full object-contain"
+                    onError={(e) => {
+                      e.currentTarget.style.display = 'none';
+                    }}
+                  />
+                </div>
               )}
               {msg.sender === 'system' && (
-                 <div className="w-7 h-7 rounded-full bg-emerald-500 flex items-center justify-center shrink-0 mt-1 shadow-xs">
-                    <CheckCircleIcon className="w-4 h-4 text-white" />
-                 </div>
+                <div className="w-7 h-7 rounded-full bg-emerald-500 flex items-center justify-center shrink-0 mt-1 shadow-xs">
+                  <CheckCircleIcon className="w-4 h-4 text-white" />
+                </div>
               )}
 
-              <div className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 text-[13px] ${
-                msg.sender === 'user' ? 'bg-emerald-600 text-white rounded-tr-xs shadow-md' : 
-                msg.sender === 'system' ? 'bg-emerald-500/10 text-emerald-800 dark:text-emerald-300 border border-emerald-500/20 rounded-tl-xs font-medium' :
-                'bg-surface border border-border shadow-xs rounded-tl-xs text-ink leading-relaxed'
-              }`}>
+              <div
+                className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 text-[13px] ${
+                  msg.sender === 'user'
+                    ? 'bg-emerald-600 text-white rounded-tr-xs shadow-md'
+                    : msg.sender === 'system'
+                      ? 'bg-emerald-500/10 text-emerald-800 dark:text-emerald-300 border border-emerald-500/20 rounded-tl-xs font-medium'
+                      : 'bg-surface border border-border shadow-xs rounded-tl-xs text-ink leading-relaxed'
+                }`}
+              >
                 {msg.thinking && thinkingEnabled && (
                   <details className="mb-2 bg-surface-2 border border-border rounded-lg overflow-hidden group shadow-xs">
                     <summary className="px-2 py-1 text-[11px] text-emerald-600 dark:text-emerald-400 font-bold hover:bg-emerald-500/10 cursor-pointer flex items-center gap-1 transition-colors select-none">
@@ -855,42 +1070,50 @@ export const AIAssistantChat: React.FC = () => {
                     </div>
                   </details>
                 )}
-                <div 
+                <div
                   onClick={handleMessageClick}
-                  className="whitespace-pre-wrap leading-relaxed" 
-                  dangerouslySetInnerHTML={{ __html: formatMessageText(msg.text) }} 
+                  className="whitespace-pre-wrap leading-relaxed"
+                  dangerouslySetInnerHTML={{ __html: formatMessageText(msg.text) }}
                 />
-                
+
                 {msg.isActionable && msg.actionType === 'CREATE_BATCH' && (
                   <div className="mt-3 p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl space-y-2">
-                     <p className="text-[11px] font-bold text-amber-800 dark:text-amber-300 flex items-center gap-1.5"><ExclamationCircleIcon className="w-3.5 h-3.5"/> Chọn sản phẩm cho lô mới:</p>
-                     <select 
-                       className="w-full bg-surface border border-amber-500/30 text-xs font-bold text-ink px-2 py-2 rounded-lg outline-none focus:ring-2 focus:ring-amber-500"
-                       value={selectedProductId}
-                       onChange={(e) => setSelectedProductId(e.target.value)}
-                     >
-                       <option value="" disabled>-- Danh sách --</option>
-                       {products.filter(p => p.status === 'ACTIVE').map(p => (
-                          <option key={p.id} value={p.id}>{p.code} - {p.name}</option>
-                       ))}
-                     </select>
-                     <button 
-                       disabled={isCreatingBatch || !selectedProductId}
-                       onClick={() => handleCreateBatch(msg.id, msg.metadata)}
-                       className="w-full mt-2 py-2 bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white font-black uppercase text-[10px] tracking-wider rounded-lg shadow-xs transition-colors flex items-center justify-center gap-2 cursor-pointer"
-                     >
-                       {isCreatingBatch && <ArrowPathIcon className="w-3.5 h-3.5 animate-spin" />}
-                       Tạo Lô Nhanh
-                     </button>
+                    <p className="text-[11px] font-bold text-amber-800 dark:text-amber-300 flex items-center gap-1.5">
+                      <ExclamationCircleIcon className="w-3.5 h-3.5" /> Chọn sản phẩm cho lô mới:
+                    </p>
+                    <select
+                      className="w-full bg-surface border border-amber-500/30 text-xs font-bold text-ink px-2 py-2 rounded-lg outline-none focus:ring-2 focus:ring-amber-500"
+                      value={selectedProductId}
+                      onChange={(e) => setSelectedProductId(e.target.value)}
+                    >
+                      <option value="" disabled>
+                        -- Danh sách --
+                      </option>
+                      {products
+                        .filter((p) => p.status === 'ACTIVE')
+                        .map((p) => (
+                          <option key={p.id} value={p.id}>
+                            {p.code} - {p.name}
+                          </option>
+                        ))}
+                    </select>
+                    <button
+                      disabled={isCreatingBatch || !selectedProductId}
+                      onClick={() => handleCreateBatch(msg.id, msg.metadata)}
+                      className="w-full mt-2 py-2 bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white font-black uppercase text-[10px] tracking-wider rounded-lg shadow-xs transition-colors flex items-center justify-center gap-2 cursor-pointer"
+                    >
+                      {isCreatingBatch && <ArrowPathIcon className="w-3.5 h-3.5 animate-spin" />}
+                      Tạo Lô Nhanh
+                    </button>
                   </div>
                 )}
 
                 {msg.isActionable && msg.actionType === 'REDIRECT' && (
-                  <button 
-                     onClick={() => handleRedirect(msg.metadata)}
-                     className="mt-3 w-full py-2 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-700 dark:text-emerald-300 font-bold uppercase text-[10px] tracking-wider rounded-lg shadow-xs transition-colors flex items-center justify-center gap-2 cursor-pointer"
+                  <button
+                    onClick={() => handleRedirect(msg.metadata)}
+                    className="mt-3 w-full py-2 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-700 dark:text-emerald-300 font-bold uppercase text-[10px] tracking-wider rounded-lg shadow-xs transition-colors flex items-center justify-center gap-2 cursor-pointer"
                   >
-                     {msg.metadata?.path ? 'Xem Báo cáo chi tiết →' : 'Tới Form Điền Kết Quả ➔'}
+                    {msg.metadata?.path ? 'Xem Báo cáo chi tiết →' : 'Tới Form Điền Kết Quả ➔'}
                   </button>
                 )}
               </div>
@@ -899,16 +1122,32 @@ export const AIAssistantChat: React.FC = () => {
 
           {isLoading && (
             <div className="flex gap-2.5">
-               <div className="w-7 h-7 rounded-full bg-white dark:bg-zinc-800 flex items-center justify-center shrink-0 mt-1 shadow-xs border border-border overflow-hidden p-0.5">
-                  <img src={`${import.meta.env.BASE_URL}logo.png`} alt="V-Biotech" className="w-full h-full object-contain" onError={(e) => { e.currentTarget.style.display='none'; }} />
-               </div>
-               <div className="bg-surface border border-border shadow-xs rounded-2xl rounded-tl-xs px-3 py-2 flex items-center gap-2">
-                 <span className="flex gap-1">
-                   <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                   <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                   <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-                 </span>
-               </div>
+              <div className="w-7 h-7 rounded-full bg-white dark:bg-zinc-800 flex items-center justify-center shrink-0 mt-1 shadow-xs border border-border overflow-hidden p-0.5">
+                <img
+                  src={`${import.meta.env.BASE_URL}logo.png`}
+                  alt="V-Biotech"
+                  className="w-full h-full object-contain"
+                  onError={(e) => {
+                    e.currentTarget.style.display = 'none';
+                  }}
+                />
+              </div>
+              <div className="bg-surface border border-border shadow-xs rounded-2xl rounded-tl-xs px-3 py-2 flex items-center gap-2">
+                <span className="flex gap-1">
+                  <span
+                    className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-bounce"
+                    style={{ animationDelay: '0ms' }}
+                  />
+                  <span
+                    className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-bounce"
+                    style={{ animationDelay: '150ms' }}
+                  />
+                  <span
+                    className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-bounce"
+                    style={{ animationDelay: '300ms' }}
+                  />
+                </span>
+              </div>
             </div>
           )}
           <div ref={messagesEndRef} />
@@ -940,20 +1179,34 @@ export const AIAssistantChat: React.FC = () => {
                       rawMaterials: rawMaterials || [],
                     };
                     const history = messages
-                      .filter(m =>
-                        m.id !== 'msg_welcome' &&
-                        (m.sender === 'user' || m.sender === 'ai') &&
-                        !m.isActionable
+                      .filter(
+                        (m) =>
+                          m.id !== 'msg_welcome' &&
+                          (m.sender === 'user' || m.sender === 'ai') &&
+                          !m.isActionable
                       )
-                      .map(m => ({
+                      .map((m) => ({
                         role: m.sender === 'user' ? 'user' : 'model',
-                        parts: [{ text: m.text }]
+                        parts: [{ text: m.text }],
                       }));
-                    const preferredModel = localStorage.getItem('GEMINI_MODEL') || 'gemini-2.5-flash';
-                    const aiResponse = await geminiService.chatWithAppContext(chip.prompt, appContextData, history as any, preferredModel);
-                    addMessage({ sender: 'ai', text: aiResponse.text, thinking: aiResponse.thinking });
+                    const preferredModel =
+                      localStorage.getItem('GEMINI_MODEL') || 'gemini-2.5-flash';
+                    const aiResponse = await geminiService.chatWithAppContext(
+                      chip.prompt,
+                      appContextData,
+                      history as any,
+                      preferredModel
+                    );
+                    addMessage({
+                      sender: 'ai',
+                      text: aiResponse.text,
+                      thinking: aiResponse.thinking,
+                    });
                   } catch (error: any) {
-                    addMessage({ sender: 'ai', text: `Xin lỗi, tôi gặp sự cố:\n\n${formatGeminiError(error)}` });
+                    addMessage({
+                      sender: 'ai',
+                      text: `Xin lỗi, tôi gặp sự cố:\n\n${formatGeminiError(error)}`,
+                    });
                   } finally {
                     setIsLoading(false);
                     setChatInputText('');
@@ -969,18 +1222,21 @@ export const AIAssistantChat: React.FC = () => {
         </div>
 
         {/* Input Area */}
-        <form onSubmit={handleSendTextMessage} className="p-3 bg-surface border-t border-border flex items-center gap-2">
-          <input 
-            type="file" 
-            ref={fileInputRef} 
-            className="hidden" 
+        <form
+          onSubmit={handleSendTextMessage}
+          className="p-3 bg-surface border-t border-border flex items-center gap-2"
+        >
+          <input
+            type="file"
+            ref={fileInputRef}
+            className="hidden"
             accept="image/*,application/pdf"
             multiple
             onChange={(e) => {
               const files = Array.from(e.target.files || []);
               if (files.length > 0) {
                 processFiles(files);
-                e.target.value = ''; 
+                e.target.value = '';
               }
             }}
           />
@@ -989,11 +1245,13 @@ export const AIAssistantChat: React.FC = () => {
             <div className="absolute bottom-[70px] left-3 right-3 bg-emerald-600 text-white text-[11px] font-bold px-3 py-1.5 rounded-lg flex items-center gap-2 shadow-lg animate-in slide-in-from-bottom duration-200">
               <div className="flex-1">
                 <div className="flex justify-between mb-1">
-                  <span>🗂️ Batch OCR: {batchProgress.current}/{batchProgress.total}</span>
+                  <span>
+                    🗂️ Batch OCR: {batchProgress.current}/{batchProgress.total}
+                  </span>
                   <span>{Math.round((batchProgress.current / batchProgress.total) * 100)}%</span>
                 </div>
                 <div className="w-full bg-white/30 rounded-full h-1">
-                  <div 
+                  <div
                     className="bg-white rounded-full h-1 transition-all duration-500"
                     style={{ width: `${(batchProgress.current / batchProgress.total) * 100}%` }}
                   />
@@ -1001,7 +1259,7 @@ export const AIAssistantChat: React.FC = () => {
               </div>
             </div>
           )}
-          <button 
+          <button
             type="button"
             disabled={isLoading}
             onClick={() => fileInputRef.current?.click()}
@@ -1017,8 +1275,8 @@ export const AIAssistantChat: React.FC = () => {
             disabled={isLoading}
             className="flex-1 bg-surface-2 border border-border rounded-full px-4 py-2 text-[13px] text-ink placeholder:text-ink-muted font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-surface transition-all"
           />
-          <button 
-            type="submit" 
+          <button
+            type="submit"
             disabled={!chatInputText.trim() || isLoading}
             className="w-9 h-9 flex items-center justify-center rounded-full bg-emerald-600 text-white hover:bg-emerald-700 disabled:bg-surface-3 disabled:text-ink-muted transition-colors shrink-0 cursor-pointer"
           >

@@ -43,10 +43,51 @@ import {
 import { useAppStore } from '../../store/useAppStore';
 import { useUIStore } from '../../store/useUIStore';
 import { useShallow } from 'zustand/react/shallow';
-import { AIAssistantChat } from '../features/AIAssistantChat';
 import { useQualityAlerts } from '../../hooks/useQualityAlerts';
 import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcuts';
 import { GlobalCommandPalette } from './GlobalCommandPalette';
+
+const LazyAIAssistantChat = React.lazy(() =>
+  import('../features/AIAssistantChat').then((m) => ({ default: m.AIAssistantChat }))
+);
+
+const AIChatLauncher: React.FC = () => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [hasLoaded, setHasLoaded] = useState(false);
+
+  const handleOpen = () => {
+    setHasLoaded(true);
+    setIsOpen(true);
+  };
+
+  const handlePreload = () => {
+    // Preload AI chunk on hover/focus to guarantee zero latency when clicked
+    import('../features/AIAssistantChat');
+  };
+
+  return (
+    <>
+      {!isOpen && (
+        <button
+          onClick={handleOpen}
+          onMouseEnter={handlePreload}
+          onFocus={handlePreload}
+          className="fixed bottom-6 right-6 w-14 h-14 bg-gradient-to-r from-emerald-600 to-teal-600 rounded-full flex items-center justify-center text-white shadow-lg shadow-emerald-500/25 hover:scale-105 hover:from-emerald-700 hover:to-teal-700 transition-all z-50 group cursor-pointer"
+          title="Trợ lý AI V-Biotech"
+          aria-label="Mở trợ lý AI"
+        >
+          <SparklesIcon className="w-7 h-7 group-hover:animate-pulse" />
+        </button>
+      )}
+
+      {hasLoaded && (
+        <React.Suspense fallback={null}>
+          <LazyAIAssistantChat isOpen={isOpen} onClose={() => setIsOpen(false)} />
+        </React.Suspense>
+      )}
+    </>
+  );
+};
 
 interface NavItemChild {
   name: string;
@@ -709,7 +750,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         </main>
       </div>
 
-      {role !== 'GUEST' && <AIAssistantChat />}
+      {role !== 'GUEST' && <AIChatLauncher />}
       <GlobalCommandPalette />
     </div>
   );

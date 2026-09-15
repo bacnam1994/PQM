@@ -22,6 +22,13 @@ export default defineConfig(({ mode }) => ({
           'vendor-react': ['react', 'react-dom', 'react-router-dom'],
           'vendor-ui': ['@headlessui/react', '@heroicons/react'],
           'vendor-charts': ['recharts'],
+          'vendor-query': [
+            '@tanstack/react-query',
+            '@tanstack/react-query-persist-client',
+            '@tanstack/query-sync-storage-persister',
+          ],
+          'vendor-virtual': ['@tanstack/react-virtual'],
+          'vendor-ai': ['@google/generative-ai'],
           'vendor-firebase': [
             'firebase/app',
             'firebase/auth',
