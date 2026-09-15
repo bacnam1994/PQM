@@ -1027,5 +1027,73 @@ describe('dataConsistencyService - Data Linkage & Consistency Engine', () => {
         )
       ).toBe(false);
     });
+
+    // TC13: Formula và TCCS có tên khác biệt nhưng được Hard-link qua formulaIngredientId -> Không tạo cảnh báo thiếu chỉ tiêu
+    it('TC13: Formula và TCCS có tên khác biệt nhưng được Hard-link qua formulaIngredientId -> Không tạo cảnh báo thiếu chỉ tiêu', () => {
+      const prodSalt: Product = {
+        id: 'prod_cu',
+        code: 'SP-CU',
+        name: 'Sản phẩm Bổ sung Đồng',
+        group: 'Thực phẩm bảo vệ sức khỏe',
+        registrationNo: 'VD-CU-01',
+        registrationDate: '2026-01-01',
+        registrant: 'V-Biotech',
+        description: 'Bổ sung Đồng',
+        status: 'ACTIVE',
+        createdAt: '2026-01-01',
+        updatedAt: '2026-01-01',
+      };
+
+      const formulaSalt: ProductFormula = {
+        id: 'formula_cu',
+        productId: 'prod_cu',
+        ingredients: [
+          {
+            id: 'ing_cu_salt',
+            name: 'Đồng sulfat pentahydrat',
+            declaredContent: 100,
+            elementalContent: 25,
+            unit: 'mg',
+          },
+        ],
+        createdAt: '2026-01-01',
+        updatedAt: '2026-01-01',
+      };
+
+      const tccsSalt: TCCS = {
+        id: 'tccs_cu',
+        productId: 'prod_cu',
+        code: 'TCCS 02:2026/CU',
+        issueDate: '2026-01-01',
+        isActive: true,
+        mainQualityCriteria: [
+          {
+            name: 'Định lượng ion Cu2+', // Tên khác hoàn toàn với "Đồng sulfat pentahydrat"
+            unit: 'mg',
+            min: 22.5,
+            max: 27.5,
+            type: CriterionType.NUMBER,
+            formulaIngredientId: 'Đồng sulfat pentahydrat', // Hard-link bằng tên hoạt chất
+            calculationBasis: 'ELEMENTAL',
+          },
+        ],
+        safetyCriteria: [],
+        createdAt: '2026-01-01',
+      };
+
+      const report = auditDataConsistency({
+        products: [prodSalt],
+        rawMaterials: [],
+        tccsList: [tccsSalt],
+        productFormulas: [formulaSalt],
+        batches: [],
+        testResults: [],
+      });
+
+      const missingIssue = report.issues.find(
+        (i) => i.type === 'FORMULA_ACTIVE_INGREDIENT_MISSING_IN_TCCS'
+      );
+      expect(missingIssue).toBeUndefined();
+    });
   });
 });

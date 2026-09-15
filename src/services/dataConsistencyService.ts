@@ -858,9 +858,31 @@ export const auditDataConsistency = (data: SystemDataSnapshot): ConsistencyRepor
           .filter((t) => t.length >= 2 && !stopWords.has(t));
       };
 
+      const allActiveCriteria = [
+        ...(activeTccs.mainQualityCriteria || []),
+        ...(activeTccs.safetyCriteria || []),
+      ];
+
       formula.ingredients.forEach((ing) => {
         if (ing.name && ing.name.trim()) {
           const normIngName = normalizeName(ing.name);
+
+          // Kiểm tra ưu tiên số 1: Đã được Hard-link qua formulaIngredientId chưa?
+          const isHardLinked = allActiveCriteria.some((c) => {
+            if (!c.formulaIngredientId) return false;
+            const link = c.formulaIngredientId.trim().toLowerCase();
+            return (
+              link === ing.name.trim().toLowerCase() ||
+              (ing.id && link === ing.id.toLowerCase()) ||
+              normalizeName(link) === normIngName
+            );
+          });
+
+          if (isHardLinked) {
+            return; // Đã liên kết chuẩn xác qua cấu hình, bỏ qua không báo lỗi giả
+          }
+
+          // Nếu chưa Hard-link, mới dùng Fallback là thuật toán extractCoreTokens
           const ingTokens = extractCoreTokens(normIngName);
 
           const isPresent = tccsCriteriaNames.some((tcName) => {

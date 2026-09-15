@@ -13,7 +13,11 @@ export const criterionSchema = z
     max: z.union([z.number(), z.null(), z.undefined()]).optional(),
     textValue: z.string().optional().default(''),
     declaredContent: z.union([z.number(), z.null(), z.undefined()]).optional(),
-    calculationBasis: z.string().optional().default(''),
+    formulaIngredientId: z.string().optional(),
+    calculationBasis: z
+      .union([z.enum(['DECLARED', 'ELEMENTAL']), z.literal('')])
+      .optional()
+      .default('DECLARED'),
     confidence: z.string().optional(),
   })
   .refine(

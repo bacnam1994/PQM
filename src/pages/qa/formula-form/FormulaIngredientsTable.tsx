@@ -163,7 +163,8 @@ export const FormulaIngredientsTable: React.FC<FormulaIngredientsTableProps> = (
               </div>
 
               <input
-                placeholder="0"
+                placeholder="HL Công bố (VD: 100)"
+                title="Hàm lượng công bố dạng muối / hợp chất (Ví dụ: 100)"
                 value={ing.declaredContent}
                 onChange={(e) => onChangeIngredient(index, 'declaredContent', e.target.value)}
                 className="col-span-2 px-3 py-2 bg-surface border border-border rounded-lg text-xs font-medium text-ink outline-none text-right focus:ring-2 focus:ring-emerald-500/15 focus:border-emerald-500"
@@ -176,10 +177,19 @@ export const FormulaIngredientsTable: React.FC<FormulaIngredientsTableProps> = (
                 list="formula-unit-suggestions"
               />
               <input
-                placeholder="(Tùy chọn)"
+                type="number"
+                step="any"
+                placeholder="HL Nguyên tố (VD: 25)"
+                title="Chỉ nhập khi nguyên liệu là dạng muối (Ví dụ: Đồng sulfat -> nhập lượng Đồng nguyên tố vào đây)"
                 value={ing.elementalContent || ''}
-                onChange={(e) => onChangeIngredient(index, 'elementalContent', e.target.value)}
-                className="col-span-2 px-3 py-2 bg-surface border border-border rounded-lg text-xs font-medium text-ink outline-none text-right focus:ring-2 focus:ring-emerald-500/15 focus:border-emerald-500"
+                onChange={(e) =>
+                  onChangeIngredient(
+                    index,
+                    'elementalContent',
+                    e.target.value === '' ? '' : Number(e.target.value)
+                  )
+                }
+                className="col-span-2 px-3 py-2 bg-emerald-500/5 hover:bg-emerald-500/10 focus:bg-surface border border-emerald-500/20 rounded-lg text-xs font-semibold text-emerald-700 dark:text-emerald-400 outline-none text-right focus:ring-2 focus:ring-emerald-500/15 focus:border-emerald-500 transition-colors"
               />
               <button
                 type="button"
