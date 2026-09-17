@@ -51,7 +51,7 @@ describe('Phase 5: EvaluationSnapshotModal - ALCOA+ Snapshot Verification', () =
 
     expect(screen.getByText('tr_test_1', { exact: false })).toBeDefined();
     expect(screen.getByText('qa@vbiotech.vn')).toBeDefined();
-    expect(screen.getByText(/Toàn vẹn ALCOA\+/i)).toBeDefined();
+    expect(screen.getByText(/Chữ ký toàn vẹn/i)).toBeDefined();
     expect(screen.getByText('Độ ẩm')).toBeDefined();
     expect(screen.getByText('Định lượng')).toBeDefined();
   });

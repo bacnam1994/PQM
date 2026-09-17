@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import {
   buildEvaluationSnapshot,
   createEvaluationHash,
+  verifyEvaluationSnapshotIntegrity,
   CURRENT_ENGINE_VERSION,
 } from './EvaluationSnapshotBuilder';
 import { QualityEvaluationEngine } from './QualityEvaluationEngine';
@@ -50,7 +51,7 @@ describe('Phase 4: Evaluation Snapshot & ALCOA+ Data Integrity', () => {
     expect(snapshot.criterionResults).toHaveLength(3);
     expect(snapshot.criterionResults[0].criteriaName).toBe('Định tính');
     expect(snapshot.criterionResults[0].isPass).toBe(true);
-    expect(snapshot.evaluationHash).toMatch(/^eval_[0-9a-f]+$/);
+    expect(snapshot.evaluationHash).toMatch(/^[0-9a-f]{64}$/);
     expect(snapshot.reasons).toEqual([]);
   });
 
@@ -178,15 +179,11 @@ describe('Phase 4: Evaluation Snapshot & ALCOA+ Data Integrity', () => {
     expect(healedSnapshot.evaluationHash).toBeDefined();
 
     // Verify hash matches the recomputed payload with new overallStatus
-    const expectedHash = createEvaluationHash({
-      testResultId: testResultToHeal.id,
-      batchId: testResultToHeal.batchId,
-      overallStatus: 'PASS',
-      criterionResults: healedSnapshot.criterionResults,
-      evaluatedAt: healedSnapshot.evaluatedAt,
-      evaluatedBy: healedSnapshot.evaluatedBy,
-    });
-
-    expect(healedSnapshot.evaluationHash).toBe(expectedHash);
+    const isIntegrityValid = verifyEvaluationSnapshotIntegrity(
+      healedSnapshot,
+      testResultToHeal.id,
+      testResultToHeal.batchId
+    );
+    expect(isIntegrityValid).toBe(true);
   });
 });

@@ -13,12 +13,18 @@ import { normalizeName } from '../../services/criteriaAliasService';
 import { CriterionEvaluator } from './CriterionEvaluator';
 import { AlternateRuleEvaluator } from './AlternateRuleEvaluator';
 
+export type CanonicalTestStatus = 'PASS' | 'FAIL' | 'PENDING' | 'UNKNOWN';
+
 export class OverallResultEvaluator {
   /**
-   * Tính toán kết quả tổng thể toàn phiếu (PASS hoặc FAIL)
+   * Tính toán kết quả tổng thể toàn phiếu: PASS, FAIL, PENDING hoặc UNKNOWN
+   * Tuân thủ quy chuẩn ALCOA+: Không ép PENDING/UNKNOWN thành FAIL ở tầng domain.
    */
-  static calculateOverallStatus(results: TestResultEntry[], tccs: TCCS | null): 'PASS' | 'FAIL' {
-    if (!results || results.length === 0) return TEST_RESULT_STATUS.FAIL;
+  static calculateOverallStatus(
+    results: TestResultEntry[],
+    tccs: TCCS | null
+  ): CanonicalTestStatus {
+    if (!results || results.length === 0) return 'UNKNOWN';
 
     const rules = tccs?.alternateRules || [];
     const failures = results.filter((r) => r.isPass === false);
@@ -30,7 +36,7 @@ export class OverallResultEvaluator {
 
     // 1. Duyệt qua các chỉ tiêu rớt (Failures) để xem có được cứu/miễn không
     for (const fail of failures) {
-      // VÁ BUG 3: Kiểm tra xem lỗi này có thuộc chỉ tiêu phụ được miễn kiểm không?
+      // Kiểm tra xem lỗi này có thuộc chỉ tiêu phụ được miễn kiểm không?
       const condRuleWhereThisIsAlt = rules.find(
         (r) => r.type === EVALUATION_RULE.CONDITIONAL_CHECK && isNameMatch(r.alt, fail.criteriaName)
       );
@@ -62,16 +68,17 @@ export class OverallResultEvaluator {
           altResult.value === '' ||
           altResult.isPass === false
         ) {
-          return TEST_RESULT_STATUS.FAIL;
+          return 'FAIL';
         }
       } else {
         // Không thuộc diện miễn kiểm, cũng không có luật FAIL_RETRY cứu -> Đánh rớt phiếu
-        return TEST_RESULT_STATUS.FAIL;
+        return 'FAIL';
       }
     }
 
-    // 2. VÁ BUG 2: Rà soát xem có CONDITIONAL_CHECK nào BỊ KÍCH HOẠT mà chưa đạt không?
+    // 2. Rà soát xem có CONDITIONAL_CHECK nào BỊ KÍCH HOẠT mà chưa đạt hoặc chưa có kết quả không?
     const conditionalRules = rules.filter((r: any) => r.type === EVALUATION_RULE.CONDITIONAL_CHECK);
+    let hasPendingConditional = false;
     for (const rule of conditionalRules) {
       const mainResult = results.find((r) => isNameMatch(r.criteriaName, rule.main));
       if (mainResult && mainResult.value !== undefined && mainResult.value !== '') {
@@ -83,23 +90,21 @@ export class OverallResultEvaluator {
 
         if (isTriggered === true) {
           const altResult = results.find((r) => isNameMatch(r.criteriaName, rule.alt));
-          if (
-            !altResult ||
-            altResult.value === undefined ||
-            altResult.value === '' ||
-            altResult.isPass === false
-          ) {
-            return TEST_RESULT_STATUS.FAIL;
+          if (!altResult || altResult.value === undefined || altResult.value === '') {
+            hasPendingConditional = true;
+          } else if (altResult.isPass === false) {
+            return 'FAIL';
+          } else if (altResult.isPass === null) {
+            hasPendingConditional = true;
           }
         }
       }
     }
 
-    // 3. Kiểm tra xem có chỉ tiêu bắt buộc nào chưa có kết luận không (value rỗng)
-    const hasUnresolved = results.some((r) => {
-      if (r.isPass !== null && r.isPass !== undefined) return false;
-      const valStr = r.value !== undefined && r.value !== null ? String(r.value).trim() : '';
-      if (valStr !== '') return false;
+    // 3. Kiểm tra xem có chỉ tiêu bắt buộc nào chưa có kết luận không (value rỗng hoặc isPass null)
+    let hasUnresolved = false;
+    for (const r of results) {
+      if (r.isExtra && (!r.limit || r.limit.trim() === '')) continue;
 
       // Kiểm tra xem có được miễn kiểm theo CONDITIONAL_CHECK không
       const condRule = rules.find(
@@ -113,24 +118,27 @@ export class OverallResultEvaluator {
             condRule.conditionValue || '',
             String(mainResult.value)
           );
-          if (isTriggered !== true) return false; // Được miễn kiểm
+          if (isTriggered !== true) continue; // Được miễn kiểm
         }
       }
-      if (r.isExtra && (!r.limit || r.limit.trim() === '')) return false;
-      return true;
-    });
 
-    if (hasUnresolved) {
-      return TEST_RESULT_STATUS.FAIL;
+      const valStr = r.value !== undefined && r.value !== null ? String(r.value).trim() : '';
+      if (valStr === '' || r.isPass === null || r.isPass === undefined) {
+        hasUnresolved = true;
+      }
+    }
+
+    if (hasUnresolved || hasPendingConditional) {
+      return 'PENDING';
     }
 
     // Phải có ít nhất 1 chỉ tiêu đạt
     const hasValidPass = results.some((r) => r.isPass === true);
     if (!hasValidPass) {
-      return TEST_RESULT_STATUS.FAIL;
+      return 'PENDING';
     }
 
-    return TEST_RESULT_STATUS.PASS;
+    return 'PASS';
   }
 
   /**

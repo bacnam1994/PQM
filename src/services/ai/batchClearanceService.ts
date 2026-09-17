@@ -143,9 +143,10 @@ export const evaluateBatchQualityClearance = (
         missingCriteria.push(cName);
       }
     } else {
-      let isPass = normalizeCriterionPassStatus(matchedRes.isPass) !== false;
+      const normalizedPass = normalizeCriterionPassStatus(matchedRes.isPass);
+      let isPass = normalizedPass === true;
 
-      // Nếu rớt, kiểm tra xem có quy tắc alternateRules nào cứu không
+      // Nếu rớt hoặc chưa đạt, kiểm tra xem có quy tắc alternateRules nào cứu không
       if (!isPass) {
         // 1. CONDITIONAL_CHECK: Nếu chỉ tiêu phụ này được miễn kiểm
         const condRule = rules.find(

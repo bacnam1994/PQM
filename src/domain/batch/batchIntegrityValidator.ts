@@ -16,7 +16,7 @@
  */
 
 import { Batch, TestResult, TCCS } from '../../types';
-import { BatchTestResolutionResult } from './batchTestResultResolver';
+import { BatchTestResolutionResult, resolveTestResultsForBatch } from './batchTestResultResolver';
 import { calculateOverallStatus } from '../../utils/evaluation';
 import {
   resolveTestResultStatus,
@@ -32,10 +32,19 @@ export type BatchIntegrityStatus =
   | 'DATA_UNAVAILABLE'
   | 'NOT_APPLICABLE';
 
+export type CollectionLoadState =
+  | 'NOT_STARTED'
+  | 'LOADING'
+  | 'LOADED'
+  | 'PARTIAL'
+  | 'ERROR'
+  | 'OFFLINE';
+
 export interface DataFreshnessState {
   isBatchesLoading?: boolean;
   isTestResultsLoading?: boolean;
   testResultsLoaded?: boolean;
+  loadState?: CollectionLoadState;
   isOffline?: boolean;
   isError?: boolean;
 }
@@ -58,6 +67,7 @@ export interface BatchIntegrityEvaluation {
   debugInfo: {
     resolution: BatchTestResolutionResult;
     freshness: DataFreshnessState;
+    authoritativeResults?: TestResult[];
   };
 }
 
@@ -97,11 +107,16 @@ export function isValidTestResultForBatch(testResult: TestResult, batch?: Batch)
  */
 export function evaluateBatchReleaseIntegrity(
   batch: Batch,
-  resolution: BatchTestResolutionResult,
+  resolutionOrResults: BatchTestResolutionResult | TestResult[],
   freshness: DataFreshnessState = {},
   boundTccs?: TCCS
 ): BatchIntegrityEvaluation {
-  const { isTestResultsLoading = false, testResultsLoaded = true, isError = false } = freshness;
+  const resolution: BatchTestResolutionResult = Array.isArray(resolutionOrResults)
+    ? resolveTestResultsForBatch(batch, resolutionOrResults)
+    : resolutionOrResults;
+
+  const safeFreshness = freshness || {};
+  const { isTestResultsLoading = false, testResultsLoaded = true, isError = false } = safeFreshness;
 
   // 1. Guard: Lô chưa xuất xưởng thì không áp dụng luật bắt buộc có phiếu PASS xuất xưởng
   if (batch.status !== 'RELEASED') {

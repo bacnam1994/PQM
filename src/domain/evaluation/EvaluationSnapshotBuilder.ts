@@ -17,13 +17,21 @@ import {
   Batch,
   TCCS,
 } from '../../types';
+import { calculateSha256Sync } from '../../utils/cryptoUtils';
 
 export const CURRENT_ENGINE_VERSION = '4.0.0-deterministic';
 
 /**
- * Sinh mã băm bảo vệ toàn vẹn lịch sử đánh giá (Deterministic Evaluation Hash)
+ * Sinh mã băm bảo vệ toàn vẹn lịch sử đánh giá (Cryptographic SHA-256 Evaluation Hash)
  */
 export function createEvaluationHash(payload: Record<string, any>): string {
+  return calculateSha256Sync(payload);
+}
+
+/**
+ * Hàm legacy hash cũ để tương thích ngược khi đọc dữ liệu lịch sử cũ
+ */
+function createLegacyEvaluationHash(payload: Record<string, any>): string {
   const str = JSON.stringify(payload);
   let h1 = 0xdeadbeef ^ 0;
   let h2 = 0x41c64e6d ^ 0;
@@ -35,6 +43,70 @@ export function createEvaluationHash(payload: Record<string, any>): string {
   h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
   h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
   return 'eval_' + (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(16);
+}
+
+/**
+ * Xây dựng payload tiêu chuẩn để tính băm bảo vệ toàn vẹn (Canonical Evaluation Hash Payload)
+ */
+export function buildEvaluationHashPayload(
+  snapshot: Omit<EvaluationSnapshot, 'evaluationHash'>,
+  testResultId: string,
+  batchId?: string
+): Record<string, any> {
+  return {
+    testResultId,
+    batchId: batchId || '',
+    tccsId: snapshot.tccsId || '',
+    tccsVersion: snapshot.tccsVersion ?? 1,
+    engineVersion: snapshot.engineVersion,
+    criterionResults: snapshot.criterionResults,
+    overallStatus: snapshot.overallStatus,
+    alternateUsed: !!snapshot.alternateUsed,
+    reasons: snapshot.reasons || [],
+    warnings: snapshot.warnings || [],
+    evaluatedAt: snapshot.evaluatedAt,
+    evaluatedBy: snapshot.evaluatedBy,
+  };
+}
+
+/**
+ * Xác minh tính toàn vẹn chữ ký băm của EvaluationSnapshot (ALCOA+ Tamper Detection)
+ */
+export function verifyEvaluationSnapshotIntegrity(
+  snapshot: EvaluationSnapshot | undefined | null,
+  testResultId: string,
+  batchId?: string
+): boolean {
+  if (!snapshot || !snapshot.evaluationHash) return false;
+
+  // 1. Kiểm tra với chuẩn SHA-256 mới (12 trường cốt lõi)
+  const fullPayload = buildEvaluationHashPayload(snapshot, testResultId, batchId);
+  const calculatedSha256 = createEvaluationHash(fullPayload);
+  if (snapshot.evaluationHash === calculatedSha256) {
+    return true;
+  }
+
+  // 2. Tương thích ngược: Kiểm tra với legacy format (6 trường)
+  const legacyPayload = {
+    testResultId,
+    batchId: batchId || '',
+    overallStatus: snapshot.overallStatus,
+    criterionResults: snapshot.criterionResults,
+    evaluatedAt: snapshot.evaluatedAt,
+    evaluatedBy: snapshot.evaluatedBy,
+  };
+
+  // Thử hash mới cho legacy payload
+  if (snapshot.evaluationHash === createEvaluationHash(legacyPayload)) {
+    return true;
+  }
+
+  // Thử legacy hash (eval_...)
+  if (snapshot.evaluationHash.startsWith('eval_')) {
+    return snapshot.evaluationHash === createLegacyEvaluationHash(legacyPayload);
+  }
+
+  return false;
 }
 
 /**
@@ -70,21 +142,13 @@ export function buildEvaluationSnapshot(
     }
   }
 
-  const hashPayload = {
-    testResultId: testResult.id,
-    batchId: testResult.batchId,
-    overallStatus: testResult.overallStatus,
-    criterionResults,
-    evaluatedAt,
-    evaluatedBy,
-  };
+  const tccsId = options?.tccs?.id || options?.batch?.tccsId;
+  const tccsVersion = options?.tccs?.version || 1;
 
-  const evaluationHash = createEvaluationHash(hashPayload);
-
-  return {
+  const baseSnapshot: Omit<EvaluationSnapshot, 'evaluationHash'> = {
     engineVersion: CURRENT_ENGINE_VERSION,
-    tccsId: options?.tccs?.id || options?.batch?.tccsId,
-    tccsVersion: options?.tccs?.version || 1,
+    tccsId,
+    tccsVersion,
     evaluatedAt,
     evaluatedBy,
     overallStatus: testResult.overallStatus,
@@ -92,6 +156,13 @@ export function buildEvaluationSnapshot(
     alternateUsed,
     reasons,
     warnings,
+  };
+
+  const hashPayload = buildEvaluationHashPayload(baseSnapshot, testResult.id, testResult.batchId);
+  const evaluationHash = createEvaluationHash(hashPayload);
+
+  return {
+    ...baseSnapshot,
     evaluationHash,
   };
 }

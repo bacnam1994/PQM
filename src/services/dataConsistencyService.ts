@@ -80,6 +80,24 @@ export type ConsistencyCategory =
 
 export type IssueSeverity = 'CRITICAL' | 'WARNING' | 'INFO';
 
+export interface AutoHealPayload {
+  action?: string;
+  formulaId?: string;
+  materialId?: string;
+  ingredientName?: string;
+  excipientName?: string;
+  testResultId?: string;
+  correctStatus?: string;
+  batchId?: string;
+  testResultIds?: string[];
+  productId?: string;
+  targetTccsId?: string;
+  aliasId?: string;
+  targetLabId?: string;
+  canonicalLabName?: string;
+  [key: string]: any;
+}
+
 export interface ConsistencyIssue {
   id: string;
   type: ConsistencyIssueType;
@@ -107,7 +125,7 @@ export interface ConsistencyIssue {
     | 'FIX_ACTIVE_TCCS'
     | 'CLEAN_ORPHAN_ALIAS'
     | 'NORMALIZE_TEST_LAB';
-  healPayload?: any;
+  healPayload?: AutoHealPayload;
   expected?: string;
   actual?: string;
   reason?: string;
@@ -1043,7 +1061,7 @@ export const auditDataConsistency = (data: SystemDataSnapshot): ConsistencyRepor
  */
 export const generateAutoHealPlan = (report: ConsistencyReport, data: SystemDataSnapshot) => {
   const formulaUpdates: Record<string, ProductFormula> = {};
-  const testResultStatusUpdates: Record<string, 'PASS' | 'FAIL'> = {};
+  const testResultStatusUpdates: Record<string, 'PASS' | 'FAIL' | 'PENDING' | 'UNKNOWN'> = {};
   const testResultBatchIdUpdates: Record<string, string> = {};
   const testResultLabUpdates: Record<string, { labId: string; labName: string }> = {};
   const tccsActiveUpdates: Record<string, { tccsId: string; isActive: boolean }[]> = {};
@@ -1092,7 +1110,13 @@ export const generateAutoHealPlan = (report: ConsistencyReport, data: SystemData
       }
     } else if (issue.autoHealAction === 'FIX_TEST_STATUS' && issue.healPayload) {
       const { testResultId, correctStatus } = issue.healPayload;
-      testResultStatusUpdates[testResultId] = correctStatus;
+      if (testResultId && correctStatus) {
+        testResultStatusUpdates[testResultId] = correctStatus as
+          | 'PASS'
+          | 'FAIL'
+          | 'PENDING'
+          | 'UNKNOWN';
+      }
     } else if (issue.autoHealAction === 'FIX_TEST_RELATIONSHIP' && issue.healPayload) {
       const { batchId, testResultIds } = issue.healPayload;
       if (batchId && Array.isArray(testResultIds)) {

@@ -12,6 +12,7 @@ import {
   checkRuleExemption,
 } from '../../utils';
 import { calculateOverallStatus } from './../../utils/evaluation';
+import { CriterionEvaluator } from '../../domain/evaluation/CriterionEvaluator';
 import { lookupPharmaTerm, isCriteriaMatch } from '../../utils/aiMapping';
 import {
   TestResultEntry,
@@ -133,7 +134,7 @@ export const useTestResultSave = ({
               if (isAutoPassed) {
                 isPass = true;
               } else {
-                isPass = evaluateCriterionSmart(c, val);
+                isPass = CriterionEvaluator.evaluateCriterion(c, val).isPass;
               }
 
               results.push({

@@ -23,6 +23,8 @@ import {
 import { queryClient } from '../../lib/queryClient';
 import { TEST_RESULT_QUERY_KEYS } from '../../hooks/queries/useTestResultQueries';
 import { BATCH_QUERY_KEYS } from '../../hooks/queries/useBatchQueries';
+import { TestResult } from '../../types/testResult';
+import { CanonicalTestStatus } from '../../domain/test-result/testResultStatusResolver';
 import { QualityEvaluationEngine } from '../../domain/evaluation/QualityEvaluationEngine';
 import toast from 'react-hot-toast';
 
@@ -50,11 +52,18 @@ export const DataConsistencyCenter: React.FC = () => {
   const [expandedIssueId, setExpandedIssueId] = useState<string | null>(null);
 
   const syncStatus = useAppStore((state) => state.syncStatus);
-  const isTestResultsLoading = syncStatus === 'SAVING';
-  const testResultsLoaded =
-    (testResults && testResults.length > 0) || syncStatus === 'SAVED' || syncStatus === 'IDLE';
+  const loadState = useMemo(() => {
+    if (syncStatus === 'OFFLINE') return 'OFFLINE';
+    if (syncStatus === 'ERROR') return 'ERROR';
+    if (syncStatus === 'SAVING') return 'LOADING';
+    if (syncStatus === 'SAVED' || syncStatus === 'IDLE') return 'LOADED';
+    return 'NOT_STARTED';
+  }, [syncStatus]);
 
-  // Lấy dữ liệu hệ thống hiện tại kèm trạng thái Freshness
+  const isTestResultsLoading = loadState === 'LOADING';
+  const testResultsLoaded = loadState === 'LOADED';
+
+  // Lấy dữ liệu hệ thống hiện tại kèm trạng thái Freshness chuẩn hóa
   const systemSnapshot: SystemDataSnapshot = useMemo(
     () => ({
       products: products || [],
@@ -68,6 +77,7 @@ export const DataConsistencyCenter: React.FC = () => {
       dataFreshness: {
         isTestResultsLoading,
         testResultsLoaded,
+        loadState,
         isOffline: syncStatus === 'OFFLINE',
         isError: syncStatus === 'ERROR',
       },
@@ -83,6 +93,7 @@ export const DataConsistencyCenter: React.FC = () => {
       testingLaboratories,
       isTestResultsLoading,
       testResultsLoaded,
+      loadState,
       syncStatus,
     ]
   );
@@ -149,14 +160,39 @@ export const DataConsistencyCenter: React.FC = () => {
           const { testResultId, correctStatus } = issue.healPayload;
           const testRes = testResults.find((t) => t.id === testResultId);
           if (testRes) {
+            const statusUpper = String((testRes as any).status || '').toUpperCase();
+            if (
+              statusUpper === 'APPROVED' ||
+              statusUpper === 'FINAL' ||
+              statusUpper === 'RELEASED' ||
+              (testRes as any).isFinal
+            ) {
+              toast.error(
+                `Phiếu ${testRes.id} đã Phê duyệt/Khóa sổ (${statusUpper}). Không được phép Auto-Heal, vui lòng lập phiếu Deviation/Reopen.`
+              );
+              return;
+            }
+
             const boundTccs = tccsList.find(
               (t) =>
                 t.id === (testRes as any).tccsId ||
                 t.id === testRes.evaluationSnapshot?.tccsId ||
                 (testRes.batch && t.productId === testRes.batch.productId)
             );
-            const candidateTr = { ...testRes, overallStatus: correctStatus };
+            const candidateTr: TestResult = {
+              ...testRes,
+              overallStatus: (correctStatus as CanonicalTestStatus) || testRes.overallStatus,
+            };
             const newSnapshot = QualityEvaluationEngine.evaluate(candidateTr, boundTccs);
+
+            // Post-heal verification (EVAL-022)
+            if (!newSnapshot || !newSnapshot.evaluationHash) {
+              toast.error(
+                'Post-heal verification thất bại: Không thể tạo snapshot SHA-256 hợp lệ.'
+              );
+              return;
+            }
+
             await updateTestResult({
               ...candidateTr,
               overallStatus: newSnapshot.overallStatus,
@@ -178,6 +214,18 @@ export const DataConsistencyCenter: React.FC = () => {
             for (const trId of testResultIds) {
               const testRes = testResults.find((t) => t.id === trId);
               if (testRes) {
+                const statusUpper = String((testRes as any).status || '').toUpperCase();
+                if (
+                  statusUpper === 'APPROVED' ||
+                  statusUpper === 'FINAL' ||
+                  statusUpper === 'RELEASED' ||
+                  (testRes as any).isFinal
+                ) {
+                  toast.error(
+                    `Phiếu ${testRes.id} đã Phê duyệt/Khóa sổ (${statusUpper}). Bỏ qua Auto-Heal liên kết.`
+                  );
+                  continue;
+                }
                 await updateTestResult({ ...testRes, batchId });
               }
             }
@@ -254,11 +302,35 @@ export const DataConsistencyCenter: React.FC = () => {
         successCount++;
       }
 
-      // 2. Cập nhật Test Result Statuses
+      // 2. Cập nhật Test Result Statuses (Bảo vệ phiếu đã phê duyệt + tái thẩm định qua Engine)
       for (const trId of Object.keys(plan.testResultStatusUpdates)) {
         const tr = testResults.find((t) => t.id === trId);
         if (tr) {
-          await updateTestResult({ ...tr, overallStatus: plan.testResultStatusUpdates[trId] });
+          const statusUpper = String((tr as any).status || '').toUpperCase();
+          if (
+            statusUpper === 'APPROVED' ||
+            statusUpper === 'FINAL' ||
+            statusUpper === 'RELEASED' ||
+            (tr as any).isFinal
+          ) {
+            // Bỏ qua tuyệt đối các phiếu đã hoàn tất/phê duyệt
+            continue;
+          }
+
+          const boundTccs = tccsList.find(
+            (t) =>
+              t.id === (tr as any).tccsId ||
+              t.id === tr.evaluationSnapshot?.tccsId ||
+              (tr.batch && t.productId === tr.batch.productId)
+          );
+          const candidateTr = { ...tr, overallStatus: plan.testResultStatusUpdates[trId] as any };
+          const newSnapshot = QualityEvaluationEngine.evaluate(candidateTr, boundTccs);
+
+          await updateTestResult({
+            ...candidateTr,
+            overallStatus: newSnapshot.overallStatus,
+            evaluationSnapshot: newSnapshot,
+          });
           successCount++;
         }
       }

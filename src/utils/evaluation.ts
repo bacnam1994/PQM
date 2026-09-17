@@ -11,6 +11,6 @@ import { QualityEvaluationEngine } from '../domain/evaluation/QualityEvaluationE
 export const calculateOverallStatus = (
   results: TestResultEntry[],
   tccs: TCCS | null
-): 'PASS' | 'FAIL' => {
+): 'PASS' | 'FAIL' | 'PENDING' | 'UNKNOWN' => {
   return QualityEvaluationEngine.calculateOverallStatus(results, tccs);
 };

@@ -587,23 +587,38 @@ export function resolveFinalTestResultForBatch(
     };
   }
 
-  // 2. Ưu tiên phiếu APPROVED / FINAL hơn DRAFT / TESTING
-  const finalizedCandidates = candidates.filter((tr) => {
+  // 2. Formal Precedence Matrix:
+  // Cấp độ: APPROVED (40) > FINAL (30) > RELEASED (20) > DRAFT/PENDING (10)
+  // Kết hợp: version > updatedAt/testDate > id deterministic tie-breaker
+  function getStatusPrecedenceScore(tr: TestResult): number {
     const s = String((tr as any).status || '').toUpperCase();
-    return s === 'APPROVED' || s === 'FINAL' || s === 'RELEASED' || (tr as any).isFinal === true;
-  });
+    if (s === 'APPROVED') return 40;
+    if (s === 'FINAL' || (tr as any).isFinal === true) return 30;
+    if (s === 'RELEASED') return 20;
+    if (s === 'DRAFT' || s === 'PENDING' || s === 'TESTING') return 10;
+    return 15; // default working status
+  }
 
-  const workingCandidates = finalizedCandidates.length > 0 ? finalizedCandidates : candidates;
+  // 3. Sắp xếp tìm bản ghi hiện hành theo thang điểm ưu tiên chính thức
+  const sorted = [...candidates].sort((a, b) => {
+    // 1. Trạng thái phê duyệt
+    const scoreA = getStatusPrecedenceScore(a);
+    const scoreB = getStatusPrecedenceScore(b);
+    if (scoreA !== scoreB) return scoreB - scoreA;
 
-  // 3. Sắp xếp tìm bản ghi hiện hành (ưu tiên version cao hơn, ngày test hoặc updatedAt mới hơn)
-  const sorted = [...workingCandidates].sort((a, b) => {
+    // 2. Version / revision
     const vA = (a as any).version || (a as any).revision || 0;
     const vB = (b as any).version || (b as any).revision || 0;
     if (vA !== vB) return vB - vA;
 
+    // 3. Timestamp mới hơn
     const dateA = a.updatedAt || a.testDate || a.createdAt || '';
     const dateB = b.updatedAt || b.testDate || b.createdAt || '';
-    return dateB.localeCompare(dateA);
+    const dateDiff = dateB.localeCompare(dateA);
+    if (dateDiff !== 0) return dateDiff;
+
+    // 4. Deterministic tie-breaker bằng ID
+    return (b.id || '').localeCompare(a.id || '');
   });
 
   const finalTestResult = sorted[0];
@@ -923,8 +938,15 @@ export function detectTestResultStatusMismatch(
       ? 'STORED_PASS_BUT_COMPUTED_FAIL'
       : 'STORED_FAIL_BUT_COMPUTED_PASS';
 
-  // Mục 15: Chỉ Auto-Heal khi deterministic và có đầy đủ bằng chứng chỉ tiêu thực tế
+  const isFinalized =
+    statusUpper === 'APPROVED' ||
+    statusUpper === 'FINAL' ||
+    statusUpper === 'RELEASED' ||
+    (testResult as any).isFinal === true;
+
+  // Mục 15: Chỉ Auto-Heal khi deterministic, chưa bị khóa duyệt (không phải APPROVED/FINAL/RELEASED)
   const isSafeToAutoHeal =
+    !isFinalized &&
     results.length > 0 &&
     (computedCanonical === 'FAIL'
       ? failures.length > 0
@@ -949,6 +971,8 @@ export function detectTestResultStatusMismatch(
           correctStatus: computedCanonical,
         }
       : undefined,
-    suggestedAction: `Cập nhật lại trạng thái phiếu thành "${computedCanonical}" theo kết quả đánh giá các chỉ tiêu.`,
+    suggestedAction: isFinalized
+      ? `Phiếu kiểm nghiệm đã được Phê duyệt/Khóa sổ (${statusUpper || 'FINAL'}). Cần tạo phiếu Sai lệch (Deviation) hoặc Yêu cầu Thay đổi (Change Control) để Reopen trước khi chỉnh sửa.`
+      : `Cập nhật lại trạng thái phiếu thành "${computedCanonical}" theo kết quả đánh giá các chỉ tiêu.`,
   };
 }

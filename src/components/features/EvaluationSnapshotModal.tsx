@@ -24,7 +24,10 @@ import {
 import { Modal } from '../ui/CommonUI';
 import { TestResult, TCCS } from '../../types';
 import { formatDateStandard } from '../../utils';
-import { createEvaluationHash } from '../../domain/evaluation/EvaluationSnapshotBuilder';
+import {
+  createEvaluationHash,
+  verifyEvaluationSnapshotIntegrity,
+} from '../../domain/evaluation/EvaluationSnapshotBuilder';
 
 interface EvaluationSnapshotModalProps {
   isOpen: boolean;
@@ -45,23 +48,13 @@ export const EvaluationSnapshotModal: React.FC<EvaluationSnapshotModalProps> = (
   const integrityVerification = useMemo(() => {
     if (!snapshot || !testResult) return { isValid: false, reason: 'Chưa có snapshot' };
 
-    const recalculatedHash = createEvaluationHash({
-      testResultId: testResult.id,
-      batchId: testResult.batchId,
-      overallStatus: snapshot.overallStatus,
-      criterionResults: snapshot.criterionResults,
-      evaluatedAt: snapshot.evaluatedAt,
-      evaluatedBy: snapshot.evaluatedBy,
-    });
-
-    const isMatch = snapshot.evaluationHash === recalculatedHash;
+    const isMatch = verifyEvaluationSnapshotIntegrity(snapshot, testResult.id, testResult.batchId);
     return {
       isValid: isMatch,
       hash: snapshot.evaluationHash,
-      recalculatedHash,
       reason: isMatch
-        ? 'Toàn vẹn ALCOA+ (Khớp mã băm)'
-        : 'Cảnh báo: Dữ liệu có dấu hiệu bị can thiệp!',
+        ? 'Chữ ký toàn vẹn (ALCOA+ SHA-256 Valid)'
+        : 'Phát hiện sai lệch / Chỉnh sửa trái phép sau khi ký duyệt (Tamper Alert)',
     };
   }, [snapshot, testResult]);
 

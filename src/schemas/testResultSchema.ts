@@ -6,7 +6,7 @@ import { z } from 'zod';
 export const testResultEntrySchema = z.object({
   criteriaName: z.string().trim().min(1, 'Tên chỉ tiêu không được để trống'),
   value: z.string().trim().min(1, 'Kết quả thử nghiệm không được để trống'),
-  isPass: z.boolean().nullable().default(true),
+  isPass: z.boolean().nullable().default(null),
   isExtra: z.boolean().optional().default(false),
   unit: z.string().optional().default(''),
   limit: z.string().optional().default(''),
@@ -24,7 +24,7 @@ export const testResultFormSchema = z.object({
   batchId: z.string().trim().min(1, 'Vui lòng chọn hoặc nhập số Lô sản xuất kiểm nghiệm'),
   labName: z.string().trim().min(1, 'Đơn vị / Phòng kiểm nghiệm không được để trống'),
   testDate: z.string().trim().min(1, 'Ngày kiểm nghiệm không được để trống'),
-  overallStatus: z.enum(['PASS', 'FAIL', 'PENDING', 'UNKNOWN']).default('PASS'),
+  overallStatus: z.enum(['PASS', 'FAIL', 'PENDING', 'UNKNOWN']).default('PENDING'),
   notes: z.string().optional().default(''),
   results: z
     .array(testResultEntrySchema)

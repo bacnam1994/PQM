@@ -26,16 +26,18 @@ export const fetchTestResultsByBatchId = async (targetBatchId: string): Promise<
         fbResults = Object.values(snapshot.val()) as TestResult[];
       }
     } catch (error) {
-      console.warn("Lỗi khi tải PKN từ Database (thử fallback quét):", error);
+      console.warn('Lỗi khi tải PKN từ Database (thử fallback quét):', error);
       // Fallback: nếu query bị lỗi do thiếu index, thử lấy tất cả và lọc
       try {
         const allSnap = await get(ref(db, 'testResults'));
         if (allSnap.exists()) {
           const all = Object.values(allSnap.val()) as TestResult[];
-          fbResults = all.filter(r => r && (r.batchId === targetBatchId || r.batchId?.endsWith(targetBatchId)));
+          fbResults = all.filter(
+            (r) => r && (r.batchId === targetBatchId || r.batchId?.endsWith(targetBatchId))
+          );
         }
       } catch (fallbackErr) {
-        console.warn("Fallback fetch all testResults failed:", fallbackErr);
+        console.warn('Fallback fetch all testResults failed:', fallbackErr);
       }
     }
 
@@ -43,20 +45,24 @@ export const fetchTestResultsByBatchId = async (targetBatchId: string): Promise<
     try {
       const cached = await getFromCache('testResults');
       if (cached && Array.isArray(cached)) {
-        localResults = cached.filter((r: any) => r && (r.batchId === targetBatchId || r.batchId?.endsWith(targetBatchId)));
+        localResults = cached.filter(
+          (r: any) => r && (r.batchId === targetBatchId || r.batchId?.endsWith(targetBatchId))
+        );
       }
-    } catch (error) { console.warn("Lỗi khi tải PKN từ Cache:", error); }
+    } catch (error) {
+      console.warn('Lỗi khi tải PKN từ Cache:', error);
+    }
 
     // 3. Lấy từ Global Store hiện có
     const appState = useAppStore.getState();
     const storeResults = [
       ...(appState.allTestResults || []),
-      ...(appState.testResults || [])
-    ].filter(r => r && (r.batchId === targetBatchId || r.batchId?.endsWith(targetBatchId)));
+      ...(appState.testResults || []),
+    ].filter((r) => r && (r.batchId === targetBatchId || r.batchId?.endsWith(targetBatchId)));
 
     // 4. Gộp dữ liệu (ưu tiên DB nếu trùng ID)
     const merged = new Map<string, TestResult>();
-    [...storeResults, ...localResults, ...fbResults].forEach(r => {
+    [...storeResults, ...localResults, ...fbResults].forEach((r) => {
       if (r && r.id) merged.set(r.id, r);
     });
     const finalResults = Array.from(merged.values());
@@ -66,9 +72,9 @@ export const fetchTestResultsByBatchId = async (targetBatchId: string): Promise<
     if (mergeTestResults && finalResults.length > 0) {
       mergeTestResults(finalResults);
     }
-    
-    return finalResults.sort((a, b) => 
-      new Date(b.testDate || 0).getTime() - new Date(a.testDate || 0).getTime()
+
+    return finalResults.sort(
+      (a, b) => new Date(b.testDate || 0).getTime() - new Date(a.testDate || 0).getTime()
     );
   } catch (error) {
     console.error(`Lỗi tổng hợp lịch sử PKN cho lô ${targetBatchId}:`, error);
@@ -87,26 +93,27 @@ export const fetchTestResultById = async (idOrSuffix: string): Promise<TestResul
 
   // 1. Thử tìm trong Global Store trước (nhanh nhất)
   const appState = useAppStore.getState();
-  const allStoreResults = [
-    ...(appState.allTestResults || []),
-    ...(appState.testResults || [])
-  ];
-  const foundInStore = allStoreResults.find(r => r && (r.id === idOrSuffix || r.id.endsWith(idOrSuffix)));
+  const allStoreResults = [...(appState.allTestResults || []), ...(appState.testResults || [])];
+  const foundInStore = allStoreResults.find(
+    (r) => r && (r.id === idOrSuffix || r.id.endsWith(idOrSuffix))
+  );
   if (foundInStore) return foundInStore;
 
   // 2. Thử tìm trong IndexedDB cache trước (nhanh, offline-first)
   try {
     const cached = await getFromCache('testResults');
     if (cached && Array.isArray(cached)) {
-      const found = cached.find((r: any) =>
-        r && (r.id === idOrSuffix || r.id.endsWith(idOrSuffix))
+      const found = cached.find(
+        (r: any) => r && (r.id === idOrSuffix || r.id.endsWith(idOrSuffix))
       );
       if (found) {
         if (appState.mergeTestResults) appState.mergeTestResults([found]);
         return found as TestResult;
       }
     }
-  } catch (e) { console.warn('Cache lookup failed:', e); }
+  } catch (e) {
+    console.warn('Cache lookup failed:', e);
+  }
 
   // 3. Fallback: Fetch từ Firebase
   try {
@@ -119,19 +126,14 @@ export const fetchTestResultById = async (idOrSuffix: string): Promise<TestResul
       return found;
     }
 
-    // 3.2 Nếu không tìm thấy hoặc idOrSuffix là suffix, fetch toàn bộ danh sách để tìm
-    const snapshot = await get(ref(db, 'testResults'));
-    if (snapshot.exists()) {
-      const all = Object.values(snapshot.val()) as TestResult[];
-      const found = all.find(r => r && (r.id === idOrSuffix || r.id.endsWith(idOrSuffix)));
-      if (found) {
-        // Bơm vào store để các lần sau không cần fetch lại
-        const mergeTestResults = useAppStore.getState().mergeTestResults;
-        if (mergeTestResults) mergeTestResults([found]);
-        return found;
-      }
-    }
-  } catch (e) { console.error('Firebase lookup failed:', e); }
+    // 3.2 Targeted Fail-Closed: Tuyệt đối không fetch toàn bộ collection testResults về client (EVAL-011)
+    // Nếu ID trực tiếp không tìm thấy trên Firebase, trả về null để bảo vệ hiệu năng & băng thông
+    console.warn(
+      `[testResultService] Không tìm thấy phiếu kiểm nghiệm với khóa: "${idOrSuffix}" trực tiếp trên RTDB.`
+    );
+  } catch (e) {
+    console.error(`[testResultService] Firebase lookup failed cho "${idOrSuffix}":`, e);
+  }
 
   return null;
 };
@@ -149,7 +151,7 @@ export const fetchTestResultsByProductId = async (productId: string): Promise<Te
   try {
     // 1. Lấy danh sách lô hàng thuộc sản phẩm từ store và Firebase
     const appState = useAppStore.getState();
-    let productBatches = appState.batches.filter(b => b.productId === productId);
+    let productBatches = appState.batches.filter((b) => b.productId === productId);
 
     // Nếu store chưa có đủ dữ liệu, fetch toàn bộ lô từ Firebase và lọc
     if (productBatches.length === 0) {
@@ -167,7 +169,7 @@ export const fetchTestResultsByProductId = async (productId: string): Promise<Te
 
     if (productBatches.length === 0) return [];
 
-    const batchIds = productBatches.map(b => b.id);
+    const batchIds = productBatches.map((b) => b.id);
 
     // 2. Tra cứu kết quả kiểm nghiệm có sẵn trong store và cache trước (không cần fetch riêng lẻ)
     const allAvailableResults = [
@@ -176,11 +178,11 @@ export const fetchTestResultsByProductId = async (productId: string): Promise<Te
     ];
 
     const batchIdSet = new Set(batchIds);
-    const fromStore = allAvailableResults.filter(r => r && batchIdSet.has(r.batchId));
+    const fromStore = allAvailableResults.filter((r) => r && batchIdSet.has(r.batchId));
 
     // Kiểm tra các lô chưa có dữ liệu kiểm nghiệm trong store
-    const batchIdsInStore = new Set(fromStore.map(r => r.batchId));
-    const missingBatchIds = batchIds.filter(id => !batchIdsInStore.has(id));
+    const batchIdsInStore = new Set(fromStore.map((r) => r.batchId));
+    const missingBatchIds = batchIds.filter((id) => !batchIdsInStore.has(id));
 
     // 3. Fetch các lô còn thiếu từ Firebase
     let fromFirebase: TestResult[] = [];
@@ -189,12 +191,14 @@ export const fetchTestResultsByProductId = async (productId: string): Promise<Te
         // Nếu chỉ vài lô bị thiếu → fetch từng lô riêng lẻ
         if (missingBatchIds.length <= 5) {
           const results = await Promise.all(
-            missingBatchIds.map(async bId => {
+            missingBatchIds.map(async (bId) => {
               try {
                 const q = query(ref(db, 'testResults'), orderByChild('batchId'), equalTo(bId));
                 const snap = await get(q);
                 return snap.exists() ? (Object.values(snap.val()) as TestResult[]) : [];
-              } catch (e) { return []; }
+              } catch (e) {
+                return [];
+              }
             })
           );
           fromFirebase = results.flat();
@@ -203,7 +207,7 @@ export const fetchTestResultsByProductId = async (productId: string): Promise<Te
           const snap = await get(ref(db, 'testResults'));
           if (snap.exists()) {
             const all = Object.values(snap.val()) as TestResult[];
-            fromFirebase = all.filter(r => r && batchIdSet.has(r.batchId));
+            fromFirebase = all.filter((r) => r && batchIdSet.has(r.batchId));
           }
         }
       } catch (e) {
@@ -213,7 +217,7 @@ export const fetchTestResultsByProductId = async (productId: string): Promise<Te
 
     // 4. Gộp và loại trùng
     const merged = new Map<string, TestResult>();
-    [...fromStore, ...fromFirebase].forEach(r => {
+    [...fromStore, ...fromFirebase].forEach((r) => {
       if (r && r.id) merged.set(r.id, r);
     });
 
@@ -224,8 +228,8 @@ export const fetchTestResultsByProductId = async (productId: string): Promise<Te
       appState.mergeTestResults(finalResults);
     }
 
-    return finalResults.sort((a, b) =>
-      new Date(b.testDate || 0).getTime() - new Date(a.testDate || 0).getTime()
+    return finalResults.sort(
+      (a, b) => new Date(b.testDate || 0).getTime() - new Date(a.testDate || 0).getTime()
     );
   } catch (error) {
     console.error(`Lỗi tải toàn bộ lịch sử kiểm nghiệm cho sản phẩm ${productId}:`, error);
@@ -259,16 +263,13 @@ export const fetchAllTestResultsRaw = async (): Promise<TestResult[]> => {
 
   // Fallback: Global store
   const state = useAppStore.getState();
-  return [
-    ...(state.allTestResults || []),
-    ...(state.testResults || [])
-  ];
+  return [...(state.allTestResults || []), ...(state.testResults || [])];
 };
 
 /**
  * Đổi tên chỉ tiêu trên 100% phiếu kiểm nghiệm trong toàn bộ cơ sở dữ liệu (Atomic Multi-path Update).
  * Đảm bảo mọi phiếu cũ và mới đều được đổi tên đồng bộ.
- * 
+ *
  * @param oldName Tên chỉ tiêu cũ cần đổi
  * @param newName Tên chỉ tiêu mới
  * @param targetProductId (Tùy chọn) Chỉ áp dụng cho các lô thuộc 1 sản phẩm cụ thể
@@ -302,8 +303,8 @@ export const bulkRenameCriteriaInAllTestResults = async (
         console.warn('[bulkRename] Lỗi lấy danh sách lô:', e);
       }
     }
-    const filtered = (allBatches || []).filter(b => b && b.productId === targetProductId);
-    validBatchIdSet = new Set(filtered.map(b => b.id));
+    const filtered = (allBatches || []).filter((b) => b && b.productId === targetProductId);
+    validBatchIdSet = new Set(filtered.map((b) => b.id));
   }
 
   // 3. Tìm các phiếu có chỉ tiêu cần đổi
@@ -311,7 +312,7 @@ export const bulkRenameCriteriaInAllTestResults = async (
   const modifiedResults: TestResult[] = [];
   const now = new Date().toISOString();
 
-  allResults.forEach(result => {
+  allResults.forEach((result) => {
     if (!result || !result.id) return;
 
     // Lọc theo sản phẩm nếu có
@@ -321,7 +322,7 @@ export const bulkRenameCriteriaInAllTestResults = async (
     }
 
     let hasChange = false;
-    const newEntries = (result.results || []).map(entry => {
+    const newEntries = (result.results || []).map((entry) => {
       if (entry && entry.criteriaName && entry.criteriaName.trim().toLowerCase() === normOld) {
         hasChange = true;
         return { ...entry, criteriaName: targetName };
@@ -333,7 +334,7 @@ export const bulkRenameCriteriaInAllTestResults = async (
       const updatedResult: TestResult = {
         ...result,
         results: newEntries,
-        updatedAt: now
+        updatedAt: now,
       };
       updates[`testResults/${result.id}/results`] = newEntries;
       updates[`testResults/${result.id}/updatedAt`] = now;
@@ -353,8 +354,8 @@ export const bulkRenameCriteriaInAllTestResults = async (
       appState.mergeTestResults(modifiedResults);
     }
     if (appState.allTestResults && appState.allTestResults.length > 0) {
-      const modifiedMap = new Map(modifiedResults.map(r => [r.id, r]));
-      const newAll = appState.allTestResults.map(r => modifiedMap.get(r.id) || r);
+      const modifiedMap = new Map(modifiedResults.map((r) => [r.id, r]));
+      const newAll = appState.allTestResults.map((r) => modifiedMap.get(r.id) || r);
       useAppStore.setState({ allTestResults: newAll });
     }
 
@@ -362,7 +363,7 @@ export const bulkRenameCriteriaInAllTestResults = async (
     try {
       const cached = await getFromCache('testResults');
       if (cached && Array.isArray(cached)) {
-        const modifiedMap = new Map(modifiedResults.map(r => [r.id, r]));
+        const modifiedMap = new Map(modifiedResults.map((r) => [r.id, r]));
         const newCached = cached.map((r: any) => modifiedMap.get(r.id) || r);
         await saveToCache('testResults', newCached);
       }
@@ -373,4 +374,3 @@ export const bulkRenameCriteriaInAllTestResults = async (
 
   return { updatedCount, totalScanned: allResults.length };
 };
-

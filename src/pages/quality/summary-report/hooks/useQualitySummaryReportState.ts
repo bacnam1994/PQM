@@ -271,10 +271,12 @@ export const useQualitySummaryReportState = () => {
           } else if (entry?.isPass !== undefined && entry.isPass !== null) {
             isPass = entry.isPass;
           } else {
-            isPass = true;
+            isPass = null;
           }
-        } else if (entry?.isPass !== undefined) {
+        } else if (entry?.isPass !== undefined && entry.isPass !== null) {
           isPass = entry.isPass;
+        } else {
+          isPass = null;
         }
 
         criteriaResults[criterion.name] = {

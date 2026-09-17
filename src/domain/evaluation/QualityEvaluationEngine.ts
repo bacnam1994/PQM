@@ -55,9 +55,12 @@ export class QualityEvaluationEngine {
   }
 
   /**
-   * Tính toán kết quả tổng thể toàn phiếu (PASS / FAIL)
+   * Tính toán kết quả tổng thể toàn phiếu (PASS / FAIL / PENDING / UNKNOWN)
    */
-  static calculateOverallStatus(results: TestResultEntry[], tccs: TCCS | null): 'PASS' | 'FAIL' {
+  static calculateOverallStatus(
+    results: TestResultEntry[],
+    tccs: TCCS | null
+  ): 'PASS' | 'FAIL' | 'PENDING' | 'UNKNOWN' {
     return OverallResultEvaluator.calculateOverallStatus(results, tccs);
   }
 
@@ -77,6 +80,8 @@ export class QualityEvaluationEngine {
       const calculated = this.calculateOverallStatus(testResult.results, tccs || null);
       if (calculated === 'PASS') {
         overallStatus = 'PASS';
+      } else if (calculated === 'FAIL') {
+        overallStatus = 'FAIL';
       } else if (overallStatus !== 'PENDING') {
         overallStatus = calculated;
       }

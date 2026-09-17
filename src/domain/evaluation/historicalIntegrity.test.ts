@@ -7,7 +7,11 @@
 
 import { describe, it, expect } from 'vitest';
 import { QualityEvaluationEngine } from './QualityEvaluationEngine';
-import { buildEvaluationSnapshot, createEvaluationHash } from './EvaluationSnapshotBuilder';
+import {
+  buildEvaluationSnapshot,
+  createEvaluationHash,
+  verifyEvaluationSnapshotIntegrity,
+} from './EvaluationSnapshotBuilder';
 import { TCCS, TestResult, Batch } from '../../types';
 
 describe('P5 — Historical Integrity & Immutable Evaluation Snapshot', () => {
@@ -127,15 +131,12 @@ describe('P5 — Historical Integrity & Immutable Evaluation Snapshot', () => {
     expect(testResultB001.evaluationSnapshot?.tccsVersion).toBe(1);
     expect(testResultB001.evaluationSnapshot?.criterionResults[0].isPass).toBe(true);
 
-    // Xác thực mã băm evaluationHash ban đầu vẫn khớp 100% với dữ liệu snapshot đã niêm phong
-    const recalculatedHash = createEvaluationHash({
-      testResultId: testResultB001.id,
-      batchId: testResultB001.batchId,
-      overallStatus: testResultB001.evaluationSnapshot?.overallStatus,
-      criterionResults: testResultB001.evaluationSnapshot?.criterionResults,
-      evaluatedAt: testResultB001.evaluationSnapshot?.evaluatedAt,
-      evaluatedBy: testResultB001.evaluationSnapshot?.evaluatedBy,
-    });
-    expect(testResultB001.evaluationSnapshot?.evaluationHash).toBe(recalculatedHash);
+    // Xác thực mã băm evaluationHash ban đầu vẫn khớp 100% với dữ liệu snapshot đã niêm phong (ALCOA+ SHA-256)
+    const isIntegrityValid = verifyEvaluationSnapshotIntegrity(
+      testResultB001.evaluationSnapshot,
+      testResultB001.id,
+      testResultB001.batchId
+    );
+    expect(isIntegrityValid).toBe(true);
   });
 });
