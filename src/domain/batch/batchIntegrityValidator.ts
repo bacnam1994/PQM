@@ -18,7 +18,11 @@
 import { Batch, TestResult, TCCS } from '../../types';
 import { BatchTestResolutionResult } from './batchTestResultResolver';
 import { calculateOverallStatus } from '../../utils/evaluation';
-import { resolveTestResultStatus } from '../test-result/testResultStatusResolver';
+import {
+  resolveTestResultStatus,
+  resolveAuthoritativeTestResultsForBatch,
+  calculateOverallStatusForTestResult,
+} from '../test-result/testResultStatusResolver';
 
 export type BatchIntegrityStatus =
   | 'PASS'
@@ -163,34 +167,22 @@ export function evaluateBatchReleaseIntegrity(
   const validPrimary = resolution.primaryResults.filter((r) => isValidTestResultForBatch(r, batch));
 
   if (validPrimary.length > 0) {
-    // Sắp xếp theo ngày kiểm nghiệm tăng dần (phiếu mới nhất ở cuối)
-    const sorted = [...validPrimary].sort((a, b) =>
-      (a.testDate || '').localeCompare(b.testDate || '')
-    );
-    const latestTest = sorted[sorted.length - 1];
+    // Chọn danh sách phiếu Authoritative theo từng phòng kiểm nghiệm (Multi-Lab, Mục 8, 9, 10, 11)
+    const authResults = resolveAuthoritativeTestResultsForBatch(batch, validPrimary, boundTccs);
 
-    // Hợp nhất kết quả kiểm nghiệm các lần
-    const consolidatedMap = new Map<string, any>();
-    sorted.forEach((t) => {
-      (t.results || []).forEach((r) => {
-        if (r && r.criteriaName) {
-          consolidatedMap.set(r.criteriaName.trim().toLowerCase(), r);
-        }
-      });
+    const authStatuses = authResults.map((t) => {
+      if (Array.isArray(t.results) && t.results.length > 0) {
+        return calculateOverallStatusForTestResult(t, boundTccs, authResults);
+      }
+      return resolveTestResultStatus(t);
     });
-    const consolidatedResults = Array.from(consolidatedMap.values());
-    const consolidatedStatus =
-      consolidatedResults.length > 0
-        ? calculateOverallStatus(consolidatedResults, boundTccs || null)
-        : undefined;
 
-    const hasPassTest = validPrimary.some((t) => resolveTestResultStatus(t) === 'PASS');
-    const isLatestPass =
-      resolveTestResultStatus(latestTest) === 'PASS' || consolidatedStatus === 'PASS';
+    const hasFail = authStatuses.some((s) => s === 'FAIL');
+    const isAllPass = authStatuses.length > 0 && authStatuses.every((s) => s === 'PASS');
 
-    if (hasPassTest || isLatestPass) {
-      // ĐẠT: Có ít nhất 1 phiếu kiểm nghiệm đạt hoặc hợp nhất đạt
-      const validPassCount = validPrimary.filter(
+    if (!hasFail && isAllPass) {
+      // ĐẠT: Tất cả phiếu authoritative đều đạt chuẩn
+      const validPassCount = authResults.filter(
         (t) => resolveTestResultStatus(t) === 'PASS'
       ).length;
       return {
@@ -209,7 +201,8 @@ export function evaluateBatchReleaseIntegrity(
         debugInfo: { resolution, freshness },
       };
     } else {
-      // Có phiếu kiểm nghiệm nhưng tất cả đều FAIL
+      // Có phiếu kiểm nghiệm nhưng kết quả authoritative cuối cùng không đạt (FAIL hoặc PENDING)
+      const isPending = authStatuses.some((s) => s === 'PENDING');
       return {
         batchId: batch.id,
         batchNo: batch.batchNo,
@@ -221,7 +214,9 @@ export function evaluateBatchReleaseIntegrity(
         validPassCount: 0,
         matchedTestIds: validPrimary.map((r) => r.id),
         relationshipType: 'PRIMARY',
-        summaryMessage: `Lô "${batch.batchNo}" đã xuất xưởng nhưng kết quả kiểm nghiệm cuối cùng là KHÔNG ĐẠT (FAIL).`,
+        summaryMessage: isPending
+          ? `Lô "${batch.batchNo}" đã xuất xưởng nhưng phiếu kiểm nghiệm hiện hành chưa hoàn tất kiểm nghiệm (PENDING).`
+          : `Lô "${batch.batchNo}" đã xuất xưởng nhưng kết quả kiểm nghiệm cuối cùng là KHÔNG ĐẠT (FAIL).`,
         shouldAlert: true,
         alertType: 'CRITICAL',
         suggestedAction:

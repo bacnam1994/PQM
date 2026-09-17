@@ -5,6 +5,29 @@ import { normalizeName, diceScore } from '../services/criteriaAliasService';
 import { isCriteriaMatch, lookupPharmaTerm } from './aiMapping';
 
 /**
+ * Rào chắn toán học tính toán tỷ lệ phần trăm dạng số (Raw percentage)
+ * Ngăn chặn triệt để lỗi chia cho 0 sinh ra Infinity% hoặc NaN
+ */
+export function calculateRelativePercentageRaw(
+  actualValue: number,
+  declaredContent: number
+): number | null {
+  if (
+    !declaredContent ||
+    declaredContent === 0 ||
+    !isFinite(declaredContent) ||
+    isNaN(declaredContent)
+  ) {
+    return null; // Ngăn chia cho 0
+  }
+  if (!isFinite(actualValue) || isNaN(actualValue)) {
+    return null;
+  }
+  const result = (actualValue / declaredContent) * 100;
+  return isFinite(result) ? result : null;
+}
+
+/**
  * Tính toán tỷ lệ % để hiển thị trên Phiếu kiểm nghiệm / CoA
  */
 export function calculateRelativePercentage(
@@ -18,34 +41,38 @@ export function calculateRelativePercentage(
 
   // 1. Đọc chính xác số thực tế, xử lý trọn vẹn định dạng khoa học (VD: 1.5 x 10⁸ -> 150000000)
   const actualNum = parseNumberFromText(actualValue);
-  if (isNaN(actualNum)) return null;
+  if (isNaN(actualNum) || !isFinite(actualNum)) return null;
 
   let baseNum = NaN;
 
   // 2. Ưu tiên 1: Lấy từ Hàm lượng công bố (nếu có cấu hình)
+  // Rào chắn toán học: Bỏ qua nếu declaredContent <= 0 hoặc không hợp lệ để tránh chia cho 0
   if (
     declaredContent !== undefined &&
     declaredContent !== null &&
     String(declaredContent).trim() !== ''
   ) {
-    // Ép buộc dùng parseNumberFromText để giải quyết triệt để lỗi "10⁸" -> 10
-    baseNum = parseNumberFromText(declaredContent);
+    const parsed = parseNumberFromText(declaredContent);
+    if (!isNaN(parsed) && isFinite(parsed) && parsed > 0) {
+      baseNum = parsed;
+    }
   }
 
   // 3. Ưu tiên 2 (Dự phòng thông minh): Tự bóc tách từ Tiêu chuẩn
   // Xử lý bài toán L-Lysine: "15 ± 20 %" -> tự động lấy base là 15
   if (isNaN(baseNum) && limitText) {
     const spec = SpecificationParser.parse(limitText);
-    if (spec.type === 'TOLERANCE' && spec.baseValue !== undefined) {
+    if (spec.type === 'TOLERANCE' && spec.baseValue !== undefined && spec.baseValue > 0) {
       baseNum = spec.baseValue;
     }
   }
 
-  // Nếu không tìm được cơ sở tính toán nào hợp lệ, hoặc base <= 0 -> Bỏ qua
-  if (isNaN(baseNum) || baseNum <= 0) return null;
+  // Nếu không tìm được cơ sở tính toán nào hợp lệ, hoặc base <= 0 -> Bỏ qua (ngăn chia cho 0)
+  if (isNaN(baseNum) || !isFinite(baseNum) || baseNum <= 0) return null;
 
   // 4. Tính toán % và làm tròn 2 chữ số thập phân
   const percentage = (actualNum / baseNum) * 100;
+  if (isNaN(percentage) || !isFinite(percentage)) return null;
   const rounded = Math.round(percentage * 100) / 100;
 
   return `(${rounded}%)`;

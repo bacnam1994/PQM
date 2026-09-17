@@ -296,8 +296,15 @@ export function searchUniversal(
           title: `Phiếu KN Lab: ${tr.labName || 'Chưa đặt tên Lab'}`,
           subtitle: `Ngày kiểm nghiệm: ${tr.testDate || 'N/A'} • ${tr.notes || 'Không có ghi chú'}`,
           path: `/test-results/print/${tr.id}`,
-          badge: tr.overallStatus === 'PASS' ? 'PASS' : 'FAIL',
-          badgeColor: tr.overallStatus === 'PASS' ? 'green' : 'red',
+          badge: tr.overallStatus,
+          badgeColor:
+            tr.overallStatus === 'PASS'
+              ? 'green'
+              : tr.overallStatus === 'PENDING'
+                ? 'amber'
+                : tr.overallStatus === 'UNKNOWN'
+                  ? 'gray'
+                  : 'red',
           score: maxS,
         });
       }
@@ -486,8 +493,15 @@ export class UniversalInvertedIndex {
           title: `Phiếu KN Lab: ${tr.labName || 'Chưa đặt tên Lab'}`,
           subtitle: `Ngày kiểm nghiệm: ${tr.testDate || 'N/A'}`,
           path: `/test-results/print/${tr.id}`,
-          badge: tr.overallStatus === 'PASS' ? 'PASS' : 'FAIL',
-          badgeColor: tr.overallStatus === 'PASS' ? 'green' : 'red',
+          badge: tr.overallStatus,
+          badgeColor:
+            tr.overallStatus === 'PASS'
+              ? 'green'
+              : tr.overallStatus === 'PENDING'
+                ? 'amber'
+                : tr.overallStatus === 'UNKNOWN'
+                  ? 'gray'
+                  : 'red',
           score: 0,
         });
       }

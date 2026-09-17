@@ -23,6 +23,7 @@ import {
 import { queryClient } from '../../lib/queryClient';
 import { TEST_RESULT_QUERY_KEYS } from '../../hooks/queries/useTestResultQueries';
 import { BATCH_QUERY_KEYS } from '../../hooks/queries/useBatchQueries';
+import { QualityEvaluationEngine } from '../../domain/evaluation/QualityEvaluationEngine';
 import toast from 'react-hot-toast';
 
 export const DataConsistencyCenter: React.FC = () => {
@@ -148,14 +149,28 @@ export const DataConsistencyCenter: React.FC = () => {
           const { testResultId, correctStatus } = issue.healPayload;
           const testRes = testResults.find((t) => t.id === testResultId);
           if (testRes) {
-            await updateTestResult({ ...testRes, overallStatus: correctStatus });
+            const boundTccs = tccsList.find(
+              (t) =>
+                t.id === (testRes as any).tccsId ||
+                t.id === testRes.evaluationSnapshot?.tccsId ||
+                (testRes.batch && t.productId === testRes.batch.productId)
+            );
+            const candidateTr = { ...testRes, overallStatus: correctStatus };
+            const newSnapshot = QualityEvaluationEngine.evaluate(candidateTr, boundTccs);
+            await updateTestResult({
+              ...candidateTr,
+              overallStatus: newSnapshot.overallStatus,
+              evaluationSnapshot: newSnapshot,
+            });
             queryClient.invalidateQueries({ queryKey: TEST_RESULT_QUERY_KEYS.all });
             if (testRes.batchId) {
               queryClient.invalidateQueries({
                 queryKey: TEST_RESULT_QUERY_KEYS.byBatch(testRes.batchId),
               });
             }
-            toast.success(`Đã cập nhật trạng thái phiếu kiểm nghiệm thành ${correctStatus}`);
+            toast.success(
+              `Đã cập nhật trạng thái phiếu kiểm nghiệm thành ${newSnapshot.overallStatus}`
+            );
           }
         } else if (issue.autoHealAction === 'FIX_TEST_RELATIONSHIP') {
           const { batchId, testResultIds } = issue.healPayload;

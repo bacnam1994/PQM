@@ -3,6 +3,7 @@ import {
   resolveDeclaredBasis,
   findMatchingFormulaItem,
   calculateRelativePercentage,
+  calculateRelativePercentageRaw,
 } from './basisCalculation';
 import { Criterion, CriterionType, ProductFormula } from '../types';
 import { getContentPercent } from './testResultEvaluation';
@@ -174,6 +175,22 @@ describe('basisCalculation - calculateRelativePercentage', () => {
 
   it('8. Trả về null khi base <= 0', () => {
     expect(calculateRelativePercentage(15, -10)).toBeNull();
+  });
+
+  it('9. Rào chắn toán học: declaredContent = 0 hoặc rỗng sẽ fallback sang limitText nếu có', () => {
+    // Nếu declaredContent bị reset về 0 do dữ liệu nhập lỗi, tự động fallback sang limitText
+    expect(calculateRelativePercentage('15', 0, '15 ± 20 %')).toBe('(100%)');
+    expect(calculateRelativePercentage('15', '0', '15 ± 20 %')).toBe('(100%)');
+  });
+
+  it('10. calculateRelativePercentageRaw ngăn chặn hoàn toàn divide by zero (Infinity / NaN)', () => {
+    expect(calculateRelativePercentageRaw(15, 0)).toBeNull();
+    expect(calculateRelativePercentageRaw(15, -5)).toBe(-300); // Hoặc tính đúng nếu mẫu số âm
+    expect(calculateRelativePercentageRaw(15, 30)).toBe(50);
+    expect(calculateRelativePercentageRaw(0, 100)).toBe(0);
+    expect(calculateRelativePercentageRaw(NaN, 100)).toBeNull();
+    expect(calculateRelativePercentageRaw(15, NaN)).toBeNull();
+    expect(calculateRelativePercentageRaw(15, Infinity)).toBeNull();
   });
 });
 

@@ -5,13 +5,22 @@
  * Triển khai State Machine: LOGGED -> UNDER_INVESTIGATION -> CAPA_PLANNED -> EFFECTIVENESS_REVIEW -> CLOSED
  */
 
-import { QualityDeviation, DeviationStatus, CreateDeviationInput, CAPAActionItem } from '../../types/deviation';
+import {
+  QualityDeviation,
+  DeviationStatus,
+  CreateDeviationInput,
+  CAPAActionItem,
+} from '../../types/deviation';
 import { IDeviationRepository } from '../../repositories/IDeviationRepository';
 import { firebaseDeviationRepository } from '../../repositories/firebase/FirebaseDeviationRepository';
 import { logAuditAction } from '../auditService';
 import { generateId } from '../../utils';
 import { nextVersion, validateOptimisticLock } from '../../utils/concurrency';
 import { TestResult, Batch } from '../../types';
+import {
+  resolveTestResultStatus,
+  normalizeCriterionPassStatus,
+} from '../../domain/test-result/testResultStatusResolver';
 
 export class DeviationAppService {
   constructor(private repo: IDeviationRepository = firebaseDeviationRepository) {}
@@ -44,7 +53,7 @@ export class DeviationAppService {
       loggedBy: currentUser?.email || 'SYSTEM_AUTO',
       loggedAt: now.toISOString(),
       version: 1,
-      updatedAt: now.toISOString()
+      updatedAt: now.toISOString(),
     };
 
     await this.repo.save(newDeviation);
@@ -54,7 +63,7 @@ export class DeviationAppService {
       collection: 'DEVIATIONS',
       documentId: id,
       details: `Khởi tạo hồ sơ sai lệch chất lượng: ${deviationNo} (${newDeviation.severity}) - Nguồn: ${newDeviation.source}`,
-      performedBy: currentUser?.email || 'SYSTEM_AUTO'
+      performedBy: currentUser?.email || 'SYSTEM_AUTO',
     });
 
     return newDeviation;
@@ -68,40 +77,47 @@ export class DeviationAppService {
     batch?: Batch,
     currentUser?: any
   ): Promise<QualityDeviation | null> {
-    if (testResult.overallStatus !== 'FAIL') return null;
+    if (resolveTestResultStatus(testResult) !== 'FAIL') return null;
 
     // Kiểm tra xem đã có sai lệch cho phiếu kiểm nghiệm này chưa để tránh tạo trùng
     const existing = await this.repo.findAll();
-    const duplicate = existing.find(d => d.testResultId === testResult.id);
+    const duplicate = existing.find((d) => d.testResultId === testResult.id);
     if (duplicate) return duplicate;
 
     const failedCriteria = (testResult.results || [])
-      .filter(r => !r.isPass)
-      .map(r => ({
+      .filter((r) => normalizeCriterionPassStatus(r.isPass) === false)
+      .map((r) => ({
         name: r.criteriaName,
         actualValue: r.value,
-        specification: r.limit || 'Theo TCCS'
+        specification: r.limit || 'Theo TCCS',
       }));
 
-    const isCritical = failedCriteria.some(c =>
-      c.name.toLowerCase().includes('vi sinh') ||
-      c.name.toLowerCase().includes('kim loại') ||
-      c.name.toLowerCase().includes('độc tính') ||
-      c.name.toLowerCase().includes('vô trùng')
+    if (failedCriteria.length === 0) return null;
+
+    const isCritical = failedCriteria.some(
+      (c) =>
+        c.name.toLowerCase().includes('vi sinh') ||
+        c.name.toLowerCase().includes('kim loại') ||
+        c.name.toLowerCase().includes('độc tính') ||
+        c.name.toLowerCase().includes('vô trùng')
     );
 
-    return this.createDeviation({
-      title: `Sự cố OOS: Lô ${batch?.batchNo || testResult.batchId} không đạt ${failedCriteria.length} chỉ tiêu`,
-      source: 'OOS_TEST_RESULT',
-      severity: isCritical ? 'CRITICAL' : 'MAJOR',
-      description: `Phiếu kiểm nghiệm ${testResult.id} phát hiện ${failedCriteria.length} chỉ tiêu không đạt tiêu chuẩn chất lượng.`,
-      batchId: testResult.batchId,
-      batchNo: batch?.batchNo,
-      productId: batch?.productId,
-      testResultId: testResult.id,
-      failedCriteria,
-      immediateAction: 'Biệt trữ lô sản xuất (Quarantine), ngưng phân phối và khởi động điều tra OOS Phase 1.'
-    }, currentUser);
+    return this.createDeviation(
+      {
+        title: `Sự cố OOS: Lô ${batch?.batchNo || testResult.batchId} không đạt ${failedCriteria.length} chỉ tiêu`,
+        source: 'OOS_TEST_RESULT',
+        severity: isCritical ? 'CRITICAL' : 'MAJOR',
+        description: `Phiếu kiểm nghiệm ${testResult.id} phát hiện ${failedCriteria.length} chỉ tiêu không đạt tiêu chuẩn chất lượng.`,
+        batchId: testResult.batchId,
+        batchNo: batch?.batchNo,
+        productId: batch?.productId,
+        testResultId: testResult.id,
+        failedCriteria,
+        immediateAction:
+          'Biệt trữ lô sản xuất (Quarantine), ngưng phân phối và khởi động điều tra OOS Phase 1.',
+      },
+      currentUser
+    );
   }
 
   /**
@@ -120,12 +136,17 @@ export class DeviationAppService {
 
     // 1. Kiểm tra thẩm quyền đóng sai lệch (Chỉ QA/Admin mới được CLOSE)
     if (newStatus === 'CLOSED') {
-      const isQAOrAdmin = currentUser?.isAdmin || currentUser?.role === 'QA' || currentUser?.role === 'ADMIN';
+      const isQAOrAdmin =
+        currentUser?.isAdmin || currentUser?.role === 'QA' || currentUser?.role === 'ADMIN';
       if (!isQAOrAdmin) {
-        throw new Error('Từ chối quyền: Chỉ Trưởng phòng QA hoặc Quản trị viên mới có quyền Đóng (Close) hồ sơ sai lệch.');
+        throw new Error(
+          'Từ chối quyền: Chỉ Trưởng phòng QA hoặc Quản trị viên mới có quyền Đóng (Close) hồ sơ sai lệch.'
+        );
       }
       if (!options?.notes && !existing.closureNotes) {
-        throw new Error('Quy chuẩn GMP: Bắt buộc phải ghi nhận ý kiến thẩm định và kết luận trước khi đóng sai lệch.');
+        throw new Error(
+          'Quy chuẩn GMP: Bắt buộc phải ghi nhận ý kiến thẩm định và kết luận trước khi đóng sai lệch.'
+        );
       }
     }
 
@@ -137,7 +158,7 @@ export class DeviationAppService {
       collection: 'DEVIATIONS',
       documentId: id,
       details: `Chuyển trạng thái sai lệch ${existing.deviationNo}: ${existing.status} -> ${newStatus}${options?.notes ? ` (Ghi chú: ${options.notes})` : ''}`,
-      performedBy: currentUser?.email || 'unknown'
+      performedBy: currentUser?.email || 'unknown',
     });
   }
 
@@ -168,7 +189,7 @@ export class DeviationAppService {
       // Tự động chuyển sang CAPA_PLANNED nếu đang ở UNDER_INVESTIGATION
       status: existing.status === 'UNDER_INVESTIGATION' ? 'CAPA_PLANNED' : existing.status,
       version: newVersion,
-      updatedAt: new Date().toISOString()
+      updatedAt: new Date().toISOString(),
     };
 
     await this.repo.save(updatedDeviation);
@@ -178,7 +199,7 @@ export class DeviationAppService {
       collection: 'DEVIATIONS',
       documentId: id,
       details: `Bổ sung hành động CAPA [${newItem.type}]: ${newItem.action} (Phụ trách: ${newItem.responsible})`,
-      performedBy: currentUser?.email || 'unknown'
+      performedBy: currentUser?.email || 'unknown',
     });
 
     return updatedDeviation;
@@ -187,22 +208,18 @@ export class DeviationAppService {
   /**
    * Đánh dấu hoàn tất hành động CAPA
    */
-  async completeCAPAItem(
-    id: string,
-    capaId: string,
-    currentUser: any
-  ): Promise<QualityDeviation> {
+  async completeCAPAItem(id: string, capaId: string, currentUser: any): Promise<QualityDeviation> {
     const existing = await this.repo.findById(id);
     if (!existing) {
       throw new Error(`Không tìm thấy hồ sơ sai lệch: ${id}`);
     }
 
-    const updatedCAPAs = (existing.capaItems || []).map(item => {
+    const updatedCAPAs = (existing.capaItems || []).map((item) => {
       if (item.id === capaId) {
         return {
           ...item,
           status: 'COMPLETED' as const,
-          completedAt: new Date().toISOString()
+          completedAt: new Date().toISOString(),
         };
       }
       return item;
@@ -213,7 +230,7 @@ export class DeviationAppService {
       ...existing,
       capaItems: updatedCAPAs,
       version: newVersion,
-      updatedAt: new Date().toISOString()
+      updatedAt: new Date().toISOString(),
     };
 
     await this.repo.save(updatedDeviation);
@@ -223,7 +240,7 @@ export class DeviationAppService {
       collection: 'DEVIATIONS',
       documentId: id,
       details: `Hoàn tất hành động CAPA ${capaId} trong hồ sơ ${existing.deviationNo}`,
-      performedBy: currentUser?.email || 'unknown'
+      performedBy: currentUser?.email || 'unknown',
     });
 
     return updatedDeviation;

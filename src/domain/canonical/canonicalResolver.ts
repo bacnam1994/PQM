@@ -38,6 +38,8 @@ import {
   normalizeCriterionPassStatus,
   resolveTestResultStatus,
   resolveAuthoritativeTestResultForBatch,
+  resolveFinalTestResultForBatch,
+  resolveAuthoritativeTestResultsForBatch,
   detectTestResultStatusMismatch,
   calculateOverallStatusForTestResult,
   CanonicalTestStatus,
@@ -149,55 +151,26 @@ export class CanonicalStatusResolver {
     allBatchResults?: TestResult[]
   ): TestResultStatus {
     const norm = normalizeTestResultStatus(testResult.overallStatus);
-    const { total, pass, fail, pending, allPass } = this.evaluateCriteria(testResult.results || []);
+    const results = testResult.results || [];
 
-    if (total === 0) {
-      return norm === 'PENDING' ? 'PENDING' : 'INVALID';
+    if (results.length === 0) {
+      if (norm === 'PENDING') return 'PENDING';
+      if (norm === 'PASS' || norm === 'FAIL') return norm;
+      return 'INVALID';
     }
 
-    // 1. Nếu có TCCS / alternateRules, phân giải qua calculateOverallStatusForTestResult
-    // để hỗ trợ đầy đủ các quy tắc thay thế (FAIL_RETRY, CONDITIONAL_CHECK)
-    if (boundTccs?.alternateRules && boundTccs.alternateRules.length > 0) {
-      const overallFromRules = calculateOverallStatusForTestResult(
-        testResult,
-        boundTccs,
-        allBatchResults
-      );
-      if (overallFromRules === 'PASS') {
-        return 'PASS';
-      }
-      if (overallFromRules === 'FAIL') {
-        return 'FAIL';
-      }
-    }
-
-    // 2. Nếu có chỉ tiêu không đạt thực sự
-    if (fail > 0) {
-      return 'FAIL';
-    }
-
-    // 3. Nếu 100% chỉ tiêu đều pass
-    if (allPass) {
-      return 'PASS';
-    }
-
-    // 4. Nếu fail === 0, có ít nhất 1 chỉ tiêu đạt (pass > 0), và phiếu được xác nhận là PASS:
-    // (Xử lý các phiếu có chỉ tiêu cảm quan / thông tin dạng text có isPass: null)
-    if (fail === 0 && pass > 0 && (norm === 'PASS' || pending === 0)) {
-      return 'PASS';
-    }
-
-    // 5. Nếu chưa có chỉ tiêu nào được kiểm nghiệm hoặc norm là PENDING
-    if (pending > 0 && (pass === 0 || norm === 'PENDING')) {
-      return 'PENDING';
-    }
+    // Đánh giá đồng bộ qua calculateOverallStatusForTestResult
+    const computed = calculateOverallStatusForTestResult(testResult, boundTccs, allBatchResults);
+    if (computed === 'PASS') return 'PASS';
+    if (computed === 'FAIL') return 'FAIL';
+    if (computed === 'PENDING') return 'PENDING';
 
     return norm === 'PASS' ? 'PASS' : norm === 'FAIL' ? 'FAIL' : 'PENDING';
   }
 
   /**
    * Bước 5: Tính trạng thái chất lượng chuẩn của Lô sản xuất (Calculate Canonical Batch Quality Status)
-   * Hỗ trợ hợp nhất đa phiếu (Hóa lý vs Vi sinh)
+   * Hỗ trợ hợp nhất đa phiếu (Multi-Lab, Hóa lý vs Vi sinh) và độc lập với phiếu lịch sử cũ
    */
   public static calculateCanonicalBatchQualityStatus(
     batch: Batch,
@@ -222,45 +195,38 @@ export class CanonicalStatusResolver {
       return 'NOT_TESTED';
     }
 
-    // Đánh giá từng phiếu kiểm nghiệm của lô
-    const testStatuses = validTests.map((tr) =>
-      this.calculateCanonicalTestStatus(tr, boundTccs, validTests)
-    );
-
-    // Nếu có bất kỳ phiếu nào FAIL thực sự -> Lô FAIL
-    if (testStatuses.some((s) => s === 'FAIL')) {
-      return 'FAIL';
-    }
-
-    // Nếu tất cả phiếu đều PASS -> Lô PASS
-    if (testStatuses.length > 0 && testStatuses.every((s) => s === 'PASS')) {
-      return 'PASS';
-    }
-
-    // Nếu có phiếu đang PENDING/TESTING
-    if (testStatuses.some((s) => s === 'PENDING')) {
-      return 'TESTING';
-    }
-
-    // Chọn phiếu authoritative đại diện
-    const authoritative = this.selectAuthoritativeResult(batch, validTests);
+    // Chọn phiếu authoritative chính thức cho batch
+    const resolution = resolveFinalTestResultForBatch(batch, validTests, boundTccs);
+    const authoritative = resolution.finalTestResult;
     if (!authoritative) {
       return 'INCOMPLETE';
     }
 
-    const testStatus = this.calculateCanonicalTestStatus(authoritative, boundTccs, validTests);
-
-    if (testStatus === 'PASS') {
-      return 'PASS';
+    // Sử dụng bộ giải pháp Multi-Lab authoritative chính quy (Mục 8, 9, 10, 11)
+    const labAuthResults = resolveAuthoritativeTestResultsForBatch(batch, validTests, boundTccs);
+    if (labAuthResults.length === 0) {
+      return 'INCOMPLETE';
     }
-    if (testStatus === 'FAIL') {
+
+    const labStatuses = labAuthResults.map((tr) =>
+      this.calculateCanonicalTestStatus(tr, boundTccs, labAuthResults)
+    );
+
+    if (labStatuses.some((s) => s === 'FAIL')) {
       return 'FAIL';
     }
-    if (testStatus === 'PENDING') {
+    if (labStatuses.some((s) => s === 'PENDING')) {
       return 'TESTING';
     }
+    if (labStatuses.length > 0 && labStatuses.every((s) => s === 'PASS')) {
+      return 'PASS';
+    }
 
-    return 'INCOMPLETE';
+    return resolution.status === 'PASS'
+      ? 'PASS'
+      : resolution.status === 'FAIL'
+        ? 'FAIL'
+        : 'INCOMPLETE';
   }
 
   /**

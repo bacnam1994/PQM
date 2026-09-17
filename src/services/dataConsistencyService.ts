@@ -42,6 +42,7 @@ import {
   resolveTestResultStatus,
   normalizeTestResultStatus,
 } from '../domain/test-result/testResultStatusResolver';
+import { QualityEvaluationEngine } from '../domain/evaluation/QualityEvaluationEngine';
 
 export type ConsistencyIssueType =
   | 'ORPHAN_BATCH'
@@ -1161,7 +1162,20 @@ export const executeAutoHealPlan = async (
   for (const trId of Object.keys(plan.testResultStatusUpdates)) {
     const tr = actions.testResults.find((t) => t.id === trId);
     if (tr) {
-      await actions.updateTestResult({ ...tr, overallStatus: plan.testResultStatusUpdates[trId] });
+      const targetStatus = plan.testResultStatusUpdates[trId];
+      const boundTccs = actions.tccsList.find(
+        (t) =>
+          t.id === (tr as any).tccsId ||
+          t.id === tr.evaluationSnapshot?.tccsId ||
+          (tr.batch && t.productId === tr.batch.productId)
+      );
+      const updatedTr: TestResult = { ...tr, overallStatus: targetStatus };
+      const newSnapshot = QualityEvaluationEngine.evaluate(updatedTr, boundTccs);
+      await actions.updateTestResult({
+        ...updatedTr,
+        overallStatus: newSnapshot.overallStatus,
+        evaluationSnapshot: newSnapshot,
+      });
       successCount++;
     }
   }

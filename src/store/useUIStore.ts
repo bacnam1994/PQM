@@ -30,7 +30,6 @@ const consentAwareStorage = {
   },
 };
 
-
 type ViewMode = 'grid' | 'list';
 
 // Tên key mặc định (không có userId) — dùng khi chưa đăng nhập
@@ -134,34 +133,68 @@ interface UIState {
   setBatchFilterYear: (year: string) => void;
   setBatchFilterMonth: (month: string) => void;
   setBatchFilterProductId: (productId: string) => void;
-  setBatchSortConfig: (sort: { key: 'createdAt' | 'mfgDate' | 'batchNo'; direction: 'asc' | 'desc' }) => void;
+  setBatchSortConfig: (sort: {
+    key: 'createdAt' | 'mfgDate' | 'batchNo';
+    direction: 'asc' | 'desc';
+  }) => void;
 
   setTestResultFilterYear: (year: string) => void;
   setTestResultFilterMonth: (month: string) => void;
   setTestResultFilterProductId: (productId: string) => void;
-  setTestResultSortConfig: (sort: { key: 'testDate' | 'batchNo'; direction: 'asc' | 'desc' }) => void;
+  setTestResultSortConfig: (sort: {
+    key: 'testDate' | 'batchNo';
+    direction: 'asc' | 'desc';
+  }) => void;
 
   /** Reset toàn bộ preferences về mặc định */
   resetPreferences: () => void;
 }
 
-const DEFAULT_STATE: Omit<UIState, 
-  | 'setDecimalSeparator' | 'setDateFormat'
-  | 'setRowsPerPage' | 'setSidebarCollapsed' | 'toggleSidebar'
-  | 'addSearchHistory' | 'clearSearchHistory' | 'setLastVisitedPath'
-  | 'setDefaultBatchFilter' | 'setDefaultTestResultFilter' | 'setDashboardWidgets'
-  | 'setProductViewMode' | 'setTccsViewMode' | 'setFormulaViewMode'
-  | 'setMaterialViewMode' | 'setCriteriaViewMode' | 'setBatchViewMode' | 'setTestResultViewMode'
-  | 'setProductSort' | 'setProductFilterType' | 'setProductFilterStatus'
-  | 'setBatchFilterStatus' | 'setBatchFilterYear' | 'setBatchFilterMonth' | 'setBatchFilterProductId' | 'setBatchSortConfig'
-  | 'setTestResultFilterYear' | 'setTestResultFilterMonth' | 'setTestResultFilterProductId' | 'setTestResultSortConfig'
-  | 'setGoogleDriveFolderUrl' | 'setGoogleDriveClientId' | 'setGoogleDriveApiKey' | 'setUseGoogleDriveUpload'
+const DEFAULT_STATE: Omit<
+  UIState,
+  | 'setDecimalSeparator'
+  | 'setDateFormat'
+  | 'setRowsPerPage'
+  | 'setSidebarCollapsed'
+  | 'toggleSidebar'
+  | 'addSearchHistory'
+  | 'clearSearchHistory'
+  | 'setLastVisitedPath'
+  | 'setDefaultBatchFilter'
+  | 'setDefaultTestResultFilter'
+  | 'setDashboardWidgets'
+  | 'setProductViewMode'
+  | 'setTccsViewMode'
+  | 'setFormulaViewMode'
+  | 'setMaterialViewMode'
+  | 'setCriteriaViewMode'
+  | 'setBatchViewMode'
+  | 'setTestResultViewMode'
+  | 'setProductSort'
+  | 'setProductFilterType'
+  | 'setProductFilterStatus'
+  | 'setBatchFilterStatus'
+  | 'setBatchFilterYear'
+  | 'setBatchFilterMonth'
+  | 'setBatchFilterProductId'
+  | 'setBatchSortConfig'
+  | 'setTestResultFilterYear'
+  | 'setTestResultFilterMonth'
+  | 'setTestResultFilterProductId'
+  | 'setTestResultSortConfig'
+  | 'setGoogleDriveFolderUrl'
+  | 'setGoogleDriveClientId'
+  | 'setGoogleDriveApiKey'
+  | 'setUseGoogleDriveUpload'
   | 'resetPreferences'
 > = {
   // Google Drive
-  googleDriveFolderUrl: 'https://drive.google.com/drive/folders/10tDp_k40fk8iuotqazP1BsROiN5jXzK-?usp=sharing',
+  googleDriveFolderUrl:
+    'https://drive.google.com/drive/folders/10tDp_k40fk8iuotqazP1BsROiN5jXzK-?usp=sharing',
   googleDriveFolderId: '10tDp_k40fk8iuotqazP1BsROiN5jXzK-',
-  googleDriveClientId: import.meta.env.VITE_GOOGLE_DRIVE_CLIENT_ID || '1012122917408-cghpfis2qisbu6fb37qk4gnceicqpc0o.apps.googleusercontent.com',
+  googleDriveClientId:
+    import.meta.env.VITE_GOOGLE_DRIVE_CLIENT_ID ||
+    '1012122917408-cghpfis2qisbu6fb37qk4gnceicqpc0o.apps.googleusercontent.com',
   googleDriveApiKey: '',
   useGoogleDriveUpload: false,
   // Format
@@ -234,9 +267,7 @@ export const useUIStore = create<UIState>()(
         set((s) => {
           const trimmed = query.trim();
           // Loại bỏ mục trùng, đưa mục mới lên đầu, giữ tối đa 10
-          const filtered = s.searchHistory.filter(
-            (h) => h.toLowerCase() !== trimmed.toLowerCase()
-          );
+          const filtered = s.searchHistory.filter((h) => h.toLowerCase() !== trimmed.toLowerCase());
           return { searchHistory: [trimmed, ...filtered].slice(0, 10) };
         });
       },
@@ -300,12 +331,12 @@ export function migrateToUserKey(userId: string): void {
   const userKey = getUserStorageKey(userId);
 
   // Nếu đã có data riêng của user, không cần migrate
-  if (localStorage.getItem(userKey)) return;
+  if (consentAwareStorage.getItem(userKey)) return;
 
   // Nếu có data từ key chung, copy sang key user
-  const sharedData = localStorage.getItem(BASE_STORAGE_KEY);
+  const sharedData = consentAwareStorage.getItem(BASE_STORAGE_KEY);
   if (sharedData) {
-    localStorage.setItem(userKey, sharedData);
+    consentAwareStorage.setItem(userKey, sharedData);
   }
 }
 
@@ -319,14 +350,15 @@ export function loadUserPreferences(userId: string): void {
   migrateToUserKey(userId);
 
   try {
-    const raw = localStorage.getItem(userKey);
+    const raw = consentAwareStorage.getItem(userKey);
     if (raw) {
       const parsed = JSON.parse(raw);
       const state = parsed?.state;
       if (state && typeof state === 'object') {
         const updatedState = { ...state };
         if (!updatedState.googleDriveClientId) {
-          updatedState.googleDriveClientId = useUIStore.getState().googleDriveClientId || DEFAULT_STATE.googleDriveClientId;
+          updatedState.googleDriveClientId =
+            useUIStore.getState().googleDriveClientId || DEFAULT_STATE.googleDriveClientId;
         }
         useUIStore.setState((current) => ({ ...current, ...updatedState }));
       }

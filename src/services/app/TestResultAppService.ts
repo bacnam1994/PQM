@@ -48,11 +48,12 @@ export class TestResultAppService {
       throw new Error('Ngày kiểm nghiệm không được để trống.');
     }
 
-    // Tự động kiểm tra tính toán tổng hợp PASS / FAIL dựa trên các chỉ tiêu chi tiết
-    let evaluatedStatus: 'PASS' | 'FAIL' = testResult.overallStatus || 'PASS';
+    // Tự động kiểm tra tính toán tổng hợp PASS / FAIL / PENDING / UNKNOWN dựa trên các chỉ tiêu chi tiết
+    let evaluatedStatus: 'PASS' | 'FAIL' | 'PENDING' | 'UNKNOWN' =
+      resolveTestResultStatus(testResult);
     if (testResult.results && testResult.results.length > 0) {
-      const hasFailedEntry = testResult.results.some((r) => r.isPass === false);
-      evaluatedStatus = hasFailedEntry ? 'FAIL' : 'PASS';
+      const calc = calculateOverallStatusForTestResult(testResult);
+      if (calc) evaluatedStatus = calc;
     }
 
     const evaluationSnapshot =
@@ -120,19 +121,23 @@ export class TestResultAppService {
       throw new Error('Ngày kiểm nghiệm không được để trống.');
     }
 
-    let evaluatedStatus: 'PASS' | 'FAIL' =
-      resolveTestResultStatus(testResult) === 'FAIL' ? 'FAIL' : 'PASS';
+    let evaluatedStatus: 'PASS' | 'FAIL' | 'PENDING' | 'UNKNOWN' =
+      resolveTestResultStatus(testResult);
     if (testResult.results && testResult.results.length > 0) {
       const calc = calculateOverallStatusForTestResult(testResult);
-      if (calc === 'FAIL') evaluatedStatus = 'FAIL';
-      else if (calc === 'PASS') evaluatedStatus = 'PASS';
+      if (calc) evaluatedStatus = calc;
     }
 
     const newVersion = nextVersion(oldTestResult?.version ?? testResult.version);
 
-    const evaluationSnapshot =
-      testResult.evaluationSnapshot ||
-      buildEvaluationSnapshot({ ...testResult, overallStatus: evaluatedStatus }, currentUser);
+    // ALCOA+: Tái tạo snapshot nếu chưa có snapshot hoặc snapshot cũ có overallStatus lệch với evaluatedStatus
+    const shouldRebuildSnapshot =
+      !testResult.evaluationSnapshot ||
+      testResult.evaluationSnapshot.overallStatus !== evaluatedStatus;
+
+    const evaluationSnapshot = shouldRebuildSnapshot
+      ? buildEvaluationSnapshot({ ...testResult, overallStatus: evaluatedStatus }, currentUser)
+      : testResult.evaluationSnapshot;
 
     const cleanResult: TestResult = {
       ...testResult,

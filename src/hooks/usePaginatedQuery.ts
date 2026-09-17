@@ -4,7 +4,12 @@
  */
 
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { IRepository, PaginationOptions, QueryFilter, PaginatedResult } from '../repositories/types';
+import {
+  IRepository,
+  PaginationOptions,
+  QueryFilter,
+  PaginatedResult,
+} from '../repositories/types';
 
 export interface UsePaginatedQueryOptions<T> {
   repository: IRepository<T>;
@@ -24,7 +29,9 @@ export interface UsePaginatedQueryReturn<T> {
   hasNextPage: boolean;
   hasPrevPage: boolean;
   nextCursor: string | null;
+  nextCursorId: string | null;
   prevCursor: string | null;
+  prevCursorId: string | null;
   isLoading: boolean;
   error: Error | null;
 
@@ -43,7 +50,7 @@ export function usePaginatedQuery<T extends { id?: string }>({
   initialOrderBy = 'createdAt',
   initialOrderDirection = 'desc',
   initialFilters = [],
-  autoFetch = true
+  autoFetch = true,
 }: UsePaginatedQueryOptions<T>): UsePaginatedQueryReturn<T> {
   const [items, setItems] = useState<T[]>([]);
   const [totalCount, setTotalCount] = useState(0);
@@ -53,7 +60,9 @@ export function usePaginatedQuery<T extends { id?: string }>({
   const [hasNextPage, setHasNextPage] = useState(false);
   const [hasPrevPage, setHasPrevPage] = useState(false);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [nextCursorId, setNextCursorId] = useState<string | null>(null);
   const [prevCursor, setPrevCursor] = useState<string | null>(null);
+  const [prevCursorId, setPrevCursorId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
 
@@ -65,7 +74,13 @@ export function usePaginatedQuery<T extends { id?: string }>({
   const pageCache = useRef<Map<number, PaginatedResult<T>>>(new Map());
 
   const fetchPage = useCallback(
-    async (pageToFetch: number, sizeToFetch: number, currentFilters: QueryFilter<T>[], currentOrder: keyof T | string, currentDir: 'asc' | 'desc') => {
+    async (
+      pageToFetch: number,
+      sizeToFetch: number,
+      currentFilters: QueryFilter<T>[],
+      currentOrder: keyof T | string,
+      currentDir: 'asc' | 'desc'
+    ) => {
       setIsLoading(true);
       setError(null);
 
@@ -74,7 +89,7 @@ export function usePaginatedQuery<T extends { id?: string }>({
           page: pageToFetch,
           pageSize: sizeToFetch,
           orderBy: currentOrder,
-          orderDirection: currentDir
+          orderDirection: currentDir,
         };
 
         const result = await repository.findPaginated(options, currentFilters);
@@ -86,7 +101,9 @@ export function usePaginatedQuery<T extends { id?: string }>({
         setHasNextPage(result.hasNextPage);
         setHasPrevPage(result.hasPrevPage);
         setNextCursor(result.nextCursor ?? null);
+        setNextCursorId(result.nextCursorId ?? null);
         setPrevCursor(result.prevCursor ?? null);
+        setPrevCursorId(result.prevCursorId ?? null);
 
         // Lưu vào cache
         pageCache.current.set(pageToFetch, result);
@@ -168,7 +185,9 @@ export function usePaginatedQuery<T extends { id?: string }>({
     hasNextPage,
     hasPrevPage,
     nextCursor,
+    nextCursorId,
     prevCursor,
+    prevCursorId,
     isLoading,
     error,
     goToPage,
@@ -177,6 +196,6 @@ export function usePaginatedQuery<T extends { id?: string }>({
     setPageSize,
     setFilters,
     setSorting,
-    refresh
+    refresh,
   };
 }

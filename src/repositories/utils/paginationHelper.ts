@@ -11,7 +11,7 @@ import { QueryFilter, PaginationOptions, PaginatedResult } from '../types';
 export function getFieldValue(item: any, fieldPath: string): any {
   if (!item || !fieldPath) return undefined;
   if (!fieldPath.includes('.')) return item[fieldPath];
-  
+
   const parts = fieldPath.split('.');
   let current = item;
   for (const part of parts) {
@@ -29,7 +29,8 @@ export function matchesFilter<T>(item: T, filter: QueryFilter<T>): boolean {
   const targetValue = filter.value;
 
   if (itemValue === undefined || itemValue === null) {
-    if (filter.operator === '==' && (targetValue === null || targetValue === undefined)) return true;
+    if (filter.operator === '==' && (targetValue === null || targetValue === undefined))
+      return true;
     if (filter.operator === '!=' && targetValue !== null && targetValue !== undefined) return true;
     return false;
   }
@@ -64,7 +65,7 @@ export function matchesFilter<T>(item: T, filter: QueryFilter<T>): boolean {
 
     case 'in':
       if (!Array.isArray(targetValue)) return false;
-      return targetValue.some(val => {
+      return targetValue.some((val) => {
         if (typeof itemValue === 'string' && typeof val === 'string') {
           return itemValue.trim().toLowerCase() === val.trim().toLowerCase();
         }
@@ -81,7 +82,7 @@ export function matchesFilter<T>(item: T, filter: QueryFilter<T>): boolean {
  */
 export function applyFilters<T>(items: T[], filters?: QueryFilter<T>[]): T[] {
   if (!filters || filters.length === 0) return items;
-  return items.filter(item => filters.every(f => matchesFilter(item, f)));
+  return items.filter((item) => filters.every((f) => matchesFilter(item, f)));
 }
 
 /**
@@ -142,9 +143,10 @@ export function paginateDataset<T extends { id?: string }>(
   // 3. Phân đoạn dữ liệu (Cursor hoặc Offset)
   let startIndex = 0;
 
-  if (options?.cursor) {
-    // Cursor pagination: tìm phần tử có id trùng với cursor
-    const cursorIndex = sorted.findIndex(item => item.id === options.cursor);
+  if (options?.cursorId || options?.cursor) {
+    // Cursor pagination: tìm phần tử có id trùng với cursorId hoặc cursor
+    const targetId = options.cursorId || options.cursor;
+    const cursorIndex = sorted.findIndex((item) => item.id === targetId);
     if (cursorIndex >= 0) {
       startIndex = cursorIndex + 1;
     }
@@ -161,13 +163,25 @@ export function paginateDataset<T extends { id?: string }>(
   const hasNextPage = startIndex + pageSize < totalCount;
   const hasPrevPage = startIndex > 0;
 
-  const nextCursor = hasNextPage && paginatedItems.length > 0
-    ? paginatedItems[paginatedItems.length - 1].id ?? null
-    : null;
+  const nextCursor =
+    hasNextPage && paginatedItems.length > 0
+      ? ((paginatedItems[paginatedItems.length - 1] as any)[orderBy] ??
+        paginatedItems[paginatedItems.length - 1].id ??
+        null)
+      : null;
 
-  const prevCursor = hasPrevPage && paginatedItems.length > 0
-    ? paginatedItems[0].id ?? null
-    : null;
+  const nextCursorId =
+    hasNextPage && paginatedItems.length > 0
+      ? (paginatedItems[paginatedItems.length - 1].id ?? null)
+      : null;
+
+  const prevCursor =
+    hasPrevPage && paginatedItems.length > 0
+      ? ((paginatedItems[0] as any)[orderBy] ?? paginatedItems[0].id ?? null)
+      : null;
+
+  const prevCursorId =
+    hasPrevPage && paginatedItems.length > 0 ? (paginatedItems[0].id ?? null) : null;
 
   return {
     items: paginatedItems,
@@ -178,6 +192,8 @@ export function paginateDataset<T extends { id?: string }>(
     hasNextPage,
     hasPrevPage,
     nextCursor,
-    prevCursor
+    nextCursorId,
+    prevCursor,
+    prevCursorId,
   };
 }

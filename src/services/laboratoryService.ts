@@ -305,7 +305,7 @@ export interface UnmappedLabDetectionResult {
   batchNo?: string;
   productName?: string;
   testDate?: string;
-  overallStatus?: 'PASS' | 'FAIL';
+  overallStatus?: 'PASS' | 'FAIL' | 'PENDING' | 'UNKNOWN';
   matchedLab?: TestingLaboratory;
   confidence: 'EXACT' | 'ALIAS' | 'SUBSTRING' | 'FUZZY' | 'NONE';
   similarity: number;
@@ -321,7 +321,7 @@ export const detectUnmappedTestResults = (
     labId?: string;
     labName?: string;
     testDate?: string;
-    overallStatus?: 'PASS' | 'FAIL';
+    overallStatus?: 'PASS' | 'FAIL' | 'PENDING' | 'UNKNOWN';
     batch?: any;
   }>,
   laboratories: TestingLaboratory[] = DEFAULT_TESTING_LABORATORIES,

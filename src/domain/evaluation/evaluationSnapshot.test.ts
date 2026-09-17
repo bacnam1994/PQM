@@ -4,6 +4,7 @@ import {
   createEvaluationHash,
   CURRENT_ENGINE_VERSION,
 } from './EvaluationSnapshotBuilder';
+import { QualityEvaluationEngine } from './QualityEvaluationEngine';
 import { TestResult } from '../../types';
 import { TestResultAppService } from '../../services/app/TestResultAppService';
 
@@ -155,5 +156,37 @@ describe('Phase 4: Evaluation Snapshot & ALCOA+ Data Integrity', () => {
     expect(legacyResult.evaluationSnapshot).toBeUndefined();
     expect(legacyResult.overallStatus).toBe('PASS');
     expect(legacyResult.results[0].isPass).toBe(true);
+  });
+
+  it('Auto-Heal: QualityEvaluationEngine.evaluate tái tạo snapshot và evaluationHash đồng bộ 100%, chống giả mạo ALCOA+', () => {
+    const testResultToHeal: TestResult = {
+      id: 'TR-AUTO-HEAL',
+      batchId: 'BATCH-HEAL-1',
+      labName: 'Central Lab',
+      testDate: '2026-09-17',
+      createdAt: '2026-09-17T08:00:00.000Z',
+      overallStatus: 'FAIL',
+      results: [
+        { criteriaName: 'Định tính', value: 'Dương tính', isPass: true },
+        { criteriaName: 'Độ hòa tan', value: '85%', isPass: true },
+      ],
+    };
+
+    const healedSnapshot = QualityEvaluationEngine.evaluate(testResultToHeal);
+
+    expect(healedSnapshot.overallStatus).toBe('PASS');
+    expect(healedSnapshot.evaluationHash).toBeDefined();
+
+    // Verify hash matches the recomputed payload with new overallStatus
+    const expectedHash = createEvaluationHash({
+      testResultId: testResultToHeal.id,
+      batchId: testResultToHeal.batchId,
+      overallStatus: 'PASS',
+      criterionResults: healedSnapshot.criterionResults,
+      evaluatedAt: healedSnapshot.evaluatedAt,
+      evaluatedBy: healedSnapshot.evaluatedBy,
+    });
+
+    expect(healedSnapshot.evaluationHash).toBe(expectedHash);
   });
 });

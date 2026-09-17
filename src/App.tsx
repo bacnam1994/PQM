@@ -158,8 +158,8 @@ const GuestRoute: React.FC = () => {
 
   if (authLoading) return null;
   if (!user) return <Navigate to="/login" replace />;
-  // Nếu là Admin thì không giữ ở trang chào mừng mà chuyển thẳng vào hệ thống
-  if (role === 'ADMIN' || isAdmin) {
+  // Đẩy tất cả user đã có quyền nghiệp vụ vào màn hình chính
+  if (role !== 'GUEST' || isAdmin) {
     return <Navigate to="/" replace />;
   }
 

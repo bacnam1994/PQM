@@ -1,9 +1,10 @@
 import { batchAppService } from '../../services/app/BatchAppService';
 import { queryClient } from '../../lib/queryClient';
-import { BATCH_QUERY_KEYS } from '../../constants/queryKeys';
+import { BATCH_QUERY_KEYS, TEST_RESULT_QUERY_KEYS } from '../../constants/queryKeys';
 import { BatchSlice, StoreSlice } from './types';
-import { Batch, ElectronicSignature } from '../../types';
+import { Batch, ElectronicSignature, TestResult } from '../../types';
 import { resolveCurrentIdentity } from '../utils/storeHelpers';
+import { testResultRepository } from '../../repositories/firebase/FirebaseTestResultRepository';
 
 export const createBatchSlice: StoreSlice<BatchSlice> = (set, get) => ({
   // --- INITIAL BATCH STATE ---
@@ -72,7 +73,19 @@ export const createBatchSlice: StoreSlice<BatchSlice> = (set, get) => ({
     try {
       const state = get();
       const currentBatch = state.batches.find((b: Batch) => b.id === id);
-      const batchTestResults = state.testResults.filter((r: any) => r.batchId === id);
+
+      // Lấy dữ liệu an toàn thông qua TanStack Query Cache (hoặc Repository)
+      let batchTestResults = queryClient.getQueryData<TestResult[]>(
+        TEST_RESULT_QUERY_KEYS.byBatch(id)
+      );
+      if (!batchTestResults || batchTestResults.length === 0) {
+        // Fallback tải trực tiếp từ DB nếu cache chưa có
+        batchTestResults = await testResultRepository.findByRelation('batchId', id);
+      }
+      if ((!batchTestResults || batchTestResults.length === 0) && state.testResults?.length) {
+        batchTestResults = state.testResults.filter((r: any) => r.batchId === id);
+      }
+
       const currentUser = resolveCurrentIdentity(state);
       await batchAppService.updateStatus(id, status as Batch['status'], currentUser, {
         reason: rejectReason,

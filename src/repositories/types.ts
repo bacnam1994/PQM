@@ -13,6 +13,7 @@ export interface QueryFilter<T = any> {
 export interface PaginationOptions<T = any> {
   pageSize?: number;
   cursor?: string | null;
+  cursorId?: string | null;
   offset?: number;
   page?: number;
   orderBy?: keyof T | string;
@@ -28,7 +29,9 @@ export interface PaginatedResult<T> {
   hasNextPage: boolean;
   hasPrevPage: boolean;
   nextCursor?: string | null;
+  nextCursorId?: string | null;
   prevCursor?: string | null;
+  prevCursorId?: string | null;
 }
 
 export interface IRepository<T> {

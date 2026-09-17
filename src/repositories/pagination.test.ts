@@ -207,6 +207,89 @@ describe('Repository Layer - Pagination & Filtering Engine', () => {
       expect(page2.items[1].id).toBe('e4');
       expect(page2.hasPrevPage).toBe(true);
     });
+
+    it('phân trang theo Cursor kết hợp cursorId (Tie-breaker) khi các bản ghi trùng giá trị sắp xếp', () => {
+      // 5 bản ghi có cùng createdAt nhưng id khác nhau
+      const sameDateData: TestEntity[] = [
+        {
+          id: 'tr1',
+          name: 'Mẫu 1',
+          category: 'Thuốc',
+          status: 'ACTIVE',
+          quantity: 10,
+          createdAt: '2026-09-14',
+        },
+        {
+          id: 'tr2',
+          name: 'Mẫu 2',
+          category: 'Thuốc',
+          status: 'ACTIVE',
+          quantity: 10,
+          createdAt: '2026-09-14',
+        },
+        {
+          id: 'tr3',
+          name: 'Mẫu 3',
+          category: 'Thuốc',
+          status: 'ACTIVE',
+          quantity: 10,
+          createdAt: '2026-09-14',
+        },
+        {
+          id: 'tr4',
+          name: 'Mẫu 4',
+          category: 'Thuốc',
+          status: 'ACTIVE',
+          quantity: 10,
+          createdAt: '2026-09-14',
+        },
+        {
+          id: 'tr5',
+          name: 'Mẫu 5',
+          category: 'Thuốc',
+          status: 'ACTIVE',
+          quantity: 10,
+          createdAt: '2026-09-14',
+        },
+      ];
+
+      // Trang 1
+      const page1 = paginateDataset(sameDateData, {
+        pageSize: 2,
+        orderBy: 'createdAt',
+        orderDirection: 'asc',
+      });
+      expect(page1.items.length).toBe(2);
+      expect(page1.items[0].id).toBe('tr1');
+      expect(page1.items[1].id).toBe('tr2');
+      expect(page1.nextCursor).toBe('2026-09-14');
+      expect(page1.nextCursorId).toBe('tr2');
+
+      // Trang 2: Truyền cursor và cursorId làm tie-breaker, không bị lặp lại trang 1
+      const page2 = paginateDataset(sameDateData, {
+        pageSize: 2,
+        cursor: page1.nextCursor,
+        cursorId: page1.nextCursorId,
+        orderBy: 'createdAt',
+        orderDirection: 'asc',
+      });
+      expect(page2.items.length).toBe(2);
+      expect(page2.items[0].id).toBe('tr3');
+      expect(page2.items[1].id).toBe('tr4');
+      expect(page2.nextCursorId).toBe('tr4');
+
+      // Trang 3
+      const page3 = paginateDataset(sameDateData, {
+        pageSize: 2,
+        cursor: page2.nextCursor,
+        cursorId: page2.nextCursorId,
+        orderBy: 'createdAt',
+        orderDirection: 'asc',
+      });
+      expect(page3.items.length).toBe(1);
+      expect(page3.items[0].id).toBe('tr5');
+      expect(page3.hasNextPage).toBe(false);
+    });
   });
 
   describe('4. BaseFirebaseRepository Implementation', () => {

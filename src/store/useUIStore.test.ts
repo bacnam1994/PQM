@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { useUIStore } from './useUIStore';
+import { useUIStore, migrateToUserKey, loadUserPreferences } from './useUIStore';
 import { declineConsent } from '../hooks/useCookieConsent';
 
 describe('useUIStore Persist Consent', () => {
@@ -56,5 +56,18 @@ describe('useUIStore Persist Consent', () => {
 
     // Verify it is still updated in memory/state
     expect(useUIStore.getState().decimalSeparator).toBe('comma');
+  });
+
+  it('migrateToUserKey and loadUserPreferences should NOT write to localStorage when DECLINED', () => {
+    declineConsent();
+    const testUserId = 'user-gdpr-test';
+
+    // Attempt migration and load
+    migrateToUserKey(testUserId);
+    loadUserPreferences(testUserId);
+
+    // Verify that no keys were written to physical browser localStorage
+    expect(localStorage.getItem(`PQM_UI_${testUserId}`)).toBeNull();
+    expect(localStorage.getItem('PQM_UI_Preferences')).toBeNull();
   });
 });

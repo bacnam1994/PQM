@@ -95,6 +95,41 @@ export class OverallResultEvaluator {
       }
     }
 
+    // 3. Kiểm tra xem có chỉ tiêu bắt buộc nào chưa có kết luận không (value rỗng)
+    const hasUnresolved = results.some((r) => {
+      if (r.isPass !== null && r.isPass !== undefined) return false;
+      const valStr = r.value !== undefined && r.value !== null ? String(r.value).trim() : '';
+      if (valStr !== '') return false;
+
+      // Kiểm tra xem có được miễn kiểm theo CONDITIONAL_CHECK không
+      const condRule = rules.find(
+        (rule) =>
+          rule.type === EVALUATION_RULE.CONDITIONAL_CHECK && isNameMatch(rule.alt, r.criteriaName)
+      );
+      if (condRule) {
+        const mainResult = results.find((m) => isNameMatch(m.criteriaName, condRule.main));
+        if (mainResult && mainResult.value !== undefined && mainResult.value !== '') {
+          const isTriggered = CriterionEvaluator.checkRange(
+            condRule.conditionValue || '',
+            String(mainResult.value)
+          );
+          if (isTriggered !== true) return false; // Được miễn kiểm
+        }
+      }
+      if (r.isExtra && (!r.limit || r.limit.trim() === '')) return false;
+      return true;
+    });
+
+    if (hasUnresolved) {
+      return TEST_RESULT_STATUS.FAIL;
+    }
+
+    // Phải có ít nhất 1 chỉ tiêu đạt
+    const hasValidPass = results.some((r) => r.isPass === true);
+    if (!hasValidPass) {
+      return TEST_RESULT_STATUS.FAIL;
+    }
+
     return TEST_RESULT_STATUS.PASS;
   }
 

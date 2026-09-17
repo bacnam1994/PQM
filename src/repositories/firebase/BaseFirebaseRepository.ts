@@ -91,10 +91,19 @@ export abstract class BaseFirebaseRepository<T extends { id: string }> implement
       // Giới hạn số lượng nạp từ server theo trang
       // Nếu là phân trang theo cursor
       if (options?.cursor) {
+        // Bắt buộc truyền tham số thứ 2 là ID duy nhất của bản ghi (tie-breaker)
         if (direction === 'asc') {
-          q = query(q, startAt(options.cursor), limitToFirst(pageSize + 1));
+          q = query(
+            q,
+            options.cursorId ? startAt(options.cursor, options.cursorId) : startAt(options.cursor),
+            limitToFirst(pageSize + 1)
+          );
         } else {
-          q = query(q, endAt(options.cursor), limitToLast(pageSize + 1));
+          q = query(
+            q,
+            options.cursorId ? endAt(options.cursor, options.cursorId) : endAt(options.cursor),
+            limitToLast(pageSize + 1)
+          );
         }
       } else {
         // Lấy số lượng giới hạn vừa đủ cho trang hiện tại
@@ -143,6 +152,10 @@ export abstract class BaseFirebaseRepository<T extends { id: string }> implement
           paginatedItems.length > 0
             ? (paginatedItems[paginatedItems.length - 1] as any)[orderBy]
             : null,
+        nextCursorId:
+          paginatedItems.length > 0 ? (paginatedItems[paginatedItems.length - 1] as any).id : null,
+        prevCursor: paginatedItems.length > 0 ? (paginatedItems[0] as any)[orderBy] : null,
+        prevCursorId: paginatedItems.length > 0 ? (paginatedItems[0] as any).id : null,
       };
     } catch (err) {
       console.warn(

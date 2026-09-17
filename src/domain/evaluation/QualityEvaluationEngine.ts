@@ -17,8 +17,9 @@ import {
   ND_KEYWORDS,
   POS_KEYWORDS,
 } from './ValueNormalizer';
-import { TestResultEntry, TCCS, AlternateRule } from '../../types';
+import { TestResultEntry, TestResult, EvaluationSnapshot, TCCS, AlternateRule } from '../../types';
 import { useUIStore } from '../../store/useUIStore';
+import { buildEvaluationSnapshot } from './EvaluationSnapshotBuilder';
 
 export class QualityEvaluationEngine {
   /**
@@ -58,6 +59,34 @@ export class QualityEvaluationEngine {
    */
   static calculateOverallStatus(results: TestResultEntry[], tccs: TCCS | null): 'PASS' | 'FAIL' {
     return OverallResultEvaluator.calculateOverallStatus(results, tccs);
+  }
+
+  /**
+   * Tái thẩm định toàn diện phiếu kiểm nghiệm và niêm phong EvaluationSnapshot hợp lệ (ALCOA+ Compliance).
+   * Tự động sinh evaluationHash khớp 100% với trạng thái mới, loại bỏ nguy cơ bị đánh dấu Giả mạo/Tampered.
+   */
+  static evaluate(
+    testResult: TestResult,
+    tccs?: TCCS | null,
+    currentUser?: any
+  ): EvaluationSnapshot {
+    let overallStatus = testResult.overallStatus;
+    if (!overallStatus || overallStatus === 'UNKNOWN') {
+      overallStatus = this.calculateOverallStatus(testResult.results || [], tccs || null);
+    } else if (testResult.results && testResult.results.length > 0) {
+      const calculated = this.calculateOverallStatus(testResult.results, tccs || null);
+      if (calculated === 'PASS') {
+        overallStatus = 'PASS';
+      } else if (overallStatus !== 'PENDING') {
+        overallStatus = calculated;
+      }
+    }
+
+    return buildEvaluationSnapshot(
+      { ...testResult, overallStatus },
+      currentUser || { email: 'system-auto-heal@vbiotech.vn' },
+      { tccs: tccs || undefined }
+    );
   }
 
   /**

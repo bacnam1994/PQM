@@ -7,7 +7,7 @@ import { Batch } from './batch';
 export interface TestResultEntry {
   criteriaName: string;
   value: string | number;
-  isPass: boolean;
+  isPass: boolean | null; // Cho phép null với chỉ tiêu cảm quan/informational
   isExtra?: boolean;
   unit?: string;
   limit?: string;
@@ -36,7 +36,7 @@ export interface EvaluationSnapshot {
   tccsVersion?: string | number;
   evaluatedAt: string;
   evaluatedBy: string;
-  overallStatus: 'PASS' | 'FAIL';
+  overallStatus: 'PASS' | 'FAIL' | 'PENDING' | 'UNKNOWN';
   criterionResults: EvaluationSnapshotCriterionResult[];
   alternateUsed: boolean;
   reasons: string[];
@@ -56,7 +56,7 @@ export interface TestResult {
   labName: string;
   testDate: string;
   results: TestResultEntry[];
-  overallStatus: 'PASS' | 'FAIL';
+  overallStatus: 'PASS' | 'FAIL' | 'PENDING' | 'UNKNOWN';
   evaluationSnapshot?: EvaluationSnapshot;
   notes?: string;
   attachments?: Attachment[];

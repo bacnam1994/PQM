@@ -10,6 +10,7 @@
 import { Product, Batch, TCCS, TestResult, TestResultEntry } from '../../types';
 import { EntityIdentityManager } from '../identity/entityIdentity';
 import { CanonicalStatusResolver } from '../canonical/canonicalResolver';
+import { resolveTestResultStatus } from '../test-result/testResultStatusResolver';
 
 export type ValidationTier = 'TIER_1_SCHEMA' | 'TIER_2_REFERENTIAL' | 'TIER_3_BUSINESS';
 
@@ -120,25 +121,27 @@ export class ValidationEngine {
     boundTccs?: TCCS | null
   ): ValidationErrorItem[] {
     const errors: ValidationErrorItem[] = [];
-    const results: TestResultEntry[] = testResult.results || [];
+    const storedStatus = resolveTestResultStatus(testResult);
+    const calculatedTestStatus = CanonicalStatusResolver.calculateCanonicalTestStatus(
+      testResult,
+      boundTccs
+    );
 
-    const evalResult = CanonicalStatusResolver.evaluateCriteria(results);
-    const calculatedTestStatus = CanonicalStatusResolver.calculateCanonicalTestStatus(testResult);
-
-    // Business Rule 1: Nếu có bất kỳ chỉ tiêu bắt buộc nào FAIL, overallStatus không được phép là PASS
-    if (evalResult.fail > 0 && testResult.overallStatus === 'PASS') {
+    // Business Rule 1: Nếu tính toán chỉ tiêu là FAIL nhưng storedStatus là PASS
+    if (calculatedTestStatus === 'FAIL' && storedStatus === 'PASS') {
       errors.push({
         tier: 'TIER_3_BUSINESS',
         field: 'overallStatus',
-        message: `Sai lệch nghiệp vụ: overallStatus là PASS nhưng có ${evalResult.fail} chỉ tiêu không đạt`,
+        message:
+          'Sai lệch nghiệp vụ: overallStatus là PASS nhưng các chỉ tiêu thực tế đánh giá là FAIL',
         code: 'BIZ_STATUS_CRITERIA_MISMATCH',
         expected: 'FAIL',
         actual: testResult.overallStatus,
       });
     }
 
-    // Business Rule 2: Nếu tất cả chỉ tiêu đều PASS, overallStatus không nên là FAIL
-    if (evalResult.allPass && testResult.overallStatus === 'FAIL') {
+    // Business Rule 2: Nếu tính toán chỉ tiêu là PASS nhưng storedStatus là FAIL
+    if (calculatedTestStatus === 'PASS' && storedStatus === 'FAIL') {
       errors.push({
         tier: 'TIER_3_BUSINESS',
         field: 'overallStatus',

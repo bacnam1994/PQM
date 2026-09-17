@@ -287,20 +287,24 @@ export function resolveTestResultStatus(testResult: unknown): CanonicalTestStatu
   // 3. Nếu không có trường tổng thể, kiểm tra mảng kết quả results
   if (Array.isArray(tr.results) && tr.results.length > 0) {
     let hasFail = false;
-    let hasPass = false;
+    let hasPending = false;
+    let passCount = 0;
 
     for (const r of tr.results) {
       if (!r) continue;
       const criterionPass = normalizeCriterionPassStatus(r.isPass);
       if (criterionPass === false) {
         hasFail = true;
+      } else if (criterionPass === null) {
+        hasPending = true;
       } else if (criterionPass === true) {
-        hasPass = true;
+        passCount++;
       }
     }
 
     if (hasFail) return 'FAIL';
-    if (hasPass) return 'PASS';
+    if (hasPending) return 'PENDING';
+    if (passCount > 0) return 'PASS';
     return 'PENDING';
   }
 
@@ -317,8 +321,9 @@ function isCriteriaNameMatch(nameA?: string, nameB?: string): boolean {
 
 /**
  * 4. Tính toán kết quả thực tế của Phiếu kiểm nghiệm dựa trên các chỉ tiêu thực tế
- * Có hỗ trợ đầy đủ quy tắc thay thế (Alternate Rules: FAIL_RETRY & CONDITIONAL_CHECK)
- * và hợp nhất chỉ tiêu nếu cùng một Lô có nhiều phiếu kiểm nghiệm chia theo lab.
+ * Tuân thủ nghiêm ngặt thứ tự ưu tiên: FAIL > PENDING > PASS.
+ * Có hỗ trợ đầy đủ quy tắc thay thế (Alternate Rules: FAIL_RETRY & CONDITIONAL_CHECK).
+ * Tuyệt đối không để một chỉ tiêu PASS tự động kéo cả phiếu thành PASS.
  */
 export function calculateOverallStatusForTestResult(
   testResult: TestResult,
@@ -331,33 +336,51 @@ export function calculateOverallStatusForTestResult(
 
   const currentResults = testResult.results;
 
-  // Hợp nhất các chỉ tiêu của tất cả phiếu thuộc lô (nếu có) để phục vụ tra cứu quy tắc thay thế
-  const consolidatedCriteriaMap = new Map<string, TestResultEntry>();
+  // Lọc các kết quả chỉ tiêu có hiệu lực trong phiếu hiện tại
+  // Xây dựng map chỉ tiêu trong phiếu hiện tại (ưu tiên hàng đầu)
+  const currentCriteriaMap = new Map<string, TestResultEntry>();
+  currentResults.forEach((entry) => {
+    if (entry && entry.criteriaName) {
+      currentCriteriaMap.set(normalizeName(entry.criteriaName), entry);
+    }
+  });
+
+  // Hợp nhất các phiếu hợp lệ của lô (nếu có) nhưng loại bỏ các phiếu bị hủy / xóa mềm
+  // và chỉ dùng để tra cứu quy tắc thay thế liên phiếu hợp lệ
+  const validBatchResultsMap = new Map<string, TestResultEntry>();
   if (Array.isArray(allBatchResults) && allBatchResults.length > 0) {
     allBatchResults.forEach((tr) => {
+      if (!tr) return;
+      if ((tr as any).isDeleted || (tr as any).deleted) return;
+      const s = String((tr as any).status || '').toUpperCase();
+      if (s === 'CANCELLED' || s === 'VOIDED' || s === 'INVALID') return;
+
       (tr.results || []).forEach((entry) => {
         if (entry && entry.criteriaName) {
           const key = normalizeName(entry.criteriaName);
-          consolidatedCriteriaMap.set(key, entry);
+          // Không ghi đè nếu phiếu hiện tại đã có chỉ tiêu này
+          if (!validBatchResultsMap.has(key)) {
+            validBatchResultsMap.set(key, entry);
+          }
         }
       });
     });
-  } else {
-    currentResults.forEach((entry) => {
-      if (entry && entry.criteriaName) {
-        const key = normalizeName(entry.criteriaName);
-        consolidatedCriteriaMap.set(key, entry);
-      }
-    });
   }
+
+  // Nguồn tra cứu tổng hợp: ưu tiên currentResults, fallback sang validBatchResults
+  const getLookupEntry = (name: string): TestResultEntry | undefined => {
+    const key = normalizeName(name);
+    return currentCriteriaMap.get(key) || validBatchResultsMap.get(key);
+  };
 
   const rules = boundTccs?.alternateRules || [];
 
-  // Lọc các chỉ tiêu rớt trong phiếu hiện tại
+  // 1. Xác định các chỉ tiêu áp dụng (Applicable Criteria)
+  // và phát hiện các lỗi không thể cứu (Unrescued Failures)
   const failures = currentResults.filter((r) => normalizeCriterionPassStatus(r.isPass) === false);
 
   for (const fail of failures) {
-    // 1. CONDITIONAL_CHECK: Kiểm tra xem chỉ tiêu rớt này có thuộc chỉ tiêu phụ được miễn kiểm không?
+    // a. CONDITIONAL_CHECK: Kiểm tra xem chỉ tiêu rớt này có thuộc chỉ tiêu phụ được miễn kiểm không?
     const condRuleWhereThisIsAlt = rules.find(
       (r) =>
         r.type === EVALUATION_RULE.CONDITIONAL_CHECK &&
@@ -365,7 +388,7 @@ export function calculateOverallStatusForTestResult(
     );
 
     if (condRuleWhereThisIsAlt) {
-      const mainResult = consolidatedCriteriaMap.get(normalizeName(condRuleWhereThisIsAlt.main));
+      const mainResult = getLookupEntry(condRuleWhereThisIsAlt.main);
       if (mainResult && mainResult.value !== undefined && mainResult.value !== '') {
         const isTriggered = CriterionEvaluator.checkRange(
           condRuleWhereThisIsAlt.conditionValue || '',
@@ -376,7 +399,7 @@ export function calculateOverallStatusForTestResult(
       }
     }
 
-    // 2. FAIL_RETRY: Kiểm tra xem có quy tắc thử lại cứu chỉ tiêu rớt này không
+    // b. FAIL_RETRY: Kiểm tra xem có quy tắc thử lại cứu chỉ tiêu rớt này không
     const retryRule = rules.find(
       (r: any) =>
         isCriteriaNameMatch(r.main, fail.criteriaName) &&
@@ -384,23 +407,23 @@ export function calculateOverallStatusForTestResult(
     );
 
     if (retryRule) {
-      const altResult = consolidatedCriteriaMap.get(normalizeName(retryRule.alt));
+      const altResult = getLookupEntry(retryRule.alt);
       if (
         altResult &&
         altResult.value !== undefined &&
         altResult.value !== '' &&
         normalizeCriterionPassStatus(altResult.isPass) === true
       ) {
-        // Đã được cứu bởi chỉ tiêu thử lại đạt
+        // Đã được cứu bởi chỉ tiêu thử lại đạt có kết quả thực tế
         continue;
       }
     }
 
-    // Không được miễn và không có luật cứu -> Thất bại
+    // Không được miễn và không có luật cứu hợp lệ -> THẤT BẠI
     return 'FAIL';
   }
 
-  // 3. CONDITIONAL_CHECK bị kích hoạt: Chỉ áp dụng nếu chỉ tiêu chính nằm trong phiếu này
+  // 2. CONDITIONAL_CHECK bị kích hoạt: Chỉ tiêu phụ bắt buộc phải có và đạt
   const conditionalRules = rules.filter((r: any) => r.type === EVALUATION_RULE.CONDITIONAL_CHECK);
   for (const rule of conditionalRules) {
     const mainResult = currentResults.find((r) => isCriteriaNameMatch(r.criteriaName, rule.main));
@@ -411,25 +434,75 @@ export function calculateOverallStatusForTestResult(
       );
 
       if (isTriggered === true) {
-        const altResult = consolidatedCriteriaMap.get(normalizeName(rule.alt));
-        if (
-          !altResult ||
-          altResult.value === undefined ||
-          altResult.value === '' ||
-          normalizeCriterionPassStatus(altResult.isPass) === false
-        ) {
-          // Bị kích hoạt nhưng chỉ tiêu phụ chưa làm hoặc không đạt
+        const altResult = getLookupEntry(rule.alt);
+        if (!altResult || altResult.value === undefined || altResult.value === '') {
+          // Bị kích hoạt nhưng chưa có kết quả chỉ tiêu phụ -> PENDING
+          return 'PENDING';
+        }
+        if (normalizeCriterionPassStatus(altResult.isPass) === false) {
+          // Bị kích hoạt nhưng chỉ tiêu phụ không đạt -> FAIL
           return 'FAIL';
         }
       }
     }
   }
 
-  // Kiểm tra xem có ít nhất một chỉ tiêu đạt hợp lệ không
-  const hasValidPass = currentResults.some((r) => normalizeCriterionPassStatus(r.isPass) === true);
-  if (hasValidPass) return 'PASS';
+  // 3. Kiểm tra các chỉ tiêu bắt buộc chưa giải quyết xong (Unresolved / Pending Required Criteria)
+  // Chỉ tiêu chưa nhập kết quả (value rỗng) mà không được miễn kiểm
+  const pendingCriteria = currentResults.filter((r) => {
+    const passStatus = normalizeCriterionPassStatus(r.isPass);
+    if (passStatus === true) return false;
+    if (passStatus === false) return false; // Failures are handled above
 
-  // Nếu toàn bộ đều null/undefined/rỗng -> PENDING
+    // passStatus is null or undefined
+    const valStr = r.value !== undefined && r.value !== null ? String(r.value).trim() : '';
+
+    // Nếu đã nhập kết quả (ví dụ chỉ tiêu cảm quan / text dạng 'Bột màu trắng', 'Đạt yêu cầu') -> không tính là pending
+    if (valStr !== '') {
+      return false;
+    }
+
+    // Giá trị rỗng: Kiểm tra xem chỉ tiêu chưa có kết quả này có được miễn kiểm không
+    const condRule = rules.find(
+      (rule) =>
+        rule.type === EVALUATION_RULE.CONDITIONAL_CHECK &&
+        isCriteriaNameMatch(rule.alt, r.criteriaName)
+    );
+    if (condRule) {
+      const mainResult = getLookupEntry(condRule.main);
+      if (mainResult && mainResult.value !== undefined && mainResult.value !== '') {
+        const isTriggered = CriterionEvaluator.checkRange(
+          condRule.conditionValue || '',
+          String(mainResult.value)
+        );
+        if (isTriggered !== true) {
+          return false; // Được miễn kiểm -> không bắt buộc
+        }
+      }
+    }
+
+    // Nếu là chỉ tiêu phụ tự do không có giới hạn (isExtra và không có limit) -> không bắt buộc
+    if (r.isExtra && (!r.limit || r.limit.trim() === '')) {
+      return false;
+    }
+
+    return true; // Không có kết quả -> PENDING
+  });
+
+  if (pendingCriteria.length > 0) {
+    return 'PENDING';
+  }
+
+  // 4. Nếu tất cả chỉ tiêu áp dụng đều đạt (All Applicable Criteria Pass)
+  const applicablePassedCriteria = currentResults.filter((r) => {
+    return normalizeCriterionPassStatus(r.isPass) === true;
+  });
+
+  if (applicablePassedCriteria.length > 0) {
+    return 'PASS';
+  }
+
+  // Mặc định: Nếu không có chỉ tiêu nào đạt -> PENDING
   return 'PENDING';
 }
 
@@ -535,8 +608,17 @@ export function resolveFinalTestResultForBatch(
 
   const finalTestResult = sorted[0];
 
-  // 4. Đánh giá trạng thái
-  const hasPassTest = candidates.some((tr) => resolveTestResultStatus(tr) === 'PASS');
+  // 4. Đánh giá trạng thái Authoritative Test Result
+  // Ưu tiên tính toán từ các chỉ tiêu thực tế, fallback sang stored status
+  let computedStatus: CanonicalTestStatus = 'UNKNOWN';
+  if (Array.isArray(finalTestResult.results) && finalTestResult.results.length > 0) {
+    computedStatus = calculateOverallStatusForTestResult(finalTestResult, boundTccs, candidates);
+  }
+  if (computedStatus === 'UNKNOWN') {
+    computedStatus = resolveTestResultStatus(finalTestResult);
+  }
+
+  const hasPassTest = computedStatus === 'PASS';
 
   // Tính trạng thái hợp nhất
   const consolidatedMap = new Map<string, TestResultEntry>();
@@ -547,14 +629,7 @@ export function resolveFinalTestResultForBatch(
       }
     });
   });
-  const consolidatedList = Array.from(consolidatedMap.values());
   const isConsolidated = candidates.length > 1;
-
-  let computedStatus: CanonicalTestStatus = resolveTestResultStatus(finalTestResult);
-
-  if (computedStatus === 'UNKNOWN' || computedStatus === 'PENDING') {
-    computedStatus = calculateOverallStatusForTestResult(finalTestResult, boundTccs, candidates);
-  }
 
   const confidence = relationshipType === 'PRIMARY' ? 'HIGH' : 'MEDIUM';
   diagnostics.push(
@@ -578,7 +653,7 @@ export function resolveFinalTestResultForBatch(
 }
 
 /**
- * Canonical Authoritative Test Result Resolver (Mục 9)
+ * Canonical Authoritative Test Result Resolver (Mục 8 & 9)
  * Chọn phiếu kiểm nghiệm chính thức / hiện hành cho Lô sản xuất.
  */
 export function resolveAuthoritativeTestResultForBatch(
@@ -588,6 +663,131 @@ export function resolveAuthoritativeTestResultForBatch(
 ): TestResult | undefined {
   const res = resolveFinalTestResultForBatch(batch, testResults, boundTccs);
   return res.finalTestResult;
+}
+
+/**
+ * Multi-Lab Authoritative Test Results Resolver (Mục 11)
+ * Chọn danh sách phiếu kiểm nghiệm authoritative cho Lô sản xuất, phân tách theo từng phòng kiểm nghiệm (Lab).
+ */
+export function resolveAuthoritativeTestResultsForBatch(
+  batch: Batch,
+  testResults: TestResult[] = [],
+  boundTccs?: TCCS | null
+): TestResult[] {
+  if (!batch || !Array.isArray(testResults) || testResults.length === 0) {
+    return [];
+  }
+
+  const normalizedBatchNo = (batch.batchNo || '').trim().toLowerCase();
+  const primaryCandidates: TestResult[] = [];
+  const legacyCandidates: TestResult[] = [];
+
+  testResults.forEach((tr) => {
+    if (!tr) return;
+    if ((tr as any).isDeleted || (tr as any).deleted) return;
+
+    const trStatusUpper = String((tr as any).status || '').toUpperCase();
+    if (
+      trStatusUpper === 'CANCELLED' ||
+      trStatusUpper === 'VOIDED' ||
+      trStatusUpper === 'INVALID'
+    ) {
+      return;
+    }
+
+    const trBatchId = (tr.batchId || '').trim();
+    const trBatchNo = ((tr as any).batchNo || '').trim().toLowerCase();
+
+    if (trBatchId === batch.id) {
+      primaryCandidates.push(tr);
+    } else if (
+      (trBatchId && trBatchId.toLowerCase() === normalizedBatchNo) ||
+      (trBatchNo && trBatchNo === normalizedBatchNo)
+    ) {
+      legacyCandidates.push(tr);
+    }
+  });
+
+  const candidates = primaryCandidates.length > 0 ? primaryCandidates : legacyCandidates;
+  if (candidates.length === 0) return [];
+
+  // 2. Xác định phiếu authoritative tối cao cho batch (Mục 8)
+  const finalRes = resolveFinalTestResultForBatch(batch, candidates, boundTccs);
+  const supremeAuth = finalRes.finalTestResult;
+  if (!supremeAuth) return [];
+
+  const supremeStatus = String((supremeAuth as any).status || '').toUpperCase();
+  const isSupremeFinalized =
+    ['APPROVED', 'FINAL', 'RELEASED'].includes(supremeStatus) ||
+    (supremeAuth as any).isFinal === true;
+  const supremeVersion = (supremeAuth as any).version || (supremeAuth as any).revision || 0;
+  const supremeDate = supremeAuth.updatedAt || supremeAuth.testDate || supremeAuth.createdAt || '';
+  const supremeCanonicalStatus = resolveTestResultStatus(supremeAuth);
+
+  // 3. Lọc các phiếu active không bị superseded bởi supremeAuth (Mục 8, 9, 10, 11)
+  const activeCandidates = candidates.filter((tr) => {
+    if (tr.id === supremeAuth.id) return true;
+
+    // Nếu supremeAuth đã FINAL/APPROVED mà tr không FINAL/APPROVED -> tr bị superseded
+    if (isSupremeFinalized) {
+      const s = String((tr as any).status || '').toUpperCase();
+      const isFin = ['APPROVED', 'FINAL', 'RELEASED'].includes(s) || (tr as any).isFinal === true;
+      if (!isFin) return false;
+    }
+
+    // Nếu supremeAuth có version cao hơn tr -> tr là revision cũ -> superseded
+    const v = (tr as any).version || (tr as any).revision || 0;
+    if (supremeVersion > 0 && v < supremeVersion) {
+      return false;
+    }
+
+    // Nếu tr có ngày kiểm nghiệm/tạo cũ hơn supremeAuth và kết quả là FAIL trong khi supremeAuth là PASS
+    // -> Đây là trường hợp re-test / kiểm tra lại sau khi không đạt (Mục 9, 11) -> tr cũ bị superseded
+    const trDate = tr.updatedAt || tr.testDate || tr.createdAt || '';
+    if (trDate && supremeDate && trDate < supremeDate) {
+      const trStatus = resolveTestResultStatus(tr);
+      if (trStatus === 'FAIL' && supremeCanonicalStatus === 'PASS') {
+        return false;
+      }
+    }
+
+    return true;
+  });
+
+  // 4. Gom nhóm activeCandidates theo Lab
+  const labGroups = new Map<string, TestResult[]>();
+  activeCandidates.forEach((tr) => {
+    const key = (tr.labId || tr.labName || 'DEFAULT_LAB').trim().toLowerCase();
+    if (!labGroups.has(key)) {
+      labGroups.set(key, []);
+    }
+    labGroups.get(key)!.push(tr);
+  });
+
+  // Với mỗi Lab còn active, chọn 1 phiếu có thứ tự ưu tiên cao nhất
+  const authoritativeResults: TestResult[] = [];
+  labGroups.forEach((group) => {
+    const finalized = group.filter((tr) => {
+      const s = String((tr as any).status || '').toUpperCase();
+      return s === 'APPROVED' || s === 'FINAL' || s === 'RELEASED' || (tr as any).isFinal === true;
+    });
+
+    const working = finalized.length > 0 ? finalized : group;
+
+    const sorted = [...working].sort((a, b) => {
+      const vA = (a as any).version || (a as any).revision || 0;
+      const vB = (b as any).version || (b as any).revision || 0;
+      if (vA !== vB) return vB - vA;
+
+      const dateA = a.updatedAt || a.testDate || a.createdAt || '';
+      const dateB = b.updatedAt || b.testDate || b.createdAt || '';
+      return dateB.localeCompare(dateA);
+    });
+
+    authoritativeResults.push(sorted[0]);
+  });
+
+  return authoritativeResults;
 }
 
 /**
@@ -644,7 +844,8 @@ export function detectTestResultStatusMismatch(
     statusUpper === 'CANCELLED' ||
     statusUpper === 'VOIDED' ||
     statusUpper === 'INVALID' ||
-    (testResult as any).isDeleted
+    (testResult as any).isDeleted ||
+    (testResult as any).deleted
   ) {
     return {
       ...defaultDiagnostic,
@@ -674,7 +875,7 @@ export function detectTestResultStatusMismatch(
   defaultDiagnostic.diagnosticDetails.totalCriteriaCount = results.length;
   defaultDiagnostic.diagnosticDetails.criteriaSummary = criteriaSummary;
 
-  // 5. UNKNOWN / PENDING Guard:
+  // 5. UNKNOWN / PENDING Guard (Mục 12):
   // Nếu trạng thái đang là UNKNOWN hoặc PENDING, tuyệt đối không tạo alert mismatch
   if (
     storedCanonical === 'UNKNOWN' ||
@@ -714,7 +915,7 @@ export function detectTestResultStatusMismatch(
     };
   }
 
-  // 7. PHÁT HIỆN SAI LỆCH THỰC SỰ:
+  // 7. PHÁT HIỆN SAI LỆCH THỰC SỰ (REAL MISMATCH - Mục 12):
   // storedCanonical là PASS nhưng computedCanonical là FAIL (hoặc ngược lại)
   const shouldAlert = true;
   const reason =
@@ -722,8 +923,7 @@ export function detectTestResultStatusMismatch(
       ? 'STORED_PASS_BUT_COMPUTED_FAIL'
       : 'STORED_FAIL_BUT_COMPUTED_PASS';
 
-  // Chỉ Auto-Heal khi có rule chắc chắn và dữ liệu chỉ tiêu đầy đủ (Item 15)
-  // Nếu computedCanonical === 'PASS', cho phép SAFE_AUTO_HEAL (chỉ cập nhật overallStatus, tuyệt đối không chạm vào value chỉ tiêu)
+  // Mục 15: Chỉ Auto-Heal khi deterministic và có đầy đủ bằng chứng chỉ tiêu thực tế
   const isSafeToAutoHeal =
     results.length > 0 &&
     (computedCanonical === 'FAIL'
