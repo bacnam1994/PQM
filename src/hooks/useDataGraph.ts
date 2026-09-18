@@ -43,8 +43,8 @@ export interface HydratedTCCS extends TCCS {
   aliases: CriteriaAlias[];
   /** Tổng số phiếu kiểm nghiệm của tất cả lô dùng TCCS này */
   testResultsCount: number;
-  /** Tỷ lệ đạt (%) của các phiếu KN liên quan (0-100) */
-  passRate: number;
+  /** Tỷ lệ đạt (%) của các phiếu KN liên quan (0-100) hoặc null nếu chưa có phiếu nào */
+  passRate: number | null;
 }
 
 export interface HydratedRawMaterial extends RawMaterial {
@@ -59,11 +59,16 @@ export interface HydratedBatch extends Batch {
   formula?: ProductFormula;
   testResults?: TestResult[];
   latestTestResult?: TestResult;
+  /**
+   * isFullyTested: Chuẩn hóa Type/API (Model 1).
+   * TODO (Model 6 - Business Rule Engine): Đánh giá điều kiện kiểm nghiệm toàn diện.
+   * Tuyệt đối không suy diễn chỉ từ việc 'có ít nhất 1 test PASS'.
+   */
   isFullyTested?: boolean;
   /** Số phiếu kiểm nghiệm của lô này */
   testResultsCount?: number;
-  /** Tỷ lệ đạt (%) của các phiếu KN trong lô (0-100) */
-  passRate?: number;
+  /** Tỷ lệ đạt (%) của các phiếu KN trong lô (0-100) hoặc null nếu chưa có phiếu nào */
+  passRate?: number | null;
 }
 
 export interface HydratedTestResult extends TestResult {
@@ -86,7 +91,8 @@ export interface HydratedProduct extends Product {
   batches: Batch[];
   batchesCount: number;
   testResultsCount: number;
-  passRate: number;
+  /** Tỷ lệ đạt (%) chất lượng tổng thể của sản phẩm hoặc null nếu chưa có phiếu nào */
+  passRate: number | null;
   latestBatch?: Batch;
 }
 
@@ -259,9 +265,11 @@ export const useDataGraph = () => {
         formula: batch.formulaSnapshot || formulasByProductId.get(batch.productId),
         testResults: sortedTests,
         latestTestResult: sortedTests[0],
-        isFullyTested: bTests.length > 0 && bTests.some((t) => t.overallStatus === 'PASS'),
+        isFullyTested:
+          bTests.length > 0 &&
+          bTests.every((t) => t.overallStatus === 'PASS' || t.overallStatus === 'FAIL'),
         testResultsCount: bTests.length,
-        passRate: bTests.length > 0 ? Math.round((passTests.length / bTests.length) * 100) : 100,
+        passRate: bTests.length > 0 ? Math.round((passTests.length / bTests.length) * 100) : null,
       };
     });
   }, [rawBatches, productsById, tccsById, formulasByProductId, testResultsByBatchId]);
@@ -275,7 +283,7 @@ export const useDataGraph = () => {
       const overallStatus =
         res.results && res.results.length > 0
           ? calculateOverallStatus(res.results, tccs || null)
-          : res.overallStatus || 'PASS';
+          : (res.overallStatus ?? 'UNKNOWN');
       const labInfo = resolveCanonicalLab(res.labId || res.labName, testingLaboratories);
 
       return {
@@ -293,9 +301,11 @@ export const useDataGraph = () => {
                 tccs,
                 formula: formulasByProductId.get(rawBatch.productId),
                 testResults: bTests,
-                isFullyTested: bTests.some((t) => t.overallStatus === 'PASS'),
+                isFullyTested:
+                  bTests.length > 0 &&
+                  bTests.every((t) => t.overallStatus === 'PASS' || t.overallStatus === 'FAIL'),
                 testResultsCount: bTests.length,
-                passRate: bTests.length > 0 ? Math.round((passCount / bTests.length) * 100) : 100,
+                passRate: bTests.length > 0 ? Math.round((passCount / bTests.length) * 100) : null,
               };
             })()
           : undefined,
@@ -322,7 +332,7 @@ export const useDataGraph = () => {
       const overallStatus =
         res.results && res.results.length > 0
           ? calculateOverallStatus(res.results, tccs || null)
-          : res.overallStatus || 'PASS';
+          : (res.overallStatus ?? 'UNKNOWN');
 
       return {
         ...res,
@@ -337,9 +347,11 @@ export const useDataGraph = () => {
                 tccs,
                 formula: formulasByProductId.get(rawBatch.productId),
                 testResults: bTests,
-                isFullyTested: bTests.some((t) => t.overallStatus === 'PASS'),
+                isFullyTested:
+                  bTests.length > 0 &&
+                  bTests.every((t) => t.overallStatus === 'PASS' || t.overallStatus === 'FAIL'),
                 testResultsCount: bTests.length,
-                passRate: bTests.length > 0 ? Math.round((passCount / bTests.length) * 100) : 100,
+                passRate: bTests.length > 0 ? Math.round((passCount / bTests.length) * 100) : null,
               };
             })()
           : undefined,
@@ -427,7 +439,7 @@ export const useDataGraph = () => {
         passCount += bTests.filter((r) => r.overallStatus === 'PASS').length;
       });
       const passRate =
-        testResultsCount > 0 ? Math.round((passCount / testResultsCount) * 100) : 100;
+        testResultsCount > 0 ? Math.round((passCount / testResultsCount) * 100) : null;
       return {
         ...t,
         product: productsById.get(t.productId),
@@ -463,7 +475,7 @@ export const useDataGraph = () => {
         passCount += bTests.filter((t) => t.overallStatus === 'PASS').length;
       });
 
-      const passRate = pTestsCount > 0 ? Math.round((passCount / pTestsCount) * 100) : 100;
+      const passRate = pTestsCount > 0 ? Math.round((passCount / pTestsCount) * 100) : null;
 
       return {
         ...prod,
@@ -546,9 +558,11 @@ export const useDataGraph = () => {
         formula: batch.formulaSnapshot || formulasByProductId.get(batch.productId),
         testResults: sortedTests,
         latestTestResult: sortedTests[0],
-        isFullyTested: bTests.length > 0 && bTests.some((t) => t.overallStatus === 'PASS'),
+        isFullyTested:
+          bTests.length > 0 &&
+          bTests.every((t) => t.overallStatus === 'PASS' || t.overallStatus === 'FAIL'),
         testResultsCount: bTests.length,
-        passRate: bTests.length > 0 ? Math.round((passTests.length / bTests.length) * 100) : 100,
+        passRate: bTests.length > 0 ? Math.round((passTests.length / bTests.length) * 100) : null,
       };
     },
     [batchesById, productsById, tccsById, formulasByProductId, testResultsByBatchId]

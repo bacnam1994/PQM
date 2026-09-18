@@ -109,6 +109,163 @@ export function verifyEvaluationSnapshotIntegrity(
   return false;
 }
 
+export interface SnapshotValidationResult {
+  isValid: boolean;
+  reason?: string;
+}
+
+/**
+ * Kiểm tra tính hợp lệ toàn diện của EvaluationSnapshot (Model 2 - ALCOA+ Snapshot Gate)
+ * Chỉ dùng evaluationSnapshot nếu:
+ * - hash hợp lệ (verifyEvaluationSnapshotIntegrity)
+ * - snapshot schema hợp lệ (overallStatus, criterionResults, engineVersion)
+ * - snapshot gắn đúng testResult (testResultId)
+ * - batchId đúng
+ * - tccsId đúng (nếu có context)
+ * - tccsVersion đúng (nếu có context boundTccs)
+ * - engineVersion phù hợp
+ * - criterionResults tương ứng dữ liệu nguồn (testResult.results)
+ * - snapshot chưa bị invalidated
+ * Nếu bất kỳ điều kiện nào không thỏa mãn -> isValid = false (cần re-evaluate).
+ */
+export function validateEvaluationSnapshot(
+  snapshot: EvaluationSnapshot | undefined | null,
+  testResult: TestResult,
+  boundTccs?: TCCS | null
+): SnapshotValidationResult {
+  if (!snapshot) {
+    return { isValid: false, reason: 'Snapshot không tồn tại' };
+  }
+
+  // 1. Schema check
+  if (!snapshot.evaluationHash || typeof snapshot.evaluationHash !== 'string') {
+    return { isValid: false, reason: 'Snapshot thiếu evaluationHash' };
+  }
+  if (
+    !snapshot.overallStatus ||
+    !['PASS', 'FAIL', 'PENDING', 'UNKNOWN'].includes(snapshot.overallStatus)
+  ) {
+    return { isValid: false, reason: 'Snapshot overallStatus không hợp lệ' };
+  }
+  if (!Array.isArray(snapshot.criterionResults)) {
+    return { isValid: false, reason: 'Snapshot criterionResults không phải là mảng' };
+  }
+  if (!snapshot.engineVersion) {
+    return { isValid: false, reason: 'Snapshot thiếu engineVersion' };
+  }
+
+  // 2. Cờ vô hiệu hóa (Invalidated flag)
+  if ((snapshot as any).isInvalidated === true) {
+    return { isValid: false, reason: 'Snapshot đã bị đánh dấu vô hiệu hóa (isInvalidated: true)' };
+  }
+
+  // 3. Khóa ngoại testResultId
+  const snapshotTrId = (snapshot as any).testResultId;
+  if (snapshotTrId && testResult.id && snapshotTrId !== testResult.id) {
+    return {
+      isValid: false,
+      reason: `Snapshot gắn sai testResultId (snapshot: ${snapshotTrId}, testResult: ${testResult.id})`,
+    };
+  }
+
+  // 4. Khóa ngoại batchId
+  const snapshotBatchId = snapshot.batchId || (snapshot as any).batchId;
+  if (snapshotBatchId && testResult.batchId && snapshotBatchId !== testResult.batchId) {
+    return {
+      isValid: false,
+      reason: `Snapshot gắn sai batchId (snapshot: ${snapshotBatchId}, testResult: ${testResult.batchId})`,
+    };
+  }
+
+  // 5. TCCS context check
+  if (boundTccs) {
+    if (snapshot.tccsId && boundTccs.id && snapshot.tccsId !== boundTccs.id) {
+      return {
+        isValid: false,
+        reason: `Snapshot áp dụng sai TCCS (${snapshot.tccsId} so với hiện tại: ${boundTccs.id})`,
+      };
+    }
+    if (snapshot.tccsVersion !== undefined && boundTccs.version !== undefined) {
+      if (String(snapshot.tccsVersion) !== String(boundTccs.version)) {
+        return {
+          isValid: false,
+          reason: `Snapshot dùng phiên bản TCCS cũ (v${snapshot.tccsVersion} so với v${boundTccs.version}) - Cần re-evaluate`,
+        };
+      }
+    }
+  }
+
+  // 6. Cryptographic hash integrity check
+  const isHashValid = verifyEvaluationSnapshotIntegrity(
+    snapshot,
+    testResult.id,
+    testResult.batchId
+  );
+  if (!isHashValid) {
+    return {
+      isValid: false,
+      reason:
+        'Mã băm SHA-256 không hợp lệ hoặc dữ liệu snapshot bị sửa đổi trái phép (Hash Mismatch)',
+    };
+  }
+
+  // 7. Parity check: criterionResults tương ứng dữ liệu nguồn (testResult.results)
+  // Nếu source results đã bị chỉnh sửa sau khi snapshot niêm phong -> snapshot bị coi là stale/invalidated
+  if (Array.isArray(testResult.results)) {
+    if (testResult.results.length !== snapshot.criterionResults.length) {
+      return {
+        isValid: false,
+        reason: `Số lượng chỉ tiêu hiện tại (${testResult.results.length}) khác với số lượng chỉ tiêu trong snapshot (${snapshot.criterionResults.length})`,
+      };
+    }
+
+    // Kiểm tra từng chỉ tiêu
+    for (let i = 0; i < testResult.results.length; i++) {
+      const sourceCrit = testResult.results[i];
+      const snapCrit = snapshot.criterionResults[i];
+      if (!sourceCrit || !snapCrit) continue;
+
+      // So khớp tên chỉ tiêu
+      const sourceName = (sourceCrit.criteriaName || '').trim().toLowerCase();
+      const snapName = (snapCrit.criteriaName || '').trim().toLowerCase();
+      if (sourceName !== snapName) {
+        return {
+          isValid: false,
+          reason: `Tên chỉ tiêu thứ ${i + 1} không khớp ("${sourceCrit.criteriaName}" vs "${snapCrit.criteriaName}")`,
+        };
+      }
+
+      // So khớp kết quả isPass
+      if (sourceCrit.isPass !== snapCrit.isPass) {
+        return {
+          isValid: false,
+          reason: `Trạng thái đạt chỉ tiêu "${sourceCrit.criteriaName}" đã thay đổi (${sourceCrit.isPass} so với snapshot: ${snapCrit.isPass})`,
+        };
+      }
+
+      // So khớp giá trị value
+      const sourceVal =
+        sourceCrit.value !== undefined && sourceCrit.value !== null
+          ? String(sourceCrit.value).trim()
+          : '';
+      const snapVal =
+        snapCrit.value !== undefined && snapCrit.value !== null
+          ? String(snapCrit.value).trim()
+          : (snapCrit as any).actualValue !== undefined && (snapCrit as any).actualValue !== null
+            ? String((snapCrit as any).actualValue).trim()
+            : '';
+      if (sourceVal !== snapVal) {
+        return {
+          isValid: false,
+          reason: `Giá trị chỉ tiêu "${sourceCrit.criteriaName}" đã thay đổi ("${sourceVal}" so với snapshot: "${snapVal}")`,
+        };
+      }
+    }
+  }
+
+  return { isValid: true };
+}
+
 /**
  * Khởi tạo Snapshot đóng băng kết quả thẩm định cho phiếu kiểm nghiệm
  */
@@ -147,6 +304,8 @@ export function buildEvaluationSnapshot(
 
   const baseSnapshot: Omit<EvaluationSnapshot, 'evaluationHash'> = {
     engineVersion: CURRENT_ENGINE_VERSION,
+    testResultId: testResult.id,
+    batchId: testResult.batchId,
     tccsId,
     tccsVersion,
     evaluatedAt,

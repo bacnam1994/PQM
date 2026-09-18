@@ -35,7 +35,10 @@ import { ElectronicSignature } from '../../types/signature';
 import { useDeviationsByBatchQuery } from '../../hooks/queries/useDeviationQueries';
 import { Surface, PageHeader, StatusBadge } from '../../components/ui';
 import { ReleaseRules } from '../../domain/rules';
-import { normalizeCriterionPassStatus } from '../../domain/test-result/testResultStatusResolver';
+import {
+  normalizeCriterionPassStatus,
+  resolveTestResultStatus,
+} from '../../domain/test-result/testResultStatusResolver';
 
 // Helper tính tiến độ lô
 const calculateBatchProgress = (batch: any, batchResults: TestResult[]) => {
@@ -586,7 +589,7 @@ const BatchDetailPage = () => {
                   >
                     <div className="bg-surface-2/60 px-4 py-3 flex justify-between items-center border-b border-border">
                       <div className="flex items-center gap-3">
-                        <StatusBadge status={res.overallStatus === 'PASS' ? 'PASS' : 'FAIL'} />
+                        <StatusBadge status={resolveTestResultStatus(res)} />
                         <div>
                           <p className="text-sm font-semibold text-ink">{res.labName}</p>
                           <p className="text-xs text-ink-muted mt-0.5">
@@ -595,7 +598,7 @@ const BatchDetailPage = () => {
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
-                        {res.overallStatus !== 'PASS' && (
+                        {resolveTestResultStatus(res) !== 'PASS' && (
                           <>
                             <button
                               onClick={() => handleOpenOOS(res)}

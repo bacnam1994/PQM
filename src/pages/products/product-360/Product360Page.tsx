@@ -1,19 +1,19 @@
 import React, { useState, useMemo } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { 
-  ArrowLeftIcon, 
-  CubeIcon, 
-  Square3Stack3DIcon, 
-  DocumentTextIcon, 
-  ChartBarSquareIcon, 
-  PrinterIcon, 
-  ArrowTrendingUpIcon, 
-  ExclamationTriangleIcon, 
-  ArrowsRightLeftIcon, 
-  ArrowTopRightOnSquareIcon, 
-  CheckCircleIcon, 
-  BeakerIcon, 
-  SparklesIcon 
+import {
+  ArrowLeftIcon,
+  CubeIcon,
+  Square3Stack3DIcon,
+  DocumentTextIcon,
+  ChartBarSquareIcon,
+  PrinterIcon,
+  ArrowTrendingUpIcon,
+  ExclamationTriangleIcon,
+  ArrowsRightLeftIcon,
+  ArrowTopRightOnSquareIcon,
+  CheckCircleIcon,
+  BeakerIcon,
+  SparklesIcon,
 } from '@heroicons/react/24/outline';
 import { useDataGraph } from '../../../hooks/useDataGraph';
 import { ensureArray, formatDateStandard } from '../../../utils';
@@ -30,7 +30,7 @@ export const Product360Page: React.FC = () => {
   // Lấy dữ liệu sản phẩm đã được hydrate đầy đủ
   const product = useMemo(() => {
     if (!id) return null;
-    return products.find(p => p.id === id) || null;
+    return products.find((p) => p.id === id) || null;
   }, [id, products]);
 
   const batches = useMemo(() => ensureArray(product?.batches), [product]);
@@ -39,8 +39,8 @@ export const Product360Page: React.FC = () => {
   const formula = useMemo(() => product?.formula, [product]);
 
   const totalBatches = batches.length;
-  const releasedBatches = batches.filter(b => b.status === 'RELEASED').length;
-  const releaseRate = totalBatches > 0 ? Math.round((releasedBatches / totalBatches) * 100) : 100;
+  const releasedBatches = batches.filter((b) => b.status === 'RELEASED').length;
+  const releaseRate = totalBatches > 0 ? Math.round((releasedBatches / totalBatches) * 100) : null;
 
   if (!product) {
     return (
@@ -49,7 +49,9 @@ export const Product360Page: React.FC = () => {
           <CubeIcon className="w-8 h-8 text-ink-muted" />
         </div>
         <h2 className="text-xl font-bold text-ink">Không tìm thấy sản phẩm</h2>
-        <p className="text-ink-muted text-sm mt-1">Sản phẩm không tồn tại hoặc đã bị xóa khỏi hệ thống.</p>
+        <p className="text-ink-muted text-sm mt-1">
+          Sản phẩm không tồn tại hoặc đã bị xóa khỏi hệ thống.
+        </p>
         <Link
           to="/products"
           className="inline-flex items-center gap-2 mt-4 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-medium transition-colors shadow-sm"
@@ -77,10 +79,13 @@ export const Product360Page: React.FC = () => {
               <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20">
                 PRODUCT 360° QUALITY COCKPIT
               </span>
-              <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full ${
-                product.status === 'ACTIVE' ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20' :
-                'bg-surface-2 text-ink-muted border border-border'
-              }`}>
+              <span
+                className={`text-xs font-semibold px-2.5 py-0.5 rounded-full ${
+                  product.status === 'ACTIVE'
+                    ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20'
+                    : 'bg-surface-2 text-ink-muted border border-border'
+                }`}
+              >
                 {product.status || 'ACTIVE'}
               </span>
             </div>
@@ -88,7 +93,8 @@ export const Product360Page: React.FC = () => {
               {product.name} ({product.code})
             </h1>
             <p className="text-xs text-ink-muted mt-0.5">
-              Hồ sơ chất lượng toàn diện vòng đời sản phẩm, tiến trình tiêu chuẩn và hiệu năng sản xuất
+              Hồ sơ chất lượng toàn diện vòng đời sản phẩm, tiến trình tiêu chuẩn và hiệu năng sản
+              xuất
             </p>
           </div>
         </div>
@@ -134,7 +140,7 @@ export const Product360Page: React.FC = () => {
         <div className="p-3.5 bg-surface rounded-xl border border-border shadow-xs">
           <span className="text-xs font-medium text-ink-muted block">Tỷ lệ xuất xưởng</span>
           <span className="font-semibold text-sm text-emerald-700 dark:text-emerald-400 truncate block mt-0.5">
-            {releaseRate}%
+            {releaseRate !== null ? `${releaseRate}%` : 'N/A'}
           </span>
         </div>
       </div>
@@ -183,9 +189,7 @@ export const Product360Page: React.FC = () => {
       </div>
 
       {/* Tab Contents */}
-      {activeTab === 'BATCHES' && (
-        <ProductBatchReleaseMatrix batches={batches} />
-      )}
+      {activeTab === 'BATCHES' && <ProductBatchReleaseMatrix batches={batches} />}
 
       {activeTab === 'TCCS' && (
         <ProductTccsHistory tccsList={tccsList} activeTccsId={activeTccs?.id} />
@@ -237,10 +241,15 @@ export const Product360Page: React.FC = () => {
                       <td className="p-3 text-ink-muted">{ing.unit || '—'}</td>
                       <td className="p-3 text-ink-muted">
                         {ing.materialId ? (
-                          <Link to="/materials" className="text-emerald-700 dark:text-emerald-400 hover:underline">
+                          <Link
+                            to="/materials"
+                            className="text-emerald-700 dark:text-emerald-400 hover:underline"
+                          >
                             Mã: {ing.materialId}
                           </Link>
-                        ) : 'Chưa gắn'}
+                        ) : (
+                          'Chưa gắn'
+                        )}
                       </td>
                     </tr>
                   ))}

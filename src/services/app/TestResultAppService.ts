@@ -38,7 +38,21 @@ export class TestResultAppService {
       throw new Error('Từ chối quyền: Bạn không có quyền lập phiếu kiểm nghiệm mới.');
     }
 
-    if (!testResult.batchId?.trim()) {
+    // MODEL 3: Enforce Authoritative Technical Entity Identity
+    let effectiveBatchId = testResult.batchId?.trim();
+    let effectiveTccsId = testResult.tccsId?.trim();
+
+    if (options?.batch) {
+      if (effectiveBatchId === options.batch.batchNo) {
+        // Tự động chuẩn hóa nếu người dùng vô tình truyền batchNo thay cho Technical ID
+        effectiveBatchId = options.batch.id;
+      }
+      if (!effectiveTccsId && options.batch.tccsId) {
+        effectiveTccsId = options.batch.tccsId;
+      }
+    }
+
+    if (!effectiveBatchId) {
       throw new Error('Phiếu kiểm nghiệm phải gắn liền với một Lô sản xuất cụ thể.');
     }
     if (!testResult.labName?.trim()) {
@@ -64,6 +78,8 @@ export class TestResultAppService {
 
     const cleanResult: TestResult = {
       ...testResult,
+      batchId: effectiveBatchId,
+      tccsId: effectiveTccsId,
       overallStatus: evaluatedStatus,
       evaluationSnapshot,
       version: testResult.version && testResult.version > 0 ? testResult.version : 1,
@@ -96,7 +112,8 @@ export class TestResultAppService {
   async updateTestResult(
     testResult: TestResult,
     currentUser: any,
-    oldTestResult?: TestResult
+    oldTestResult?: TestResult,
+    options?: { batch?: Batch }
   ): Promise<void> {
     if (!can(currentUser, 'test_result:update', oldTestResult || testResult)) {
       throw new Error(
@@ -111,7 +128,20 @@ export class TestResultAppService {
       `Phiếu kiểm nghiệm ${testResult.id}`
     );
 
-    if (!testResult.batchId?.trim()) {
+    // MODEL 3: Enforce Authoritative Technical Entity Identity
+    let effectiveBatchId = testResult.batchId?.trim();
+    let effectiveTccsId = testResult.tccsId?.trim();
+
+    if (options?.batch) {
+      if (effectiveBatchId === options.batch.batchNo) {
+        effectiveBatchId = options.batch.id;
+      }
+      if (!effectiveTccsId && options.batch.tccsId) {
+        effectiveTccsId = options.batch.tccsId;
+      }
+    }
+
+    if (!effectiveBatchId) {
       throw new Error('Phiếu kiểm nghiệm phải gắn liền với một Lô sản xuất cụ thể.');
     }
     if (!testResult.labName?.trim()) {
@@ -136,11 +166,15 @@ export class TestResultAppService {
       testResult.evaluationSnapshot.overallStatus !== evaluatedStatus;
 
     const evaluationSnapshot = shouldRebuildSnapshot
-      ? buildEvaluationSnapshot({ ...testResult, overallStatus: evaluatedStatus }, currentUser)
+      ? buildEvaluationSnapshot({ ...testResult, overallStatus: evaluatedStatus }, currentUser, {
+          batch: options?.batch,
+        })
       : testResult.evaluationSnapshot;
 
     const cleanResult: TestResult = {
       ...testResult,
+      batchId: effectiveBatchId,
+      tccsId: effectiveTccsId,
       overallStatus: evaluatedStatus,
       evaluationSnapshot,
       version: newVersion,
@@ -152,7 +186,7 @@ export class TestResultAppService {
     // Chuẩn GMP: Tự động ghi nhận Hồ sơ Sai lệch (Deviation/OOS) khi kết quả kiểm nghiệm cập nhật thành FAIL
     if (resolveTestResultStatus(cleanResult) === 'FAIL') {
       try {
-        await this.deviationService.autoLogFromOOS(cleanResult, undefined, currentUser);
+        await this.deviationService.autoLogFromOOS(cleanResult, options?.batch, currentUser);
       } catch (err) {
         console.error('[TestResultAppService] Tự động tạo hồ sơ sai lệch OOS thất bại:', err);
       }

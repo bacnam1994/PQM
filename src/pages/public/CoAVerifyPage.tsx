@@ -27,6 +27,7 @@ import {
 import { TestResult, Batch, Product, TCCS } from '../../types';
 import { ElectronicSignature } from '../../types/signature';
 import { formatDateStandard, calculateOverallStatus, TEST_RESULT_STATUS } from '../../utils';
+import { resolveTestResultStatus } from '../../domain/test-result/testResultStatusResolver';
 
 export const CoAVerifyPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -125,11 +126,7 @@ export const CoAVerifyPage: React.FC = () => {
     fetchData();
   }, [id]);
 
-  const isPassed = testResult?.evaluationSnapshot
-    ? testResult.evaluationSnapshot.overallStatus === 'PASS'
-    : testResult?.overallStatus === 'PASS' ||
-      (testResult &&
-        calculateOverallStatus(testResult.results || [], tccs) === TEST_RESULT_STATUS.PASS);
+  const isPassed = testResult ? resolveTestResultStatus(testResult, tccs) === 'PASS' : false;
 
   if (loading) {
     return (

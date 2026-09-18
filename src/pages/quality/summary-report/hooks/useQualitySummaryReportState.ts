@@ -494,7 +494,7 @@ export const useQualitySummaryReportState = () => {
       totalBatches: stats.total,
       passedBatches: stats.pass,
       failedBatches: stats.fail,
-      passRate: stats.total > 0 ? (stats.pass / stats.total) * 100 : 100,
+      passRate: stats.total > 0 ? (stats.pass / stats.total) * 100 : 0,
       criteriaCpkList: mainCriteria.map((c) => {
         const s = criteriaStats[c.name];
         return {

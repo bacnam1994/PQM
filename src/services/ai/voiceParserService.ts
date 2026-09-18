@@ -21,9 +21,27 @@ export interface ParsedVoiceCriteria {
  * Bảng quy đổi số đọc tiếng Việt sang số
  */
 const VIETNAMESE_NUMBERS: Record<string, number> = {
-  'không': 0, 'mot': 1, 'một': 1, 'mốt': 1, 'hai': 2, 'ba': 3, 'bốn': 4, 'tư': 4,
-  'năm': 5, 'lăm': 5, 'sáu': 6, 'bảy': 7, 'bẩy': 7, 'tám': 8, 'chín': 9, 'mười': 10,
-  'chục': 10, 'mươi': 10, 'trăm': 100, 'nghìn': 1000, 'ngàn': 1000
+  không: 0,
+  mot: 1,
+  một: 1,
+  mốt: 1,
+  hai: 2,
+  ba: 3,
+  bốn: 4,
+  tư: 4,
+  năm: 5,
+  lăm: 5,
+  sáu: 6,
+  bảy: 7,
+  bẩy: 7,
+  tám: 8,
+  chín: 9,
+  mười: 10,
+  chục: 10,
+  mươi: 10,
+  trăm: 100,
+  nghìn: 1000,
+  ngàn: 1000,
 };
 
 /**
@@ -78,9 +96,8 @@ export const parseVoiceTextRuleBased = (
   const clauses = normalized.split(/[,;\n]|(?:\b(?:và|tiếp theo|chỉ tiêu|tiêu chí)\b)/i);
 
   // Tập hợp các tên chỉ tiêu mục tiêu hoặc từ điển
-  const allKnownNames = targetCriteriaNames.length > 0 
-    ? targetCriteriaNames 
-    : Object.keys(PHARMA_TERM_DICTIONARY);
+  const allKnownNames =
+    targetCriteriaNames.length > 0 ? targetCriteriaNames : Object.keys(PHARMA_TERM_DICTIONARY);
 
   for (const rawClause of clauses) {
     const clause = rawClause.trim();
@@ -104,13 +121,18 @@ export const parseVoiceTextRuleBased = (
     if (!matchedName) {
       for (const [canonical, aliases] of Object.entries(PHARMA_TERM_DICTIONARY)) {
         // Tìm xem canonical hoặc alias nào có trong targetCriteriaNames
-        const isTarget = allKnownNames.includes(canonical) || allKnownNames.some(t => aliases.includes(t.toLowerCase()));
-        
+        const isTarget =
+          allKnownNames.includes(canonical) ||
+          allKnownNames.some((t) => aliases.includes(t.toLowerCase()));
+
         for (const alias of [canonical, ...aliases]) {
           const idx = clause.toLowerCase().indexOf(alias.toLowerCase());
           if (idx !== -1 && alias.length > matchedLength) {
             // Ưu tiên trả về tên trong targetCriteriaNames nếu có
-            const targetMatch = targetCriteriaNames.find(t => t.toLowerCase() === canonical.toLowerCase() || aliases.includes(t.toLowerCase()));
+            const targetMatch = targetCriteriaNames.find(
+              (t) =>
+                t.toLowerCase() === canonical.toLowerCase() || aliases.includes(t.toLowerCase())
+            );
             matchedName = targetMatch || canonical;
             matchedPos = idx;
             matchedLength = alias.length;
@@ -122,11 +144,19 @@ export const parseVoiceTextRuleBased = (
     if (matchedName) {
       // Phần còn lại sau tên chỉ tiêu chứa giá trị
       const afterName = clause.substring(matchedPos + matchedLength).trim();
-      
+
       // Tìm số hoặc giá trị định tính
       const numMatch = afterName.match(/[-+]?[0-9]*\.?[0-9]+/);
-      const isFailText = afterName.includes('không đạt') || afterName.includes('hỏng') || afterName.includes('fail') || afterName.includes('khong dat');
-      const isPassText = afterName.includes('đạt') || afterName.includes('pass') || afterName.includes('chuẩn') || afterName.includes('dat');
+      const isFailText =
+        afterName.includes('không đạt') ||
+        afterName.includes('hỏng') ||
+        afterName.includes('fail') ||
+        afterName.includes('khong dat');
+      const isPassText =
+        afterName.includes('đạt') ||
+        afterName.includes('pass') ||
+        afterName.includes('chuẩn') ||
+        afterName.includes('dat');
 
       let val = '';
       let unit = '';
@@ -145,15 +175,17 @@ export const parseVoiceTextRuleBased = (
       } else if (isPassText) {
         val = 'Đạt';
       } else {
-        val = afterName || 'Đạt';
+        val = afterName;
       }
+
+      const isPass = isFailText ? false : isPassText ? true : null;
 
       results.push({
         criteriaName: matchedName,
         value: val,
         unit: unit || undefined,
-        isPass: isFailText ? false : true,
-        confidence: numMatch || isPassText ? 'high' : 'medium'
+        isPass,
+        confidence: numMatch || isPassText ? 'high' : 'medium',
       });
     }
   }
@@ -184,7 +216,7 @@ Bạn là Trợ lý AI chuyên trách chuyển đổi giọng nói thành dữ l
 Người dùng là Kiểm nghiệm viên đang đọc kết quả thử nghiệm trong phòng lab:
 "${spokenText}"
 
-${targetCriteriaNames.length > 0 ? `DANH SÁCH CHỈ TIÊU CỦA SẢN PHẨM HIỆN TẠI:\n${targetCriteriaNames.map(n => `- "${n}"`).join('\n')}` : ''}
+${targetCriteriaNames.length > 0 ? `DANH SÁCH CHỈ TIÊU CỦA SẢN PHẨM HIỆN TẠI:\n${targetCriteriaNames.map((n) => `- "${n}"`).join('\n')}` : ''}
 
 YÊU CẦU:
 1. Hãy phân tích và trích xuất tất cả các chỉ tiêu, giá trị đo được, đơn vị và đánh giá Đạt/Không Đạt.
@@ -204,7 +236,10 @@ YÊU CẦU:
 
     const response = await model.generateContent(prompt);
     const text = response.response.text();
-    const cleanJson = text.replace(/```json/gi, '').replace(/```/g, '').trim();
+    const cleanJson = text
+      .replace(/```json/gi, '')
+      .replace(/```/g, '')
+      .trim();
     const parsed = JSON.parse(cleanJson);
 
     if (Array.isArray(parsed) && parsed.length > 0) {
@@ -213,7 +248,7 @@ YÊU CẦU:
         value: String(item.value || ''),
         unit: item.unit || undefined,
         isPass: item.isPass !== undefined ? Boolean(item.isPass) : true,
-        confidence: item.confidence || 'high'
+        confidence: item.confidence || 'high',
       }));
     }
   } catch (err) {

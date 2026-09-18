@@ -388,8 +388,11 @@ export const Batch360Page: React.FC = () => {
                 </thead>
                 <tbody className="divide-y divide-border">
                   {batchTestResults.map((tr) => {
-                    const passCount = ensureArray(tr.results).filter((r) => r.isPass).length;
+                    const passCount = ensureArray(tr.results).filter(
+                      (r) => r.isPass === true
+                    ).length;
                     const totalCount = ensureArray(tr.results).length;
+                    const trStatus = resolveTestResultStatus(tr);
                     return (
                       <tr key={tr.id} className="hover:bg-surface-2/60 transition-colors">
                         <td className="p-3 font-medium text-ink">
@@ -399,17 +402,23 @@ export const Batch360Page: React.FC = () => {
                         <td className="p-3">
                           <span
                             className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${
-                              tr.overallStatus === 'PASS'
+                              trStatus === 'PASS'
                                 ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20'
-                                : 'bg-rose-500/10 text-rose-700 dark:text-rose-400 border border-rose-500/20'
+                                : trStatus === 'PENDING'
+                                  ? 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20'
+                                  : 'bg-rose-500/10 text-rose-700 dark:text-rose-400 border border-rose-500/20'
                             }`}
                           >
-                            {tr.overallStatus === 'PASS' ? (
+                            {trStatus === 'PASS' ? (
                               <CheckCircleIcon className="w-3.5 h-3.5 text-emerald-600" />
                             ) : (
                               <XCircleIcon className="w-3.5 h-3.5 text-rose-600" />
                             )}
-                            {tr.overallStatus === 'PASS' ? 'ĐẠT' : 'KHÔNG ĐẠT'}
+                            {trStatus === 'PASS'
+                              ? 'ĐẠT'
+                              : trStatus === 'PENDING'
+                                ? 'ĐANG CHỜ'
+                                : 'KHÔNG ĐẠT'}
                           </span>
                         </td>
                         <td className="p-3 text-ink-muted">

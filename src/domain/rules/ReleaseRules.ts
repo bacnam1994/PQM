@@ -16,6 +16,8 @@ export interface ReleasePrerequisiteEvaluation {
     allTestCriteriaPassed: boolean;
     noCriticalOpenDeviations: boolean;
     hasProperRole: boolean;
+    isNotExpired?: boolean;
+    isNotAlreadyClosed?: boolean;
   };
   blockers: string[];
   recommendation: string;
@@ -31,8 +33,9 @@ export class ReleaseRules {
     deviations?: Deviation[];
     userRole?: Role | string;
     boundTccs?: TCCS | null;
+    asOfDate?: string | Date;
   }): ReleasePrerequisiteEvaluation {
-    const { batch, testResults, deviations = [], userRole, boundTccs } = options;
+    const { batch, testResults, deviations = [], userRole, boundTccs, asOfDate } = options;
     const blockers: string[] = [];
 
     // 1. Kiểm tra Lô
@@ -41,13 +44,34 @@ export class ReleaseRules {
       blockers.push('Thông tin Lô sản xuất không hợp lệ.');
     }
 
-    // 2. Kiểm tra thẩm quyền người thực hiện
+    // 2. Kiểm tra trạng thái Lô hiện tại
+    let isNotAlreadyClosed = true;
+    if (batch?.status === 'RELEASED') {
+      isNotAlreadyClosed = false;
+      blockers.push('Lô này đã ở trạng thái Xuất xưởng (RELEASED).');
+    } else if (batch?.status === 'REJECTED') {
+      isNotAlreadyClosed = false;
+      blockers.push('Lô đã bị Từ chối (REJECTED), không thể xuất xưởng.');
+    }
+
+    // 3. Kiểm tra hạn sử dụng (Expiration Date)
+    let isNotExpired = true;
+    if (batch?.expDate) {
+      const asOf = asOfDate ? new Date(asOfDate) : new Date();
+      const exp = new Date(batch.expDate);
+      if (!isNaN(exp.getTime()) && exp.getTime() < asOf.getTime()) {
+        isNotExpired = false;
+        blockers.push(`Lô đã quá hạn dùng (${batch.expDate}) tại thời điểm xem xét xuất xưởng.`);
+      }
+    }
+
+    // 4. Kiểm tra thẩm quyền người thực hiện
     const hasProperRole = !userRole || ['ADMIN', 'QA'].includes(userRole);
     if (!hasProperRole) {
       blockers.push(`Vai trò ${userRole} không đủ thẩm quyền xuất xưởng.`);
     }
 
-    // 3. Phân giải chất lượng từ Canonical Status Resolver
+    // 5. Phân giải chất lượng từ Canonical Status Resolver
     const qualityRes = CanonicalStatusResolver.resolveBatchQuality(batch, testResults, boundTccs);
     const hasAuthoritativeTestResult = !!qualityRes.authoritativeTestResult;
     const allTestCriteriaPassed = qualityRes.batchQualityStatus === 'PASS';
@@ -60,7 +84,7 @@ export class ReleaseRules {
       );
     }
 
-    // 4. Kiểm tra Sai lệch chưa đóng (Open Deviations)
+    // 6. Kiểm tra Sai lệch chưa đóng (Open Deviations)
     const openCriticalDeviations = deviations.filter(
       (d) =>
         (d.batchId === batch.id || d.batchNo === batch.batchNo) &&
@@ -75,7 +99,7 @@ export class ReleaseRules {
       );
     }
 
-    // Tính điểm sẵn sàng
+    // Tính điểm sẵn sàng (Score)
     let points = 0;
     if (hasValidBatch) points += 20;
     if (hasProperRole) points += 20;
@@ -83,21 +107,48 @@ export class ReleaseRules {
     if (allTestCriteriaPassed) points += 20;
     if (noCriticalOpenDeviations) points += 20;
 
+    if (!isNotExpired || !isNotAlreadyClosed) {
+      points = Math.max(0, points - 20);
+    }
+
     return {
       isEligibleForRelease: blockers.length === 0,
-      score: points,
+      score: blockers.length === 0 ? 100 : Math.min(points, 90),
       criteriaMet: {
         hasValidBatch,
         hasAuthoritativeTestResult,
         allTestCriteriaPassed,
         noCriticalOpenDeviations,
         hasProperRole,
+        isNotExpired,
+        isNotAlreadyClosed,
       },
       blockers,
       recommendation:
         blockers.length === 0
           ? 'Lô đủ điều kiện xuất xưởng theo quy chuẩn GMP.'
           : `Chưa đủ điều kiện xuất xưởng: ${blockers.join('; ')}`,
+    };
+  }
+
+  /**
+   * Kiểm tra nhanh khả năng ký duyệt xuất xưởng
+   */
+  public static canSignRelease(
+    batch: Batch,
+    testResults: TestResult[],
+    userRole?: Role | string,
+    deviations?: Deviation[]
+  ): { allowed: boolean; reason?: string } {
+    const evalResult = this.evaluateReleasePrerequisites({
+      batch,
+      testResults,
+      deviations,
+      userRole,
+    });
+    return {
+      allowed: evalResult.isEligibleForRelease,
+      reason: evalResult.blockers.length > 0 ? evalResult.blockers[0] : undefined,
     };
   }
 }

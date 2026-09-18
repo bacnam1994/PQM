@@ -143,29 +143,18 @@ export class CanonicalStatusResolver {
 
   /**
    * Bước 4: Tính trạng thái chuẩn của Phiếu kiểm nghiệm (Calculate Canonical Test Status)
-   * Tôn trọng AlternateRuleEvaluator và xử lý đúng các chỉ tiêu cảm quan/thông tin (isPass: null)
+   * Tôn trọng Source-of-Truth Precedence 3 tầng (Snapshot -> Re-evaluation -> Stored).
    */
   public static calculateCanonicalTestStatus(
     testResult: TestResult,
     boundTccs?: TCCS | null,
     allBatchResults?: TestResult[]
   ): TestResultStatus {
-    const norm = normalizeTestResultStatus(testResult.overallStatus);
-    const results = testResult.results || [];
-
-    if (results.length === 0) {
-      if (norm === 'PENDING') return 'PENDING';
-      if (norm === 'PASS' || norm === 'FAIL') return norm;
-      return 'INVALID';
-    }
-
-    // Đánh giá đồng bộ qua calculateOverallStatusForTestResult
-    const computed = calculateOverallStatusForTestResult(testResult, boundTccs, allBatchResults);
-    if (computed === 'PASS') return 'PASS';
-    if (computed === 'FAIL') return 'FAIL';
-    if (computed === 'PENDING') return 'PENDING';
-
-    return norm === 'PASS' ? 'PASS' : norm === 'FAIL' ? 'FAIL' : 'PENDING';
+    const resolved = resolveTestResultStatus(testResult, { boundTccs, allBatchResults });
+    if (resolved === 'PASS') return 'PASS';
+    if (resolved === 'FAIL') return 'FAIL';
+    if (resolved === 'PENDING') return 'PENDING';
+    return 'INVALID';
   }
 
   /**

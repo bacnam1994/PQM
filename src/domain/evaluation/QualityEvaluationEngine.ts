@@ -17,7 +17,14 @@ import {
   ND_KEYWORDS,
   POS_KEYWORDS,
 } from './ValueNormalizer';
-import { TestResultEntry, TestResult, EvaluationSnapshot, TCCS, AlternateRule } from '../../types';
+import {
+  TestResultEntry,
+  TestResult,
+  EvaluationSnapshot,
+  TCCS,
+  AlternateRule,
+  CanonicalQualityStatus,
+} from '../../types';
 import { useUIStore } from '../../store/useUIStore';
 import { buildEvaluationSnapshot } from './EvaluationSnapshotBuilder';
 
@@ -25,7 +32,7 @@ export class QualityEvaluationEngine {
   /**
    * Đánh giá một chỉ tiêu thông minh theo logic chuẩn Dược
    */
-  static evaluateCriterionSmart(criterion: any, value: any): boolean {
+  static evaluateCriterionSmart(criterion: unknown, value: unknown): boolean {
     const res = CriterionEvaluator.evaluateCriterion(criterion, value);
     return res.isPass === true;
   }
@@ -41,9 +48,9 @@ export class QualityEvaluationEngine {
    * Đánh giá chỉ tiêu có xem xét alternateRules từ TCCS
    */
   static evaluateCriterionWithAlternates(
-    criterion: any,
-    value: any,
-    allValues: Record<string, any> = {},
+    criterion: unknown,
+    value: unknown,
+    allValues: Record<string, unknown> = {},
     tccsAlternateRules: AlternateRule[] = []
   ) {
     return AlternateRuleEvaluator.evaluateCriterionWithAlternates(
@@ -60,31 +67,26 @@ export class QualityEvaluationEngine {
   static calculateOverallStatus(
     results: TestResultEntry[],
     tccs: TCCS | null
-  ): 'PASS' | 'FAIL' | 'PENDING' | 'UNKNOWN' {
+  ): CanonicalQualityStatus {
     return OverallResultEvaluator.calculateOverallStatus(results, tccs);
   }
 
   /**
    * Tái thẩm định toàn diện phiếu kiểm nghiệm và niêm phong EvaluationSnapshot hợp lệ (ALCOA+ Compliance).
    * Tự động sinh evaluationHash khớp 100% với trạng thái mới, loại bỏ nguy cơ bị đánh dấu Giả mạo/Tampered.
+   * Tuân thủ Evidence-First: Thiếu kết quả -> UNKNOWN, Có FAIL -> FAIL.
    */
   static evaluate(
     testResult: TestResult,
     tccs?: TCCS | null,
-    currentUser?: any
+    currentUser?: { email?: string; [key: string]: unknown } | null
   ): EvaluationSnapshot {
-    let overallStatus = testResult.overallStatus;
-    if (!overallStatus || overallStatus === 'UNKNOWN') {
-      overallStatus = this.calculateOverallStatus(testResult.results || [], tccs || null);
-    } else if (testResult.results && testResult.results.length > 0) {
-      const calculated = this.calculateOverallStatus(testResult.results, tccs || null);
-      if (calculated === 'PASS') {
-        overallStatus = 'PASS';
-      } else if (calculated === 'FAIL') {
-        overallStatus = 'FAIL';
-      } else if (overallStatus !== 'PENDING') {
-        overallStatus = calculated;
-      }
+    let overallStatus: CanonicalQualityStatus = 'UNKNOWN';
+
+    if (!testResult.results || testResult.results.length === 0) {
+      overallStatus = 'UNKNOWN';
+    } else {
+      overallStatus = this.calculateOverallStatus(testResult.results, tccs || null);
     }
 
     return buildEvaluationSnapshot(

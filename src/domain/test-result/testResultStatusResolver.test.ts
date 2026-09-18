@@ -30,7 +30,6 @@ describe('Canonical Test Result Status Resolver & Mismatch Detector', () => {
         'DAT',
         'dat',
         'OK',
-        'APPROVED',
         true,
         1,
       ];
@@ -51,7 +50,6 @@ describe('Canonical Test Result Status Resolver & Mismatch Detector', () => {
         'KHÔNG ĐẠT',
         'KHONG_DAT',
         'KHONG DAT',
-        'REJECTED',
         'OOS',
         false,
         0,
@@ -68,14 +66,29 @@ describe('Canonical Test Result Status Resolver & Mismatch Detector', () => {
         'pending',
         'Đang kiểm nghiệm',
         'Chưa có kết luận',
-        'DRAFT',
-        'nháp',
         'TESTING',
         'IN_PROGRESS',
       ];
       pendingVariants.forEach((v) => {
         expect(normalizeTestResultStatus(v)).toBe('PENDING');
         expect(resolveCanonicalTestStatus(v)).toBe('PENDING');
+      });
+    });
+
+    it('does not treat workflow statuses (APPROVED, FINAL, RELEASED, REJECTED, DRAFT) as quality status', () => {
+      const workflowStatuses = [
+        'APPROVED',
+        'FINAL',
+        'RELEASED',
+        'REJECTED',
+        'DRAFT',
+        'nháp',
+        'SUBMITTED',
+        'SUPERSEDED',
+      ];
+      workflowStatuses.forEach((ws) => {
+        expect(normalizeTestResultStatus(ws)).toBe('UNKNOWN');
+        expect(resolveCanonicalTestStatus(ws)).toBe('UNKNOWN');
       });
     });
 
@@ -98,9 +111,9 @@ describe('Canonical Test Result Status Resolver & Mismatch Detector', () => {
       expect(resolveTestResultStatus(tr)).toBe('PASS');
     });
 
-    it('falls back to status if overallStatus is absent', () => {
+    it('does not treat workflow status APPROVED as PASS (APPROVED != PASS -> UNKNOWN)', () => {
       const tr: any = { status: 'APPROVED' };
-      expect(resolveTestResultStatus(tr)).toBe('PASS');
+      expect(resolveTestResultStatus(tr)).toBe('UNKNOWN');
     });
 
     it('falls back to overallResult if present', () => {

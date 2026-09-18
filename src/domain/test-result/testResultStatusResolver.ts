@@ -22,8 +22,15 @@ import { Batch, TestResult, TestResultEntry, TCCS } from '../../types';
 import { TEST_RESULT_STATUS, EVALUATION_RULE } from '../../utils/constants';
 import { normalizeName } from '../../services/criteriaAliasService';
 import { CriterionEvaluator } from '../evaluation/CriterionEvaluator';
+import { validateEvaluationSnapshot } from '../evaluation/EvaluationSnapshotBuilder';
 
 export type CanonicalTestStatus = 'PASS' | 'FAIL' | 'PENDING' | 'UNKNOWN';
+
+export interface ResolveQualityStatusOptions {
+  boundTccs?: TCCS | null;
+  allBatchResults?: TestResult[];
+  skipSnapshot?: boolean;
+}
 
 export type TestResultRelationshipType =
   | 'PRIMARY'
@@ -129,7 +136,6 @@ export function normalizeTestResultStatus(value: unknown): CanonicalTestStatus {
     'CONFORMS',
     'CONFORMING',
     'HOÀN THÀNH',
-    'APPROVED',
     'SUCCESS',
     'ÂM TÍNH',
     'AM TINH',
@@ -157,7 +163,6 @@ export function normalizeTestResultStatus(value: unknown): CanonicalTestStatus {
     'KHONG_DAT',
     'NOT_PASSED',
     'NOT PASSED',
-    'REJECTED',
     'OOS',
     'OUT_OF_SPEC',
     'LOẠI',
@@ -179,7 +184,7 @@ export function normalizeTestResultStatus(value: unknown): CanonicalTestStatus {
     return 'FAIL';
   }
 
-  // Nhóm CHỜ / ĐANG KIỂM NGHIỆM / NHÁP (PENDING)
+  // Nhóm CHỜ / ĐANG KIỂM NGHIỆM (PENDING)
   const pendingKeywords = [
     'PENDING',
     'TESTING',
@@ -190,19 +195,28 @@ export function normalizeTestResultStatus(value: unknown): CanonicalTestStatus {
     'DANG KIEM NGHIEM',
     'CHƯA CÓ KẾT LUẬN',
     'CHUA CO KET LUAN',
-    'DRAFT',
-    'NHÁP',
-    'NHAP',
     'WAITING',
     'NEW',
   ];
-  if (
-    pendingKeywords.includes(str) ||
-    str.includes('ĐANG KIỂM') ||
-    str.includes('CHƯA') ||
-    str.includes('DRAFT')
-  ) {
+  if (pendingKeywords.includes(str) || str.includes('ĐANG KIỂM') || str.includes('CHƯA')) {
     return 'PENDING';
+  }
+
+  // WORKFLOW STATUS: Tuyệt đối không dùng workflow status làm quality status!
+  // APPROVED != PASS, FINAL != PASS, RELEASED != PASS, REJECTED != FAIL
+  const workflowKeywords = [
+    'DRAFT',
+    'NHÁP',
+    'NHAP',
+    'SUBMITTED',
+    'FINAL',
+    'APPROVED',
+    'RELEASED',
+    'REJECTED',
+    'SUPERSEDED',
+  ];
+  if (workflowKeywords.includes(str)) {
+    return 'UNKNOWN';
   }
 
   return 'UNKNOWN';
@@ -238,30 +252,20 @@ export function normalizeCriterionPassStatus(value: unknown): boolean | null {
 }
 
 /**
- * 3. Thẩm định và trích xuất trạng thái được lưu (Stored Status) của Phiếu kiểm nghiệm
- * Quét qua danh sách các thuộc tính khả dĩ theo thứ tự ưu tiên ALCOA+:
- * 1. overallStatus
- * 2. status
- * 3. overallResult
- * 4. result
- * 5. resultStatus
- * 6. conclusion
- * 7. conclusionStatus
- * 8. evaluationSnapshot.overallStatus
- * 9. isPassed / passed / pass
+ * Trích xuất trạng thái được lưu trữ trên văn bản/database (Stored Document Status).
+ * Chỉ đọc các trường cấp tài liệu, không suy luận lại từ criteria.
+ * Dùng cho audit, đối soát sai lệch (Reconciliation) và fallback migration.
  */
-export function resolveTestResultStatus(testResult: unknown): CanonicalTestStatus {
+export function extractStoredDocumentStatus(testResult: unknown): CanonicalTestStatus {
   if (!testResult || typeof testResult !== 'object') {
     return 'UNKNOWN';
   }
 
   const tr = testResult as Record<string, any>;
 
-  // 1. Quét các trường status cấp tài liệu
   const candidateFields = [
     tr.overallStatus,
     tr.overallResult,
-    tr.status,
     tr.resultStatus,
     tr.result,
     tr.conclusion,
@@ -279,13 +283,96 @@ export function resolveTestResultStatus(testResult: unknown): CanonicalTestStatu
     }
   }
 
-  // 2. Quét các trường boolean
+  // Quét các trường boolean legacy
   if (typeof tr.isPassed === 'boolean') return tr.isPassed ? 'PASS' : 'FAIL';
   if (typeof tr.passed === 'boolean') return tr.passed ? 'PASS' : 'FAIL';
   if (typeof tr.pass === 'boolean') return tr.pass ? 'PASS' : 'FAIL';
 
-  // 3. Nếu không có trường tổng thể, kiểm tra mảng kết quả results
-  if (Array.isArray(tr.results) && tr.results.length > 0) {
+  return 'UNKNOWN';
+}
+
+/**
+ * 3. Canonical Quality Status Resolver (Model 2 - Single Source of Truth)
+ * Thẩm định và trích xuất trạng thái chất lượng của Phiếu kiểm nghiệm.
+ *
+ * SOURCE-OF-TRUTH PRECEDENCE (3 TẦNG):
+ * Tầng 1: Evaluation Snapshot hợp lệ và integrity verified (SHA-256 + schema + context match + parity).
+ * Tầng 2: Re-evaluation từ source data hiện tại (results[] và boundTccs):
+ *         - results rỗng -> UNKNOWN
+ *         - có bất kỳ criterion FAIL -> FAIL (stored PASS / APPROVED không bao giờ được override)
+ *         - còn criterion unresolved -> PENDING
+ *         - tất cả criterion PASS -> PASS
+ * Tầng 3: Legacy stored status chỉ dùng cho compatibility/diagnostic khi record không có mảng results.
+ */
+export function resolveTestResultStatus(
+  testResult: unknown,
+  boundTccsOrOptions?: TCCS | null | ResolveQualityStatusOptions
+): CanonicalTestStatus {
+  if (!testResult || typeof testResult !== 'object') {
+    return 'UNKNOWN';
+  }
+
+  const tr = testResult as Record<string, any>;
+
+  // Bóc tách options/context
+  let boundTccs: TCCS | null | undefined;
+  let allBatchResults: TestResult[] | undefined;
+  let skipSnapshot = false;
+
+  if (boundTccsOrOptions) {
+    if (
+      'mainQualityCriteria' in boundTccsOrOptions ||
+      'safetyCriteria' in boundTccsOrOptions ||
+      'productId' in boundTccsOrOptions ||
+      ('id' in boundTccsOrOptions && !('boundTccs' in boundTccsOrOptions))
+    ) {
+      boundTccs = boundTccsOrOptions as TCCS;
+    } else {
+      const opts = boundTccsOrOptions as ResolveQualityStatusOptions;
+      boundTccs = opts.boundTccs;
+      allBatchResults = opts.allBatchResults;
+      skipSnapshot = !!opts.skipSnapshot;
+    }
+  }
+
+  // =========================================================================
+  // TẦNG 1: EVALUATION SNAPSHOT RESOLUTION (ALCOA+ Frozen State)
+  // =========================================================================
+  if (!skipSnapshot && tr.evaluationSnapshot) {
+    const snapValidation = validateEvaluationSnapshot(
+      tr.evaluationSnapshot,
+      tr as TestResult,
+      boundTccs
+    );
+    if (snapValidation.isValid) {
+      return normalizeTestResultStatus(tr.evaluationSnapshot.overallStatus);
+    }
+    // Nếu snapshot không hợp lệ (sai hash, sai tccsVersion, sai batch, hoặc results đã bị sửa đổi)
+    // -> BỎ QUA snapshot, bắt buộc rơi xuống Tầng 2 để Re-evaluate!
+  }
+
+  // =========================================================================
+  // TẦNG 2: RE-EVALUATION TỪ SOURCE DATA HIỆN TẠI (Evidence-First)
+  // =========================================================================
+  if (Array.isArray(tr.results)) {
+    // Không có kết quả kiểm nghiệm -> UNKNOWN
+    if (tr.results.length === 0) {
+      return 'UNKNOWN';
+    }
+
+    // Đánh giá đầy đủ qua calculateOverallStatusForTestResult (hỗ trợ alternateRules và multi-lab lookup)
+    const calculated = calculateOverallStatusForTestResult(
+      tr as TestResult,
+      boundTccs,
+      allBatchResults
+    );
+
+    if (calculated !== 'UNKNOWN') {
+      return calculated;
+    }
+
+    // Nếu calculateOverallStatusForTestResult trả về UNKNOWN nhưng có phần tử trong results,
+    // ta chạy fallback kiểm tra trực diện criteria
     let hasFail = false;
     let hasPending = false;
     let passCount = 0;
@@ -305,10 +392,14 @@ export function resolveTestResultStatus(testResult: unknown): CanonicalTestStatu
     if (hasFail) return 'FAIL';
     if (hasPending) return 'PENDING';
     if (passCount > 0) return 'PASS';
-    return 'PENDING';
+
+    return 'UNKNOWN';
   }
 
-  return 'UNKNOWN';
+  // =========================================================================
+  // TẦNG 3: LEGACY STORED STATUS (Chỉ dùng cho metadata-only record không có results[])
+  // =========================================================================
+  return extractStoredDocumentStatus(testResult);
 }
 
 /**
@@ -869,7 +960,7 @@ export function detectTestResultStatusMismatch(
   }
 
   // 3. Chuẩn hóa trạng thái lưu (Stored Status)
-  const storedCanonical = resolveTestResultStatus(testResult);
+  const storedCanonical = extractStoredDocumentStatus(testResult);
 
   // 4. Tính toán trạng thái thực tế theo chỉ tiêu (Computed Status)
   const computedCanonical = calculateOverallStatusForTestResult(

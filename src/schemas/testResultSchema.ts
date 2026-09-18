@@ -24,7 +24,7 @@ export const testResultFormSchema = z.object({
   batchId: z.string().trim().min(1, 'Vui lòng chọn hoặc nhập số Lô sản xuất kiểm nghiệm'),
   labName: z.string().trim().min(1, 'Đơn vị / Phòng kiểm nghiệm không được để trống'),
   testDate: z.string().trim().min(1, 'Ngày kiểm nghiệm không được để trống'),
-  overallStatus: z.enum(['PASS', 'FAIL', 'PENDING', 'UNKNOWN']).default('PENDING'),
+  overallStatus: z.enum(['PASS', 'FAIL', 'PENDING', 'UNKNOWN']).default('UNKNOWN'),
   notes: z.string().optional().default(''),
   results: z
     .array(testResultEntrySchema)

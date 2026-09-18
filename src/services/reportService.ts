@@ -7,6 +7,7 @@ import { QualityAnomaly } from '../types';
 import { lookupPharmaTerm } from '../utils/aiMapping';
 import { detectOOTForCriterion, BatchCriterionDataPoint } from '../utils/ootDetection';
 import { getXLSX } from '../utils';
+import { resolveTestResultStatus } from '../domain/test-result/testResultStatusResolver';
 
 /**
  * Định dạng ngày tháng sang DD/MM/YYYY
@@ -119,7 +120,7 @@ export const generateQualityReport = async (
   const rows: ReportRow[] = filteredResults.map((tr: any) => {
     const batch = batches.find((b: any) => b.id === tr.batchId);
     const product = products.find((p: any) => p.id === batch?.productId);
-    const isPass = tr.overallStatus === 'PASS';
+    const isPass = resolveTestResultStatus(tr) === 'PASS';
     const results = tr.results || [];
     const passItems = results.filter((r: any) => r.isPass !== false && r.value).length;
     const failItems = results.filter((r: any) => r.isPass === false).length;
@@ -141,9 +142,9 @@ export const generateQualityReport = async (
 
   // ─── Tính tóm tắt ───────────────────────────────────────────────────
   const total = rows.length;
-  const pass = filteredResults.filter((tr: any) => tr.overallStatus === 'PASS').length;
+  const pass = filteredResults.filter((tr: any) => resolveTestResultStatus(tr) === 'PASS').length;
   const fail = total - pass;
-  const passRate = total > 0 ? `${((pass / total) * 100).toFixed(1)}%` : '0%';
+  const passRate = total > 0 ? `${((pass / total) * 100).toFixed(1)}%` : 'N/A';
 
   // ─── Tạo Workbook XLSX ───────────────────────────────────────────────
   const wb = XLSX.utils.book_new();

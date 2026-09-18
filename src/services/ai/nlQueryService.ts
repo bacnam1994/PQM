@@ -3,7 +3,7 @@
  * =================
  * AI Natural Language Query Engine cho PQM.
  * Cho phép người dùng hỏi bằng tiếng Việt tự nhiên về dữ liệu hệ thống.
- * 
+ *
  * Hỗ trợ các loại truy vấn:
  * - Lọc lô: "lô nào có độ ẩm > 3%?"
  * - Thống kê: "sản phẩm nào có tỷ lệ lỗi cao nhất?"
@@ -13,12 +13,12 @@
  */
 
 export type NLQueryResultType =
-  | 'TABLE'           // Bảng danh sách kết quả
-  | 'STATS'           // Số liệu thống kê tổng hợp
-  | 'COMPARISON'      // So sánh 2 thực thể
-  | 'TIMELINE'        // Danh sách theo thời gian
-  | 'ALERT_LIST'      // Danh sách cảnh báo
-  | 'EMPTY';          // Không có kết quả
+  | 'TABLE' // Bảng danh sách kết quả
+  | 'STATS' // Số liệu thống kê tổng hợp
+  | 'COMPARISON' // So sánh 2 thực thể
+  | 'TIMELINE' // Danh sách theo thời gian
+  | 'ALERT_LIST' // Danh sách cảnh báo
+  | 'EMPTY'; // Không có kết quả
 
 export interface NLQueryColumn {
   key: string;
@@ -103,7 +103,7 @@ interface ParsedIntent {
     batchNoB?: string;
     status?: string;
     daysAhead?: number;
-    monthStr?: string;  // "tháng 7", "tháng 07/2026"
+    monthStr?: string; // "tháng 7", "tháng 07/2026"
     yearStr?: string;
     quarterStr?: string;
     percentThreshold?: number; // "độ ẩm > 3%"
@@ -114,8 +114,21 @@ interface ParsedIntent {
   keywords: string[];
 }
 
-const MONTH_WORDS = ['tháng 1','tháng 2','tháng 3','tháng 4','tháng 5','tháng 6','tháng 7','tháng 8','tháng 9','tháng 10','tháng 11','tháng 12'];
-const QUARTER_WORDS = ['quý 1','quý 2','quý 3','quý 4','q1','q2','q3','q4'];
+const MONTH_WORDS = [
+  'tháng 1',
+  'tháng 2',
+  'tháng 3',
+  'tháng 4',
+  'tháng 5',
+  'tháng 6',
+  'tháng 7',
+  'tháng 8',
+  'tháng 9',
+  'tháng 10',
+  'tháng 11',
+  'tháng 12',
+];
+const QUARTER_WORDS = ['quý 1', 'quý 2', 'quý 3', 'quý 4', 'q1', 'q2', 'q3', 'q4'];
 
 const detectIntent = (query: string): ParsedIntent => {
   const q = query.toLowerCase().trim();
@@ -172,12 +185,20 @@ const detectIntent = (query: string): ParsedIntent => {
     return { intent: 'EXPIRY_CHECK', entities, keywords: [...keywords, 'expiry'] };
   }
 
-  if ((q.includes('tỷ lệ lỗi') || q.includes('không đạt') || q.includes('fail')) && 
-      (q.includes('cao nhất') || q.includes('nhiều nhất') || q.includes('top'))) {
+  if (
+    (q.includes('tỷ lệ lỗi') || q.includes('không đạt') || q.includes('fail')) &&
+    (q.includes('cao nhất') || q.includes('nhiều nhất') || q.includes('top'))
+  ) {
     return { intent: 'FAIL_RATE', entities, keywords: [...keywords, 'fail_rate'] };
   }
 
-  if (q.includes('phòng lab') || q.includes('phòng kiểm') || q.includes('quatest') || q.includes('eurofins') || q.includes('lab')) {
+  if (
+    q.includes('phòng lab') ||
+    q.includes('phòng kiểm') ||
+    q.includes('quatest') ||
+    q.includes('eurofins') ||
+    q.includes('lab')
+  ) {
     return { intent: 'LAB_PERFORMANCE', entities, keywords: [...keywords, 'lab'] };
   }
 
@@ -186,7 +207,12 @@ const detectIntent = (query: string): ParsedIntent => {
   }
 
   if (q.includes('sản phẩm') || q.includes('lô') || q.includes('batch')) {
-    if (q.includes('xu hướng') || q.includes('biểu đồ') || q.includes('spc') || q.includes('drift')) {
+    if (
+      q.includes('xu hướng') ||
+      q.includes('biểu đồ') ||
+      q.includes('spc') ||
+      q.includes('drift')
+    ) {
       return { intent: 'CRITERIA_TREND', entities, keywords: [...keywords, 'trend'] };
     }
     if (keywords.includes('threshold_filter') || q.includes('lọc') || q.includes('tìm')) {
@@ -215,7 +241,9 @@ const fmt = (d: string) => {
   try {
     const dt = new Date(d);
     return isNaN(dt.getTime()) ? d : dt.toLocaleDateString('vi-VN');
-  } catch { return d; }
+  } catch {
+    return d;
+  }
 };
 
 const daysBetween = (d1: Date, d2: Date) => Math.round((d2.getTime() - d1.getTime()) / 86400000);
@@ -232,16 +260,16 @@ export const executeNLQuery = (query: string, ctx: NLQueryContext): NLQueryResul
   if (intent === 'EXPIRY_CHECK') {
     const days = entities.daysAhead ?? 30;
     const cutoff = new Date(now.getTime() + days * 86400000);
-    
+
     const expiring = ctx.batches
-      .filter(b => {
+      .filter((b) => {
         if (!b.expDate) return false;
         const exp = new Date(b.expDate);
         return exp >= now && exp <= cutoff;
       })
       .sort((a, b) => new Date(a.expDate).getTime() - new Date(b.expDate).getTime())
-      .map(b => {
-        const product = ctx.products.find(p => p.id === b.productId);
+      .map((b) => {
+        const product = ctx.products.find((p) => p.id === b.productId);
         const daysLeft = daysBetween(now, new Date(b.expDate));
         return {
           batchNo: b.batchNo,
@@ -267,26 +295,36 @@ export const executeNLQuery = (query: string, ctx: NLQueryContext): NLQueryResul
         { key: 'mfgDate', label: 'NSX', type: 'date' },
         { key: 'expDate', label: 'HSD', type: 'date' },
         { key: 'daysLeft', label: 'Còn lại', type: 'text' },
-        { key: 'status', label: 'Trạng thái', type: 'badge', badgeConfig: {
-          RELEASED: { color: 'green', label: 'Đã xuất' },
-          TESTING: { color: 'yellow', label: 'Đang KN' },
-          PENDING: { color: 'gray', label: 'Chờ' },
-          REJECTED: { color: 'red', label: 'Bị từ chối' },
-        }},
+        {
+          key: 'status',
+          label: 'Trạng thái',
+          type: 'badge',
+          badgeConfig: {
+            RELEASED: { color: 'green', label: 'Đã xuất' },
+            TESTING: { color: 'yellow', label: 'Đang KN' },
+            PENDING: { color: 'gray', label: 'Chờ' },
+            REJECTED: { color: 'red', label: 'Bị từ chối' },
+          },
+        },
       ],
       rows: expiring,
       totalCount: expiring.length,
-      summary: `📌 ${expiring.filter(e => parseInt(e.daysLeft) <= 7).length} lô hết hạn trong 7 ngày tới cần ưu tiên xử lý.`,
+      summary: `📌 ${expiring.filter((e) => parseInt(e.daysLeft) <= 7).length} lô hết hạn trong 7 ngày tới cần ưu tiên xử lý.`,
     };
   }
 
   // ── FAIL_RATE ────────────────────────────────────────
   if (intent === 'FAIL_RATE') {
-    const statsMap = new Map<string, { productId: string; name: string; total: number; fail: number }>();
-    ctx.products.forEach(p => statsMap.set(p.id, { productId: p.id, name: p.name, total: 0, fail: 0 }));
-    
-    ctx.testResults.forEach(r => {
-      const batch = ctx.batches.find(b => b.id === r.batchId);
+    const statsMap = new Map<
+      string,
+      { productId: string; name: string; total: number; fail: number }
+    >();
+    ctx.products.forEach((p) =>
+      statsMap.set(p.id, { productId: p.id, name: p.name, total: 0, fail: 0 })
+    );
+
+    ctx.testResults.forEach((r) => {
+      const batch = ctx.batches.find((b) => b.id === r.batchId);
       if (!batch) return;
       const entry = statsMap.get(batch.productId);
       if (!entry) return;
@@ -295,8 +333,8 @@ export const executeNLQuery = (query: string, ctx: NLQueryContext): NLQueryResul
     });
 
     const ranked = Array.from(statsMap.values())
-      .filter(e => e.total > 0)
-      .map(e => ({
+      .filter((e) => e.total > 0)
+      .map((e) => ({
         product: e.name,
         total: e.total,
         fail: e.fail,
@@ -336,7 +374,7 @@ export const executeNLQuery = (query: string, ctx: NLQueryContext): NLQueryResul
     if (entities.monthStr) {
       const month = parseInt(entities.monthStr.replace('tháng ', ''));
       const year = entities.yearStr ? parseInt(entities.yearStr) : now.getFullYear();
-      filtered = filtered.filter(r => {
+      filtered = filtered.filter((r) => {
         if (!r.testDate) return false;
         const d = new Date(r.testDate);
         return d.getMonth() + 1 === month && d.getFullYear() === year;
@@ -346,9 +384,14 @@ export const executeNLQuery = (query: string, ctx: NLQueryContext): NLQueryResul
     // Lọc theo quý
     if (entities.quarterStr) {
       const q = parseInt(entities.quarterStr);
-      const qMonths: Record<number, number[]> = { 1: [1,2,3], 2: [4,5,6], 3: [7,8,9], 4: [10,11,12] };
+      const qMonths: Record<number, number[]> = {
+        1: [1, 2, 3],
+        2: [4, 5, 6],
+        3: [7, 8, 9],
+        4: [10, 11, 12],
+      };
       const year = entities.yearStr ? parseInt(entities.yearStr) : now.getFullYear();
-      filtered = filtered.filter(r => {
+      filtered = filtered.filter((r) => {
         if (!r.testDate) return false;
         const d = new Date(r.testDate);
         return d.getFullYear() === year && qMonths[q]?.includes(d.getMonth() + 1);
@@ -358,9 +401,9 @@ export const executeNLQuery = (query: string, ctx: NLQueryContext): NLQueryResul
     const rows = filtered
       .sort((a, b) => (b.testDate || '').localeCompare(a.testDate || ''))
       .slice(0, 50)
-      .map(r => {
-        const batch = ctx.batches.find(b => b.id === r.batchId);
-        const product = batch ? ctx.products.find(p => p.id === batch.productId) : null;
+      .map((r) => {
+        const batch = ctx.batches.find((b) => b.id === r.batchId);
+        const product = batch ? ctx.products.find((p) => p.id === batch.productId) : null;
         return {
           testDate: fmt(r.testDate),
           batchNo: batch?.batchNo || r.batchId,
@@ -372,7 +415,10 @@ export const executeNLQuery = (query: string, ctx: NLQueryContext): NLQueryResul
       });
 
     if (rows.length === 0) {
-      return { type: 'EMPTY', message: 'Không tìm thấy phiếu kiểm nghiệm phù hợp với điều kiện lọc.' };
+      return {
+        type: 'EMPTY',
+        message: 'Không tìm thấy phiếu kiểm nghiệm phù hợp với điều kiện lọc.',
+      };
     }
 
     return {
@@ -384,10 +430,15 @@ export const executeNLQuery = (query: string, ctx: NLQueryContext): NLQueryResul
         { key: 'batchNo', label: 'Số lô', type: 'text' },
         { key: 'product', label: 'Sản phẩm', type: 'text' },
         { key: 'labName', label: 'Đơn vị KN', type: 'text' },
-        { key: 'status', label: 'Kết quả', type: 'badge', badgeConfig: {
-          PASS: { color: 'green', label: 'ĐẠT' },
-          FAIL: { color: 'red', label: 'KHÔNG ĐẠT' },
-        }},
+        {
+          key: 'status',
+          label: 'Kết quả',
+          type: 'badge',
+          badgeConfig: {
+            PASS: { color: 'green', label: 'ĐẠT' },
+            FAIL: { color: 'red', label: 'KHÔNG ĐẠT' },
+          },
+        },
         { key: 'criteriaCount', label: 'Số chỉ tiêu', type: 'number' },
       ],
       rows,
@@ -397,16 +448,19 @@ export const executeNLQuery = (query: string, ctx: NLQueryContext): NLQueryResul
 
   // ── COMPARISON ────────────────────────────────────────
   if (intent === 'COMPARISON' && entities.batchNoA && entities.batchNoB) {
-    const batchA = ctx.batches.find(b => b.batchNo?.toUpperCase() === entities.batchNoA);
-    const batchB = ctx.batches.find(b => b.batchNo?.toUpperCase() === entities.batchNoB);
+    const batchA = ctx.batches.find((b) => b.batchNo?.toUpperCase() === entities.batchNoA);
+    const batchB = ctx.batches.find((b) => b.batchNo?.toUpperCase() === entities.batchNoB);
 
     if (!batchA || !batchB) {
-      return { type: 'EMPTY', message: `Không tìm thấy lô "${entities.batchNoA}" hoặc "${entities.batchNoB}" trong hệ thống.` };
+      return {
+        type: 'EMPTY',
+        message: `Không tìm thấy lô "${entities.batchNoA}" hoặc "${entities.batchNoB}" trong hệ thống.`,
+      };
     }
 
-    const resultsA = ctx.testResults.filter(r => r.batchId === batchA.id);
-    const resultsB = ctx.testResults.filter(r => r.batchId === batchB.id);
-    
+    const resultsA = ctx.testResults.filter((r) => r.batchId === batchA.id);
+    const resultsB = ctx.testResults.filter((r) => r.batchId === batchB.id);
+
     const latestA = resultsA.sort((a, b) => b.testDate.localeCompare(a.testDate))[0];
     const latestB = resultsB.sort((a, b) => b.testDate.localeCompare(a.testDate))[0];
 
@@ -414,15 +468,23 @@ export const executeNLQuery = (query: string, ctx: NLQueryContext): NLQueryResul
       return { type: 'EMPTY', message: 'Một trong hai lô chưa có kết quả kiểm nghiệm để so sánh.' };
     }
 
-    const mapA = new Map<string, any>((latestA.results || []).map((r: any) => [r.criteriaName?.toLowerCase(), r]));
-    const criteriaNames = [...new Set([...(latestA.results || []), ...(latestB.results || [])].map((r: any) => r.criteriaName))];
+    const mapA = new Map<string, any>(
+      (latestA.results || []).map((r: any) => [r.criteriaName?.toLowerCase(), r])
+    );
+    const criteriaNames = [
+      ...new Set(
+        [...(latestA.results || []), ...(latestB.results || [])].map((r: any) => r.criteriaName)
+      ),
+    ];
 
-    const rows = criteriaNames.map(name => {
+    const rows = criteriaNames.map((name) => {
       const rA = mapA.get(name?.toLowerCase());
-      const rB = (latestB.results || []).find((r: any) => r.criteriaName?.toLowerCase() === name?.toLowerCase());
+      const rB = (latestB.results || []).find(
+        (r: any) => r.criteriaName?.toLowerCase() === name?.toLowerCase()
+      );
       const valA = rA ? (rA as any).value : '---';
       const valB = rB ? (rB as any).value : '---';
-      
+
       let delta = '---';
       let winner: 'A' | 'B' | 'TIE' | undefined;
       if (valA !== '---' && valB !== '---') {
@@ -453,10 +515,11 @@ export const executeNLQuery = (query: string, ctx: NLQueryContext): NLQueryResul
     const totalProducts = ctx.products.length;
     const totalBatches = ctx.batches.length;
     const totalTests = ctx.testResults.length;
-    const failTests = ctx.testResults.filter(r => r.overallStatus === 'FAIL').length;
-    const passRate = totalTests > 0 ? ((totalTests - failTests) / totalTests * 100).toFixed(1) : '100';
+    const failTests = ctx.testResults.filter((r) => r.overallStatus === 'FAIL').length;
+    const passRate =
+      totalTests > 0 ? (((totalTests - failTests) / totalTests) * 100).toFixed(1) : null;
 
-    const expiring30 = ctx.batches.filter(b => {
+    const expiring30 = ctx.batches.filter((b) => {
       if (!b.expDate) return false;
       const d = new Date(b.expDate);
       return d >= now && d <= new Date(now.getTime() + 30 * 86400000);
@@ -469,18 +532,23 @@ export const executeNLQuery = (query: string, ctx: NLQueryContext): NLQueryResul
         { label: 'Tổng sản phẩm', value: totalProducts, highlight: false },
         { label: 'Tổng lô sản xuất', value: totalBatches, highlight: false },
         { label: 'Phiếu kiểm nghiệm', value: totalTests, highlight: false },
-        { label: 'Tỷ lệ đạt', value: passRate + '%', highlight: true, trend: parseFloat(passRate) >= 90 ? 'STABLE' : 'DOWN' },
+        {
+          label: 'Tỷ lệ đạt',
+          value: passRate !== null ? passRate + '%' : 'N/A',
+          highlight: true,
+          trend: passRate && parseFloat(passRate) >= 90 ? 'STABLE' : 'DOWN',
+        },
         { label: 'Phiếu không đạt', value: failTests, highlight: failTests > 0 },
         { label: 'Lô sắp hết hạn (30 ngày)', value: expiring30, highlight: expiring30 > 0 },
       ],
-      summary: `Hệ thống đang quản lý ${totalProducts} sản phẩm với ${totalBatches} lô sản xuất. Tỷ lệ đạt chất lượng tổng thể: **${passRate}%**.`,
+      summary: `Hệ thống đang quản lý ${totalProducts} sản phẩm với ${totalBatches} lô sản xuất. Tỷ lệ đạt chất lượng tổng thể: **${passRate !== null ? passRate + '%' : 'Chưa có dữ liệu'}**.`,
     };
   }
 
   // ── LAB_PERFORMANCE ────────────────────────────────────────
   if (intent === 'LAB_PERFORMANCE') {
     const labMap = new Map<string, { total: number; fail: number }>();
-    ctx.testResults.forEach(r => {
+    ctx.testResults.forEach((r) => {
       const lab = r.labName || 'Không xác định';
       const entry = labMap.get(lab) || { total: 0, fail: 0 };
       entry.total++;
@@ -522,8 +590,9 @@ export const executeNLQuery = (query: string, ctx: NLQueryContext): NLQueryResul
       { label: 'Sản phẩm', value: ctx.products.length },
       { label: 'Lô sản xuất', value: ctx.batches.length },
       { label: 'Phiếu kiểm nghiệm', value: ctx.testResults.length },
-      { label: 'TCCS đang áp dụng', value: ctx.tccsList.filter(t => t.isActive).length },
+      { label: 'TCCS đang áp dụng', value: ctx.tccsList.filter((t) => t.isActive).length },
     ],
-    summary: 'Bạn có thể hỏi tôi các câu như: "Lô nào hết hạn trong 30 ngày?", "Sản phẩm nào có tỷ lệ lỗi cao nhất?", "Phiếu kiểm nghiệm tháng 7 của sản phẩm X?"',
+    summary:
+      'Bạn có thể hỏi tôi các câu như: "Lô nào hết hạn trong 30 ngày?", "Sản phẩm nào có tỷ lệ lỗi cao nhất?", "Phiếu kiểm nghiệm tháng 7 của sản phẩm X?"',
   };
 };
