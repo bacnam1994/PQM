@@ -102,7 +102,7 @@ const statusFromTestResult = (trOrStatus: any): GenealogyNodeStatus => {
  * Xây dựng cây Genealogy cho một lô sản xuất
  */
 export const buildBatchGenealogy = (ctx: GenealogyContext): BatchGenealogyReport => {
-  const { batch, product, tccs, formula, rawMaterials, testResults } = ctx;
+  const { batch, product, tccs, formula, rawMaterials = [], testResults = [] } = ctx;
   const now = new Date().toISOString();
   const missingLinks: string[] = [];
   const riskReasons: string[] = [];

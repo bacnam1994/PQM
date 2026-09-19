@@ -11,6 +11,11 @@ export default defineConfig(({ mode }) => ({
     globals: true,
     environment: 'jsdom',
     setupFiles: './src/setupTests.ts',
+    include: [
+      'src/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}',
+      'tests/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}',
+    ],
+    exclude: ['**/node_modules/**', '**/dist/**', '**/e2e/**', '**/store/test-result-form.spec.ts'],
   },
   plugins: [react()],
   build: {

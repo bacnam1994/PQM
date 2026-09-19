@@ -3,10 +3,13 @@ import { ref, set, remove, update, query, orderByChild, equalTo, get } from 'fir
 import { deleteMultipleStorageFiles } from './storageService';
 
 /**
- * Ghi một bản ghi vào đường dẫn cụ thể
+ * @deprecated @forbidden CẤM GỌI TRỰC TIẾP saveItem
+ * Mọi thao tác ghi dữ liệu có kiểm soát phải thông qua Repository và Application Service tương ứng.
  */
 export const saveItem = async (path: string, id: string, data: any) => {
-  await set(ref(db, `${path}/${id}`), data);
+  throw new Error(
+    `[FORBIDDEN DIRECT WRITE] Cấm gọi trực tiếp saveItem('${path}', '${id}'). Mọi thao tác ghi dữ liệu phải qua Application Service và Repository để đảm bảo thẩm định quyền hạn, nghiệp vụ và Audit Trail ALCOA+.`
+  );
 };
 
 /**
@@ -17,10 +20,14 @@ export const deleteItemService = async (path: string, id: string) => {
 };
 
 /**
- * Cập nhật trạng thái của một Lô
+ * @deprecated @forbidden CẤM GỌI TRỰC TIẾP updateBatchStatusService
+ * Chuyển trạng thái Lô sản xuất bắt buộc phải thông qua BatchAppService.updateStatus
+ * để bảo đảm thẩm tra BatchStateMachine, Release Gate và Audit Trail.
  */
 export const updateBatchStatusService = async (id: string, status: string) => {
-  await set(ref(db, `batches/${id}/status`), status);
+  throw new Error(
+    `[FORBIDDEN STATUS MUTATION] Cấm gọi trực tiếp updateBatchStatusService('${id}', '${status}'). Vui lòng sử dụng batchAppService.updateStatus() để đảm bảo quy trình State Machine và Audit Trail.`
+  );
 };
 
 /**
@@ -30,7 +37,7 @@ export const updateBatchStatusService = async (id: string, status: string) => {
 export const deleteProductService = async (id: string) => {
   const updates: Record<string, any> = {};
   const storageUrlsToDelete: string[] = [];
-  
+
   // 1. Kiểm tra ảnh sản phẩm cần dọn dẹp
   const productSnap = await get(ref(db, `products/${id}`));
   if (productSnap.exists()) {
@@ -45,7 +52,7 @@ export const deleteProductService = async (id: string) => {
   const formulaQuery = query(ref(db, 'product_formulas'), orderByChild('productId'), equalTo(id));
   const formulaSnap = await get(formulaQuery);
   if (formulaSnap.exists()) {
-    Object.keys(formulaSnap.val()).forEach(key => updates[`product_formulas/${key}`] = null);
+    Object.keys(formulaSnap.val()).forEach((key) => (updates[`product_formulas/${key}`] = null));
   }
 
   // 3. Xóa TCCS liên quan và các Criteria Alias của TCCS đó
@@ -59,7 +66,9 @@ export const deleteProductService = async (id: string) => {
       const aliasQuery = query(ref(db, 'criteria_aliases'), orderByChild('tccsId'), equalTo(tKey));
       const aliasSnap = await get(aliasQuery);
       if (aliasSnap.exists()) {
-        Object.keys(aliasSnap.val()).forEach(aKey => updates[`criteria_aliases/${aKey}`] = null);
+        Object.keys(aliasSnap.val()).forEach(
+          (aKey) => (updates[`criteria_aliases/${aKey}`] = null)
+        );
       }
     }
   }
@@ -67,29 +76,29 @@ export const deleteProductService = async (id: string) => {
   // 4. Xóa Lô và dữ liệu con của Lô (Kết quả kiểm nghiệm)
   const batchesQuery = query(ref(db, 'batches'), orderByChild('productId'), equalTo(id));
   const batchesSnap = await get(batchesQuery);
-  
+
   if (batchesSnap.exists()) {
     const batches = batchesSnap.val();
     const batchIds = Object.keys(batches);
-    
+
     for (const bid of batchIds) {
-        updates[`batches/${bid}`] = null;
-        
-        // Tìm và xóa Test Results của Lô, thu thập attachment URLs
-        const resultsQuery = query(ref(db, 'testResults'), orderByChild('batchId'), equalTo(bid));
-        const resultsSnap = await get(resultsQuery);
-        if (resultsSnap.exists()) {
-          const results = resultsSnap.val();
-          Object.keys(results).forEach(k => {
-            updates[`testResults/${k}`] = null;
-            const res = results[k];
-            if (res && Array.isArray(res.attachments)) {
-              res.attachments.forEach((att: any) => {
-                if (att?.url && att?.source !== 'google_drive') storageUrlsToDelete.push(att.url);
-              });
-            }
-          });
-        }
+      updates[`batches/${bid}`] = null;
+
+      // Tìm và xóa Test Results của Lô, thu thập attachment URLs
+      const resultsQuery = query(ref(db, 'testResults'), orderByChild('batchId'), equalTo(bid));
+      const resultsSnap = await get(resultsQuery);
+      if (resultsSnap.exists()) {
+        const results = resultsSnap.val();
+        Object.keys(results).forEach((k) => {
+          updates[`testResults/${k}`] = null;
+          const res = results[k];
+          if (res && Array.isArray(res.attachments)) {
+            res.attachments.forEach((att: any) => {
+              if (att?.url && att?.source !== 'google_drive') storageUrlsToDelete.push(att.url);
+            });
+          }
+        });
+      }
     }
   }
 
@@ -98,7 +107,7 @@ export const deleteProductService = async (id: string) => {
 
   // Dọn dẹp tệp tin mồ côi trên Storage (bất đồng bộ không block giao diện)
   if (storageUrlsToDelete.length > 0) {
-    deleteMultipleStorageFiles(storageUrlsToDelete).catch(err => {
+    deleteMultipleStorageFiles(storageUrlsToDelete).catch((err) => {
       console.warn('Lỗi dọn dẹp Storage trong deleteProductService:', err);
     });
   }
@@ -111,12 +120,12 @@ export const deleteBatchService = async (id: string) => {
   const updates: Record<string, any> = {};
   const storageUrlsToDelete: string[] = [];
   updates[`batches/${id}`] = null;
-  
+
   const resultsQuery = query(ref(db, 'testResults'), orderByChild('batchId'), equalTo(id));
   const resultsSnap = await get(resultsQuery);
   if (resultsSnap.exists()) {
     const results = resultsSnap.val();
-    Object.keys(results).forEach(k => {
+    Object.keys(results).forEach((k) => {
       updates[`testResults/${k}`] = null;
       const res = results[k];
       if (res && Array.isArray(res.attachments)) {
@@ -130,7 +139,7 @@ export const deleteBatchService = async (id: string) => {
   await update(ref(db), updates);
 
   if (storageUrlsToDelete.length > 0) {
-    deleteMultipleStorageFiles(storageUrlsToDelete).catch(err => {
+    deleteMultipleStorageFiles(storageUrlsToDelete).catch((err) => {
       console.warn('Lỗi dọn dẹp Storage trong deleteBatchService:', err);
     });
   }
@@ -155,7 +164,7 @@ export const deleteTestResultService = async (id: string) => {
   await remove(ref(db, `testResults/${id}`));
 
   if (storageUrlsToDelete.length > 0) {
-    deleteMultipleStorageFiles(storageUrlsToDelete).catch(err => {
+    deleteMultipleStorageFiles(storageUrlsToDelete).catch((err) => {
       console.warn('Lỗi dọn dẹp Storage trong deleteTestResultService:', err);
     });
   }

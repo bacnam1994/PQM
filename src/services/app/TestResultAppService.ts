@@ -4,7 +4,7 @@
  * Tự động đánh giá Đạt/Không đạt, ALCOA+ Audit Trail & Optimistic Concurrency Control (OCC)
  */
 
-import { TestResult, Batch } from '../../types';
+import { TestResult, Batch, TestResultWorkflowStatus } from '../../types';
 import { ITestResultRepository } from '../../repositories/TestResultRepository';
 import { testResultRepository as defaultTestResultRepo } from '../../repositories/firebase/FirebaseTestResultRepository';
 import {
@@ -19,6 +19,10 @@ import {
   resolveTestResultStatus,
   calculateOverallStatusForTestResult,
 } from '../../domain/test-result/testResultStatusResolver';
+import {
+  TestResultWorkflowStateMachine,
+  QualityWorkflowMatrixGuard,
+} from '../../domain/workflow/stateMachine';
 
 export class TestResultAppService {
   constructor(
@@ -202,10 +206,87 @@ export class TestResultAppService {
   }
 
   /**
+   * Cập nhật trạng thái quy trình tài liệu (Workflow State Machine)
+   * Kiểm soát: DRAFT -> SUBMITTED -> FINAL -> APPROVED -> RELEASED -> SUPERSEDED
+   * Và đối chiếu Ma trận Chất lượng × Quy trình (Quality × Workflow Matrix)
+   */
+  async updateWorkflowStatus(
+    id: string,
+    newWorkflowStatus: TestResultWorkflowStatus,
+    currentUser: any,
+    options?: {
+      reason?: string;
+      oldTestResult?: TestResult;
+      batch?: Batch;
+    }
+  ): Promise<void> {
+    const current = options?.oldTestResult || (await this.repo.findById(id));
+    if (!current) {
+      throw new Error(`Không tìm thấy Phiếu kiểm nghiệm với mã: ${id}`);
+    }
+
+    const currentWorkflowStatus: TestResultWorkflowStatus = current.workflowStatus || 'DRAFT';
+
+    // 1. Thẩm tra bước chuyển trạng thái quy trình (FSM)
+    const transitionCheck = TestResultWorkflowStateMachine.canTransition(
+      currentWorkflowStatus,
+      newWorkflowStatus,
+      {
+        actorRole: currentUser?.role,
+        actorId: currentUser?.uid,
+        reason: options?.reason,
+      }
+    );
+    if (!transitionCheck.allowed) {
+      throw new Error(`Quy chuẩn State Machine Phiếu KN: ${transitionCheck.reason}`);
+    }
+
+    // 2. Thẩm tra Ma trận Chất lượng × Quy trình (Quality × Workflow Matrix)
+    const qualityStatus = resolveTestResultStatus(current);
+    const matrixCheck = QualityWorkflowMatrixGuard.validate(newWorkflowStatus, qualityStatus);
+    if (!matrixCheck.allowed) {
+      throw new Error(`Ma trận Chất lượng × Quy trình: ${matrixCheck.reason}`);
+    }
+
+    // 3. Yêu cầu lý do đối với SUPERSEDED
+    if (newWorkflowStatus === 'SUPERSEDED' && (!options?.reason || !options.reason.trim())) {
+      throw new Error(
+        'Đánh dấu thay thế phiếu kiểm nghiệm (SUPERSEDED) bắt buộc phải có lý do giải trình.'
+      );
+    }
+
+    const newVersion = nextVersion(current.version ?? 1);
+    const cleanResult: TestResult = {
+      ...current,
+      workflowStatus: newWorkflowStatus,
+      version: newVersion,
+      updatedAt: new Date().toISOString(),
+    };
+
+    await this.repo.update(cleanResult);
+
+    logAuditAction({
+      action: 'UPDATE',
+      collection: 'TEST_RESULTS',
+      documentId: id,
+      details: `Chuyển trạng thái quy trình phiếu KN: ${currentWorkflowStatus} -> ${newWorkflowStatus}${options?.reason ? ` (Lý do: ${options.reason})` : ''}`,
+      performedBy: currentUser?.email || 'unknown',
+    });
+  }
+
+  /**
    * Xóa Phiếu kiểm nghiệm
    */
   async deleteTestResult(id: string, currentUser: any, oldTestResult?: TestResult): Promise<void> {
-    if (!can(currentUser, 'test_result:delete', oldTestResult)) {
+    const current = oldTestResult || (await this.repo.findById(id));
+
+    if (current?.workflowStatus === 'APPROVED' || current?.workflowStatus === 'RELEASED') {
+      throw new Error(
+        'Từ chối thao tác: Không thể xóa Phiếu kiểm nghiệm đã được phê duyệt (APPROVED) hoặc xuất xưởng (RELEASED). Theo quy chuẩn ALCOA+ và Part 11, phiếu chỉ có thể được thay thế (SUPERSEDED) kèm biên bản CAPA/Deviation.'
+      );
+    }
+
+    if (!can(currentUser, 'test_result:delete', current)) {
       throw new Error('Từ chối quyền: Bạn không có quyền xóa phiếu kiểm nghiệm này.');
     }
 

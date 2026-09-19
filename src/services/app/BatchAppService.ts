@@ -12,6 +12,7 @@ import { logAuditAction } from '../auditService';
 import { validateOptimisticLock, nextVersion } from '../../utils/concurrency';
 import { signatureService } from '../signatureService';
 import { BatchRules } from '../../domain/rules';
+import { BatchStateMachine } from '../../domain/workflow/stateMachine';
 
 export interface BatchCreationContext {
   activeTCCS?: TCCS;
@@ -169,24 +170,41 @@ export class BatchAppService {
       requireSignature?: boolean;
     }
   ): Promise<void> {
+    const currentBatch = options?.currentBatch || (await this.repo.findById(batchId));
+    if (!currentBatch) {
+      throw new Error(`Không tìm thấy Lô sản xuất với mã: ${batchId}`);
+    }
+
     // 1. Phân quyền chuyển đổi trạng thái
     if (status === 'RELEASED') {
-      if (!can(currentUser, 'batch:release', options?.currentBatch)) {
+      if (!can(currentUser, 'batch:release', currentBatch)) {
         throw new Error(
           'Từ chối quyền: Chỉ bộ phận QA hoặc Quản trị viên mới có thẩm quyền phê duyệt xuất xưởng (Release) lô.'
         );
       }
     } else if (status === 'REJECTED') {
-      if (!can(currentUser, 'batch:reject', options?.currentBatch)) {
+      if (!can(currentUser, 'batch:reject', currentBatch)) {
         throw new Error('Từ chối quyền: Bạn không có quyền từ chối (Reject) lô sản xuất.');
       }
     } else {
-      if (!can(currentUser, 'batch:update', options?.currentBatch)) {
+      if (!can(currentUser, 'batch:update', currentBatch)) {
         throw new Error('Từ chối quyền: Bạn không có quyền cập nhật trạng thái lô sản xuất.');
       }
     }
 
-    // 2. Kiểm tra chữ ký điện tử (FDA 21 CFR Part 11 Compliance)
+    // 2. Thẩm tra quy tắc chuyển trạng thái FSM (BatchStateMachine)
+    // Cấm nhảy cóc trạng thái hoặc chuyển đổi trái phép (vd: PENDING -> RELEASED, RELEASED -> PENDING)
+    const transitionCheck = BatchStateMachine.canTransition(currentBatch.status, status, {
+      actorRole: currentUser?.role,
+      actorId: currentUser?.uid,
+      reason: options?.reason,
+      conditionsMet: status === 'RELEASED' ? true : undefined,
+    });
+    if (!transitionCheck.allowed) {
+      throw new Error(`Quy chuẩn State Machine: ${transitionCheck.reason}`);
+    }
+
+    // 3. Kiểm tra chữ ký điện tử (FDA 21 CFR Part 11 Compliance)
     if (status === 'RELEASED') {
       if (options?.requireSignature && !options?.signature) {
         throw new Error(
@@ -207,14 +225,14 @@ export class BatchAppService {
       }
     }
 
-    // 3. Ràng buộc bảo toàn dữ liệu & GMP Release Guard:
+    // 4. Ràng buộc bảo toàn dữ liệu & GMP Release Guard:
     // Thẩm định qua Domain BatchRules & Canonical Quality Resolver
-    if (status === 'RELEASED' && options?.currentBatch) {
+    if (status === 'RELEASED') {
       const releaseDecision = BatchRules.canRelease(
-        options.currentBatch,
+        currentBatch,
         options?.batchTestResults || [],
         currentUser?.role,
-        (options?.currentBatch as any)?.tccs
+        (currentBatch as any)?.tccs
       );
       if (!releaseDecision.allowed) {
         throw new Error(
@@ -229,7 +247,7 @@ export class BatchAppService {
       action: 'UPDATE',
       collection: 'BATCHES',
       documentId: batchId,
-      details: `Chuyển trạng thái lô: ${options?.currentBatch?.batchNo || batchId} -> ${status}${options?.reason ? ` (Lý do: ${options.reason})` : ''}${options?.signature ? ` [Đã ký điện tử: ${options.signature.signerEmail}]` : ''}`,
+      details: `Chuyển trạng thái lô: ${currentBatch.batchNo || batchId} -> ${status}${options?.reason ? ` (Lý do: ${options.reason})` : ''}${options?.signature ? ` [Đã ký điện tử: ${options.signature.signerEmail}]` : ''}`,
       performedBy: currentUser?.email || 'unknown',
     });
   }
@@ -250,6 +268,13 @@ export class BatchAppService {
   async deleteBatch(id: string, currentUser: any, batchNo?: string): Promise<void> {
     if (!can(currentUser, 'batch:delete')) {
       throw new Error('Từ chối quyền: Chỉ Quản trị viên mới có quyền xóa dữ liệu lô sản xuất.');
+    }
+
+    const targetBatch = await this.repo.findById(id);
+    if (targetBatch?.status === 'RELEASED') {
+      throw new Error(
+        'Từ chối thao tác: Không thể xóa Lô đã xuất xưởng (RELEASED). Chỉ có thể thu hồi (Recall/Blocked) theo quy định GMP.'
+      );
     }
 
     await this.repo.delete(id);

@@ -23,9 +23,14 @@ import { db } from '../../firebase';
 import { IRepository, PaginationOptions, QueryFilter, PaginatedResult } from '../types';
 import { removeUndefined } from '../../utils';
 import { paginateDataset, applyFilters } from '../utils/paginationHelper';
+import { getQueryPolicy, FailClosedQueryError, QueryPolicy } from '../queryPolicy';
 
 export abstract class BaseFirebaseRepository<T extends { id: string }> implements IRepository<T> {
   protected abstract readonly collectionPath: string;
+
+  protected get queryPolicy(): QueryPolicy {
+    return getQueryPolicy(this.collectionPath);
+  }
 
   async findById(id: string): Promise<T | null> {
     if (!id) return null;
@@ -67,7 +72,14 @@ export abstract class BaseFirebaseRepository<T extends { id: string }> implement
           const boundedQuery = query(ref(db, this.collectionPath), limitToLast(500));
           const snap = await get(boundedQuery);
           candidateItems = snap.exists() ? (Object.values(snap.val()) as T[]) : [];
-        } catch {
+        } catch (err) {
+          if (this.queryPolicy.noFullScanFallback) {
+            throw new FailClosedQueryError(
+              this.collectionPath,
+              'findPaginated.compoundCandidates',
+              err
+            );
+          }
           candidateItems = await this.findAll();
         }
       }
@@ -158,6 +170,9 @@ export abstract class BaseFirebaseRepository<T extends { id: string }> implement
         prevCursorId: paginatedItems.length > 0 ? (paginatedItems[0] as any).id : null,
       };
     } catch (err) {
+      if (this.queryPolicy.noFullScanFallback) {
+        throw new FailClosedQueryError(this.collectionPath, 'findPaginated', err);
+      }
       console.warn(
         `[Repository] Phân trang Server-side lỗi hoặc chưa đánh chỉ mục trên ${this.collectionPath}, fallback:`,
         err
@@ -184,7 +199,10 @@ export abstract class BaseFirebaseRepository<T extends { id: string }> implement
       try {
         const snap = await get(query(ref(db, this.collectionPath), limitToLast(500)));
         candidateItems = snap.exists() ? (Object.values(snap.val()) as T[]) : [];
-      } catch {
+      } catch (err) {
+        if (this.queryPolicy.noFullScanFallback) {
+          throw new FailClosedQueryError(this.collectionPath, 'count.candidate', err);
+        }
         candidateItems = await this.findAll();
       }
     }
@@ -210,6 +228,13 @@ export abstract class BaseFirebaseRepository<T extends { id: string }> implement
       const val = snapshot.val();
       return Object.values(val) as T[];
     } catch (err) {
+      if (this.queryPolicy.noFullScanFallback) {
+        throw new FailClosedQueryError(
+          this.collectionPath,
+          `findByRelation(${String(foreignKey)})`,
+          err
+        );
+      }
       console.warn(
         `[Repository] findByRelation trên ${this.collectionPath}.${String(foreignKey)} fallback findAll:`,
         err

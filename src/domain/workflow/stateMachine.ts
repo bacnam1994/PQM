@@ -14,6 +14,7 @@
 
 import { BatchStatus, TestResultStatus } from '../canonical/canonicalStatus';
 import { Role } from '../../types/permissions';
+import { TestResultWorkflowStatus, CanonicalQualityStatus } from '../../types/testResult';
 
 export interface StateTransitionResult<TState> {
   success: boolean;
@@ -363,5 +364,195 @@ export class WorkflowValidator {
       isValid: violations.length === 0,
       violations,
     };
+  }
+}
+
+// ============================================================
+// 10d. TestResultWorkflowStateMachine (Document Lifecycle FSM)
+// ============================================================
+export class TestResultWorkflowStateMachine {
+  /**
+   * Ma trận chuyển đổi vòng đời quy trình tài liệu theo PQM_STATE_TRANSITION_MATRIX.md
+   * DRAFT -> SUBMITTED | SUPERSEDED
+   * SUBMITTED -> DRAFT | FINAL | SUPERSEDED
+   * FINAL -> APPROVED | SUPERSEDED
+   * APPROVED -> RELEASED | SUPERSEDED
+   * RELEASED -> SUPERSEDED
+   * REJECTED -> DRAFT | SUPERSEDED
+   * SUPERSEDED -> [] (Trạng thái kết thúc tuyệt đối)
+   */
+  private static readonly VALID_TRANSITIONS: Record<
+    TestResultWorkflowStatus,
+    TestResultWorkflowStatus[]
+  > = {
+    DRAFT: ['SUBMITTED', 'SUPERSEDED'],
+    SUBMITTED: ['DRAFT', 'FINAL', 'SUPERSEDED'],
+    FINAL: ['APPROVED', 'SUPERSEDED'],
+    APPROVED: ['RELEASED', 'SUPERSEDED'],
+    RELEASED: ['SUPERSEDED'],
+    REJECTED: ['DRAFT', 'SUPERSEDED'],
+    SUPERSEDED: [],
+  };
+
+  /** Thẩm quyền vai trò bắt buộc cho từng bước nhảy quy trình */
+  private static readonly ROLE_REQUIREMENTS: Partial<
+    Record<TestResultWorkflowStatus, Partial<Record<TestResultWorkflowStatus, string[]>>>
+  > = {
+    DRAFT: {
+      SUBMITTED: ['LAB', 'QC', 'QA', 'ADMIN'],
+    },
+    SUBMITTED: {
+      DRAFT: ['LAB', 'QC', 'QA', 'ADMIN'],
+      FINAL: ['QC', 'QA', 'ADMIN'],
+    },
+    FINAL: {
+      APPROVED: ['QA', 'ADMIN'],
+    },
+    APPROVED: {
+      RELEASED: ['QA', 'ADMIN'],
+    },
+  };
+
+  public static getValidNextStates(
+    fromState: TestResultWorkflowStatus
+  ): TestResultWorkflowStatus[] {
+    return this.VALID_TRANSITIONS[fromState] || [];
+  }
+
+  public static canTransition(
+    fromState: TestResultWorkflowStatus,
+    toState: TestResultWorkflowStatus,
+    context?: TransitionContext
+  ): { allowed: boolean; reason?: string } {
+    if (fromState === toState) {
+      return { allowed: true };
+    }
+
+    if (fromState === 'SUPERSEDED') {
+      return {
+        allowed: false,
+        reason:
+          'Phiếu kiểm nghiệm đã SUPERSEDED là trạng thái kết thúc bất biến — cấm chuyển đổi tiếp.',
+      };
+    }
+
+    const validNext = this.VALID_TRANSITIONS[fromState] || [];
+    if (!validNext.includes(toState)) {
+      return {
+        allowed: false,
+        reason: `Chuyển đổi quy trình không hợp lệ: Không thể chuyển từ ${fromState} sang ${toState}.`,
+      };
+    }
+
+    // Kiểm tra vai trò
+    const allowedRoles = this.ROLE_REQUIREMENTS[fromState]?.[toState];
+    if (allowedRoles && context?.actorRole) {
+      const roleStr = String(context.actorRole).toUpperCase();
+      if (!allowedRoles.includes(roleStr) && roleStr !== 'ADMIN') {
+        return {
+          allowed: false,
+          reason: `Vai trò ${context.actorRole} không có thẩm quyền chuyển trạng thái quy trình từ ${fromState} sang ${toState}. Yêu cầu: ${allowedRoles.join(', ')}.`,
+        };
+      }
+    }
+
+    return { allowed: true };
+  }
+
+  public static transition(
+    fromState: TestResultWorkflowStatus,
+    toState: TestResultWorkflowStatus,
+    action: string,
+    context?: TransitionContext
+  ): StateTransitionResult<TestResultWorkflowStatus> {
+    const check = this.canTransition(fromState, toState, context);
+    if (!check.allowed) {
+      return {
+        success: false,
+        fromState,
+        toState,
+        action,
+        error: check.reason,
+        timestamp: new Date().toISOString(),
+        requiresAuditRecord: true,
+      };
+    }
+
+    return {
+      success: true,
+      fromState,
+      toState,
+      action,
+      timestamp: new Date().toISOString(),
+      requiresAuditRecord: ['FINAL', 'APPROVED', 'RELEASED', 'SUPERSEDED'].includes(toState),
+    };
+  }
+}
+
+// ============================================================
+// 10e. QualityWorkflowMatrixGuard (Quality × Workflow Matrix)
+// ============================================================
+export class QualityWorkflowMatrixGuard {
+  /**
+   * Thẩm tra tính hợp lệ giữa QualityStatus và WorkflowStatus
+   * Theo bảng ma trận Section 10 PQM_SYSTEM_WORKFLOW_MASTER.md:
+   *
+   * WorkflowStatus | UNKNOWN | PENDING | PASS | FAIL
+   * DRAFT          |    OK   |   OK    |  OK  |  OK
+   * SUBMITTED      |  FORBID |   OK    |  OK  |  OK
+   * FINAL          |  FORBID | FORBID  |  OK  |  OK
+   * APPROVED       |  FORBID | FORBID  |  OK  |  OK
+   * RELEASED       |  FORBID | FORBID  |  OK  | FORBID (BẤT BIẾN GMP)
+   * SUPERSEDED     |    OK   |   OK    |  OK  |  OK
+   */
+  public static validate(
+    workflowStatus: TestResultWorkflowStatus,
+    qualityStatus: CanonicalQualityStatus
+  ): { allowed: boolean; reason?: string } {
+    if (workflowStatus === 'SUBMITTED' && qualityStatus === 'UNKNOWN') {
+      return {
+        allowed: false,
+        reason:
+          'Không được nộp phiếu kiểm nghiệm (SUBMITTED) khi trạng thái chất lượng là UNKNOWN (chưa có kết quả chỉ tiêu).',
+      };
+    }
+
+    if (
+      workflowStatus === 'FINAL' &&
+      (qualityStatus === 'UNKNOWN' || qualityStatus === 'PENDING')
+    ) {
+      return {
+        allowed: false,
+        reason: `Không thể chốt kỹ thuật (FINAL) khi chất lượng còn ở trạng thái ${qualityStatus}. Bắt buộc tất cả chỉ tiêu phải có kết luận rõ ràng.`,
+      };
+    }
+
+    if (
+      workflowStatus === 'APPROVED' &&
+      (qualityStatus === 'UNKNOWN' || qualityStatus === 'PENDING')
+    ) {
+      return {
+        allowed: false,
+        reason: `QA không thể phê duyệt (APPROVED) khi chất lượng còn ở trạng thái ${qualityStatus}.`,
+      };
+    }
+
+    if (workflowStatus === 'RELEASED') {
+      if (qualityStatus === 'FAIL') {
+        return {
+          allowed: false,
+          reason:
+            'BẤT BIẾN GMP: Tuyệt đối cấm xuất xưởng (RELEASED) phiếu hoặc Lô hàng có kết quả kiểm nghiệm FAIL.',
+        };
+      }
+      if (qualityStatus === 'UNKNOWN' || qualityStatus === 'PENDING') {
+        return {
+          allowed: false,
+          reason: `Không thể xuất xưởng (RELEASED) khi chất lượng kiểm nghiệm là ${qualityStatus}.`,
+        };
+      }
+    }
+
+    return { allowed: true };
   }
 }

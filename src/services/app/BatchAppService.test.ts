@@ -164,9 +164,18 @@ describe('BatchAppService', () => {
   });
 
   describe('updateStatus & Release Guard', () => {
+    const testingBatch: Batch = { ...validBatch, status: 'TESTING' };
+
+    it('should block jumping status from PENDING directly to RELEASED (State Machine Guard)', async () => {
+      await expect(
+        service.updateStatus('batch-001', 'RELEASED', qaUser, { currentBatch: validBatch })
+      ).rejects.toThrow(/Quy chuẩn State Machine:.*Không thể chuyển từ PENDING sang RELEASED/);
+      expect(mockRepo.updateStatus).not.toHaveBeenCalled();
+    });
+
     it('should block non-QA/Admin users from releasing a batch', async () => {
       await expect(
-        service.updateStatus('batch-001', 'RELEASED', prodUser, { currentBatch: validBatch })
+        service.updateStatus('batch-001', 'RELEASED', prodUser, { currentBatch: testingBatch })
       ).rejects.toThrow(/Chỉ bộ phận QA hoặc Quản trị viên/);
       expect(mockRepo.updateStatus).not.toHaveBeenCalled();
     });
@@ -184,7 +193,7 @@ describe('BatchAppService', () => {
 
       await expect(
         service.updateStatus('batch-001', 'RELEASED', qaUser, {
-          currentBatch: validBatch,
+          currentBatch: testingBatch,
           batchTestResults: [failedTestResult],
         })
       ).rejects.toThrow(/Quy chuẩn GMP & Release Guard.*chưa đạt chuẩn PASS/);
@@ -203,7 +212,7 @@ describe('BatchAppService', () => {
       };
 
       await service.updateStatus('batch-001', 'RELEASED', qaUser, {
-        currentBatch: validBatch,
+        currentBatch: testingBatch,
         batchTestResults: [passedTestResult],
       });
       expect(mockRepo.updateStatus).toHaveBeenCalledWith('batch-001', 'RELEASED', undefined);
@@ -212,7 +221,7 @@ describe('BatchAppService', () => {
     it('should reject release when requireSignature is true but signature is missing', async () => {
       await expect(
         service.updateStatus('batch-001', 'RELEASED', qaUser, {
-          currentBatch: validBatch,
+          currentBatch: testingBatch,
           requireSignature: true,
         })
       ).rejects.toThrow(/Yêu cầu chữ ký điện tử hợp lệ/);
@@ -228,7 +237,7 @@ describe('BatchAppService', () => {
 
       await expect(
         service.updateStatus('batch-001', 'RELEASED', qaUser, {
-          currentBatch: validBatch,
+          currentBatch: testingBatch,
           signature: mismatchSig,
         })
       ).rejects.toThrow(/không khớp với Lô sản xuất/);
@@ -254,7 +263,7 @@ describe('BatchAppService', () => {
       };
 
       await service.updateStatus('batch-001', 'RELEASED', qaUser, {
-        currentBatch: validBatch,
+        currentBatch: testingBatch,
         batchTestResults: [passedTestResult],
         signature: validSig,
       });
