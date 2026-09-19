@@ -62,5 +62,25 @@ describe('testResultService', () => {
     const res = await bulkRenameCriteriaInAllTestResults('Độ ẩm', 'Độ ẩm');
     expect(res.updatedCount).toBe(0);
   });
-});
 
+  it('fetchAllTestResultsRaw đọc từ store an toàn và không quét full DB', async () => {
+    const { fetchAllTestResultsRaw } = await import('./testResultService');
+    const mockTR: TestResult = {
+      id: 'tr_store_01',
+      batchId: 'batch_store',
+      labName: 'Lab Internal',
+      testDate: '2026-09-19',
+      overallStatus: 'PASS',
+      results: [],
+      createdAt: '2026-09-19T00:00:00.000Z',
+    };
+
+    useAppStore.setState({
+      allTestResults: [mockTR],
+    });
+
+    const results = await fetchAllTestResultsRaw();
+    expect(results.length).toBe(1);
+    expect(results[0].id).toBe('tr_store_01');
+  });
+});

@@ -297,4 +297,29 @@ describe('TASK-005: Security Rules Verification Suite', () => {
       expect(result.allowed).toBe(true);
     });
   });
+
+  describe('7. Model 2.5 — Workflow Status & Data Access Hardening', () => {
+    it('chặn nhân viên LAB hoặc QC tự ý gán workflowStatus APPROVED cho phiếu kiểm nghiệm', () => {
+      const result = SecurityRulesValidator.evaluate(qcUser, 'UPDATE', 'testResults/tr_1', {
+        workflowStatus: 'APPROVED',
+      });
+      expect(result.allowed).toBe(false);
+      expect(result.reason).toContain('Chỉ QA mới có thẩm quyền Phê duyệt');
+    });
+
+    it('chặn nhân viên LAB hoặc QC tự ý gán workflowStatus RELEASED cho phiếu kiểm nghiệm', () => {
+      const result = SecurityRulesValidator.evaluate(qcUser, 'UPDATE', 'testResults/tr_1', {
+        workflowStatus: 'RELEASED',
+      });
+      expect(result.allowed).toBe(false);
+      expect(result.reason).toContain('Chỉ QA mới có thẩm quyền');
+    });
+
+    it('cho phép QA phê duyệt workflowStatus APPROVED cho phiếu kiểm nghiệm', () => {
+      const result = SecurityRulesValidator.evaluate(qaUser, 'UPDATE', 'testResults/tr_1', {
+        workflowStatus: 'APPROVED',
+      });
+      expect(result.allowed).toBe(true);
+    });
+  });
 });

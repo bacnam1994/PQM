@@ -148,10 +148,22 @@ export class SecurityRulesValidator {
     // 8. Ràng buộc Phiếu kiểm nghiệm (Test Results)
     if (rootCollection === 'testResults') {
       if (action === 'READ') return { allowed: true };
+      // Chuyển workflowStatus sang APPROVED hoặc RELEASED: BẮT BUỘC QA hoặc ADMIN
+      if (
+        (payload?.workflowStatus === 'APPROVED' || payload?.workflowStatus === 'RELEASED') &&
+        user.role !== 'QA'
+      ) {
+        return {
+          allowed: false,
+          reason:
+            'Chỉ QA mới có thẩm quyền Phê duyệt (APPROVED) hoặc Xuất xưởng (RELEASED) phiếu kiểm nghiệm.',
+        };
+      }
       // Nếu phiếu đã có evaluationSnapshot (đã chốt đánh giá) hoặc LOCKED/APPROVED: chặn LAB/QC/USER sửa đổi
       if (
         (currentData?.evaluationSnapshot ||
           currentData?.overallStatus === 'APPROVED' ||
+          currentData?.workflowStatus === 'APPROVED' ||
           currentData?.status === 'LOCKED') &&
         user.role !== 'QA'
       ) {

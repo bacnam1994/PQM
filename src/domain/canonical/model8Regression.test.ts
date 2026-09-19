@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { AutoHealingFramework } from '../healing/autoHealingFramework';
+import { AutoHealingFramework, HealingPlan } from '../healing/autoHealingFramework';
 import {
   ConsistencyIssueFactory,
   CanonicalConsistencyIssue,
@@ -236,6 +236,107 @@ describe('Model 8 Regression Suite: Auto-Healing Model', () => {
       expect(filtered.safe).toHaveLength(1);
       expect(filtered.controlled).toHaveLength(1);
       expect(filtered.blocked).toHaveLength(1);
+    });
+  });
+
+  describe('4. executeAtomicHealingPlan (All-or-Nothing Atomic Transaction)', () => {
+    it('thực thi thành công 100% các mutation trong plan khi atomic commit thành công', async () => {
+      const plan: HealingPlan = {
+        planId: 'PLAN-001',
+        correlationId: 'CORR-001',
+        status: 'PROPOSED',
+        actions: [
+          {
+            actionId: 'ACT-01',
+            issueId: 'ISSUE-01',
+            planId: 'PLAN-001',
+            entityId: 'TR-01',
+            actor: 'qa_user',
+            oldValue: 'Đạt',
+            newValue: 'PASS',
+            reason: 'Chuẩn hóa định dạng',
+            timestamp: new Date().toISOString(),
+            result: 'PENDING' as const,
+            correlationId: 'CORR-001',
+          },
+          {
+            actionId: 'ACT-02',
+            issueId: 'ISSUE-02',
+            planId: 'PLAN-001',
+            entityId: 'TR-02',
+            actor: 'qa_user',
+            oldValue: 'Không đạt',
+            newValue: 'FAIL',
+            reason: 'Chuẩn hóa định dạng',
+            timestamp: new Date().toISOString(),
+            result: 'PENDING' as const,
+            correlationId: 'CORR-001',
+          },
+        ],
+      };
+
+      const result = await AutoHealingFramework.executeAtomicHealingPlan({
+        plan,
+        actor: 'qa_lead',
+        actorRole: 'QA',
+        atomicCommit: async () => true,
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.committedActions).toBe(2);
+      expect(plan.status).toBe('COMMITTED');
+      expect(plan.actions.every((a) => a.result === 'SUCCESS')).toBe(true);
+    });
+
+    it('rollback toàn bộ plan nếu atomic commit thất bại (chống tình trạng 1 ✓, 2 ✓, 3 ✗)', async () => {
+      let rollbackInvoked = false;
+      const plan: HealingPlan = {
+        planId: 'PLAN-002',
+        correlationId: 'CORR-002',
+        status: 'PROPOSED',
+        actions: [
+          {
+            actionId: 'ACT-01',
+            issueId: 'ISSUE-01',
+            planId: 'PLAN-002',
+            entityId: 'BATCH-01',
+            actor: 'admin_user',
+            oldValue: 'TESTING',
+            newValue: 'RELEASED',
+            timestamp: new Date().toISOString(),
+            result: 'PENDING' as const,
+            correlationId: 'CORR-002',
+          },
+          {
+            actionId: 'ACT-02',
+            issueId: 'ISSUE-02',
+            planId: 'PLAN-002',
+            entityId: 'BATCH-02',
+            actor: 'admin_user',
+            oldValue: 'PENDING',
+            newValue: 'RELEASED',
+            timestamp: new Date().toISOString(),
+            result: 'PENDING' as const,
+            correlationId: 'CORR-002',
+          },
+        ],
+      };
+
+      const result = await AutoHealingFramework.executeAtomicHealingPlan({
+        plan,
+        actor: 'admin_lead',
+        actorRole: 'ADMIN',
+        atomicCommit: async () => false, // Giả lập commit thất bại
+        rollbackHandler: async () => {
+          rollbackInvoked = true;
+        },
+      });
+
+      expect(result.success).toBe(false);
+      expect(result.committedActions).toBe(0);
+      expect(plan.status).toBe('ROLLED_BACK');
+      expect(plan.actions.every((a) => a.result === 'ROLLED_BACK')).toBe(true);
+      expect(rollbackInvoked).toBe(true);
     });
   });
 });

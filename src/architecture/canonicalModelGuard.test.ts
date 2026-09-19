@@ -154,4 +154,41 @@ describe('MODEL 1 STATIC GUARD: Canonical Quality Status & No Default PASS', () 
       `Phát hiện logic passRate mặc định 100% khi không có test:\n` + passRateViolations.join('\n')
     ).toEqual([]);
   });
+
+  it('Production code KHÔNG ĐƯỢC chứa full database scan get(ref(db, "testResults"))', () => {
+    const forbiddenFullScans = [
+      "get(ref(db, 'testResults'))",
+      'get(ref(db, "testResults"))',
+      "get(ref(db, 'batches'))",
+      'get(ref(db, "batches"))',
+    ];
+
+    const violations: { file: string; line: number; lineContent: string }[] = [];
+
+    for (const file of productionFiles) {
+      const content = fs.readFileSync(file, 'utf-8');
+      const lines = content.split('\n');
+
+      lines.forEach((lineText, index) => {
+        const trimmed = lineText.trim();
+        if (trimmed.startsWith('//') || trimmed.startsWith('*')) return;
+
+        for (const pattern of forbiddenFullScans) {
+          if (lineText.includes(pattern)) {
+            violations.push({
+              file: path.relative(rootSrcDir, file),
+              line: index + 1,
+              lineContent: trimmed,
+            });
+          }
+        }
+      });
+    }
+
+    expect(
+      violations,
+      `Phát hiện ${violations.length} điểm quét cạn toàn bộ database (Full Scan) vi phạm Fail-Closed:\n` +
+        violations.map((v) => `  [${v.file}:${v.line}] ${v.lineContent}`).join('\n')
+    ).toEqual([]);
+  });
 });

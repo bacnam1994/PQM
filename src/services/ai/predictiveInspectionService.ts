@@ -13,7 +13,7 @@
  * 4. So sánh tương đồng lô (Batch Similarity)
  */
 
-import { normalizeCriterionPassStatus } from '../../domain/test-result/testResultStatusResolver';
+import { normalizeCriterionPassStatus, resolveQualityStatus } from '../../domain';
 
 export interface CriterionRiskFactor {
   criteriaName: string;
@@ -85,7 +85,7 @@ const calcLabPerformanceFactor = (
     };
   }
 
-  const passCount = labResults.filter((r) => r.overallStatus === 'PASS').length;
+  const passCount = labResults.filter((r) => resolveQualityStatus(r) === 'PASS').length;
   const passRate = (passCount / labResults.length) * 100;
 
   return {
@@ -130,7 +130,7 @@ const calcSeasonalFactor = (
     };
   }
 
-  const passCount = sameMonthResults.filter((r) => r.overallStatus === 'PASS').length;
+  const passCount = sameMonthResults.filter((r) => resolveQualityStatus(r) === 'PASS').length;
   const passRate = (passCount / sameMonthResults.length) * 100;
 
   return {
@@ -166,7 +166,7 @@ const calcTrendDriftFactor = (
     };
   }
 
-  const statuses = recentResults.map((r) => (r.overallStatus === 'PASS' ? 1 : 0));
+  const statuses = recentResults.map((r) => (resolveQualityStatus(r) === 'PASS' ? 1 : 0));
   const recentPassRate = statuses.slice(0, 3).reduce((a, b) => a + b, 0) / 3;
   const olderPassRate =
     statuses.slice(3).reduce((a, b) => a + b, 0) / Math.max(statuses.slice(3).length, 1);
@@ -256,7 +256,7 @@ const calcHistoricalSimilarityFactor = (
     };
   }
 
-  const passCount = similarResults.filter((r: any) => r.overallStatus === 'PASS').length;
+  const passCount = similarResults.filter((r: any) => resolveQualityStatus(r) === 'PASS').length;
   const passRate = (passCount / similarResults.length) * 100;
 
   return {

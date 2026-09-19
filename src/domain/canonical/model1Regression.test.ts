@@ -28,7 +28,7 @@ import {
   calculateOverallStatusForTestResult,
 } from '../test-result/testResultStatusResolver';
 import { QualityEvaluationEngine } from '../evaluation/QualityEvaluationEngine';
-import { TestResult, TestResultEntry } from '../../types';
+import { TestResult, TestResultEntry, toCanonicalTestResult } from '../../types';
 
 describe('PQM VIBE CODING — MODEL 1: CANONICAL DATA MODEL HARDENING', () => {
   // 1. missing overallStatus → UNKNOWN
@@ -229,5 +229,54 @@ describe('PQM VIBE CODING — MODEL 1: CANONICAL DATA MODEL HARDENING', () => {
     };
     const resolved = resolveTestResultStatus(trReleasedWithPending);
     expect(resolved).toBe('PENDING');
+  });
+
+  // 15. toCanonicalTestResult mapping và tách bạch Quality / Workflow
+  it('15. toCanonicalTestResult converts TestResult into CanonicalTestResult correctly', () => {
+    const tr: TestResult = {
+      id: 'tr-canonical-01',
+      batchId: 'batch-99',
+      productId: 'prod-01',
+      labName: 'Lab Quatest 3',
+      testDate: '2026-09-19',
+      overallStatus: 'PASS',
+      workflowStatus: 'APPROVED',
+      results: [
+        { criteriaName: 'Độ ẩm', value: '4.5%', isPass: true },
+        { criteriaName: 'Cảm quan', value: 'Bột màu nâu', isPass: null },
+      ],
+      createdAt: '2026-09-19T00:00:00.000Z',
+      version: 2,
+    };
+
+    const canonical = toCanonicalTestResult(tr);
+    expect(canonical.id).toBe('tr-canonical-01');
+    expect(canonical.batchId).toBe('batch-99');
+    expect(canonical.productId).toBe('prod-01');
+    expect(canonical.qualityStatus).toBe('PASS');
+    expect(canonical.workflowStatus).toBe('APPROVED');
+    expect(canonical.criteria.length).toBe(2);
+    expect(canonical.version).toBe(2);
+    expect(typeof canonical.createdAt).toBe('number');
+    expect(typeof canonical.updatedAt).toBe('number');
+  });
+
+  // 16. toCanonicalTestResult defaults and fallback product
+  it('16. toCanonicalTestResult handles fallback productId and defaults safely', () => {
+    const trLegacy: TestResult = {
+      id: 'tr-leg-02',
+      batchId: 'batch-100',
+      labName: 'Lab Case',
+      testDate: '2026-09-19',
+      overallStatus: 'FAIL',
+      results: [{ criteriaName: 'Định lượng', value: '40', isPass: false }],
+      createdAt: '2026-09-19T00:00:00.000Z',
+    };
+
+    const canonical = toCanonicalTestResult(trLegacy, 'fallback-prod-99');
+    expect(canonical.productId).toBe('fallback-prod-99');
+    expect(canonical.qualityStatus).toBe('FAIL');
+    expect(canonical.workflowStatus).toBe('DRAFT');
+    expect(canonical.version).toBe(1);
   });
 });

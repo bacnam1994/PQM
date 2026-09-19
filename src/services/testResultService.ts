@@ -1,4 +1,4 @@
-import { ref, query, orderByChild, equalTo, get, update } from 'firebase/database';
+import { ref, query, orderByChild, equalTo, get, update, limitToLast } from 'firebase/database';
 import { db } from '../firebase';
 import { TestResult } from '../types';
 import { getFromCache, saveToCache } from '../utils/offlineCache';
@@ -17,7 +17,7 @@ export const fetchTestResultsByBatchId = async (targetBatchId: string): Promise<
     let fbResults: TestResult[] = [];
     let localResults: TestResult[] = [];
 
-    // 1. Fetch từ Firebase
+    // 1. Fetch từ Firebase bằng targeted query (Model 2.5: Fail-Closed, không quét toàn bộ DB)
     try {
       const testResultsRef = ref(db, 'testResults');
       const batchQuery = query(testResultsRef, orderByChild('batchId'), equalTo(targetBatchId));
@@ -26,19 +26,8 @@ export const fetchTestResultsByBatchId = async (targetBatchId: string): Promise<
         fbResults = Object.values(snapshot.val()) as TestResult[];
       }
     } catch (error) {
-      console.warn('Lỗi khi tải PKN từ Database (thử fallback quét):', error);
-      // Fallback: nếu query bị lỗi do thiếu index, thử lấy tất cả và lọc
-      try {
-        const allSnap = await get(ref(db, 'testResults'));
-        if (allSnap.exists()) {
-          const all = Object.values(allSnap.val()) as TestResult[];
-          fbResults = all.filter(
-            (r) => r && (r.batchId === targetBatchId || r.batchId?.endsWith(targetBatchId))
-          );
-        }
-      } catch (fallbackErr) {
-        console.warn('Fallback fetch all testResults failed:', fallbackErr);
-      }
+      console.error('[testResultService] Lỗi khi tải PKN theo batchId (Fail-Closed):', error);
+      // FAIL CLOSED: Tuyệt đối không fallback quét toàn bộ database get(ref(db, 'testResults'))
     }
 
     // 2. Fetch từ IndexedDB (dành cho các lô cũ, chưa đồng bộ hoặc từ file backup)
@@ -188,30 +177,22 @@ export const fetchTestResultsByProductId = async (productId: string): Promise<Te
     let fromFirebase: TestResult[] = [];
     if (missingBatchIds.length > 0) {
       try {
-        // Nếu chỉ vài lô bị thiếu → fetch từng lô riêng lẻ
-        if (missingBatchIds.length <= 5) {
-          const results = await Promise.all(
-            missingBatchIds.map(async (bId) => {
-              try {
-                const q = query(ref(db, 'testResults'), orderByChild('batchId'), equalTo(bId));
-                const snap = await get(q);
-                return snap.exists() ? (Object.values(snap.val()) as TestResult[]) : [];
-              } catch (e) {
-                return [];
-              }
-            })
-          );
-          fromFirebase = results.flat();
-        } else {
-          // Nhiều lô thiếu → quét toàn bộ testResults một lần duy nhất (hiệu quả hơn N queries)
-          const snap = await get(ref(db, 'testResults'));
-          if (snap.exists()) {
-            const all = Object.values(snap.val()) as TestResult[];
-            fromFirebase = all.filter((r) => r && batchIdSet.has(r.batchId));
-          }
-        }
+        // Model 2.5 Hardening: Query chính xác theo batchId của các lô còn thiếu, không quét toàn bộ testResults
+        const results = await Promise.all(
+          missingBatchIds.map(async (bId) => {
+            try {
+              const q = query(ref(db, 'testResults'), orderByChild('batchId'), equalTo(bId));
+              const snap = await get(q);
+              return snap.exists() ? (Object.values(snap.val()) as TestResult[]) : [];
+            } catch (e) {
+              console.warn(`[testResultService] Không thể tải testResults cho batchId ${bId}:`, e);
+              return [];
+            }
+          })
+        );
+        fromFirebase = results.flat();
       } catch (e) {
-        console.warn('Lỗi fetch testResults cho sản phẩm từ Firebase:', e);
+        console.warn('Lỗi fetch testResults cho sản phẩm từ Firebase (Fail-Closed):', e);
       }
     }
 
@@ -238,20 +219,17 @@ export const fetchTestResultsByProductId = async (productId: string): Promise<Te
 };
 
 /**
- * Lấy TOÀN BỘ danh sách phiếu kiểm nghiệm từ Firebase RTDB (fallback cache & store)
+ * Lấy danh sách phiếu kiểm nghiệm gần nhất có kiểm soát (Model 2.5 Hardening: Không full DB scan)
  */
-export const fetchAllTestResultsRaw = async (): Promise<TestResult[]> => {
-  try {
-    const snapshot = await get(ref(db, 'testResults'));
-    if (snapshot.exists()) {
-      const data = snapshot.val();
-      return Object.values(data) as TestResult[];
-    }
-  } catch (err) {
-    console.warn('[testResultService] Không thể fetch testResults từ Firebase, thử cache:', err);
+export const fetchAllTestResultsRaw = async (limitCount = 300): Promise<TestResult[]> => {
+  // 1. Ưu tiên đọc từ Global store (đã đồng bộ)
+  const state = useAppStore.getState();
+  const storeResults = [...(state.allTestResults || []), ...(state.testResults || [])];
+  if (storeResults.length > 0) {
+    return storeResults;
   }
 
-  // Fallback: IndexedDB cache
+  // 2. Fallback: IndexedDB cache
   try {
     const cached = await getFromCache('testResults');
     if (cached && Array.isArray(cached) && cached.length > 0) {
@@ -261,9 +239,23 @@ export const fetchAllTestResultsRaw = async (): Promise<TestResult[]> => {
     console.warn('[testResultService] Fallback cache testResults thất bại:', err);
   }
 
-  // Fallback: Global store
-  const state = useAppStore.getState();
-  return [...(state.allTestResults || []), ...(state.testResults || [])];
+  // 3. Fallback có kiểm soát: Query có giới hạn limitToLast thay vì quét toàn bộ database
+  try {
+    const recentQuery = query(
+      ref(db, 'testResults'),
+      orderByChild('createdAt'),
+      limitToLast(limitCount)
+    );
+    const snapshot = await get(recentQuery);
+    if (snapshot.exists()) {
+      const data = snapshot.val();
+      return Object.values(data) as TestResult[];
+    }
+  } catch (err) {
+    console.error('[testResultService] Lỗi khi tải testResults gần nhất (Fail-Closed):', err);
+  }
+
+  return [];
 };
 
 /**
@@ -297,10 +289,15 @@ export const bulkRenameCriteriaInAllTestResults = async (
     let allBatches = appState.batches;
     if (!allBatches || allBatches.length === 0) {
       try {
-        const snap = await get(ref(db, 'batches'));
+        const batchQuery = query(
+          ref(db, 'batches'),
+          orderByChild('productId'),
+          equalTo(targetProductId)
+        );
+        const snap = await get(batchQuery);
         if (snap.exists()) allBatches = Object.values(snap.val()) as any[];
       } catch (e) {
-        console.warn('[bulkRename] Lỗi lấy danh sách lô:', e);
+        console.warn('[bulkRename] Lỗi lấy danh sách lô theo sản phẩm (Fail-Closed):', e);
       }
     }
     const filtered = (allBatches || []).filter((b) => b && b.productId === targetProductId);

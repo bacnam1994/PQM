@@ -354,15 +354,22 @@ export function resolveTestResultStatus(
   // =========================================================================
   // TẦNG 2: RE-EVALUATION TỪ SOURCE DATA HIỆN TẠI (Evidence-First)
   // =========================================================================
-  if (Array.isArray(tr.results)) {
+  const rawCriteria = (tr as any).criteria || tr.results;
+  if (Array.isArray(rawCriteria)) {
     // Không có kết quả kiểm nghiệm -> UNKNOWN
-    if (tr.results.length === 0) {
+    if (rawCriteria.length === 0) {
       return 'UNKNOWN';
     }
 
+    // Đảm bảo tr.results có dữ liệu đồng bộ khi chạy calculateOverallStatusForTestResult
+    const normalizedTr = {
+      ...tr,
+      results: rawCriteria,
+    } as TestResult;
+
     // Đánh giá đầy đủ qua calculateOverallStatusForTestResult (hỗ trợ alternateRules và multi-lab lookup)
     const calculated = calculateOverallStatusForTestResult(
-      tr as TestResult,
+      normalizedTr,
       boundTccs,
       allBatchResults
     );
@@ -377,7 +384,7 @@ export function resolveTestResultStatus(
     let hasPending = false;
     let passCount = 0;
 
-    for (const r of tr.results) {
+    for (const r of rawCriteria) {
       if (!r) continue;
       const criterionPass = normalizeCriterionPassStatus(r.isPass);
       if (criterionPass === false) {
@@ -401,6 +408,12 @@ export function resolveTestResultStatus(
   // =========================================================================
   return extractStoredDocumentStatus(testResult);
 }
+
+/**
+ * Canonical Status Resolver chính thức cho Quality Status (Model 2).
+ * UI, Hooks, và Services bắt buộc gọi hàm này thay vì so sánh overallStatus trực tiếp.
+ */
+export const resolveQualityStatus = resolveTestResultStatus;
 
 /**
  * Helper so khớp tên chỉ tiêu không phân biệt dấu và khoảng trắng

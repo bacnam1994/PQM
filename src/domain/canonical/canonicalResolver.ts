@@ -37,6 +37,7 @@ import {
   normalizeTestResultStatus,
   normalizeCriterionPassStatus,
   resolveTestResultStatus,
+  resolveQualityStatus,
   resolveAuthoritativeTestResultForBatch,
   resolveFinalTestResultForBatch,
   resolveAuthoritativeTestResultsForBatch,
@@ -45,6 +46,8 @@ import {
   CanonicalTestStatus,
 } from '../test-result/testResultStatusResolver';
 import { isValidTestResultForBatch } from '../batch/batchIntegrityValidator';
+
+export { resolveQualityStatus, normalizeCriterionPassStatus };
 
 export interface BatchQualityResolutionResult {
   batchId: string;
@@ -70,6 +73,17 @@ export interface BatchQualityResolutionResult {
 
 export class CanonicalStatusResolver {
   public static readonly VERSION = '2.0.0-CANONICAL-PIPELINE';
+
+  /**
+   * Quyết định chất lượng chính thức cho Phiếu kiểm nghiệm (Model 2 Single Source of Truth).
+   * Thứ tự ưu tiên: 1. Snapshot hợp lệ -> 2. Re-evaluate từ criteria/TCCS -> 3. Legacy status.
+   */
+  public static resolveQualityStatus(
+    testResult: TestResult | null | undefined,
+    boundTccs?: TCCS | null
+  ): CanonicalTestStatus {
+    return resolveQualityStatus(testResult, boundTccs);
+  }
 
   /**
    * Bước 1: Validate TestResult tính toàn vẹn cơ bản

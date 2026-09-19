@@ -53,6 +53,7 @@ function getSortOrder(relPath) {
   if (norm.startsWith('package.json') || norm.startsWith('vite.') || norm.startsWith('tsconfig') || norm.startsWith('tailwind') || norm.startsWith('postcss') || norm.startsWith('index.html') || norm.startsWith('firebase') || norm.startsWith('database') || norm.startsWith('storage')) {
     return '01_config_' + norm;
   }
+  if (norm.startsWith('docs/workflow/')) return '00_workflow_' + norm;
   if (norm === 'src/main.tsx') return '02_core_main';
   if (norm === 'src/App.tsx') return '03_core_app';
   if (norm === 'src/types.ts' || norm.startsWith('src/types/')) return '04_core_types_' + norm;
@@ -89,8 +90,12 @@ function run() {
   const srcFiles = getFilesRecursively(path.join(ROOT_DIR, 'src'))
     .map(f => path.relative(ROOT_DIR, f).replace(/\\/g, '/'));
 
+  // Thu thập tất cả các file trong docs/workflow/
+  const workflowFiles = getFilesRecursively(path.join(ROOT_DIR, 'docs', 'workflow'))
+    .map(f => path.relative(ROOT_DIR, f).replace(/\\/g, '/'));
+
   // Gộp lại và sắp xếp theo nhóm
-  const allFiles = [...allConfigFiles, ...srcFiles].sort((a, b) => {
+  const allFiles = [...allConfigFiles, ...workflowFiles, ...srcFiles].sort((a, b) => {
     return getSortOrder(a).localeCompare(getSortOrder(b));
   });
 

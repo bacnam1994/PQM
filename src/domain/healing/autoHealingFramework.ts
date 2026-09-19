@@ -16,6 +16,33 @@
 import { HealingStrategyType, CanonicalConsistencyIssue } from '../consistency/consistencyModel';
 import { Role } from '../../types/permissions';
 
+export interface HealingAction {
+  actionId: string;
+  issueId: string;
+  planId: string;
+  entityId: string;
+  entityType?: string;
+  actor: string;
+  approvedBy?: string;
+  oldValue: any;
+  newValue: any;
+  reason?: string;
+  previousVersion?: number;
+  newVersion?: number;
+  timestamp: string;
+  result: 'SUCCESS' | 'FAILED' | 'ROLLED_BACK' | 'PENDING';
+  correlationId: string;
+}
+
+export interface HealingPlan {
+  planId: string;
+  correlationId: string;
+  actions: HealingAction[];
+  approvedBy?: string;
+  approvedAt?: string;
+  status: 'PROPOSED' | 'APPROVED' | 'EXECUTING' | 'COMMITTED' | 'ROLLED_BACK' | 'FAILED';
+}
+
 export interface HealingPlanPreview {
   issueId: string;
   strategy: HealingStrategyType;
@@ -36,6 +63,8 @@ export interface HealingExecutionResult {
   issueId: string;
   healedAt: string;
   healedBy: string;
+  actionId?: string;
+  correlationId?: string;
   auditRecordId?: string;
   error?: string;
 }
@@ -230,10 +259,14 @@ export class AutoHealingFramework {
 
       // 4. Cập nhật trạng thái bản ghi sai lệch
       issue.status = 'HEALED';
+      const actionId = `ACT-${Date.now()}-${Math.random().toString(36).substr(2, 6).toUpperCase()}`;
+      const correlationId = `CORR-${Date.now()}`;
 
       return {
         success: true,
         issueId: issue.id,
+        actionId,
+        correlationId,
         healedAt: new Date().toISOString(),
         healedBy: actor,
         auditRecordId: `AUDIT-HEAL-${Date.now()}`,
@@ -245,6 +278,95 @@ export class AutoHealingFramework {
         healedAt: new Date().toISOString(),
         healedBy: actor,
         error: err?.message || 'Lỗi ngoại lệ trong quá trình thực thi hàn gắn.',
+      };
+    }
+  }
+
+  /**
+   * Thực thi toàn bộ Plan hàn gắn theo cơ chế Atomic Transaction (All-or-Nothing).
+   * Không bao giờ để cơ sở dữ liệu ở trạng thái dở dang (ví dụ 1 ✓, 2 ✓, 3 ✗).
+   * Nếu commit thất bại, toàn bộ action được đánh dấu ROLLED_BACK.
+   */
+  public static async executeAtomicHealingPlan(params: {
+    plan: HealingPlan;
+    actor: string;
+    actorRole?: Role | string;
+    atomicCommit: (actions: HealingAction[]) => Promise<boolean>;
+    rollbackHandler?: (actions: HealingAction[]) => Promise<void>;
+  }): Promise<{
+    success: boolean;
+    planId: string;
+    correlationId: string;
+    committedActions: number;
+    error?: string;
+  }> {
+    const { plan, actor, actorRole, atomicCommit, rollbackHandler } = params;
+
+    // Kiểm tra thẩm quyền phê duyệt
+    const isPrivileged = actorRole === 'ADMIN' || actorRole === 'QA';
+    if (!isPrivileged) {
+      plan.status = 'FAILED';
+      return {
+        success: false,
+        planId: plan.planId,
+        correlationId: plan.correlationId,
+        committedActions: 0,
+        error: 'Chỉ QA hoặc ADMIN mới có quyền thực thi kế hoạch hàn gắn dữ liệu.',
+      };
+    }
+
+    if (plan.actions.length === 0) {
+      return {
+        success: true,
+        planId: plan.planId,
+        correlationId: plan.correlationId,
+        committedActions: 0,
+      };
+    }
+
+    plan.status = 'EXECUTING';
+
+    try {
+      // Thực thi atomic commit duy nhất
+      const isCommitted = await atomicCommit(plan.actions);
+      if (!isCommitted) {
+        throw new Error('Atomic transaction commit failed from database.');
+      }
+
+      // Đánh dấu thành công toàn bộ
+      plan.actions.forEach((a) => {
+        a.result = 'SUCCESS';
+        a.approvedBy = plan.approvedBy || actor;
+      });
+      plan.status = 'COMMITTED';
+
+      return {
+        success: true,
+        planId: plan.planId,
+        correlationId: plan.correlationId,
+        committedActions: plan.actions.length,
+      };
+    } catch (err: any) {
+      // ROLLBACK: Bảo đảm không để lại DB trạng thái dở dang
+      plan.status = 'ROLLED_BACK';
+      plan.actions.forEach((a) => {
+        a.result = 'ROLLED_BACK';
+      });
+
+      if (rollbackHandler) {
+        try {
+          await rollbackHandler(plan.actions);
+        } catch (rbErr) {
+          console.error('[AutoHealingFramework] Rollback handler failed:', rbErr);
+        }
+      }
+
+      return {
+        success: false,
+        planId: plan.planId,
+        correlationId: plan.correlationId,
+        committedActions: 0,
+        error: err?.message || 'Atomic transaction failed and was rolled back.',
       };
     }
   }

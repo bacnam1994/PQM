@@ -25,7 +25,7 @@ import {
   validateEvaluationSnapshot,
   verifyEvaluationSnapshotIntegrity,
 } from '../evaluation/EvaluationSnapshotBuilder';
-import { CanonicalStatusResolver } from './canonicalResolver';
+import { CanonicalStatusResolver, resolveQualityStatus } from './canonicalResolver';
 import { TestResult, TCCS } from '../../types';
 
 describe('MODEL 2 — CANONICAL STATUS RESOLVER REGRESSION SUITE', () => {
@@ -292,5 +292,45 @@ describe('MODEL 2 — CANONICAL STATUS RESOLVER REGRESSION SUITE', () => {
     const validation = validateEvaluationSnapshot(snapshot, tr);
     expect(validation.isValid).toBe(false);
     expect(validation.reason).toContain('Mã băm SHA-256 không hợp lệ');
+  });
+
+  // -------------------------------------------------------------------------
+  // Ca kiểm thử 10: resolveQualityStatus export & equivalence
+  // -------------------------------------------------------------------------
+  it('10. resolveQualityStatus is authoritative and accessible directly and statically', () => {
+    const tr: TestResult = {
+      id: 'TR-M2-010',
+      batchId: 'BATCH-010',
+      labName: 'Lab QC',
+      testDate: '2026-09-19',
+      overallStatus: 'PASS',
+      createdAt: '2026-09-19',
+      results: [{ criteriaName: 'Định lượng', isPass: true, value: '100%' }],
+    };
+
+    expect(resolveQualityStatus(tr)).toBe('PASS');
+    expect(CanonicalStatusResolver.resolveQualityStatus(tr)).toBe('PASS');
+  });
+
+  // -------------------------------------------------------------------------
+  // Ca kiểm thử 11: resolveQualityStatus handles Canonical tr.criteria
+  // -------------------------------------------------------------------------
+  it('11. resolveQualityStatus evaluates canonical tr.criteria seamlessly', () => {
+    const trCanonical: any = {
+      id: 'TR-M2-011',
+      batchId: 'BATCH-011',
+      productId: 'PROD-011',
+      labName: 'Lab QC',
+      testDate: '2026-09-19',
+      qualityStatus: 'PENDING',
+      criteria: [
+        { criteriaName: 'Độ hòa tan', isPass: true, value: '95%' },
+        { criteriaName: 'Tạp chất liên quan', isPass: false, value: '1.2%' },
+      ],
+      createdAt: Date.now(),
+      version: 1,
+    };
+
+    expect(resolveQualityStatus(trCanonical)).toBe('FAIL');
   });
 });

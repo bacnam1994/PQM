@@ -67,9 +67,16 @@
 
     "testResults": {
       ".read": "auth != null",
-      ".indexOn": ["createdAt", "batchId", "overallStatus", "testDate"],
+      ".indexOn": [
+        "createdAt",
+        "batchId",
+        "overallStatus",
+        "qualityStatus",
+        "workflowStatus",
+        "testDate"
+      ],
       "$item_id": {
-        ".write": "auth != null && (auth.token.isAdmin === true || auth.token.role === 'ADMIN' || auth.token.role === 'QA' || root.child('users/admins/' + auth.uid).exists() || root.child('users/' + auth.uid + '/role').val() === 'ADMIN' || root.child('users/' + auth.uid + '/role').val() === 'QA' || ((auth.token.role === 'USER' || auth.token.role === 'LAB' || auth.token.role === 'QC' || root.child('users/' + auth.uid + '/role').val() === 'USER' || root.child('users/' + auth.uid + '/role').val() === 'LAB' || root.child('users/' + auth.uid + '/role').val() === 'QC') && newData.exists() && (!data.exists() || !data.hasChild('evaluationSnapshot'))))"
+        ".write": "auth != null && (auth.token.isAdmin === true || auth.token.role === 'ADMIN' || auth.token.role === 'QA' || root.child('users/admins/' + auth.uid).exists() || root.child('users/' + auth.uid + '/role').val() === 'ADMIN' || root.child('users/' + auth.uid + '/role').val() === 'QA' || ((auth.token.role === 'USER' || auth.token.role === 'LAB' || auth.token.role === 'QC' || root.child('users/' + auth.uid + '/role').val() === 'USER' || root.child('users/' + auth.uid + '/role').val() === 'LAB' || root.child('users/' + auth.uid + '/role').val() === 'QC') && newData.exists() && (!data.exists() || !data.hasChild('evaluationSnapshot')) && newData.child('workflowStatus').val() !== 'APPROVED' && newData.child('workflowStatus').val() !== 'RELEASED'))"
       }
     },
 

@@ -2,7 +2,7 @@
  * batchGenealogyService.ts
  * =========================
  * AI Batch Genealogy Tracer — Truy vết nguồn gốc lô thành phẩm.
- * 
+ *
  * Xây dựng cây truy vết hoàn chỉnh từ:
  * Nguyên liệu đầu vào → Công thức sản xuất → Lô thành phẩm → Kiểm nghiệm → Quyết định
  */
@@ -16,12 +16,7 @@ export type GenealogyNodeType =
   | 'TEST_RESULT'
   | 'DECISION';
 
-export type GenealogyNodeStatus =
-  | 'OK'
-  | 'WARNING'
-  | 'FAIL'
-  | 'PENDING'
-  | 'INFO';
+export type GenealogyNodeStatus = 'OK' | 'WARNING' | 'FAIL' | 'PENDING' | 'INFO';
 
 export interface GenealogyNode {
   id: string;
@@ -31,8 +26,8 @@ export interface GenealogyNode {
   status: GenealogyNodeStatus;
   details: Record<string, string | number | undefined>;
   children?: GenealogyNode[];
-  navigationPath?: string;   // Route để navigate đến trang chi tiết
-  isKeyNode?: boolean;       // Đánh dấu các node quan trọng
+  navigationPath?: string; // Route để navigate đến trang chi tiết
+  isKeyNode?: boolean; // Đánh dấu các node quan trọng
   badges?: { text: string; color: string }[];
 }
 
@@ -43,20 +38,20 @@ export interface BatchGenealogyReport {
   productName: string;
   overallRisk: 'LOW' | 'MEDIUM' | 'HIGH';
   riskReasons: string[];
-  tree: GenealogyNode;     // Root node = Batch
-  traceabilityScore: number;  // 0-100: Mức độ đầy đủ dữ liệu truy vết
-  missingLinks: string[];     // Các liên kết dữ liệu còn thiếu
+  tree: GenealogyNode; // Root node = Batch
+  traceabilityScore: number; // 0-100: Mức độ đầy đủ dữ liệu truy vết
+  missingLinks: string[]; // Các liên kết dữ liệu còn thiếu
   summary: string;
 }
 
 interface GenealogyContext {
-  batch: any;              // HydratedBatch
+  batch: any; // HydratedBatch
   product?: any;
   tccs?: any;
   formula?: any;
   rawMaterials: any[];
-  testResults: any[];      // TestResults của lô này
-  allBatches: any[];       // Tất cả lô (để tìm lô liên quan)
+  testResults: any[]; // TestResults của lô này
+  allBatches: any[]; // Tất cả lô (để tìm lô liên quan)
 }
 
 const fmt = (d: string | undefined) => {
@@ -64,20 +59,43 @@ const fmt = (d: string | undefined) => {
   try {
     const dt = new Date(d);
     return isNaN(dt.getTime()) ? d : dt.toLocaleDateString('vi-VN');
-  } catch { return d || 'N/A'; }
+  } catch {
+    return d || 'N/A';
+  }
 };
 
 const statusFromBatch = (batchStatus: string): GenealogyNodeStatus => {
   switch (batchStatus) {
-    case 'RELEASED': return 'OK';
-    case 'REJECTED': return 'FAIL';
-    case 'TESTING': return 'WARNING';
-    default: return 'PENDING';
+    case 'RELEASED':
+      return 'OK';
+    case 'REJECTED':
+      return 'FAIL';
+    case 'TESTING':
+      return 'WARNING';
+    default:
+      return 'PENDING';
   }
 };
 
-const statusFromTestResult = (overallStatus: string): GenealogyNodeStatus => {
-  return overallStatus === 'PASS' ? 'OK' : 'FAIL';
+import { resolveQualityStatus } from '../../domain';
+
+const statusFromTestResult = (trOrStatus: any): GenealogyNodeStatus => {
+  const quality =
+    typeof trOrStatus === 'object' && trOrStatus !== null
+      ? resolveQualityStatus(trOrStatus)
+      : trOrStatus;
+
+  switch (quality) {
+    case 'PASS':
+      return 'OK';
+    case 'FAIL':
+      return 'FAIL';
+    case 'PENDING':
+      return 'PENDING';
+    case 'UNKNOWN':
+    default:
+      return 'PENDING';
+  }
 };
 
 /**
@@ -102,69 +120,107 @@ export const buildBatchGenealogy = (ctx: GenealogyContext): BatchGenealogyReport
       'Số lô': batch.batchNo,
       'Ngày SX': fmt(batch.mfgDate),
       'Hạn dùng': fmt(batch.expDate),
-      'Năng suất lý thuyết': batch.theoreticalYield ? `${batch.theoreticalYield} ${batch.yieldUnit || ''}` : 'N/A',
-      'Năng suất thực tế': batch.actualYield ? `${batch.actualYield} ${batch.yieldUnit || ''}` : 'N/A',
+      'Năng suất lý thuyết': batch.theoreticalYield
+        ? `${batch.theoreticalYield} ${batch.yieldUnit || ''}`
+        : 'N/A',
+      'Năng suất thực tế': batch.actualYield
+        ? `${batch.actualYield} ${batch.yieldUnit || ''}`
+        : 'N/A',
       'Trạng thái': batch.status,
     },
     navigationPath: `/batches/${batch.id}`,
-    badges: batch.status === 'RELEASED' ? [{ text: 'ĐÃ XUẤT XƯỞNG', color: 'green' }] :
-            batch.status === 'REJECTED' ? [{ text: 'BỊ TỪ CHỐI', color: 'red' }] :
-            [{ text: batch.status, color: 'gray' }],
+    badges:
+      batch.status === 'RELEASED'
+        ? [{ text: 'ĐÃ XUẤT XƯỞNG', color: 'green' }]
+        : batch.status === 'REJECTED'
+          ? [{ text: 'BỊ TỪ CHỐI', color: 'red' }]
+          : [{ text: batch.status, color: 'gray' }],
     children: [],
   };
 
   // ── Node 2: Test Results ──
   const testResultNodes: GenealogyNode[] = testResults
     .sort((a, b) => (b.testDate || '').localeCompare(a.testDate || ''))
-    .map(tr => {
+    .map((tr) => {
       const passCount = (tr.results || []).filter((r: any) => r.isPass).length;
-      const failCount = (tr.results || []).filter((r: any) => !r.isPass).length;
+      const failCount = (tr.results || []).filter((r: any) => r.isPass === false).length;
+      const quality = resolveQualityStatus(tr);
+      const isPass = quality === 'PASS';
+      const isFail = quality === 'FAIL';
+      const isPending = quality === 'PENDING';
+      const labelText = isPass
+        ? 'ĐẠT'
+        : isFail
+          ? 'KHÔNG ĐẠT'
+          : isPending
+            ? 'ĐANG KIỂM NGHIỆM'
+            : 'CHƯA XÁC ĐỊNH';
+
       return {
         id: `node_tr_${tr.id}`,
         type: 'TEST_RESULT' as GenealogyNodeType,
         label: tr.labName || 'Phòng kiểm nghiệm',
         sublabel: `Ngày KN: ${fmt(tr.testDate)}`,
-        status: statusFromTestResult(tr.overallStatus),
+        status: statusFromTestResult(quality),
         details: {
           'Đơn vị KN': tr.labName || 'N/A',
           'Ngày KN': fmt(tr.testDate),
-          'Kết quả': tr.overallStatus === 'PASS' ? 'ĐẠT' : 'KHÔNG ĐẠT',
+          'Kết quả': labelText,
           'Số chỉ tiêu đạt': passCount,
           'Số chỉ tiêu không đạt': failCount,
           'Ghi chú': tr.notes || undefined,
         },
         navigationPath: `/test-results/print/${tr.id}`,
-        badges: tr.overallStatus === 'PASS'
+        badges: isPass
           ? [{ text: 'ĐẠT', color: 'green' }]
-          : [{ text: 'KHÔNG ĐẠT', color: 'red' }, { text: `${failCount} CT lỗi`, color: 'red' }],
+          : isFail
+            ? [
+                { text: 'KHÔNG ĐẠT', color: 'red' },
+                { text: `${failCount} CT lỗi`, color: 'red' },
+              ]
+            : [{ text: labelText, color: 'yellow' }],
       };
     });
 
   if (testResultNodes.length === 0) {
     missingLinks.push('Chưa có phiếu kiểm nghiệm cho lô này');
     riskReasons.push('Thiếu dữ liệu kiểm nghiệm');
-  } else if (testResultNodes.some(n => n.status === 'FAIL')) {
-    riskReasons.push(`${testResultNodes.filter(n => n.status === 'FAIL').length} phiếu kiểm nghiệm không đạt`);
+  } else if (testResultNodes.some((n) => n.status === 'FAIL')) {
+    riskReasons.push(
+      `${testResultNodes.filter((n) => n.status === 'FAIL').length} phiếu kiểm nghiệm không đạt`
+    );
   }
 
   // ── Node 3: Decision (RELEASED/REJECTED/PENDING) ──
   const decisionNode: GenealogyNode = {
     id: `node_decision_${batch.id}`,
     type: 'DECISION',
-    label: batch.status === 'RELEASED' ? '✅ Duyệt Xuất Xưởng' :
-           batch.status === 'REJECTED' ? '❌ Từ chối Xuất Xưởng' :
-           '⏳ Chờ Quyết Định',
-    sublabel: batch.status === 'REJECTED' ? `Lý do: ${batch.rejectReason || 'Không ghi chú'}` : undefined,
+    label:
+      batch.status === 'RELEASED'
+        ? '✅ Duyệt Xuất Xưởng'
+        : batch.status === 'REJECTED'
+          ? '❌ Từ chối Xuất Xưởng'
+          : '⏳ Chờ Quyết Định',
+    sublabel:
+      batch.status === 'REJECTED' ? `Lý do: ${batch.rejectReason || 'Không ghi chú'}` : undefined,
     status: batch.status === 'RELEASED' ? 'OK' : batch.status === 'REJECTED' ? 'FAIL' : 'PENDING',
     isKeyNode: true,
     details: {
-      'Quyết định': batch.status === 'RELEASED' ? 'XUẤT XƯỞNG' : batch.status === 'REJECTED' ? 'TỪ CHỐI' : 'CHỜ',
+      'Quyết định':
+        batch.status === 'RELEASED'
+          ? 'XUẤT XƯỞNG'
+          : batch.status === 'REJECTED'
+            ? 'TỪ CHỐI'
+            : 'CHỜ',
       'Lý do từ chối': batch.rejectReason || undefined,
       'Cập nhật lần cuối': fmt(batch.updatedAt),
     },
-    badges: batch.status === 'RELEASED' ? [{ text: 'RELEASED', color: 'green' }] :
-             batch.status === 'REJECTED' ? [{ text: 'REJECTED', color: 'red' }] :
-             [{ text: 'PENDING', color: 'yellow' }],
+    badges:
+      batch.status === 'RELEASED'
+        ? [{ text: 'RELEASED', color: 'green' }]
+        : batch.status === 'REJECTED'
+          ? [{ text: 'REJECTED', color: 'red' }]
+          : [{ text: 'PENDING', color: 'yellow' }],
   };
 
   // ── Node 4: TCCS ──
@@ -187,7 +243,9 @@ export const buildBatchGenealogy = (ctx: GenealogyContext): BatchGenealogyReport
         'Đang hiệu lực': tccs.isActive ? 'Có' : 'Không',
       },
       navigationPath: `/tccs/detail/${tccs.id}`,
-      badges: tccs.isActive ? [{ text: 'ĐANG ÁP DỤNG', color: 'blue' }] : [{ text: 'ĐÃ LỖI THỜI', color: 'gray' }],
+      badges: tccs.isActive
+        ? [{ text: 'ĐANG ÁP DỤNG', color: 'blue' }]
+        : [{ text: 'ĐÃ LỖI THỜI', color: 'gray' }],
     };
   } else {
     missingLinks.push('Không tìm thấy TCCS liên kết với lô này');
@@ -204,7 +262,9 @@ export const buildBatchGenealogy = (ctx: GenealogyContext): BatchGenealogyReport
     const unlinkedCount = allIngredients.length - linkedCount;
 
     if (unlinkedCount > 0) {
-      missingLinks.push(`${unlinkedCount} thành phần công thức chưa liên kết với danh mục nguyên liệu`);
+      missingLinks.push(
+        `${unlinkedCount} thành phần công thức chưa liên kết với danh mục nguyên liệu`
+      );
     }
 
     // Material nodes
@@ -214,19 +274,30 @@ export const buildBatchGenealogy = (ctx: GenealogyContext): BatchGenealogyReport
         id: `node_mat_${ing.id || ing.name}`,
         type: 'RAW_MATERIAL' as GenealogyNodeType,
         label: ing.name,
-        sublabel: material ? `[${material.category}] ${material.code || ''}` : 'Chưa liên kết danh mục',
+        sublabel: material
+          ? `[${material.category}] ${material.code || ''}`
+          : 'Chưa liên kết danh mục',
         status: material ? 'OK' : 'WARNING',
         details: {
           'Tên thành phần': ing.name,
-          'Hàm lượng công bố': ing.declaredContent ? `${ing.declaredContent} ${ing.unit || ''}` : 'N/A',
-          'Hàm lượng nguyên tố': ing.elementalContent ? `${ing.elementalContent} ${ing.unit || ''}` : undefined,
+          'Hàm lượng công bố': ing.declaredContent
+            ? `${ing.declaredContent} ${ing.unit || ''}`
+            : 'N/A',
+          'Hàm lượng nguyên tố': ing.elementalContent
+            ? `${ing.elementalContent} ${ing.unit || ''}`
+            : undefined,
           'Mã nguyên liệu': material?.code || undefined,
-          'Loại': material?.category || 'Chưa phân loại',
+          Loại: material?.category || 'Chưa phân loại',
           'Danh mục NL': material ? 'Đã liên kết' : 'Chưa liên kết',
         },
         navigationPath: material ? `/materials/catalog` : undefined,
         badges: material
-          ? [{ text: material.category === 'ACTIVE' ? 'HOẠT CHẤT' : 'TÁ DƯỢC', color: material.category === 'ACTIVE' ? 'blue' : 'gray' }]
+          ? [
+              {
+                text: material.category === 'ACTIVE' ? 'HOẠT CHẤT' : 'TÁ DƯỢC',
+                color: material.category === 'ACTIVE' ? 'blue' : 'gray',
+              },
+            ]
           : [{ text: 'CHƯA LIÊN KẾT', color: 'yellow' }],
       };
     });
@@ -263,20 +334,24 @@ export const buildBatchGenealogy = (ctx: GenealogyContext): BatchGenealogyReport
       type: 'PRODUCT',
       label: product.name,
       sublabel: `${product.code} — ${product.group || 'N/A'}`,
-      status: product.status === 'ACTIVE' ? 'OK' : product.status === 'RECALLED' ? 'FAIL' : 'WARNING',
+      status:
+        product.status === 'ACTIVE' ? 'OK' : product.status === 'RECALLED' ? 'FAIL' : 'WARNING',
       isKeyNode: true,
       details: {
         'Tên sản phẩm': product.name,
         'Mã sản phẩm': product.code,
-        'Nhóm': product.group || 'N/A',
-        'SĐK': product.registrationNo || 'N/A',
+        Nhóm: product.group || 'N/A',
+        SĐK: product.registrationNo || 'N/A',
         'Trạng thái': product.status,
         'Đơn vị đăng ký': product.registrant || undefined,
       },
       navigationPath: `/products/${product.id}`,
-      badges: product.status === 'ACTIVE' ? [{ text: 'ĐANG SX', color: 'green' }] :
-               product.status === 'RECALLED' ? [{ text: 'THU HỒI', color: 'red' }] :
-               [{ text: 'NGỪNG SX', color: 'gray' }],
+      badges:
+        product.status === 'ACTIVE'
+          ? [{ text: 'ĐANG SX', color: 'green' }]
+          : product.status === 'RECALLED'
+            ? [{ text: 'THU HỒI', color: 'red' }]
+            : [{ text: 'NGỪNG SX', color: 'gray' }],
       children,
     };
   } else {
@@ -305,11 +380,12 @@ export const buildBatchGenealogy = (ctx: GenealogyContext): BatchGenealogyReport
   if (riskReasons.length >= 3 || batch.status === 'REJECTED') overallRisk = 'HIGH';
   else if (riskReasons.length >= 1 || missingLinks.length >= 2) overallRisk = 'MEDIUM';
 
-  const summary = overallRisk === 'LOW'
-    ? `✅ Lô ${batch.batchNo} có chuỗi truy vết đầy đủ. Traceability Score: ${score}/100.`
-    : overallRisk === 'MEDIUM'
-      ? `⚠️ Lô ${batch.batchNo} có ${missingLinks.length} liên kết dữ liệu thiếu. Cần bổ sung để hoàn thiện hồ sơ.`
-      : `🔴 Lô ${batch.batchNo} có vấn đề nghiêm trọng trong chuỗi truy vết. Cần điều tra ngay.`;
+  const summary =
+    overallRisk === 'LOW'
+      ? `✅ Lô ${batch.batchNo} có chuỗi truy vết đầy đủ. Traceability Score: ${score}/100.`
+      : overallRisk === 'MEDIUM'
+        ? `⚠️ Lô ${batch.batchNo} có ${missingLinks.length} liên kết dữ liệu thiếu. Cần bổ sung để hoàn thiện hồ sơ.`
+        : `🔴 Lô ${batch.batchNo} có vấn đề nghiêm trọng trong chuỗi truy vết. Cần điều tra ngay.`;
 
   return {
     generatedAt: now,

@@ -17,6 +17,10 @@
      ```
    - File `FULL_SOURCE_CODE.md` và `FULL_SOURCE_CODE.txt` là bản snapshot toàn bộ mã nguồn tại thời điểm deploy, dùng để tham chiếu nhanh và chia sẻ với AI trong phiên làm việc tiếp theo.
 
+4. **TUÂN THỦ TUYỆT ĐỐI MASTER WORKFLOW & NGUYÊN TẮC KIẾN TRÚC ĐÃ ĐỊNH NGHĨA**:
+   - **Không được thay đổi hoặc diễn giải khác với các nguyên tắc và workflow đã định nghĩa trong thư mục [`docs/workflow/`](file:///D:/26%20Kiem%20nghiem/PQM/docs/workflow/README.md) (đặc biệt là [`docs/workflow/PQM_SYSTEM_WORKFLOW_MASTER.md`](file:///D:/26%20Kiem%20nghiem/PQM/docs/workflow/PQM_SYSTEM_WORKFLOW_MASTER.md)); nếu source code hiện tại mâu thuẫn với Master Workflow, phải báo cáo mâu thuẫn trước khi sửa.**
+   - Mọi thay đổi logic nghiệp vụ, quy trình phê duyệt, giải quyết trạng thái (Status Resolver), rào chắn an ninh (Security Guard / Firebase Rules) đều phải đối chiếu với các nguyên tắc kiến trúc đã phê duyệt trước khi triển khai.
+
 ---
 
 ## Kiến trúc triển khai (QUAN TRỌNG)
@@ -53,4 +57,3 @@
 
 - Workflow `playwright.yml`: Chạy test tự động khi push (không deploy).
 - Không có workflow deploy tự động lên GitHub Pages (đã loại bỏ).
-

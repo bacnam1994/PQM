@@ -22,6 +22,20 @@ export type StandardConsistencyIssueType =
   | 'INVALID_BUSINESS_RULE'
   | 'UNKNOWN';
 
+/**
+ * 8 nhóm phân loại sai lệch chuẩn (Model 7 - Consistency & Reconciliation)
+ * Tách biệt rõ ràng, không gom tất cả thành một loại FAIL.
+ */
+export type DiscrepancyCategory =
+  | 'MISSING'
+  | 'INCOMPLETE'
+  | 'CONTRADICTORY'
+  | 'STALE'
+  | 'ORPHAN'
+  | 'INVALID'
+  | 'DUPLICATE'
+  | 'DERIVED_MISMATCH';
+
 export type IssueSeverity = 'CRITICAL' | 'WARNING' | 'INFO';
 
 export type HealingStrategyType = 'SAFE_AUTO_HEAL' | 'CONTROLLED_HEAL' | 'NEVER_AUTO_HEAL';
@@ -29,6 +43,8 @@ export type HealingStrategyType = 'SAFE_AUTO_HEAL' | 'CONTROLLED_HEAL' | 'NEVER_
 export interface CanonicalConsistencyIssue {
   id: string;
   type: StandardConsistencyIssueType;
+  /** Nhóm phân loại bản chất sai lệch (Model 7) */
+  category?: DiscrepancyCategory;
   severity: IssueSeverity;
   entityType: string;
   entityId: string;
@@ -65,8 +81,48 @@ export interface ConsistencyReport {
 }
 
 export class ConsistencyIssueFactory {
+  /**
+   * Tự động phân loại sai lệch vào 8 nhóm chuẩn (Model 7)
+   */
+  public static deriveCategory(
+    type: StandardConsistencyIssueType,
+    actual?: any,
+    expected?: any
+  ): DiscrepancyCategory {
+    switch (type) {
+      case 'MISSING_REFERENCE':
+        return 'MISSING';
+      case 'ORPHAN_RECORD':
+        return 'ORPHAN';
+      case 'DUPLICATE_ENTITY':
+        return 'DUPLICATE';
+      case 'INVALID_REFERENCE':
+      case 'INVALID_SCHEMA':
+      case 'INVALID_BUSINESS_RULE':
+        return 'INVALID';
+      case 'STALE_DERIVED_DATA':
+        return 'STALE';
+      case 'AGGREGATION_MISMATCH':
+        return 'DERIVED_MISMATCH';
+      case 'STATUS_MISMATCH':
+      case 'CRITERIA_MISMATCH':
+        if (
+          expected === 'PENDING' ||
+          actual === 'PENDING' ||
+          expected === 'INCOMPLETE' ||
+          actual === 'INCOMPLETE'
+        ) {
+          return 'INCOMPLETE';
+        }
+        return 'CONTRADICTORY';
+      default:
+        return 'DERIVED_MISMATCH';
+    }
+  }
+
   public static createIssue(params: {
     type: StandardConsistencyIssueType;
+    category?: DiscrepancyCategory;
     severity: IssueSeverity;
     entityType: string;
     entityId: string;
@@ -80,9 +136,13 @@ export class ConsistencyIssueFactory {
   }): CanonicalConsistencyIssue {
     const canAutoHeal =
       params.healingStrategy === 'SAFE_AUTO_HEAL' || params.healingStrategy === 'CONTROLLED_HEAL';
+    const category =
+      params.category || this.deriveCategory(params.type, params.actual, params.expected);
+
     return {
       id: `ISSUE-${Date.now()}-${Math.random().toString(36).substr(2, 6).toUpperCase()}`,
       type: params.type,
+      category,
       severity: params.severity,
       entityType: params.entityType,
       entityId: params.entityId,
@@ -130,12 +190,27 @@ export class ConsistencyIssueFactory {
     expectedStatus: string;
     actualStatus: string;
     source?: string;
+    severity?: IssueSeverity;
+    category?: DiscrepancyCategory;
     details?: Record<string, any>;
   }): CanonicalConsistencyIssue {
     const isQualityFailure = params.expectedStatus === 'FAIL';
+    const isPending =
+      params.expectedStatus === 'PENDING' ||
+      params.expectedStatus === 'UNKNOWN' ||
+      params.actualStatus === 'PENDING';
+    const defaultSeverity: IssueSeverity = isQualityFailure
+      ? 'CRITICAL'
+      : isPending
+        ? 'INFO'
+        : 'WARNING';
+
+    const defaultCategory: DiscrepancyCategory = isPending ? 'INCOMPLETE' : 'CONTRADICTORY';
+
     return this.createIssue({
       type: 'STATUS_MISMATCH',
-      severity: isQualityFailure ? 'CRITICAL' : 'WARNING',
+      category: params.category || defaultCategory,
+      severity: params.severity || defaultSeverity,
       entityType: params.entityType,
       entityId: params.entityId,
       field: 'status',
@@ -300,24 +375,39 @@ export class ConsistencyAuditor {
 
     // A. Kiểm toán trạng thái Phiếu kiểm nghiệm (Stored vs Canonical computed)
     testResults.forEach((tr) => {
-      const boundTccs = tccsList.find((t) => t.id === tr.tccsId);
+      const boundBatch = batches.find((b) => b.id === tr.batchId);
+      const boundTccs =
+        tccsList.find((t) => t.id === tr.tccsId) ||
+        tccsList.find((t) => t.id === boundBatch?.tccsId) ||
+        tccsList.find((t) => t.id === tr.evaluationSnapshot?.tccsId);
+
       const computedStatus = resolveTestResultStatus(tr, boundTccs);
 
-      if (tr.overallStatus && tr.overallStatus !== computedStatus) {
-        issues.push(
-          ConsistencyIssueFactory.createStatusMismatchIssue({
-            entityType: 'TEST_RESULT',
-            entityId: tr.id,
-            expectedStatus: computedStatus,
-            actualStatus: tr.overallStatus,
-            source: 'CanonicalStatusResolver',
-            details: {
-              computedFromCriteria: true,
-              totalCriteria: tr.results?.length || 0,
-            },
-          })
-        );
+      // Nếu không có stored status hoặc đã khớp hoàn toàn -> Không có sai lệch
+      if (!tr.overallStatus || tr.overallStatus === computedStatus) {
+        return;
       }
+
+      // Phân loại bản chất: Chỉ tiêu FAIL đối đầu với Stored PASS mới là CRITICAL CONTRADICTORY
+      const isCriticalFail = tr.overallStatus === 'PASS' && computedStatus === 'FAIL';
+      const isPendingMismatch = computedStatus === 'PENDING' || computedStatus === 'UNKNOWN';
+
+      issues.push(
+        ConsistencyIssueFactory.createStatusMismatchIssue({
+          entityType: 'TEST_RESULT',
+          entityId: tr.id,
+          expectedStatus: computedStatus,
+          actualStatus: tr.overallStatus,
+          severity: isCriticalFail ? 'CRITICAL' : isPendingMismatch ? 'INFO' : 'WARNING',
+          category: isPendingMismatch ? 'INCOMPLETE' : 'CONTRADICTORY',
+          source: 'CanonicalStatusResolver',
+          details: {
+            computedFromCriteria: true,
+            totalCriteria: tr.results?.length || 0,
+            boundTccsId: boundTccs?.id,
+          },
+        })
+      );
     });
 
     // B. Kiểm toán Lô đã xuất xưởng (RELEASED Batch Integrity)

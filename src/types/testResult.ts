@@ -26,6 +26,8 @@ export type TestResultWorkflowStatus =
   | 'REJECTED'
   | 'SUPERSEDED';
 
+export type CriterionResult = TestResultEntry;
+
 export interface TestResultEntry {
   criteriaName: string;
   value: string | number;
@@ -78,9 +80,43 @@ export interface EvaluationSnapshot {
   isInvalidated?: boolean;
 }
 
+/**
+ * Mô hình dữ liệu chuẩn của Phiếu kiểm nghiệm (Model 1 - Canonical Data Model).
+ * Đảm bảo Quality Status tách bạch hoàn toàn khỏi Workflow Status.
+ */
+export interface CanonicalTestResult {
+  id: string;
+  batchId: string;
+  productId: string;
+
+  criteria: CriterionResult[];
+
+  /**
+   * Quyết định chất lượng kỹ thuật tất định:
+   * PASS | FAIL | PENDING | UNKNOWN
+   */
+  qualityStatus: CanonicalQualityStatus;
+
+  /**
+   * Vòng đời tài liệu / hành chính độc lập:
+   * DRAFT | FINAL | APPROVED | RELEASED
+   */
+  workflowStatus: 'DRAFT' | 'FINAL' | 'APPROVED' | 'RELEASED';
+
+  evaluationSnapshot?: EvaluationSnapshot;
+
+  evaluationHash?: string;
+
+  version: number;
+
+  createdAt: number;
+  updatedAt: number;
+}
+
 export interface TestResult {
   id: string;
   batchId: string;
+  productId?: string; // Khóa ngoại kỹ thuật liên kết Product (Model 1 & 3)
   /**
    * batch: Thuộc tính ảo (virtual join) phục vụ hiển thị trên UI và xuất phiếu CoA.
    * KHÔNG được lưu trực tiếp vào cơ sở dữ liệu Firebase.
@@ -91,11 +127,16 @@ export interface TestResult {
   labName: string;
   testDate: string;
   results: TestResultEntry[];
+  /** Danh sách chỉ tiêu chuẩn canonical (đồng bộ với results) */
+  criteria?: CriterionResult[];
   /** Canonical Quality Status của phiếu kiểm nghiệm (Authoritative Quality Decision) */
   overallStatus: CanonicalQualityStatus;
+  /** Trạng thái chất lượng canonical chuẩn Model 1 (đồng bộ với overallStatus) */
+  qualityStatus?: CanonicalQualityStatus;
   /** Trạng thái quy trình tài liệu / phê duyệt (Document Workflow) */
   workflowStatus?: TestResultWorkflowStatus;
   evaluationSnapshot?: EvaluationSnapshot;
+  evaluationHash?: string;
   notes?: string;
   attachments?: Attachment[];
   version?: number;
@@ -106,24 +147,70 @@ export interface TestResult {
   // LEGACY FIELDS (Chỉ dùng cho mục đích tương thích đọc dữ liệu cũ / diagnostic)
   // Tuyệt đối không dùng làm nguồn ghi mới và không được override Canonical overallStatus.
   // ========================================================================
-  /** @deprecated @legacy Sử dụng overallStatus thay thế */
+  /** @deprecated @legacy Sử dụng overallStatus / qualityStatus thay thế */
   status?: string;
-  /** @deprecated @legacy Sử dụng overallStatus thay thế */
+  /** @deprecated @legacy Sử dụng overallStatus / qualityStatus thay thế */
   overallResult?: string;
-  /** @deprecated @legacy Sử dụng overallStatus thay thế */
+  /** @deprecated @legacy Sử dụng overallStatus / qualityStatus thay thế */
   resultStatus?: string;
-  /** @deprecated @legacy Sử dụng overallStatus thay thế */
+  /** @deprecated @legacy Sử dụng overallStatus / qualityStatus thay thế */
   result?: string;
-  /** @deprecated @legacy Sử dụng overallStatus thay thế */
+  /** @deprecated @legacy Sử dụng overallStatus / qualityStatus thay thế */
   conclusion?: string;
-  /** @deprecated @legacy Sử dụng overallStatus thay thế */
+  /** @deprecated @legacy Sử dụng overallStatus / qualityStatus thay thế */
   conclusionStatus?: string;
-  /** @deprecated @legacy Sử dụng overallStatus thay thế */
-  qualityStatus?: string;
-  /** @deprecated @legacy Sử dụng overallStatus thay thế */
+  /** @deprecated @legacy Sử dụng overallStatus / qualityStatus thay thế */
   isPassed?: boolean;
-  /** @deprecated @legacy Sử dụng overallStatus thay thế */
+  /** @deprecated @legacy Sử dụng overallStatus / qualityStatus thay thế */
   passed?: boolean;
-  /** @deprecated @legacy Sử dụng overallStatus thay thế */
+  /** @deprecated @legacy Sử dụng overallStatus / qualityStatus thay thế */
   pass?: boolean;
+}
+
+/**
+ * Chuyển đổi an toàn từ TestResult sang CanonicalTestResult (Model 1)
+ */
+export function toCanonicalTestResult(
+  tr: TestResult,
+  fallbackProductId?: string
+): CanonicalTestResult {
+  const normQualityStatus: CanonicalQualityStatus =
+    (tr.qualityStatus as CanonicalQualityStatus) || tr.overallStatus || 'UNKNOWN';
+
+  let normWorkflowStatus: 'DRAFT' | 'FINAL' | 'APPROVED' | 'RELEASED' = 'DRAFT';
+  if (
+    tr.workflowStatus === 'APPROVED' ||
+    tr.workflowStatus === 'RELEASED' ||
+    tr.workflowStatus === 'FINAL'
+  ) {
+    normWorkflowStatus = tr.workflowStatus;
+  } else if (tr.workflowStatus === 'SUBMITTED') {
+    normWorkflowStatus = 'DRAFT';
+  } else if (tr.workflowStatus === 'REJECTED' || tr.workflowStatus === 'SUPERSEDED') {
+    normWorkflowStatus = 'FINAL';
+  }
+
+  const createdTs =
+    typeof tr.createdAt === 'number' ? tr.createdAt : Date.parse(tr.createdAt || '') || Date.now();
+
+  const updatedTs =
+    typeof tr.updatedAt === 'number'
+      ? tr.updatedAt
+      : (tr.updatedAt ? Date.parse(tr.updatedAt) : createdTs) || createdTs;
+
+  const criteriaList: CriterionResult[] = tr.criteria || tr.results || [];
+
+  return {
+    id: tr.id,
+    batchId: tr.batchId,
+    productId: tr.productId || tr.batch?.productId || fallbackProductId || '',
+    criteria: criteriaList,
+    qualityStatus: normQualityStatus,
+    workflowStatus: normWorkflowStatus,
+    evaluationSnapshot: tr.evaluationSnapshot,
+    evaluationHash: tr.evaluationHash || tr.evaluationSnapshot?.evaluationHash,
+    version: tr.version ?? 1,
+    createdAt: createdTs,
+    updatedAt: updatedTs,
+  };
 }
