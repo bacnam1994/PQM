@@ -53,47 +53,10 @@ export class OverallResultEvaluator {
         continue;
       }
 
-      // Xử lý CONDITIONAL_CHECK: Nếu chỉ tiêu rớt này là chỉ tiêu CHÍNH kích hoạt kiểm tra chỉ tiêu phụ
-      const condRuleWhereThisIsMain = rules.find(
-        (r) =>
-          r.type === EVALUATION_RULE.CONDITIONAL_CHECK && isNameMatch(r.main, fail.criteriaName)
-      );
-
-      if (condRuleWhereThisIsMain) {
-        const isTriggered = CriterionEvaluator.checkRange(
-          condRuleWhereThisIsMain.conditionValue || '',
-          String(fail.value)
-        );
-
-        if (isTriggered === true) {
-          const altResult = results.find((r) =>
-            isNameMatch(r.criteriaName, condRuleWhereThisIsMain.alt)
-          );
-          const altValStr =
-            altResult?.value !== undefined && altResult?.value !== null
-              ? String(altResult.value).trim()
-              : '';
-
-          // Nếu chỉ tiêu phụ chưa có kết quả -> Chờ kết quả phụ (PENDING), không kết luận FAIL ngay
-          if (
-            !altResult ||
-            altValStr === '' ||
-            altResult.isPass === null ||
-            altResult.isPass === undefined
-          ) {
-            hasPendingRetry = true;
-            continue;
-          }
-
-          // Chỉ khi chỉ tiêu phụ CÓ KẾT QUẢ VÀ RỚT -> mới kết luận FAIL
-          if (altResult.isPass === false) {
-            return 'FAIL';
-          }
-
-          // Chỉ tiêu phụ đạt -> Đã giải quyết được điều kiện, tiếp tục kiểm tra các lỗi khác
-          continue;
-        }
-      }
+      // LƯU Ý NGHIỆP VỤ CONDITIONAL_CHECK:
+      // CONDITIONAL_CHECK chỉ áp dụng khi "TC1 ĐẠT". Nếu TC1 KHÔNG ĐẠT, phiếu kiểm nghiệm
+      // lập tức bị đánh giá là KHÔNG ĐẠT (FAIL) độc lập với bất kỳ điều kiện thay thế nào.
+      // Do đó CONDITIONAL_CHECK không tham gia cứu (rescue) chỉ tiêu chính bị rớt.
 
       // Xử lý logic FAIL_RETRY (Stage 2)
       const retryRule = rules.find(
@@ -109,8 +72,7 @@ export class OverallResultEvaluator {
             ? String(altResult.value).trim()
             : '';
 
-        // Nếu chỉ tiêu phụ THỬ LẠI chưa có kết quả (hoặc chưa đánh giá xong)
-        // -> Phiếu ở trạng thái CHỜ KẾT QUẢ (PENDING), tuyệt đối KHÔNG đánh FAIL!
+        // Nếu chỉ tiêu phụ chưa có kết quả -> Đang chờ kết quả phụ (PENDING), không kết luận FAIL ngay
         if (
           !altResult ||
           altValStr === '' ||
@@ -121,13 +83,13 @@ export class OverallResultEvaluator {
           continue;
         }
 
-        // Chỉ khi chỉ tiêu phụ CÓ KẾT QUẢ VÀ BỊ RỚT (FAIL) thì mới kết luận toàn phiếu FAIL
-        if (altResult.isPass === false) {
-          return 'FAIL';
+        // Nếu chỉ tiêu phụ ĐẠT -> Đã cứu được chỉ tiêu chính
+        if (altResult.isPass === true) {
+          continue;
         }
 
-        // Nếu altResult.isPass === true -> Đã được cứu bởi chỉ tiêu thay thế, tiếp tục duyệt các lỗi khác
-        continue;
+        // Chỉ tiêu phụ cũng rớt -> Thất bại hoàn toàn
+        return 'FAIL';
       }
 
       // Không thuộc diện miễn kiểm, cũng không có luật thay thế cứu -> Đánh rớt phiếu
@@ -140,10 +102,15 @@ export class OverallResultEvaluator {
     for (const rule of conditionalRules) {
       const mainResult = results.find((r) => isNameMatch(r.criteriaName, rule.main));
       if (mainResult && mainResult.value !== undefined && mainResult.value !== '') {
+        const isMainPass = mainResult.isPass === true;
+        // CONDITIONAL_CHECK chỉ kích hoạt khi TC1 ĐẠT! Nếu TC1 rớt, đã bị bắt ở Bước 1.
+        if (!isMainPass) continue;
+
         // Kiểm tra xem giá trị chỉ tiêu chính có kích hoạt điều kiện phải làm thêm không
-        const isTriggered = CriterionEvaluator.checkRange(
-          rule.conditionValue || '',
-          String(mainResult.value)
+        const isTriggered = AlternateRuleResolver.isConditionalCheckTriggered(
+          rule.conditionValue,
+          mainResult.value,
+          isMainPass
         );
 
         if (isTriggered === true) {

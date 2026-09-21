@@ -188,7 +188,7 @@ describe('Audit Remediation — 42 Scenarios Regression Suite (GMP & ALCOA+)', (
         {
           name: 'Tổng số vi sinh hiếu khí (TAMC)',
           type: CriterionType.NUMBER,
-          max: 1000,
+          max: 10000,
           unit: 'CFU/g',
         },
       ],
@@ -216,7 +216,7 @@ describe('Audit Remediation — 42 Scenarios Regression Suite (GMP & ALCOA+)', (
 
     it('20. condition triggered -> E.coli bắt buộc kiểm (nếu thiếu -> PENDING)', () => {
       const results = [
-        { criteriaName: 'Tổng số vi sinh hiếu khí (TAMC)', value: '1500', isPass: false },
+        { criteriaName: 'Tổng số vi sinh hiếu khí (TAMC)', value: '1500', isPass: true },
       ];
       const status = OverallResultEvaluator.calculateOverallStatus(
         results as any,

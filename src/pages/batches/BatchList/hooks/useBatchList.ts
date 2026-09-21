@@ -289,9 +289,13 @@ export function useBatchList() {
         title: 'Cập nhật trạng thái',
         message: `Đã chuyển trạng thái lô sang: ${pendingStatusUpdate.status}`,
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Lỗi cập nhật trạng thái:', error);
-      notify({ type: 'ERROR', message: 'Không thể cập nhật trạng thái lô.' });
+      notify({
+        type: 'ERROR',
+        title: 'Lỗi cập nhật trạng thái',
+        message: error?.message || 'Không thể cập nhật trạng thái lô.',
+      });
     } finally {
       setIsStatusConfirmOpen(false);
       setPendingStatusUpdate(null);

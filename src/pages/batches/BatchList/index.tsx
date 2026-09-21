@@ -495,27 +495,45 @@ export const BatchList: React.FC = () => {
               Bạn có chắc chắn muốn chuyển trạng thái lô hàng sang{' '}
               <strong className="text-emerald-600">
                 {pendingStatusUpdate?.status === 'RELEASED'
-                  ? 'PHÊ DUYỆT'
+                  ? 'PHÊ DUYỆT (RELEASED)'
                   : pendingStatusUpdate?.status === 'REJECTED'
-                    ? 'TỪ CHỐI'
-                    : pendingStatusUpdate?.status}
+                    ? 'TỪ CHỐI (REJECTED)'
+                    : pendingStatusUpdate?.status === 'TESTING'
+                      ? 'ĐANG KIỂM (TESTING)'
+                      : pendingStatusUpdate?.status === 'PENDING'
+                        ? 'CHỜ KIỂM (PENDING)'
+                        : pendingStatusUpdate?.status === 'BLOCKED'
+                          ? 'KHÓA LÔ (BLOCKED)'
+                          : pendingStatusUpdate?.status}
               </strong>{' '}
               không?
             </p>
-            {pendingStatusUpdate?.status === 'REJECTED' && (
-              <div>
-                <label className="text-xs font-semibold text-ink-muted block mb-1">
-                  Lý do từ chối:
-                </label>
-                <textarea
-                  className="w-full border border-border rounded-lg p-3 text-xs bg-surface-2 text-ink focus:ring-2 focus:ring-emerald-500 outline-none"
-                  placeholder="Nhập lý do từ chối..."
-                  value={rejectReason}
-                  onChange={(e) => setRejectReason(e.target.value)}
-                  rows={3}
-                />
-              </div>
-            )}
+            <div>
+              <label className="text-xs font-semibold text-ink-muted block mb-1">
+                Lý do / Ghi chú điều chỉnh:
+                {pendingStatusUpdate?.status === 'REJECTED' ||
+                pendingStatusUpdate?.status === 'BLOCKED' ? (
+                  <span className="text-rose-500 font-bold ml-1">* Bắt buộc</span>
+                ) : (
+                  <span className="text-ink-muted font-normal ml-1">
+                    (Tùy chọn cho Quản trị viên)
+                  </span>
+                )}
+              </label>
+              <textarea
+                className="w-full border border-border rounded-lg p-3 text-xs bg-surface-2 text-ink focus:ring-2 focus:ring-emerald-500 outline-none"
+                placeholder={
+                  pendingStatusUpdate?.status === 'REJECTED'
+                    ? 'Nhập lý do từ chối lô...'
+                    : pendingStatusUpdate?.status === 'BLOCKED'
+                      ? 'Nhập lý do khóa / thu hồi lô...'
+                      : 'Nhập ghi chú hoặc lý do thay đổi trạng thái (Quản trị viên có thể để trống)...'
+                }
+                value={rejectReason}
+                onChange={(e) => setRejectReason(e.target.value)}
+                rows={3}
+              />
+            </div>
           </div>
         }
         confirmText="Đồng ý"

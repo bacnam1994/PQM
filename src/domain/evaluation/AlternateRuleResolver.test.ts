@@ -41,7 +41,7 @@ describe('AlternateRuleResolver & OverallResultEvaluator Suite', () => {
       {
         name: 'Độ ẩm',
         unit: '%',
-        max: 10,
+        max: 15,
         type: CriterionType.NUMBER,
       },
       {
@@ -196,7 +196,7 @@ describe('AlternateRuleResolver & OverallResultEvaluator Suite', () => {
     it('2.2. TC1 KÍCH HOẠT điều kiện (Độ ẩm 12% > 10%), TC2 CHƯA CÓ KẾT QUẢ -> TC2 PENDING -> Overall PENDING', () => {
       const results: TestResultEntry[] = [
         { criteriaName: 'Định lượng Hoạt chất A', value: '100', isPass: true },
-        { criteriaName: 'Độ ẩm', value: '12', isPass: false }, // > 10%
+        { criteriaName: 'Độ ẩm', value: '12', isPass: true }, // <= 15% (ĐẠT) nhưng > 10% (kích hoạt)
         { criteriaName: 'Cảm quan', value: 'Bột màu trắng', isPass: true },
       ];
 
@@ -220,7 +220,7 @@ describe('AlternateRuleResolver & OverallResultEvaluator Suite', () => {
     it('2.3. TC1 KÍCH HOẠT điều kiện, TC2 CÓ KẾT QUẢ ĐẠT (aw = 0.5 <= 0.6) -> Overall PASS', () => {
       const results: TestResultEntry[] = [
         { criteriaName: 'Định lượng Hoạt chất A', value: '100', isPass: true },
-        { criteriaName: 'Độ ẩm', value: '12', isPass: false },
+        { criteriaName: 'Độ ẩm', value: '12', isPass: true },
         { criteriaName: 'Hoạt độ nước (aw)', value: '0.5', isPass: true },
         { criteriaName: 'Cảm quan', value: 'Bột màu trắng', isPass: true },
       ];
@@ -235,15 +235,14 @@ describe('AlternateRuleResolver & OverallResultEvaluator Suite', () => {
       expect(altStatus.alternateState).toBe('TRIGGERED_PASS');
       expect(altStatus.displayBadge?.label).toBe('ĐẠT');
 
-      // Do Độ ẩm có rule CONDITIONAL_CHECK và aw đạt -> Độ ẩm được giải quyết
-      // Tuy nhiên trong logic, nếu Độ ẩm rớt và có CONDITIONAL_CHECK:
-      // overall = PASS nếu các chỉ tiêu khác đều đạt
+      const overall = OverallResultEvaluator.calculateOverallStatus(results, baseTccs);
+      expect(overall).toBe('PASS');
     });
 
     it('2.4. TC1 KÍCH HOẠT điều kiện, TC2 CÓ KẾT QUẢ K.ĐẠT (aw = 0.75 > 0.6) -> Overall FAIL', () => {
       const results: TestResultEntry[] = [
         { criteriaName: 'Định lượng Hoạt chất A', value: '100', isPass: true },
-        { criteriaName: 'Độ ẩm', value: '12', isPass: false },
+        { criteriaName: 'Độ ẩm', value: '12', isPass: true },
         { criteriaName: 'Hoạt độ nước (aw)', value: '0.75', isPass: false },
         { criteriaName: 'Cảm quan', value: 'Bột màu trắng', isPass: true },
       ];
@@ -307,6 +306,179 @@ describe('AlternateRuleResolver & OverallResultEvaluator Suite', () => {
       expect(status.isMain).toBe(false);
       expect(status.isAlt).toBe(true);
       expect(status.pairedCriterionName).toBe('Định lượng Hoạt chất A');
+    });
+  });
+
+  describe('5. Quy trình tự động chuẩn: Arsen tổng số (TC1) & Arsen vô cơ (TC2)', () => {
+    const arsenicTCCS: TCCS = {
+      id: 'tccs-arsenic',
+      productId: 'prod-arsenic',
+      code: 'TCCS-ARSENIC',
+      issueDate: '2026-01-01',
+      isActive: true,
+      version: 1,
+      createdAt: '2026-01-01',
+      mainQualityCriteria: [
+        {
+          name: 'Arsen (As) tổng số',
+          unit: 'mg/kg',
+          max: 5,
+          type: CriterionType.NUMBER,
+        },
+        {
+          name: 'Arsen vô cơ',
+          unit: 'mg/kg',
+          max: 1.5,
+          type: CriterionType.NUMBER,
+        },
+      ],
+      safetyCriteria: [],
+      alternateRules: [
+        {
+          id: 'rule-arsenic',
+          main: 'Arsen (As) tổng số',
+          alt: 'Arsen vô cơ',
+          type: 'CONDITIONAL_CHECK',
+          conditionValue: '1.5', // UI nhập số 1.5
+        },
+      ],
+    };
+
+    it('5.1. Arsen tổng số (TC1) KHÔNG ĐẠT (> 5 mg/kg) -> Phiếu lập tức FAIL độc lập với mọi điều kiện thay thế', () => {
+      // 5.1a. TC1 rớt (6 mg/kg), TC2 chưa có kết quả -> Vẫn FAIL ngay lập tức, KHÔNG bị giữ ở PENDING
+      const resultsWithoutTc2: TestResultEntry[] = [
+        { criteriaName: 'Arsen (As) tổng số', value: '6', isPass: false },
+      ];
+      expect(OverallResultEvaluator.calculateOverallStatus(resultsWithoutTc2, arsenicTCCS)).toBe(
+        'FAIL'
+      );
+
+      // 5.1b. TC1 rớt (6 mg/kg), ngay cả khi TC2 đạt (1.0 mg/kg) -> Vẫn FAIL (CONDITIONAL_CHECK không thể cứu TC1)
+      const resultsWithPassingTc2: TestResultEntry[] = [
+        { criteriaName: 'Arsen (As) tổng số', value: '6', isPass: false },
+        { criteriaName: 'Arsen vô cơ', value: '1.0', isPass: true },
+      ];
+      expect(
+        OverallResultEvaluator.calculateOverallStatus(resultsWithPassingTc2, arsenicTCCS)
+      ).toBe('FAIL');
+
+      // TC2 được giải quyết trạng thái là NOT_TRIGGERED do TC1 không đạt
+      const tc2Status = AlternateRuleResolver.resolveCriterionState(
+        'Arsen vô cơ',
+        undefined,
+        resultsWithoutTc2,
+        arsenicTCCS
+      );
+      expect(tc2Status.alternateState).toBe('NOT_TRIGGERED');
+    });
+
+    it('5.2. Arsen tổng số (TC1) ĐẠT và <= 1.5 mg/kg -> TC2 MIỄN KIỂM, bỏ qua lỗi TC2, Overall ĐẠT (PASS)', () => {
+      // 5.2a. TC1 = 1.2 mg/kg (<= 1.5), TC2 bỏ trống -> TC2 được MIỄN KIỂM -> Overall PASS
+      const resultsEmptyTc2: TestResultEntry[] = [
+        { criteriaName: 'Arsen (As) tổng số', value: '1.2', isPass: true },
+      ];
+      const tc2StatusEmpty = AlternateRuleResolver.resolveCriterionState(
+        'Arsen vô cơ',
+        undefined,
+        resultsEmptyTc2,
+        arsenicTCCS
+      );
+      expect(tc2StatusEmpty.isExempted).toBe(true);
+      expect(tc2StatusEmpty.alternateState).toBe('EXEMPTED');
+      expect(tc2StatusEmpty.displayBadge?.label).toBe('MIỄN KIỂM');
+      expect(OverallResultEvaluator.calculateOverallStatus(resultsEmptyTc2, arsenicTCCS)).toBe(
+        'PASS'
+      );
+
+      // 5.2b. TC1 = 1.5 mg/kg (chính xác bằng 1.5, <= 1.5) -> TC2 được MIỄN KIỂM
+      const resultsExact15: TestResultEntry[] = [
+        { criteriaName: 'Arsen (As) tổng số', value: '1.5', isPass: true },
+      ];
+      const tc2Status15 = AlternateRuleResolver.resolveCriterionState(
+        'Arsen vô cơ',
+        undefined,
+        resultsExact15,
+        arsenicTCCS
+      );
+      expect(tc2Status15.isExempted).toBe(true);
+      expect(tc2Status15.alternateState).toBe('EXEMPTED');
+      expect(OverallResultEvaluator.calculateOverallStatus(resultsExact15, arsenicTCCS)).toBe(
+        'PASS'
+      );
+
+      // 5.2c. TC1 = 1.2 mg/kg ĐẠT, nhưng TC2 bị nhập kết quả không đạt (2.0 > 1.5) -> Hệ thống vẫn bỏ qua lỗi của TC2 -> Overall PASS
+      const resultsFailedTc2: TestResultEntry[] = [
+        { criteriaName: 'Arsen (As) tổng số', value: '1.2', isPass: true },
+        { criteriaName: 'Arsen vô cơ', value: '2.0', isPass: false },
+      ];
+      const tc2StatusFailed = AlternateRuleResolver.resolveCriterionState(
+        'Arsen vô cơ',
+        '2.0',
+        resultsFailedTc2,
+        arsenicTCCS
+      );
+      expect(tc2StatusFailed.isExempted).toBe(true);
+      expect(tc2StatusFailed.alternateState).toBe('EXEMPTED');
+      expect(OverallResultEvaluator.calculateOverallStatus(resultsFailedTc2, arsenicTCCS)).toBe(
+        'PASS'
+      );
+    });
+
+    it('5.3. Arsen tổng số (TC1) ĐẠT và > 1.5 mg/kg -> Bắt buộc kiểm tra TC2', () => {
+      // 5.3a. TC1 = 2.0 mg/kg (> 1.5 và <= 5), TC2 ĐẠT (1.0 mg/kg <= 1.5) -> Overall ĐẠT (PASS)
+      const resultsPassBoth: TestResultEntry[] = [
+        { criteriaName: 'Arsen (As) tổng số', value: '2.0', isPass: true },
+        { criteriaName: 'Arsen vô cơ', value: '1.0', isPass: true },
+      ];
+      const tc2StatusPass = AlternateRuleResolver.resolveCriterionState(
+        'Arsen vô cơ',
+        '1.0',
+        resultsPassBoth,
+        arsenicTCCS
+      );
+      expect(tc2StatusPass.isRequired).toBe(true);
+      expect(tc2StatusPass.alternateState).toBe('TRIGGERED_PASS');
+      expect(tc2StatusPass.displayBadge?.label).toBe('ĐẠT');
+      expect(OverallResultEvaluator.calculateOverallStatus(resultsPassBoth, arsenicTCCS)).toBe(
+        'PASS'
+      );
+
+      // 5.3b. TC1 = 2.0 mg/kg, TC2 KHÔNG ĐẠT (2.0 mg/kg > 1.5) -> Overall KHÔNG ĐẠT (FAIL)
+      const resultsFailTc2: TestResultEntry[] = [
+        { criteriaName: 'Arsen (As) tổng số', value: '2.0', isPass: true },
+        { criteriaName: 'Arsen vô cơ', value: '2.0', isPass: false },
+      ];
+      const tc2StatusFail = AlternateRuleResolver.resolveCriterionState(
+        'Arsen vô cơ',
+        '2.0',
+        resultsFailTc2,
+        arsenicTCCS
+      );
+      expect(tc2StatusFail.isRequired).toBe(true);
+      expect(tc2StatusFail.alternateState).toBe('TRIGGERED_FAIL');
+      expect(tc2StatusFail.displayBadge?.label).toBe('K.ĐẠT');
+      expect(OverallResultEvaluator.calculateOverallStatus(resultsFailTc2, arsenicTCCS)).toBe(
+        'FAIL'
+      );
+
+      // 5.3c. TC1 = 2.0 mg/kg, TC2 BỎ TRỐNG (chưa có kết quả) -> Giữ ở mức PENDING
+      const resultsPendingTc2: TestResultEntry[] = [
+        { criteriaName: 'Arsen (As) tổng số', value: '2.0', isPass: true },
+        { criteriaName: 'Arsen vô cơ', value: '', isPass: null },
+      ];
+      const tc2StatusPending = AlternateRuleResolver.resolveCriterionState(
+        'Arsen vô cơ',
+        '',
+        resultsPendingTc2,
+        arsenicTCCS
+      );
+      expect(tc2StatusPending.isRequired).toBe(true);
+      expect(tc2StatusPending.isPending).toBe(true);
+      expect(tc2StatusPending.alternateState).toBe('TRIGGERED_PENDING');
+      expect(tc2StatusPending.displayBadge?.label).toBe('CHỜ KẾT QUẢ');
+      expect(OverallResultEvaluator.calculateOverallStatus(resultsPendingTc2, arsenicTCCS)).toBe(
+        'PENDING'
+      );
     });
   });
 });

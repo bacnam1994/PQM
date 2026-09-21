@@ -1,5 +1,6 @@
 import { AlternateEvaluationResult } from './EvaluationTypes';
 import { CriterionEvaluator } from './CriterionEvaluator';
+import { AlternateRuleResolver } from './AlternateRuleResolver';
 import { AlternateRule } from '../../types';
 import { isCriteriaMatch } from '../../utils/aiMapping';
 
@@ -145,11 +146,15 @@ export class AlternateRuleEvaluator {
     }
 
     if (isMainPass) {
-      // Dùng CriterionEvaluator để kiểm tra chính xác toán tử của điều kiện
+      // Dùng AlternateRuleResolver để kiểm tra chính xác toán tử của điều kiện
       if (rule.type === 'CONDITIONAL_CHECK') {
         const conditionText = rule.conditionValue || '';
         if (!conditionText) return false;
-        const isTriggered = CriterionEvaluator.checkRange(conditionText, String(mainVal));
+        const isTriggered = AlternateRuleResolver.isConditionalCheckTriggered(
+          conditionText,
+          mainVal,
+          isMainPass
+        );
         // Nếu điều kiện không bị kích hoạt -> Được miễn kiểm
         return isTriggered !== true;
       }

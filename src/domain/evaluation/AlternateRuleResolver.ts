@@ -101,6 +101,34 @@ export class AlternateRuleResolver {
   }
 
   /**
+   * Chuẩn hóa và kiểm tra xem điều kiện CONDITIONAL_CHECK có bị kích hoạt không.
+   * Quy tắc nghiệp vụ:
+   * 1. Chỉ tiêu chính TC1 BẮT BUỘC PHẢI ĐẠT (isMainPass === true). Nếu TC1 rớt, điều kiện bổ sung không kích hoạt.
+   * 2. Nếu conditionValue là số đơn thuần không kèm toán tử (ví dụ "1.5", "1000"),
+   *    do quy tắc CONDITIONAL_CHECK là "Nếu TC1 ĐẠT và > Giá trị -> Kiểm tra TC2",
+   *    toán tử mặc định là ">".
+   * 3. Nếu conditionValue đã có toán tử (ví dụ "> 1.5", ">= 75", "<= 10"), giữ nguyên toán tử đó.
+   */
+  static isConditionalCheckTriggered(
+    conditionValue: string | undefined,
+    mainVal: any,
+    isMainPass: boolean
+  ): boolean {
+    if (!isMainPass) return false;
+    if (
+      conditionValue === undefined ||
+      conditionValue === null ||
+      String(conditionValue).trim() === ''
+    ) {
+      return false;
+    }
+    const condStr = String(conditionValue).trim();
+    const hasOperator = /^(<=|≤|>=|≥|<|>|NMT|NLT)/i.test(condStr);
+    const normalizedCond = hasOperator ? condStr : `> ${condStr}`;
+    return CriterionEvaluator.checkRange(normalizedCond, String(mainVal)) === true;
+  }
+
+  /**
    * Phân giải trạng thái Alternate Rule của một chỉ tiêu cụ thể
    */
   static resolveCriterionState(
@@ -139,7 +167,10 @@ export class AlternateRuleResolver {
       if (ruleType === 'FAIL_RETRY') {
         displayNote += ` Nếu không đạt, chỉ tiêu "${altName}" sẽ được kích hoạt để đánh giá lại.`;
       } else {
-        displayNote += ` Khi đạt điều kiện "${ruleAsMain.conditionValue || ''}", chỉ tiêu "${altName}" sẽ được kích hoạt.`;
+        const condStr = ruleAsMain.conditionValue ? String(ruleAsMain.conditionValue).trim() : '';
+        const hasOp = /^(<=|≤|>=|≥|<|>|NMT|NLT)/i.test(condStr);
+        const displayCond = condStr ? (hasOp ? condStr : `> ${condStr}`) : '';
+        displayNote += ` Khi đạt điều kiện "${displayCond}", chỉ tiêu "${altName}" sẽ được kích hoạt.`;
       }
 
       return {
@@ -307,11 +338,38 @@ export class AlternateRuleResolver {
     // 2.2. Quy tắc CONDITIONAL_CHECK
     if (ruleType === 'CONDITIONAL_CHECK') {
       const conditionText = rule.conditionValue || '';
-      const isTriggered = CriterionEvaluator.checkRange(conditionText, String(mainVal));
+      const hasOperator = /^(<=|≤|>=|≥|<|>|NMT|NLT)/i.test(conditionText.trim());
+      const displayCond = hasOperator ? conditionText : `> ${conditionText}`;
 
-      if (isTriggered !== true) {
+      // Nếu chỉ tiêu chính KHÔNG ĐẠT:
+      // CONDITIONAL_CHECK chỉ áp dụng khi "TC1 ĐẠT". Nếu TC1 rớt, phiếu lập tức bị FAIL độc lập, TC2 không kích hoạt và không cứu.
+      if (!isMainPass) {
+        const note = `Chỉ tiêu chính "${mainName}" không đạt yêu cầu. Phiếu kiểm nghiệm không đạt độc lập với quy tắc thay thế.`;
+        return {
+          alternateState: 'NOT_TRIGGERED',
+          isParticipating: true,
+          isMain: false,
+          isAlt: true,
+          rule,
+          pairedCriterionName: mainName,
+          isExempted: false,
+          isRequired: false,
+          isPending: false,
+          displayBadge: {
+            label: `↳ Phụ thuộc ${mainName}`,
+            variant: 'INFO',
+            tooltip: note,
+          },
+          displayNote: note,
+        };
+      }
+
+      // Chỉ tiêu chính ĐẠT -> Kiểm tra xem có kích hoạt điều kiện bổ sung không
+      const isTriggered = this.isConditionalCheckTriggered(conditionText, mainVal, isMainPass);
+
+      if (!isTriggered) {
         // Điều kiện KHÔNG kích hoạt -> Được MIỄN KIỂM
-        const note = `Miễn kiểm: "${mainName}" = ${mainVal} không kích hoạt điều kiện "${conditionText}".`;
+        const note = `Miễn kiểm: "${mainName}" = ${mainVal} không kích hoạt điều kiện "${displayCond}".`;
         return {
           alternateState: 'EXEMPTED',
           isParticipating: true,
@@ -332,7 +390,7 @@ export class AlternateRuleResolver {
       } else {
         // Điều kiện BỊ KÍCH HOẠT -> Chỉ tiêu phụ TRỞ THÀNH BẮT BUỘC!
         if (!hasCurVal) {
-          const note = `Bắt buộc kiểm tra: "${mainName}" = ${mainVal} kích hoạt điều kiện "${conditionText}".`;
+          const note = `Bắt buộc kiểm tra: "${mainName}" = ${mainVal} kích hoạt điều kiện "${displayCond}".`;
           return {
             alternateState: 'TRIGGERED_PENDING',
             isParticipating: true,
@@ -362,7 +420,7 @@ export class AlternateRuleResolver {
         }
 
         if (isAltPass) {
-          const note = `Đạt yêu cầu khi kích hoạt điều kiện "${conditionText}".`;
+          const note = `Đạt yêu cầu khi kích hoạt điều kiện "${displayCond}".`;
           return {
             alternateState: 'TRIGGERED_PASS',
             isParticipating: true,
@@ -381,7 +439,7 @@ export class AlternateRuleResolver {
             displayNote: note,
           };
         } else {
-          const note = `Không đạt yêu cầu khi kích hoạt điều kiện "${conditionText}".`;
+          const note = `Không đạt yêu cầu khi kích hoạt điều kiện "${displayCond}".`;
           return {
             alternateState: 'TRIGGERED_FAIL',
             isParticipating: true,
@@ -434,9 +492,12 @@ export class AlternateRuleResolver {
           `(*) Chỉ tiêu "${r.main}" được áp dụng quy tắc thay thế với "${r.alt}". Nếu "${r.main}" không đạt yêu cầu, "${r.alt}" trở thành chỉ tiêu bắt buộc để đánh giá lại chất lượng lô${cond}.`
         );
       } else {
-        const cond = r.conditionValue ? ` ${r.conditionValue}` : '';
+        const condStr = r.conditionValue ? String(r.conditionValue).trim() : '';
+        const hasOp = /^(<=|≤|>=|≥|<|>|NMT|NLT)/i.test(condStr);
+        const displayCond = condStr ? (hasOp ? condStr : `> ${condStr}`) : '';
+        const cond = displayCond ? ` (${displayCond})` : '';
         notes.push(
-          `(*) Chỉ tiêu "${r.alt}" phụ thuộc vào kết quả của "${r.main}". Chỉ bắt buộc kiểm nghiệm "${r.alt}" khi "${r.main}" kích hoạt điều kiện:${cond}. Khi không kích hoạt, "${r.alt}" được miễn kiểm.`
+          `(*) Chỉ tiêu "${r.alt}" phụ thuộc vào kết quả của "${r.main}". Chỉ bắt buộc kiểm nghiệm "${r.alt}" khi "${r.main}" đạt và vượt ngưỡng${cond}. Khi không kích hoạt, "${r.alt}" được miễn kiểm.`
         );
       }
     });

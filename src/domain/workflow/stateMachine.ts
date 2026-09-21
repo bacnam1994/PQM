@@ -31,6 +31,7 @@ export interface TransitionContext {
   actorId?: string;
   reason?: string;
   conditionsMet?: boolean;
+  adminOverride?: boolean;
 }
 
 export interface WorkflowHistoryEntry<TState> {
@@ -86,7 +87,14 @@ export class BatchStateMachine {
   /**
    * Trả về danh sách các trạng thái hợp lệ tiếp theo từ trạng thái hiện tại
    */
-  public static getValidNextStates(fromState: BatchStatus): BatchStatus[] {
+  public static getValidNextStates(fromState: BatchStatus, actorRole?: string): BatchStatus[] {
+    const isAdmin = String(actorRole || '').toUpperCase() === 'ADMIN';
+    if (isAdmin) {
+      // Quản trị viên (ADMIN) có quyền quyết định tối đa trong workflow, được phép chuyển sang bất kỳ trạng thái nào
+      return (['PENDING', 'TESTING', 'RELEASED', 'REJECTED', 'BLOCKED'] as BatchStatus[]).filter(
+        (s) => s !== fromState
+      );
+    }
     return this.VALID_TRANSITIONS[fromState] || [];
   }
 
@@ -99,6 +107,53 @@ export class BatchStateMachine {
     context?: TransitionContext
   ): { allowed: boolean; reason?: string } {
     if (fromState === toState) {
+      return { allowed: true };
+    }
+
+    const isAdmin = String(context?.actorRole || '').toUpperCase() === 'ADMIN';
+
+    // ĐẶC QUYỀN TỐI CAO CỦA QUẢN TRỊ VIÊN (ADMIN ABSOLUTE OVERRIDE):
+    // Quản trị viên (ADMIN) trong workflow có quyền quyết định tối đa, được phép can thiệp bỏ qua mọi ràng buộc
+    if (isAdmin && (context?.adminOverride || context?.reason?.includes('ADMIN'))) {
+      return { allowed: true };
+    }
+
+    // Bất biến tuyệt đối ALCOA+: Lô đã xuất xưởng (RELEASED) ra thị trường chỉ có thể chuyển sang BLOCKED để thu hồi/recall,
+    // không được phép đảo ngược trực tiếp về PENDING, TESTING hay REJECTED nhằm bảo đảm tính toàn vẹn hồ sơ lô.
+    if (fromState === 'RELEASED' && toState !== 'BLOCKED') {
+      return {
+        allowed: false,
+        reason: `Chuyển đổi trạng thái không hợp lệ: Lô đã xuất xưởng (RELEASED) chỉ có thể chuyển sang BLOCKED để thu hồi, không thể chuyển sang ${toState}.`,
+      };
+    }
+
+    // Bất biến: Không thể chuyển trực tiếp từ PENDING sang RELEASED (bắt buộc phải qua TESTING)
+    if (fromState === 'PENDING' && toState === 'RELEASED') {
+      return {
+        allowed: false,
+        reason: 'Chuyển đổi trạng thái không hợp lệ: Không thể chuyển từ PENDING sang RELEASED.',
+      };
+    }
+
+    // Bất biến: Lô đang kiểm nghiệm (TESTING) không thể đảo ngược về PENDING
+    if (fromState === 'TESTING' && toState === 'PENDING') {
+      return {
+        allowed: false,
+        reason: 'Chuyển đổi trạng thái không hợp lệ: Không thể chuyển từ TESTING sang PENDING.',
+      };
+    }
+
+    // ĐẶC QUYỀN TỐI ĐA CHO QUẢN TRỊ VIÊN (ADMIN OVERRIDE):
+    // Quản trị viên (ADMIN) có thẩm quyền tối cao được phép can thiệp, phục hồi và điều chỉnh trạng thái Lô
+    // (Bao gồm phục hồi lô bị từ chối từ REJECTED sang TESTING hoặc PENDING, BLOCKED sang TESTING hoặc PENDING, v.v.)
+    if (isAdmin) {
+      // Khi chuyển sang RELEASED, Quản trị viên vẫn phải bảo đảm điều kiện kiểm nghiệm chất lượng đạt chuẩn
+      if (toState === 'RELEASED' && context?.conditionsMet === false) {
+        return {
+          allowed: false,
+          reason: 'Điều kiện kiểm nghiệm chất lượng chưa đạt để chuyển sang RELEASED.',
+        };
+      }
       return { allowed: true };
     }
 

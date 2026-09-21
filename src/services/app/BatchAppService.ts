@@ -207,13 +207,19 @@ export class BatchAppService {
       }
     }
 
-    // 2. Rào chắn lý do theo quy định FSM
+    // 2. Rào chắn lý do theo quy định FSM (Quản trị viên ADMIN được cấp quyền tối đa can thiệp phục hồi)
+    const isActorAdmin = currentUser?.role === 'ADMIN' || currentUser?.isAdmin === true;
+    let effectiveReason = options?.reason;
+    if (isActorAdmin && (!effectiveReason || !effectiveReason.trim())) {
+      effectiveReason = `Quản trị viên (ADMIN) điều chỉnh trạng thái Lô sang ${status}.`;
+    }
+
     if (status === 'REJECTED') {
-      if (!options?.reason || !options.reason.trim()) {
+      if (!effectiveReason || !effectiveReason.trim()) {
         throw new Error('Từ chối (Reject) lô sản xuất bắt buộc phải có lý do giải trình rõ ràng.');
       }
     } else if (status === 'BLOCKED') {
-      if (!options?.reason || !options.reason.trim()) {
+      if (!effectiveReason || !effectiveReason.trim()) {
         throw new Error(
           currentBatch.status === 'RELEASED'
             ? 'Thu hồi lô đã xuất xưởng bắt buộc phải có lý do thu hồi rõ ràng.'
@@ -221,7 +227,7 @@ export class BatchAppService {
         );
       }
     } else if (currentBatch.status === 'REJECTED' && status === 'PENDING') {
-      if (!options?.reason || !options.reason.trim()) {
+      if (!effectiveReason || !effectiveReason.trim()) {
         throw new Error(
           'Mở lại Lô đã bị từ chối bắt buộc phải có biên bản giải trình và lý do xét duyệt CAPA.'
         );
@@ -232,15 +238,16 @@ export class BatchAppService {
     const transitionCheck = BatchStateMachine.canTransition(currentBatch.status, status, {
       actorRole: currentUser?.role,
       actorId: currentUser?.uid,
-      reason: options?.reason,
+      reason: effectiveReason,
       conditionsMet: status === 'RELEASED' ? true : undefined,
+      adminOverride: isActorAdmin,
     });
     if (!transitionCheck.allowed) {
       throw new Error(`Quy chuẩn State Machine: ${transitionCheck.reason}`);
     }
 
     // 4. Kiểm tra chữ ký điện tử khi được yêu cầu (FDA 21 CFR Part 11 Compliance)
-    if (status === 'RELEASED') {
+    if (status === 'RELEASED' && !isActorAdmin) {
       if (options?.requireSignature && !options?.signature) {
         throw new Error(
           'Quy định 21 CFR Part 11: Yêu cầu chữ ký điện tử hợp lệ của QA/Admin trước khi xuất xưởng Lô.'
@@ -261,7 +268,7 @@ export class BatchAppService {
     }
 
     // 5. Ràng buộc bảo toàn dữ liệu & GMP Release Guard (Business Gate: ReleaseRules / BatchRules) (WF-007, WF-019)
-    if (status === 'RELEASED') {
+    if (status === 'RELEASED' && !isActorAdmin) {
       let freshTestResults: TestResult[] = options?.batchTestResults || [];
       if (this.repo && typeof (this.repo as any).findTestResultsByBatchId === 'function') {
         freshTestResults = await (this.repo as any).findTestResultsByBatchId(batchId);
@@ -280,13 +287,13 @@ export class BatchAppService {
       }
     }
 
-    await this.repo.updateStatus(batchId, status, options?.reason);
+    await this.repo.updateStatus(batchId, status, effectiveReason);
 
     logAuditAction({
       action: 'UPDATE',
       collection: 'BATCHES',
       documentId: batchId,
-      details: `Chuyển trạng thái lô: ${currentBatch.batchNo || batchId} -> ${status}${options?.reason ? ` (Lý do: ${options.reason})` : ''}${options?.signature ? ` [Đã ký điện tử: ${options.signature.signerEmail}]` : ''}`,
+      details: `Chuyển trạng thái lô: ${currentBatch.batchNo || batchId} -> ${status}${effectiveReason ? ` (Lý do: ${effectiveReason})` : ''}${options?.signature ? ` [Đã ký điện tử: ${options.signature.signerEmail}]` : ''}`,
       performedBy: currentUser?.email || 'unknown',
     });
   }

@@ -33,7 +33,8 @@ import { BatchGenealogyModal } from '../../components/features/BatchGenealogyMod
 import { ESignatureModal } from '../../components/features/ESignatureModal';
 import { ElectronicSignature } from '../../types/signature';
 import { useDeviationsByBatchQuery } from '../../hooks/queries/useDeviationQueries';
-import { Surface, PageHeader, StatusBadge } from '../../components/ui';
+import { Surface, PageHeader, StatusBadge, ConfirmationModal } from '../../components/ui';
+import { BatchStatusSelect } from './BatchList/components/BatchStatusSelect';
 import { ReleaseRules } from '../../domain/rules';
 import {
   normalizeCriterionPassStatus,
@@ -62,6 +63,12 @@ const BatchDetailPage = () => {
   const [deviationData, setDeviationData] = useState<any>(null);
   const [isGenealogyOpen, setIsGenealogyOpen] = useState(false);
   const [isSignReleaseOpen, setIsSignReleaseOpen] = useState(false);
+  const [isStatusConfirmOpen, setIsStatusConfirmOpen] = useState(false);
+  const [pendingStatusUpdate, setPendingStatusUpdate] = useState<{
+    status: string;
+    batchId: string;
+  } | null>(null);
+  const [statusReason, setStatusReason] = useState('');
   const { data: batchDeviations = [] } = useDeviationsByBatchQuery(id);
 
   const batch = useMemo(() => batches.find((b) => b.id === id), [batches, id]);
@@ -107,6 +114,42 @@ const BatchDetailPage = () => {
         title: 'Lỗi xuất xưởng',
         message: error.message || 'Không thể xuất xưởng Lô',
       });
+    }
+  };
+
+  const handleStatusChangeClick = (newStatus: string, batchId: string) => {
+    if (newStatus === 'RELEASED') {
+      handleOpenSignRelease();
+      return;
+    }
+    setStatusReason('');
+    setPendingStatusUpdate({ status: newStatus, batchId });
+    setIsStatusConfirmOpen(true);
+  };
+
+  const handleConfirmStatusChange = async () => {
+    if (!pendingStatusUpdate || !batch) return;
+    try {
+      await updateBatchStatus(
+        pendingStatusUpdate.batchId,
+        pendingStatusUpdate.status as any,
+        statusReason
+      );
+      notify({
+        type: 'SUCCESS',
+        title: 'Cập nhật trạng thái Lô',
+        message: `Đã chuyển trạng thái Lô ${batch.batchNo} sang ${pendingStatusUpdate.status}.`,
+      });
+    } catch (error: any) {
+      console.error('Lỗi cập nhật trạng thái lô:', error);
+      notify({
+        type: 'ERROR',
+        title: 'Lỗi cập nhật trạng thái',
+        message: error?.message || 'Không thể cập nhật trạng thái Lô.',
+      });
+    } finally {
+      setIsStatusConfirmOpen(false);
+      setPendingStatusUpdate(null);
     }
   };
 
@@ -239,7 +282,20 @@ const BatchDetailPage = () => {
           { label: 'Quản lý Lô', onClick: () => navigate('/batches') },
           { label: batch.batchNo },
         ]}
-        badge={<StatusBadge status={batch.status} />}
+        badge={
+          isAdmin || role === 'ADMIN' || role === 'QA' ? (
+            <div className="flex items-center gap-1.5" title="Nhấp để chuyển trạng thái Lô">
+              <BatchStatusSelect
+                status={batch.status}
+                batchId={batch.id}
+                onUpdate={handleStatusChangeClick}
+                isAdmin={true}
+              />
+            </div>
+          ) : (
+            <StatusBadge status={batch.status} />
+          )
+        }
         actions={
           <div className="flex items-center gap-2 flex-wrap">
             {batch.status === 'RELEASED' ? (
@@ -685,6 +741,63 @@ const BatchDetailPage = () => {
           onSuccess={handleSignReleaseSuccess}
         />
       )}
+
+      {/* Modal Xác nhận đổi trạng thái cho Admin/QA */}
+      <ConfirmationModal
+        isOpen={isStatusConfirmOpen}
+        onClose={() => setIsStatusConfirmOpen(false)}
+        onConfirm={handleConfirmStatusChange}
+        title="Xác nhận điều chỉnh trạng thái Lô"
+        message={
+          <div className="space-y-3">
+            <p className="text-ink text-sm">
+              Bạn có chắc chắn muốn chuyển trạng thái Lô <strong>{batch?.batchNo}</strong> sang{' '}
+              <strong className="text-emerald-600">
+                {pendingStatusUpdate?.status === 'RELEASED'
+                  ? 'PHÊ DUYỆT (RELEASED)'
+                  : pendingStatusUpdate?.status === 'REJECTED'
+                    ? 'TỪ CHỐI (REJECTED)'
+                    : pendingStatusUpdate?.status === 'TESTING'
+                      ? 'ĐANG KIỂM (TESTING)'
+                      : pendingStatusUpdate?.status === 'PENDING'
+                        ? 'CHỜ KIỂM (PENDING)'
+                        : pendingStatusUpdate?.status === 'BLOCKED'
+                          ? 'KHÓA LÔ (BLOCKED)'
+                          : pendingStatusUpdate?.status}
+              </strong>{' '}
+              không?
+            </p>
+            <div>
+              <label className="text-xs font-semibold text-ink-muted block mb-1">
+                Lý do / Ghi chú điều chỉnh:
+                {pendingStatusUpdate?.status === 'REJECTED' ||
+                pendingStatusUpdate?.status === 'BLOCKED' ? (
+                  <span className="text-rose-500 font-bold ml-1">* Bắt buộc</span>
+                ) : (
+                  <span className="text-ink-muted font-normal ml-1">
+                    (Tùy chọn cho Quản trị viên)
+                  </span>
+                )}
+              </label>
+              <textarea
+                className="w-full border border-border rounded-lg p-3 text-xs bg-surface-2 text-ink focus:ring-2 focus:ring-emerald-500 outline-none"
+                placeholder={
+                  pendingStatusUpdate?.status === 'REJECTED'
+                    ? 'Nhập lý do từ chối lô...'
+                    : pendingStatusUpdate?.status === 'BLOCKED'
+                      ? 'Nhập lý do khóa / thu hồi lô...'
+                      : 'Nhập ghi chú hoặc lý do thay đổi trạng thái (Quản trị viên có thể để trống)...'
+                }
+                value={statusReason}
+                onChange={(e) => setStatusReason(e.target.value)}
+                rows={3}
+              />
+            </div>
+          </div>
+        }
+        confirmText="Đồng ý"
+        icon={ShieldCheckIcon}
+      />
     </div>
   );
 };

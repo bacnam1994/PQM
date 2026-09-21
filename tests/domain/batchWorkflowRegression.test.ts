@@ -155,9 +155,17 @@ describe('Batch Workflow Regression Tests', () => {
       expect(BatchStateMachine.canTransition('RELEASED', 'REJECTED', admin).allowed).toBe(false);
     });
 
-    it('cấm tuyệt đối chuyển đổi từ REJECTED sang TESTING hoặc RELEASED', () => {
-      expect(BatchStateMachine.canTransition('REJECTED', 'TESTING', admin).allowed).toBe(false);
-      expect(BatchStateMachine.canTransition('REJECTED', 'RELEASED', admin).allowed).toBe(false);
+    it('REJECTED sang TESTING hoặc RELEASED bị cấm đối với QA/nhân viên, nhưng ADMIN được trao quyền tối đa phục hồi Lô', () => {
+      // QA không thể nhảy cóc từ REJECTED sang TESTING (bắt buộc mở lại PENDING qua CAPA)
+      expect(BatchStateMachine.canTransition('REJECTED', 'TESTING', qa).allowed).toBe(false);
+      // REJECTED sang RELEASED khi chưa kiểm nghiệm đạt bị chặn
+      expect(
+        BatchStateMachine.canTransition('REJECTED', 'RELEASED', { ...admin, conditionsMet: false })
+          .allowed
+      ).toBe(false);
+      // ADMIN có thẩm quyền tối cao được phép phục hồi Lô từ REJECTED sang TESTING và PENDING
+      expect(BatchStateMachine.canTransition('REJECTED', 'TESTING', admin).allowed).toBe(true);
+      expect(BatchStateMachine.canTransition('REJECTED', 'PENDING', admin).allowed).toBe(true);
     });
   });
 });

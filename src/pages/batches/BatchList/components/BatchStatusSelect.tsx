@@ -5,6 +5,7 @@ import {
   ArrowPathIcon,
   ClockIcon,
   ChevronUpDownIcon,
+  LockClosedIcon,
 } from '@heroicons/react/24/outline';
 import { StatusBadge } from '../../../../components';
 
@@ -29,6 +30,8 @@ export const BatchStatusSelect: React.FC<BatchStatusSelectProps> = ({
         return 'bg-rose-500/10 text-rose-700 dark:text-rose-400 border-rose-500/20 hover:bg-rose-500/20';
       case 'TESTING':
         return 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20 hover:bg-amber-500/20';
+      case 'BLOCKED':
+        return 'bg-purple-500/10 text-purple-700 dark:text-purple-400 border-purple-500/20 hover:bg-purple-500/20';
       default:
         return 'bg-surface-2 text-ink-muted border-border hover:bg-surface-3';
     }
@@ -42,6 +45,8 @@ export const BatchStatusSelect: React.FC<BatchStatusSelectProps> = ({
         return XMarkIcon;
       case 'TESTING':
         return ArrowPathIcon;
+      case 'BLOCKED':
+        return LockClosedIcon;
       default:
         return ClockIcon;
     }
@@ -64,12 +69,25 @@ export const BatchStatusSelect: React.FC<BatchStatusSelectProps> = ({
         onChange={(e) => onUpdate(e.target.value, batchId)}
         className={`appearance-none pl-6 pr-5 py-1 rounded-full text-xs font-medium border cursor-pointer outline-none focus:ring-2 focus:ring-emerald-500/20 transition-colors ${getStatusColor(status)}`}
       >
-        <option value="PENDING" className="bg-surface text-ink">Chờ kiểm</option>
-        <option value="TESTING" className="bg-surface text-ink">Đang kiểm</option>
-        <option value="RELEASED" className="bg-surface text-ink">Phê duyệt</option>
-        <option value="REJECTED" className="bg-surface text-ink">Từ chối</option>
+        <option value="PENDING" className="bg-surface text-ink">
+          Chờ kiểm
+        </option>
+        <option value="TESTING" className="bg-surface text-ink">
+          Đang kiểm
+        </option>
+        <option value="RELEASED" className="bg-surface text-ink">
+          Phê duyệt
+        </option>
+        <option value="REJECTED" className="bg-surface text-ink">
+          Từ chối
+        </option>
+        <option value="BLOCKED" className="bg-surface text-ink">
+          Khóa lô
+        </option>
       </select>
-      <div className={`absolute right-1.5 top-1/2 -translate-y-1/2 pointer-events-none opacity-50 group-hover/select:opacity-100 transition-opacity ${iconColor}`}>
+      <div
+        className={`absolute right-1.5 top-1/2 -translate-y-1/2 pointer-events-none opacity-50 group-hover/select:opacity-100 transition-opacity ${iconColor}`}
+      >
         <ChevronUpDownIcon className="h-3 w-3" />
       </div>
     </div>
