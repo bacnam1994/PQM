@@ -54,7 +54,7 @@ import {
   CanonicalTestStatus,
 } from '../test-result/testResultStatusResolver';
 import { isValidTestResultForBatch } from '../batch/batchIntegrityValidator';
-import { CriterionEvaluator } from '../evaluation/CriterionEvaluator';
+import { CriterionEvaluator, isExemptValue } from '../evaluation/CriterionEvaluator';
 import { AlternateRuleEvaluator } from '../evaluation/AlternateRuleEvaluator';
 import { ensureArray } from '../../utils';
 import { isCriteriaMatch } from '../../utils/aiMapping';
@@ -457,75 +457,88 @@ export class CanonicalStatusResolver {
               ? `≤ ${maxNum}`
               : crit.expectedText || 'Theo TCCS';
 
-      if (
+      const isValueEmpty =
         !entry ||
         entry.value === null ||
         entry.value === undefined ||
-        String(entry.value).trim() === ''
-      ) {
-        // Kiểm tra miễn kiểm theo Alternate Rules
-        let isExempted = false;
-        if (resolvedTccs?.alternateRules) {
-          isExempted = AlternateRuleEvaluator.checkRuleExemption(
-            cName,
-            (name) => {
-              const e = findAuthoritativeEntry(name);
-              return e ? e.value : undefined;
-            },
-            resolvedTccs,
-            {
-              rulesMap: new Map(
-                (resolvedTccs.alternateRules || []).map((r) => [
-                  (r.alt || '').trim().toLowerCase(),
-                  r,
-                ])
-              ),
-              allCriteria: requiredCriteria,
-              criteriaMap: new Map(requiredCriteria.map((c) => [c.name.trim().toLowerCase(), c])),
-            },
-            authoritativeMap
-          );
-        }
+        String(entry.value).trim() === '';
 
-        if (isExempted) {
-          const exemptedDetail: CriterionEvaluationDetail = {
-            criterionName: cName,
-            expectedLimit: limitText,
-            actualValue: 'Miễn kiểm (quy tắc thay thế)',
-            unit: crit.unit,
-            isPass: true,
-            status: 'PASS',
-            evaluationMethod: 'EXEMPTION',
-            isExempted: true,
-          };
-          criterionEvaluations.push(exemptedDetail);
-        } else {
-          missingCriteriaNames.push(cName);
-          const pendingDetail: CriterionEvaluationDetail = {
-            criterionName: cName,
-            expectedLimit: limitText,
-            actualValue: 'Chưa kiểm',
-            unit: crit.unit,
-            isPass: null,
-            status: 'PENDING',
-            evaluationMethod: 'TEXT',
-          };
-          criterionEvaluations.push(pendingDetail);
-          pendingCriteria.push(pendingDetail);
-        }
+      const isValueExempt =
+        !isValueEmpty &&
+        (isExemptValue(entry.value) ||
+          entry.isExempted === true ||
+          (normalizeCriterionPassStatus(entry.isPass) === true && isExemptValue(entry.value)));
+
+      // Kiểm tra miễn kiểm theo Alternate Rules
+      let isExemptedByRule = false;
+      if (resolvedTccs?.alternateRules) {
+        isExemptedByRule = AlternateRuleEvaluator.checkRuleExemption(
+          cName,
+          (name) => {
+            const e = findAuthoritativeEntry(name);
+            return e ? e.value : undefined;
+          },
+          resolvedTccs,
+          {
+            rulesMap: new Map(
+              (resolvedTccs.alternateRules || []).map((r) => [
+                (r.alt || '').trim().toLowerCase(),
+                r,
+              ])
+            ),
+            allCriteria: requiredCriteria,
+            criteriaMap: new Map(requiredCriteria.map((c) => [c.name.trim().toLowerCase(), c])),
+          },
+          authoritativeMap
+        );
+      }
+
+      if (isValueExempt || (isValueEmpty && isExemptedByRule)) {
+        const exemptedDetail: CriterionEvaluationDetail = {
+          criterionName: cName,
+          expectedLimit: limitText,
+          actualValue: isValueExempt ? String(entry?.value) : 'Miễn kiểm (quy tắc thay thế)',
+          unit: crit.unit,
+          isPass: true,
+          status: 'PASS',
+          evaluationMethod: 'EXEMPTION',
+          isExempted: true,
+        };
+        criterionEvaluations.push(exemptedDetail);
+      } else if (isValueEmpty) {
+        missingCriteriaNames.push(cName);
+        const pendingDetail: CriterionEvaluationDetail = {
+          criterionName: cName,
+          expectedLimit: limitText,
+          actualValue: 'Chưa kiểm',
+          unit: crit.unit,
+          isPass: null,
+          status: 'PENDING',
+          evaluationMethod: 'TEXT',
+        };
+        criterionEvaluations.push(pendingDetail);
+        pendingCriteria.push(pendingDetail);
       } else {
         const evalRes = CriterionEvaluator.evaluateCriterion(crit, entry.value);
+        // Nếu chỉ tiêu này được miễn kiểm theo quy tắc thay thế nhưng vẫn nhập giá trị thử nghiệm,
+        // và giá trị thử nghiệm không đạt (FAIL), theo logic CONDITIONAL_CHECK của GMP, chỉ tiêu phụ này vẫn được miễn kiểm
+        const isPass = evalRes.isPass === true || isExemptedByRule;
         const detail: CriterionEvaluationDetail = {
           criterionName: cName,
           expectedLimit: limitText,
           actualValue: entry.value,
           unit: crit.unit || entry.unit,
-          isPass: evalRes.isPass,
-          status: evalRes.isPass === true ? 'PASS' : evalRes.isPass === false ? 'FAIL' : 'UNKNOWN',
-          evaluationMethod: crit.type === 'NUMBER' ? 'NUMERIC' : 'TEXT',
+          isPass,
+          status: isPass ? 'PASS' : evalRes.isPass === false ? 'FAIL' : 'UNKNOWN',
+          evaluationMethod: isExemptedByRule
+            ? 'EXEMPTION'
+            : crit.type === 'NUMBER'
+              ? 'NUMERIC'
+              : 'TEXT',
+          isExempted: isExemptedByRule || undefined,
           storedIsPass: entry.isPass,
           recalculatedIsPass: evalRes.isPass,
-          note: evalRes.reason,
+          note: isExemptedByRule ? 'Miễn kiểm theo quy tắc thay thế' : evalRes.reason,
         };
         criterionEvaluations.push(detail);
 

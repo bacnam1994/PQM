@@ -40,6 +40,7 @@ export interface TestResultEntry {
    */
   isPass: boolean | null;
   isExtra?: boolean;
+  isExempted?: boolean;
   unit?: string;
   limit?: string;
   analysisMethod?: string;

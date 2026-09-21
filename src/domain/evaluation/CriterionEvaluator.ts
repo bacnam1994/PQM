@@ -23,6 +23,22 @@ function roundToSignificant(value: number, specString: string): number {
   return Math.round(value * factor) / factor;
 }
 
+/**
+ * Kiểm tra xem một giá trị kiểm nghiệm có phải là chuỗi miễn kiểm / thay thế hợp lệ hay không
+ */
+export const isExemptValue = (value: unknown): boolean => {
+  if (value === null || value === undefined) return false;
+  const str = String(value).trim().toLowerCase();
+  return (
+    str === 'miễn kiểm' ||
+    str.startsWith('miễn kiểm') ||
+    str.includes('miễn kiểm') ||
+    str.includes('quy tắc thay thế') ||
+    str === 'exempted' ||
+    str.startsWith('exempted')
+  );
+};
+
 export class CriterionEvaluator {
   /**
    * Đánh giá một chỉ tiêu dựa trên đặc tả tiêu chuẩn đã phân tích và giá trị đã chuẩn hóa
@@ -152,6 +168,20 @@ export class CriterionEvaluator {
     }
 
     const spec = SpecificationParser.parse(referenceText, criterion.type);
+
+    // NGUYÊN TẮC: Nếu giá trị mang ý nghĩa Miễn kiểm theo quy tắc thay thế -> luôn ghi nhận PASS
+    if (isExemptValue(value)) {
+      return {
+        criterionName: criterion?.name || '',
+        rawValue: value,
+        normalizedValue: val,
+        specification: spec,
+        isPass: true,
+        usedAlternate: true,
+        alternateNote: 'Miễn kiểm theo quy tắc thay thế',
+      };
+    }
+
     let isPass: boolean | null = null;
 
     if (referenceText) {

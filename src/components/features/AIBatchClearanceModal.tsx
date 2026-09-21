@@ -329,7 +329,9 @@ export const AIBatchClearanceModal: React.FC<AIBatchClearanceModalProps> = ({
                         <td className="p-2.5 font-semibold text-ink">{item.criteriaName}</td>
                         <td className="p-2.5 text-ink-muted font-mono">{item.expectedLimit}</td>
                         <td className="p-2.5 font-semibold font-mono text-ink">
-                          {item.actualValue} {item.unit || ''}
+                          {String(item.actualValue).toLowerCase().includes('miễn kiểm')
+                            ? item.actualValue
+                            : `${item.actualValue} ${item.unit || ''}`.trim()}
                         </td>
                         <td className="p-2.5">
                           <span

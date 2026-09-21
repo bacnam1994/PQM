@@ -14,7 +14,7 @@ export const removeUndefined = (obj: any): any => {
     const val = obj[key];
     if (val !== undefined) {
       if (typeof val === 'number') {
-        result[key] = (isNaN(val) || !isFinite(val)) ? 0 : val;
+        result[key] = isNaN(val) || !isFinite(val) ? 0 : val;
       } else {
         result[key] = removeUndefined(val);
       }
@@ -34,10 +34,32 @@ const getDecimalSeparator = () => {
 
 // Tối ưu 2: Đưa các object, array, RegExp tĩnh ra ngoài scope hàm
 // Tránh việc Engine JS phải khởi tạo lại bộ nhớ (Memory Allocation) và compile RegExp mỗi lần gọi hàm.
-const SUPERS: Record<string, string> = { '⁰': '0', '¹': '1', '²': '2', '³': '3', '⁴': '4', '⁵': '5', '⁶': '6', '⁷': '7', '⁸': '8', '⁹': '9', '⁻': '-' };
+const SUPERS: Record<string, string> = {
+  '⁰': '0',
+  '¹': '1',
+  '²': '2',
+  '³': '3',
+  '⁴': '4',
+  '⁵': '5',
+  '⁶': '6',
+  '⁷': '7',
+  '⁸': '8',
+  '⁹': '9',
+  '⁻': '-',
+};
 const SUPER_CHARS = Object.keys(SUPERS).join('');
 const POWER_REGEX = new RegExp(`10(?:([${SUPER_CHARS}]+)|\\^(\\-?[\\d\\.]+))`);
-const NEGATIVE_KEYWORDS = ['âm tính', 'negative', 'không phát hiện', 'không có', 'not detected', 'kph', 'k.p.h', 'nd', 'không được có'];
+const NEGATIVE_KEYWORDS = [
+  'âm tính',
+  'negative',
+  'không phát hiện',
+  'không có',
+  'not detected',
+  'kph',
+  'k.p.h',
+  'nd',
+  'không được có',
+];
 const POSITIVE_KEYWORDS = ['dương tính', 'positive', 'phát hiện', 'có phát hiện', 'detected', 'có'];
 
 // --- HELPER: Parse Microbiological Values (e.g., "10⁴", "≤ 1.5x10⁵") ---
@@ -75,32 +97,37 @@ export const parseFlexibleValue = (input: string | number): number | null => {
   }
 
   if (str === '') return null;
-  
+
   // --- Priority 1: Superscript or Caret notation (e.g., "10⁴", "1.5x10^5") ---
   const powerMatch = str.match(POWER_REGEX);
-  
+
   if (powerMatch) {
     // powerMatch[1] will be the superscript exponent, powerMatch[2] will be the caret exponent
-    const expStr = powerMatch[1] ? powerMatch[1].split('').map(c => SUPERS[c]).join('') : powerMatch[2];
+    const expStr = powerMatch[1]
+      ? powerMatch[1]
+          .split('')
+          .map((c) => SUPERS[c])
+          .join('')
+      : powerMatch[2];
     if (expStr !== undefined) {
-        const exp = parseFloat(expStr);
-        
-        const matchIndex = powerMatch.index || 0;
-        const prefix = str.substring(0, matchIndex).trim();
-        
-        let base = 1;
-        if (prefix) {
-          // Remove non-numeric characters to get the base
-          // FIX: Dùng match để tìm số thay vì replace, tránh trường hợp "Max. 1.5" bị biến thành ".1.5" (sai giá trị)
-          const numberMatches = prefix.replace(/[x*]/gi, '').match(/-?[\d\.]+/g);
-          if (numberMatches) {
-            const validNumbers = numberMatches.filter(n => !isNaN(parseFloat(n)));
-            if (validNumbers.length > 0) base = parseFloat(validNumbers[validNumbers.length - 1]);
-          }
+      const exp = parseFloat(expStr);
+
+      const matchIndex = powerMatch.index || 0;
+      const prefix = str.substring(0, matchIndex).trim();
+
+      let base = 1;
+      if (prefix) {
+        // Remove non-numeric characters to get the base
+        // FIX: Dùng match để tìm số thay vì replace, tránh trường hợp "Max. 1.5" bị biến thành ".1.5" (sai giá trị)
+        const numberMatches = prefix.replace(/[x*]/gi, '').match(/-?[\d\.]+/g);
+        if (numberMatches) {
+          const validNumbers = numberMatches.filter((n) => !isNaN(parseFloat(n)));
+          if (validNumbers.length > 0) base = parseFloat(validNumbers[validNumbers.length - 1]);
         }
-        if (!isNaN(exp)) {
-            return base * Math.pow(10, exp);
-        }
+      }
+      if (!isNaN(exp)) {
+        return base * Math.pow(10, exp);
+      }
     }
   }
 
@@ -124,7 +151,7 @@ export const parseFlexibleValue = (input: string | number): number | null => {
       return num;
     }
   }
-  
+
   return null;
 };
 
@@ -139,8 +166,8 @@ export const getOperator = (text: string): string => {
 // --- HELPER: Ensure Array (Fix Firebase Object/Array issue) ---
 export const ensureArray = (data: any) => {
   if (!data) return [];
-  if (Array.isArray(data)) return data.filter(item => item != null);
-  if (typeof data === 'object') return Object.values(data).filter(item => item != null);
+  if (Array.isArray(data)) return data.filter((item) => item != null);
+  if (typeof data === 'object') return Object.values(data).filter((item) => item != null);
   return [];
 };
 
@@ -152,20 +179,33 @@ export const evaluateCriterion = (c: any, value: string | number): boolean => {
 
   const strVal = String(value).trim();
   const lowerStrVal = strVal.toLowerCase();
-  
+
+  // NGUYÊN TẮC: Nếu giá trị mang ý nghĩa Miễn kiểm theo quy tắc thay thế -> luôn ghi nhận PASS
+  if (
+    lowerStrVal === 'miễn kiểm' ||
+    lowerStrVal.startsWith('miễn kiểm') ||
+    lowerStrVal.includes('miễn kiểm') ||
+    lowerStrVal.includes('quy tắc thay thế') ||
+    lowerStrVal === 'exempted' ||
+    lowerStrVal.startsWith('exempted')
+  ) {
+    return true;
+  }
+
   const isZeroOrAbsent = (v: string) => {
     const lower = v.toLowerCase();
-    return NEGATIVE_KEYWORDS.some(n => lower.includes(n)) || v.trim() === '0';
+    return NEGATIVE_KEYWORDS.some((n) => lower.includes(n)) || v.trim() === '0';
   };
 
   const isPositive = (v: string) => {
     const lower = v.toLowerCase();
-    return POSITIVE_KEYWORDS.some(p => lower.includes(p));
+    return POSITIVE_KEYWORDS.some((p) => lower.includes(p));
   };
 
   const isLtPrefix = /^<(?!=|≤)/.test(strVal);
   const parsedFlexible = parseFlexibleValue(strVal);
-  const isResultAbsent = isZeroOrAbsent(strVal) || (isLtPrefix && (parsedFlexible === null || parsedFlexible <= 10));
+  const isResultAbsent =
+    isZeroOrAbsent(strVal) || (isLtPrefix && (parsedFlexible === null || parsedFlexible <= 10));
   let resultAsNumber: number | null = parsedFlexible;
   if (resultAsNumber === null && isResultAbsent) {
     resultAsNumber = 0;
@@ -177,11 +217,18 @@ export const evaluateCriterion = (c: any, value: string | number): boolean => {
       // Result is non-numeric and not an "absent" word, e.g., "Cloudy" for a pH value.
       return false;
     }
-    const min = (c.min !== undefined && c.min !== null && c.min !== '') ? parseFloat(String(c.min)) : -Infinity;
-    const max = (c.max !== undefined && c.max !== null && c.max !== '') ? parseFloat(String(c.max)) : Infinity;
-    
+    const min =
+      c.min !== undefined && c.min !== null && c.min !== '' ? parseFloat(String(c.min)) : -Infinity;
+    const max =
+      c.max !== undefined && c.max !== null && c.max !== '' ? parseFloat(String(c.max)) : Infinity;
+
     // Nếu kết quả là dưới ngưỡng phát hiện (< 10) và chỉ tiêu chỉ có giới hạn trên (min <= 0 hoặc không có min)
-    if (isLtPrefix && (min === -Infinity || min <= 0) && max >= 0 && (parsedFlexible === null || parsedFlexible <= 10)) {
+    if (
+      isLtPrefix &&
+      (min === -Infinity || min <= 0) &&
+      max >= 0 &&
+      (parsedFlexible === null || parsedFlexible <= 10)
+    ) {
       return 0 >= min && 0 <= max;
     }
 
@@ -193,7 +240,7 @@ export const evaluateCriterion = (c: any, value: string | number): boolean => {
   if (!limitText) {
     return true; // No requirement text means any non-empty value passes.
   }
-  
+
   const isRequirementAbsent = isZeroOrAbsent(limitText);
   const isRequirementPositive = isPositive(limitText);
 
@@ -201,12 +248,12 @@ export const evaluateCriterion = (c: any, value: string | number): boolean => {
   if (isRequirementAbsent) {
     return isResultAbsent;
   }
-  
+
   // Path 2a-bis: Requirement is "positive" type.
   if (isRequirementPositive) {
     return isPositive(strVal);
   }
-  
+
   // Path 2b: Requirement is not "absent", but result is.
   if (isResultAbsent) {
     // This means result is 0. We must compare with a numeric limit.
@@ -217,11 +264,16 @@ export const evaluateCriterion = (c: any, value: string | number): boolean => {
     }
     const op = getOperator(limitText);
     switch (op) {
-      case '<=': return 0 <= limitVal;
-      case '>=': return 0 >= limitVal;
-      case '<':  return 0 < limitVal;
-      case '>':  return 0 > limitVal;
-      default:   return 0 === limitVal;
+      case '<=':
+        return 0 <= limitVal;
+      case '>=':
+        return 0 >= limitVal;
+      case '<':
+        return 0 < limitVal;
+      case '>':
+        return 0 > limitVal;
+      default:
+        return 0 === limitVal;
     }
   }
 
@@ -231,10 +283,14 @@ export const evaluateCriterion = (c: any, value: string | number): boolean => {
   if (resultAsNumber !== null && limitVal !== null) {
     const op = getOperator(limitText);
     switch (op) {
-      case '<=': return resultAsNumber <= limitVal;
-      case '>=': return resultAsNumber >= limitVal;
-      case '<':  return resultAsNumber < limitVal;
-      case '>':  return resultAsNumber > limitVal;
+      case '<=':
+        return resultAsNumber <= limitVal;
+      case '>=':
+        return resultAsNumber >= limitVal;
+      case '<':
+        return resultAsNumber < limitVal;
+      case '>':
+        return resultAsNumber > limitVal;
       default: // '='
         const pmSymbol = limitText.includes('±') ? '±' : limitText.includes('+/-') ? '+/-' : null;
         if (pmSymbol) {
@@ -246,13 +302,15 @@ export const evaluateCriterion = (c: any, value: string | number): boolean => {
             if (tolerancePart.includes('%')) {
               tolerance = Math.abs(base) * (tolerance / 100);
             }
-            
+
             // FIX 3: Dùng relative epsilon thay vì absolute EPSILON (1e-6)
             // để tránh lỗi floating-point với các chỉ tiêu vi lượng (< 1e-6)
             // VD: base=1e-7, tolerance=0.5e-7 → absolute eps=1e-6 sẽ ảnh hưởng sai
             const relativeEpsilon = Math.max(Math.abs(base), Math.abs(resultAsNumber!)) * 1e-10;
-            return resultAsNumber! >= base - tolerance - relativeEpsilon
-                && resultAsNumber! <= base + tolerance + relativeEpsilon;
+            return (
+              resultAsNumber! >= base - tolerance - relativeEpsilon &&
+              resultAsNumber! <= base + tolerance + relativeEpsilon
+            );
           }
         }
         return resultAsNumber === limitVal;

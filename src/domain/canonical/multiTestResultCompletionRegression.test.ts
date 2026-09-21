@@ -186,4 +186,52 @@ describe('Multi-TestResult & Heavy Metals Completion Regression', () => {
     expect(qualityResolution.decisionTrace?.completion.percentage).toBe(100);
     expect(qualityResolution.batchQualityStatus).toBe('PASS');
   });
+
+  it('đánh giá PASS khi chỉ tiêu phụ (Arsen vô cơ) được lưu trực tiếp với giá trị "Miễn kiểm"', () => {
+    const trWithExemptEntry: TestResult = {
+      id: 'tr_metals_exempt_entry',
+      batchId: 'batch_syrup_lot01',
+      labName: 'Phòng Kiểm Nghiệm',
+      testDate: '2026-02-08',
+      overallStatus: 'PASS',
+      status: 'APPROVED',
+      workflowStatus: 'APPROVED',
+      results: [
+        { criteriaName: 'Cảm quan', value: 'Dung dịch trong', isPass: true },
+        { criteriaName: 'pH', value: 5.2, isPass: true },
+        { criteriaName: 'Thể tích thực', value: 100, isPass: true },
+        { criteriaName: 'Kẽm (Kẽm gluconate)', value: 102, isPass: true },
+        { criteriaName: 'Chì (Pb)', value: 0.04, isPass: true },
+        { criteriaName: 'Cadimi (Cd)', value: 0.01, isPass: true },
+        { criteriaName: 'Thủy ngân (Hg)', value: 0.005, isPass: true },
+        { criteriaName: 'Arsen (As) tổng số', value: 0.08, isPass: true },
+        // Chỉ tiêu phụ được lưu trực tiếp là "Miễn kiểm" với đơn vị mg/L
+        { criteriaName: 'Arsen vô cơ', value: 'Miễn kiểm', isPass: true, unit: 'mg/L' },
+      ],
+      createdAt: '2026-02-08',
+    };
+
+    const qualityResolution = CanonicalStatusResolver.resolveBatchQuality(
+      mockBatch,
+      [trWithExemptEntry],
+      mockTccs
+    );
+
+    expect(qualityResolution.batchQualityStatus).toBe('PASS');
+    expect(qualityResolution.decisionTrace?.failedCriteria).toHaveLength(0);
+
+    const arsenVoCoEval = qualityResolution.decisionTrace?.criterionEvaluations.find(
+      (c) => c.criterionName === 'Arsen vô cơ'
+    );
+    expect(arsenVoCoEval).toBeDefined();
+    expect(arsenVoCoEval?.status).toBe('PASS');
+    expect(arsenVoCoEval?.isPass).toBe(true);
+    expect(arsenVoCoEval?.isExempted).toBe(true);
+
+    const dossier = evaluateBatchQualityClearance(mockBatch, [trWithExemptEntry], mockTccs);
+    expect(dossier.failedCount).toBe(0);
+    expect(dossier.verdict).toBe('READY_FOR_RELEASE');
+    const clearanceItem = dossier.testedItems.find((i) => i.criteriaName === 'Arsen vô cơ');
+    expect(clearanceItem?.isPass).toBe(true);
+  });
 });

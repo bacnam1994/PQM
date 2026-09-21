@@ -271,6 +271,9 @@ export function normalizeCriterionPassStatus(value: unknown): boolean | null {
     'KHÔNG PHÁT HIỆN',
     'KHONG PHAT HIEN',
     'NEGATIVE',
+    'MIỄN KIỂM',
+    'MIEN KIEM',
+    'EXEMPTED',
   ];
   if (passKeywords.some((kw) => str.includes(kw))) return true;
 
