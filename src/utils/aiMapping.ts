@@ -10,119 +10,235 @@ import { Criterion, TestResultEntry, AILearnedMapping } from '../types';
 export const PHARMA_TERM_DICTIONARY: Record<string, string[]> = {
   // === Lý hóa ===
   'Độ ẩm': [
-    'lod', 'loss on drying', 'loss on drying (lod)', 'moisture', 'moisture content',
-    'water content', 'ham luong nuoc', 'do am', 'hàm lượng nước', 'water',
-    'moisture and volatile matter', 'loss on drying (%)', 'water activity', 'aw'
+    'lod',
+    'loss on drying',
+    'loss on drying (lod)',
+    'moisture',
+    'moisture content',
+    'water content',
+    'ham luong nuoc',
+    'do am',
+    'hàm lượng nước',
+    'water',
+    'moisture and volatile matter',
+    'loss on drying (%)',
+    'water activity',
+    'aw',
   ],
   'Định lượng': [
-    'assay', 'purity', 'potency', 'active content', 'active ingredient content',
-    'dinh luong', 'định lượng', 'label claim', 'active substance content', 'drug content'
+    'assay',
+    'purity',
+    'potency',
+    'active content',
+    'active ingredient content',
+    'dinh luong',
+    'định lượng',
+    'label claim',
+    'active substance content',
+    'drug content',
   ],
   'Độ pH': [
-    'ph', 'ph value', 'hydrogen ion concentration', 'do ph', 'ph (20°c)', 'ph (25°c)',
-    'ph measurement', 'reaction of solution'
+    'ph',
+    'ph value',
+    'hydrogen ion concentration',
+    'do ph',
+    'ph (20°c)',
+    'ph (25°c)',
+    'ph measurement',
+    'reaction of solution',
   ],
   'Tạp chất': [
-    'impurities', 'related substances', 'tap chat', 'tạp chất liên quan',
-    'related compounds', 'degradation products', 'individual impurity', 'total impurities',
-    'rs', 'unknown impurity', 'specified impurity', 'unspecified impurity',
-    'organic impurities', 'known impurity'
+    'impurities',
+    'related substances',
+    'tap chat',
+    'tạp chất liên quan',
+    'related compounds',
+    'degradation products',
+    'individual impurity',
+    'total impurities',
+    'rs',
+    'unknown impurity',
+    'specified impurity',
+    'unspecified impurity',
+    'organic impurities',
+    'known impurity',
   ],
   'Tạp chất liên quan': [
-    'related substances', 'rs', 'related compounds', 'organic impurities',
-    'specified impurity', 'unspecified impurity'
+    'related substances',
+    'rs',
+    'related compounds',
+    'organic impurities',
+    'specified impurity',
+    'unspecified impurity',
   ],
   'Cảm quan': [
-    'appearance', 'description', 'cam quan', 'visual inspection', 'organoleptic',
-    'hinh thuc', 'hình thức', 'mau sac', 'màu sắc', 'mau', 'thể chất',
-    'colour', 'color', 'odour', 'odor', 'taste', 'clarity', 'clarity of solution'
+    'appearance',
+    'description',
+    'cam quan',
+    'visual inspection',
+    'organoleptic',
+    'hinh thuc',
+    'hình thức',
+    'mau sac',
+    'màu sắc',
+    'mau',
+    'thể chất',
+    'colour',
+    'color',
+    'odour',
+    'odor',
+    'taste',
+    'clarity',
+    'clarity of solution',
   ],
   'Độ tan rã': [
-    'disintegration', 'disintegration time', 'tan ra', 'thoi gian tan ra',
-    'thời gian tan rã', 'rã viên', 'do tan ra', 'dt', 'disintegration test', 'độ rã', 'do ra'
+    'disintegration',
+    'disintegration time',
+    'tan ra',
+    'thoi gian tan ra',
+    'thời gian tan rã',
+    'rã viên',
+    'do tan ra',
+    'dt',
+    'disintegration test',
+    'độ rã',
+    'do ra',
   ],
   'Độ hòa tan': [
-    'dissolution', 'dissolution test', 'do hoa tan', 'độ hòa tan', 'hoa tan',
-    'dissolution rate', 'in-vitro dissolution', 'release', 'drug release'
+    'dissolution',
+    'dissolution test',
+    'do hoa tan',
+    'độ hòa tan',
+    'hoa tan',
+    'dissolution rate',
+    'in-vitro dissolution',
+    'release',
+    'drug release',
   ],
   'Độ đồng đều khối lượng': [
-    'uniformity of mass', 'weight variation', 'mass variation', 'do dong deu khoi luong',
-    'uniformity of weight', 'khối lượng trung bình', 'klvien', 'kl viên',
-    'average weight', 'tablet weight', 'weight uniformity'
+    'uniformity of mass',
+    'weight variation',
+    'mass variation',
+    'do dong deu khoi luong',
+    'uniformity of weight',
+    'khối lượng trung bình',
+    'klvien',
+    'kl viên',
+    'average weight',
+    'tablet weight',
+    'weight uniformity',
   ],
   'Độ cứng': [
-    'hardness', 'tablet hardness', 'do cung', 'crushing strength', 'breaking force',
-    'tensile strength', 'fracture force'
+    'hardness',
+    'tablet hardness',
+    'do cung',
+    'crushing strength',
+    'breaking force',
+    'tensile strength',
+    'fracture force',
   ],
-  'Độ mài mòn': [
-    'friability', 'tablet friability', 'do mai mon', 'abrasion', 'attrition'
-  ],
+  'Độ mài mòn': ['friability', 'tablet friability', 'do mai mon', 'abrasion', 'attrition'],
   'Tỷ trọng': [
-    'density', 'relative density', 'specific gravity', 'ty trong', 'd20', 'd25',
-    'bulk density', 'tapped density'
+    'density',
+    'relative density',
+    'specific gravity',
+    'ty trong',
+    'd20',
+    'd25',
+    'bulk density',
+    'tapped density',
   ],
   'Độ nhớt': [
-    'viscosity', 'kinematic viscosity', 'do nhot', 'apparent viscosity',
-    'dynamic viscosity', 'brookfield viscosity'
+    'viscosity',
+    'kinematic viscosity',
+    'do nhot',
+    'apparent viscosity',
+    'dynamic viscosity',
+    'brookfield viscosity',
   ],
   'Góc quay cực': [
-    'optical rotation', 'specific optical rotation', 'goc quay cuc',
-    'polarimetry', '[α]', 'specific rotation'
+    'optical rotation',
+    'specific optical rotation',
+    'goc quay cuc',
+    'polarimetry',
+    '[α]',
+    'specific rotation',
   ],
-  'Chỉ số acid': [
-    'acid value', 'acid number', 'chi so acid', 'acidity', 'free fatty acid'
-  ],
-  'Chỉ số iod': [
-    'iodine value', 'iodine number', 'chi so iod', 'iodine absorption'
-  ],
-  'Chỉ số xà phòng': [
-    'saponification value', 'saponification number', 'chi so xa phong'
-  ],
+  'Chỉ số acid': ['acid value', 'acid number', 'chi so acid', 'acidity', 'free fatty acid'],
+  'Chỉ số iod': ['iodine value', 'iodine number', 'chi so iod', 'iodine absorption'],
+  'Chỉ số xà phòng': ['saponification value', 'saponification number', 'chi so xa phong'],
   'Tro sulfat': [
-    'sulfated ash', 'sulphated ash', 'residue on ignition', 'tro sulfat',
-    'ash', 'total ash', 'acid insoluble ash'
+    'sulfated ash',
+    'sulphated ash',
+    'residue on ignition',
+    'tro sulfat',
+    'ash',
+    'total ash',
+    'acid insoluble ash',
   ],
   'Cỡ hạt': [
-    'particle size', 'particle size distribution', 'co hat', 'kich thuoc hat',
-    'd50', 'd90', 'd10', 'mean particle size', 'psd'
+    'particle size',
+    'particle size distribution',
+    'co hat',
+    'kich thuoc hat',
+    'd50',
+    'd90',
+    'd10',
+    'mean particle size',
+    'psd',
   ],
-  'Độ thấm': [
-    'permeability', 'do tham', 'membrane permeability'
-  ],
-  'Điểm chảy': [
-    'melting point', 'melting range', 'diem chay', 'mp', 'softening point'
-  ],
-  'Điểm sôi': [
-    'boiling point', 'bp', 'diem soi'
-  ],
+  'Độ thấm': ['permeability', 'do tham', 'membrane permeability'],
+  'Điểm chảy': ['melting point', 'melting range', 'diem chay', 'mp', 'softening point'],
+  'Điểm sôi': ['boiling point', 'bp', 'diem soi'],
   'Hàm lượng nước (Karl Fischer)': [
-    'water content kf', 'karl fischer', 'water determination', 'kf titration',
-    'moisture (karl fischer)', 'water (kf)'
+    'water content kf',
+    'karl fischer',
+    'water determination',
+    'kf titration',
+    'moisture (karl fischer)',
+    'water (kf)',
   ],
   'Độ hấp thụ quang': [
-    'absorbance', 'optical density', 'od', 'uv absorbance', 'absorption',
-    'a (1%, 1cm)', 'e (1%, 1cm)', 'specific absorbance'
+    'absorbance',
+    'optical density',
+    'od',
+    'uv absorbance',
+    'absorption',
+    'a (1%, 1cm)',
+    'e (1%, 1cm)',
+    'specific absorbance',
   ],
   'Độ trong suốt': [
-    'clarity', 'clarity of solution', 'do trong', 'transparency', 'turbidity',
-    'opalescence', 'appearance of solution'
+    'clarity',
+    'clarity of solution',
+    'do trong',
+    'transparency',
+    'turbidity',
+    'opalescence',
+    'appearance of solution',
   ],
   'Màu sắc dung dịch': [
-    'colour of solution', 'color of solution', 'mau sac dung dich',
-    'degree of coloration', 'solution colour'
+    'colour of solution',
+    'color of solution',
+    'mau sac dung dich',
+    'degree of coloration',
+    'solution colour',
   ],
   'Tổng hàm lượng tạp chất': [
-    'total impurities', 'total related substances', 'tong tap chat',
-    'sum of impurities', 'total organic impurities'
+    'total impurities',
+    'total related substances',
+    'tong tap chat',
+    'sum of impurities',
+    'total organic impurities',
   ],
 
   // === Định lượng hoạt chất cụ thể ===
-  'Paracetamol': ['paracetamol', 'acetaminophen', 'pcm', 'apap'],
-  'Ibuprofen': ['ibuprofen', 'ibuprofene'],
-  'Amoxicillin': ['amoxicillin', 'amoxycillin', 'amox'],
-  'Cetirizine': ['cetirizine', 'cetirizine hydrochloride', 'cetirizin'],
-  'Omeprazole': ['omeprazole', 'omeprazol'],
-  'Metformin': ['metformin', 'metformin hydrochloride', 'metformine'],
+  Paracetamol: ['paracetamol', 'acetaminophen', 'pcm', 'apap'],
+  Ibuprofen: ['ibuprofen', 'ibuprofene'],
+  Amoxicillin: ['amoxicillin', 'amoxycillin', 'amox'],
+  Cetirizine: ['cetirizine', 'cetirizine hydrochloride', 'cetirizin'],
+  Omeprazole: ['omeprazole', 'omeprazol'],
+  Metformin: ['metformin', 'metformin hydrochloride', 'metformine'],
   'Vitamin C': ['vitamin c', 'ascorbic acid', 'l-ascorbic acid', 'ascorbate'],
   'Vitamin B1': ['vitamin b1', 'thiamine', 'thiamin', 'thiamine hydrochloride', 'aneurine'],
   'Vitamin B2': ['vitamin b2', 'riboflavin', 'lactoflavin'],
@@ -135,44 +251,133 @@ export const PHARMA_TERM_DICTIONARY: Record<string, string[]> = {
   'Vitamin E': ['vitamin e', 'tocopherol', 'alpha-tocopherol', 'd-alpha tocopherol'],
   'Vitamin K': ['vitamin k', 'vitamin k1', 'phylloquinone', 'phytomenadione'],
   // === Định lượng khoáng chất & dạng muối tương ứng ===
-  'Kẽm': [
-    'kẽm', 'zinc', 'zn', 'kẽm (zn)', 'zinc (zn)', 'hàm lượng kẽm', 'định lượng kẽm',
-    'kẽm gluconat', 'zinc gluconate', 'kẽm sulfat', 'zinc sulfate', 'kẽm acetat', 'zinc acetate',
-    'kẽm oxyd', 'zinc oxide', 'kẽm picolinat', 'zinc picolinate', 'kẽm bisglycinat'
+  Kẽm: [
+    'kẽm',
+    'zinc',
+    'zn',
+    'kẽm (zn)',
+    'zinc (zn)',
+    'hàm lượng kẽm',
+    'định lượng kẽm',
+    'kẽm gluconat',
+    'zinc gluconate',
+    'kẽm sulfat',
+    'zinc sulfate',
+    'kẽm acetat',
+    'zinc acetate',
+    'kẽm oxyd',
+    'zinc oxide',
+    'kẽm picolinat',
+    'zinc picolinate',
+    'kẽm bisglycinat',
   ],
-  'Sắt': [
-    'sắt', 'iron', 'fe', 'sắt (fe)', 'iron (fe)', 'hàm lượng sắt', 'định lượng sắt',
-    'sắt fumarat', 'ferrous fumarate', 'sắt sulfat', 'ferrous sulfate', 'sắt gluconat', 'ferrous gluconate',
-    'sắt bisglycinat', 'ferrous bisglycinate', 'iron polymaltose', 'ipc'
+  Sắt: [
+    'sắt',
+    'iron',
+    'fe',
+    'sắt (fe)',
+    'iron (fe)',
+    'hàm lượng sắt',
+    'định lượng sắt',
+    'sắt fumarat',
+    'ferrous fumarate',
+    'sắt sulfat',
+    'ferrous sulfate',
+    'sắt gluconat',
+    'ferrous gluconate',
+    'sắt bisglycinat',
+    'ferrous bisglycinate',
+    'iron polymaltose',
+    'ipc',
   ],
-  'Magie': [
-    'magie', 'magnesi', 'magnesium', 'mg', 'magie (mg)', 'magnesi (mg)', 'magnesium (mg)',
-    'magnesi lactat', 'magnesium lactate', 'magnesi oxyd', 'magnesium oxide',
-    'magnesi citrat', 'magnesium citrate', 'magnesi stearat', 'magnesium stearate'
+  Magie: [
+    'magie',
+    'magnesi',
+    'magnesium',
+    'mg',
+    'magie (mg)',
+    'magnesi (mg)',
+    'magnesium (mg)',
+    'magnesi lactat',
+    'magnesium lactate',
+    'magnesi oxyd',
+    'magnesium oxide',
+    'magnesi citrat',
+    'magnesium citrate',
+    'magnesi stearat',
+    'magnesium stearate',
   ],
-  'Canxi': [
-    'canxi', 'calci', 'calcium', 'ca', 'canxi (ca)', 'calci (ca)', 'calcium (ca)',
-    'canxi carbonat', 'calcium carbonate', 'calci gluconat', 'calcium gluconate',
-    'calci glucoheptonat', 'calcium glucoheptonate', 'calci citrat', 'calcium citrate',
-    'canxi nano', 'calcium nano', 'tricalcium phosphate'
+  Canxi: [
+    'canxi',
+    'calci',
+    'calcium',
+    'ca',
+    'canxi (ca)',
+    'calci (ca)',
+    'calcium (ca)',
+    'canxi carbonat',
+    'calcium carbonate',
+    'calci gluconat',
+    'calcium gluconate',
+    'calci glucoheptonat',
+    'calcium glucoheptonate',
+    'calci citrat',
+    'calcium citrate',
+    'canxi nano',
+    'calcium nano',
+    'tricalcium phosphate',
   ],
-  'Đồng': [
-    'đồng', 'copper', 'cu', 'đồng (cu)', 'copper (cu)', 'đồng sulfat', 'copper sulfate', 'cupric sulfate'
+  Đồng: [
+    'đồng',
+    'copper',
+    'cu',
+    'đồng (cu)',
+    'copper (cu)',
+    'đồng sulfat',
+    'copper sulfate',
+    'cupric sulfate',
   ],
-  'Mangan': [
-    'mangan', 'manganese', 'mn', 'mangan (mn)', 'manganese (mn)', 'mangan sulfat', 'manganese sulfate', 'mangan gluconat'
+  Mangan: [
+    'mangan',
+    'manganese',
+    'mn',
+    'mangan (mn)',
+    'manganese (mn)',
+    'mangan sulfat',
+    'manganese sulfate',
+    'mangan gluconat',
   ],
-  'Selen': [
-    'selen', 'selenium', 'se', 'selen (se)', 'selenium (se)', 'sodium selenite', 'selenomethionine', 'men selen', 'selenium yeast'
+  Selen: [
+    'selen',
+    'selenium',
+    'se',
+    'selen (se)',
+    'selenium (se)',
+    'sodium selenite',
+    'selenomethionine',
+    'men selen',
+    'selenium yeast',
   ],
-  'Iod': [
-    'iod', 'iốt', 'iodine', 'i', 'iod (i)', 'potassium iodide', 'kali iodid', 'ki'
+  Iod: ['iod', 'iốt', 'iodine', 'i', 'iod (i)', 'potassium iodide', 'kali iodid', 'ki'],
+  Kali: [
+    'kali',
+    'potassium',
+    'k',
+    'kali (k)',
+    'potassium (k)',
+    'kali clorid',
+    'potassium chloride',
+    'kcl',
   ],
-  'Kali': [
-    'kali', 'potassium', 'k', 'kali (k)', 'potassium (k)', 'kali clorid', 'potassium chloride', 'kcl'
-  ],
-  'Natri': [
-    'natri', 'sodium', 'na', 'natri (na)', 'sodium (na)', 'natri clorid', 'sodium chloride', 'nacl'
+  Natri: [
+    'natri',
+    'sodium',
+    'na',
+    'natri (na)',
+    'sodium (na)',
+    'natri clorid',
+    'sodium chloride',
+    'nacl',
   ],
 
   // === Vi sinh vật & Men vi sinh (Probiotics) ===
@@ -200,201 +405,268 @@ export const PHARMA_TERM_DICTIONARY: Record<string, string[]> = {
     'bacillus count',
     'probiotics count',
     'spore count',
-    'men vi sinh'
+    'men vi sinh',
   ],
   'Tổng số vi khuẩn hiếu khí': [
-    'tổng vi khuẩn hiếu khí', 'tvkhk', 'aerobic microbial count', 'total aerobic microbial count',
-    'total viable count', 'tvc', 'total plate count', 'tpc', 'aerobic plate count', 'apc',
-    'total bacteria count', 'tamc', 'tam', 'tổng số vi sinh vật hiếu khí', 'tsvsv',
-    'mesophilic aerobic bacteria', 'bacterial count'
+    'tổng vi khuẩn hiếu khí',
+    'tvkhk',
+    'aerobic microbial count',
+    'total aerobic microbial count',
+    'total viable count',
+    'tvc',
+    'total plate count',
+    'tpc',
+    'aerobic plate count',
+    'apc',
+    'total bacteria count',
+    'tamc',
+    'tam',
+    'tổng số vi sinh vật hiếu khí',
+    'tsvsv',
+    'mesophilic aerobic bacteria',
+    'bacterial count',
   ],
   'Tổng số nấm mốc và nấm men': [
-    'nấm mốc nấm men', 'tsnm', 'yeast and mould', 'yeast & mould', 'fungi',
-    'mold and yeast', 'total combined yeast and mould count', 'tymc', 'tymcl',
-    'nấm mốc', 'nấm men', 'yeast mold count', 'yeasts and moulds', 'fungal count'
+    'nấm mốc nấm men',
+    'tsnm',
+    'yeast and mould',
+    'yeast & mould',
+    'fungi',
+    'mold and yeast',
+    'total combined yeast and mould count',
+    'tymc',
+    'tymcl',
+    'nấm mốc',
+    'nấm men',
+    'yeast mold count',
+    'yeasts and moulds',
+    'fungal count',
   ],
-  'Lactobacillus': [
-    'lactobacillus', 'lactobacillus acidophilus', 'l. acidophilus', 'lactobacillus plantarum',
-    'l. plantarum', 'lactobacillus rhamnosus', 'l. rhamnosus', 'lactobacillus reuteri',
-    'l. reuteri', 'lactobacillus casei', 'l. casei'
+  Lactobacillus: [
+    'lactobacillus',
+    'lactobacillus acidophilus',
+    'l. acidophilus',
+    'lactobacillus plantarum',
+    'l. plantarum',
+    'lactobacillus rhamnosus',
+    'l. rhamnosus',
+    'lactobacillus reuteri',
+    'l. reuteri',
+    'lactobacillus casei',
+    'l. casei',
   ],
-  'Bifidobacterium': [
-    'bifidobacterium', 'bifidobacterium animalis', 'bifidobacterium lactis',
-    'bifidobacterium longum', 'bifidobacterium bifidum', 'b. lactis', 'b. longum', 'b. bifidum'
+  Bifidobacterium: [
+    'bifidobacterium',
+    'bifidobacterium animalis',
+    'bifidobacterium lactis',
+    'bifidobacterium longum',
+    'bifidobacterium bifidum',
+    'b. lactis',
+    'b. longum',
+    'b. bifidum',
   ],
   'Saccharomyces boulardii': [
-    'saccharomyces boulardii', 's. boulardii', 'saccharomyces', 'men saccharomyces'
+    'saccharomyces boulardii',
+    's. boulardii',
+    'saccharomyces',
+    'men saccharomyces',
   ],
   'E. coli': ['e.coli', 'e. coli', 'escherichia coli', 'coliform', 'coliforms', 'faecal coliforms'],
-  'Salmonella': ['salmonella', 'salmonella spp', 'salmonella spp.', 'salmonella species'],
+  Salmonella: ['salmonella', 'salmonella spp', 'salmonella spp.', 'salmonella species'],
   'Staphylococcus aureus': [
-    'staphylococcus aureus', 's. aureus', 'staph aureus', 'staphylococci',
-    'coagulase positive staphylococci'
+    'staphylococcus aureus',
+    's. aureus',
+    'staph aureus',
+    'staphylococci',
+    'coagulase positive staphylococci',
   ],
-  'Pseudomonas aeruginosa': [
-    'pseudomonas aeruginosa', 'p. aeruginosa', 'pseudomonas'
-  ],
-  'Clostridium': ['clostridium', 'clostridia', 'clostridium spp'],
+  'Pseudomonas aeruginosa': ['pseudomonas aeruginosa', 'p. aeruginosa', 'pseudomonas'],
+  Clostridium: ['clostridium', 'clostridia', 'clostridium spp'],
   'Candida albicans': ['candida', 'candida albicans', 'c. albicans'],
 
   // === Kim loại nặng ===
-  'Asen': ['asen', 'arsenic', 'as', 'as (arsenic)', 'arsen', 'arsenic (as)', 'total arsenic'],
-  'Chì': ['chì', 'lead', 'pb', 'lead (pb)', 'pb (lead)', 'chi (pb)', 'total lead'],
-  'Thủy ngân': ['thủy ngân', 'mercury', 'hg', 'mercury (hg)', 'hg (mercury)', 'thuy ngan', 'total mercury'],
-  'Cadmi': ['cadmi', 'cadmium', 'cd', 'cadmium (cd)', 'cd (cadmium)', 'cadimi', 'total cadmium'],
+  Asen: [
+    'asen',
+    'arsenic',
+    'as',
+    'as (arsenic)',
+    'arsen',
+    'arsenic (as)',
+    'total arsenic',
+    'asen tổng số',
+    'arsen tổng số',
+    'arsen (as) tổng số',
+  ],
+  'Asen vô cơ': [
+    'asen vô cơ',
+    'asen vo co',
+    'arsen vô cơ',
+    'arsen vo co',
+    'inorganic arsenic',
+    'inorganic as',
+    'thạch tín vô cơ',
+    'arsen (vô cơ)',
+  ],
+  Chì: ['chì', 'lead', 'pb', 'lead (pb)', 'pb (lead)', 'chi (pb)', 'total lead'],
+  'Thủy ngân': [
+    'thủy ngân',
+    'mercury',
+    'hg',
+    'mercury (hg)',
+    'hg (mercury)',
+    'thuy ngan',
+    'total mercury',
+  ],
+  Cadmi: ['cadmi', 'cadmium', 'cd', 'cadmium (cd)', 'cd (cadmium)', 'cadimi', 'total cadmium'],
   'Kim loại nặng': ['heavy metals', 'kim loai nang', 'heavy metal total', 'total heavy metals'],
-  'Krom': ['chromium', 'cr', 'chrome'],
-  'Niken': ['nickel', 'ni'],
+  Krom: ['chromium', 'cr', 'chrome'],
+  Niken: ['nickel', 'ni'],
 
   // === Amino acids (Axêt amin) ===
   'L-Lysine': [
-    'l-lysine', 'lysine', 'l-lysine hcl', 'l-lysine hydrochloride',
-    'lysine hcl', 'lysine hydrochloride', 'l-lysine monohydrochloride',
-    'lysine monohydrochloride', 'l-lysin', 'lysin hcl', 'lysin hydrochloride'
+    'l-lysine',
+    'lysine',
+    'l-lysine hcl',
+    'l-lysine hydrochloride',
+    'lysine hcl',
+    'lysine hydrochloride',
+    'l-lysine monohydrochloride',
+    'lysine monohydrochloride',
+    'l-lysin',
+    'lysin hcl',
+    'lysin hydrochloride',
   ],
-  'L-Methionine': [
-    'l-methionine', 'methionine', 'dl-methionine', 'l-metionin', 'metionin'
-  ],
-  'L-Threonine': [
-    'l-threonine', 'threonine', 'l-threonin', 'threonin'
-  ],
-  'L-Tryptophan': [
-    'l-tryptophan', 'tryptophan', 'l-tryptofan', 'tryptofan'
-  ],
-  'L-Valine': [
-    'l-valine', 'valine', 'l-valin', 'valin'
-  ],
-  'L-Leucine': [
-    'l-leucine', 'leucine', 'l-leucin', 'leucin'
-  ],
-  'L-Isoleucine': [
-    'l-isoleucine', 'isoleucine', 'l-isoleusin', 'isoleusin'
-  ],
-  'L-Phenylalanine': [
-    'l-phenylalanine', 'phenylalanine', 'l-phenylalanil', 'phenylalanil'
-  ],
+  'L-Methionine': ['l-methionine', 'methionine', 'dl-methionine', 'l-metionin', 'metionin'],
+  'L-Threonine': ['l-threonine', 'threonine', 'l-threonin', 'threonin'],
+  'L-Tryptophan': ['l-tryptophan', 'tryptophan', 'l-tryptofan', 'tryptofan'],
+  'L-Valine': ['l-valine', 'valine', 'l-valin', 'valin'],
+  'L-Leucine': ['l-leucine', 'leucine', 'l-leucin', 'leucin'],
+  'L-Isoleucine': ['l-isoleucine', 'isoleucine', 'l-isoleusin', 'isoleusin'],
+  'L-Phenylalanine': ['l-phenylalanine', 'phenylalanine', 'l-phenylalanil', 'phenylalanil'],
   'L-Arginine': [
-    'l-arginine', 'arginine', 'l-arginin', 'arginin',
-    'l-arginine hcl', 'arginine hydrochloride', 'l-arginine hydrochloride'
+    'l-arginine',
+    'arginine',
+    'l-arginin',
+    'arginin',
+    'l-arginine hcl',
+    'arginine hydrochloride',
+    'l-arginine hydrochloride',
   ],
-  'L-Glutamine': [
-    'l-glutamine', 'glutamine', 'l-glutamin', 'glutamin'
-  ],
+  'L-Glutamine': ['l-glutamine', 'glutamine', 'l-glutamin', 'glutamin'],
   'L-Cysteine': [
-    'l-cysteine', 'cysteine', 'l-cystin', 'cystine',
-    'l-cysteine hcl', 'cysteine hydrochloride', 'n-acetyl cysteine', 'nac'
+    'l-cysteine',
+    'cysteine',
+    'l-cystin',
+    'cystine',
+    'l-cysteine hcl',
+    'cysteine hydrochloride',
+    'n-acetyl cysteine',
+    'nac',
   ],
-  'L-Tyrosine': [
-    'l-tyrosine', 'tyrosine', 'l-tyrosin', 'tyrosin'
-  ],
+  'L-Tyrosine': ['l-tyrosine', 'tyrosine', 'l-tyrosin', 'tyrosin'],
   'L-Histidine': [
-    'l-histidine', 'histidine', 'l-histidin', 'histidin',
-    'l-histidine hcl', 'histidine hydrochloride'
+    'l-histidine',
+    'histidine',
+    'l-histidin',
+    'histidin',
+    'l-histidine hcl',
+    'histidine hydrochloride',
   ],
-  'Glycine': [
-    'glycine', 'gly', 'glycin', 'aminoacetic acid'
-  ],
-  'L-Proline': [
-    'l-proline', 'proline', 'l-prolin', 'prolin'
-  ],
-  'L-Serine': [
-    'l-serine', 'serine', 'l-serin', 'serin'
-  ],
-  'L-Alanine': [
-    'l-alanine', 'alanine', 'l-alanin', 'alanin', 'beta-alanine', 'beta-alanin'
-  ],
-  'L-Aspartic acid': [
-    'l-aspartic acid', 'aspartic acid', 'l-aspartate', 'aspartate'
-  ],
-  'L-Glutamic acid': [
-    'l-glutamic acid', 'glutamic acid', 'l-glutamate', 'glutamate'
-  ],
-  'BCAA': [
-    'bcaa', 'branched chain amino acids', 'amino acid'
-  ],
+  Glycine: ['glycine', 'gly', 'glycin', 'aminoacetic acid'],
+  'L-Proline': ['l-proline', 'proline', 'l-prolin', 'prolin'],
+  'L-Serine': ['l-serine', 'serine', 'l-serin', 'serin'],
+  'L-Alanine': ['l-alanine', 'alanine', 'l-alanin', 'alanin', 'beta-alanine', 'beta-alanin'],
+  'L-Aspartic acid': ['l-aspartic acid', 'aspartic acid', 'l-aspartate', 'aspartate'],
+  'L-Glutamic acid': ['l-glutamic acid', 'glutamic acid', 'l-glutamate', 'glutamate'],
+  BCAA: ['bcaa', 'branched chain amino acids', 'amino acid'],
 
   // === Hoạt chất supplement phổ biến ===
   'L-Carnitine': [
-    'l-carnitine', 'carnitine', 'l-carnitin', 'carnitin',
-    'l-carnitine tartrate', 'acetyl-l-carnitine', 'alcar',
-    'l-carnitine l-tartrate', 'carnitine tartrate'
+    'l-carnitine',
+    'carnitine',
+    'l-carnitin',
+    'carnitin',
+    'l-carnitine tartrate',
+    'acetyl-l-carnitine',
+    'alcar',
+    'l-carnitine l-tartrate',
+    'carnitine tartrate',
   ],
-  'Taurine': [
-    'taurine', 'taurin', 'tau', '2-aminoethanesulfonic acid'
-  ],
+  Taurine: ['taurine', 'taurin', 'tau', '2-aminoethanesulfonic acid'],
   'Coenzyme Q10': [
-    'coenzyme q10', 'coq10', 'ubiquinone', 'ubiquinol', 'co q10', 'coq-10',
-    'ubidecarenone', 'co-enzyme q10'
+    'coenzyme q10',
+    'coq10',
+    'ubiquinone',
+    'ubiquinol',
+    'co q10',
+    'coq-10',
+    'ubidecarenone',
+    'co-enzyme q10',
   ],
-  'Collagen': [
-    'collagen', 'collagen peptide', 'hydrolyzed collagen', 'fish collagen',
-    'marine collagen', 'bovine collagen', 'collagen type i', 'collagen type ii',
-    'collagen type iii', 'collagen hydrolysate', 'collagen peptides'
+  Collagen: [
+    'collagen',
+    'collagen peptide',
+    'hydrolyzed collagen',
+    'fish collagen',
+    'marine collagen',
+    'bovine collagen',
+    'collagen type i',
+    'collagen type ii',
+    'collagen type iii',
+    'collagen hydrolysate',
+    'collagen peptides',
   ],
-  'Glucosamine': [
-    'glucosamine', 'glucosamine hcl', 'glucosamine hydrochloride',
-    'glucosamine sulfate', 'n-acetyl glucosamine'
+  Glucosamine: [
+    'glucosamine',
+    'glucosamine hcl',
+    'glucosamine hydrochloride',
+    'glucosamine sulfate',
+    'n-acetyl glucosamine',
   ],
-  'Chondroitin': [
-    'chondroitin', 'chondroitin sulfate', 'chondroitin sulphate'
-  ],
+  Chondroitin: ['chondroitin', 'chondroitin sulfate', 'chondroitin sulphate'],
   'Hyaluronic acid': [
-    'hyaluronic acid', 'hyaluronate', 'sodium hyaluronate',
-    'ha', 'axit hyaluronic', 'acid hyaluronic'
+    'hyaluronic acid',
+    'hyaluronate',
+    'sodium hyaluronate',
+    'ha',
+    'axit hyaluronic',
+    'acid hyaluronic',
   ],
-  'Lutein': [
-    'lutein', 'lutein ester', 'zeaxanthin', 'marigold extract'
-  ],
-  'Lycopene': [
-    'lycopene', 'lycopen'
-  ],
-  'Resveratrol': [
-    'resveratrol', 'trans-resveratrol'
-  ],
-  'Curcumin': [
-    'curcumin', 'curcuminoid', 'turmeric extract', 'diferuloylmethane'
-  ],
+  Lutein: ['lutein', 'lutein ester', 'zeaxanthin', 'marigold extract'],
+  Lycopene: ['lycopene', 'lycopen'],
+  Resveratrol: ['resveratrol', 'trans-resveratrol'],
+  Curcumin: ['curcumin', 'curcuminoid', 'turmeric extract', 'diferuloylmethane'],
   'Omega-3': [
-    'omega-3', 'omega 3', 'dha', 'epa', 'dha+epa', 'fish oil',
-    'docosahexaenoic acid', 'eicosapentaenoic acid', 'omega-3 fatty acids'
+    'omega-3',
+    'omega 3',
+    'dha',
+    'epa',
+    'dha+epa',
+    'fish oil',
+    'docosahexaenoic acid',
+    'eicosapentaenoic acid',
+    'omega-3 fatty acids',
   ],
-  'DHA': [
-    'dha', 'docosahexaenoic acid', 'dha (docosahexaenoic acid)'
-  ],
-  'EPA': [
-    'epa', 'eicosapentaenoic acid', 'epa (eicosapentaenoic acid)'
-  ],
-  'Inositol': [
-    'inositol', 'myo-inositol', 'd-chiro-inositol'
-  ],
-  'Choline': [
-    'choline', 'choline bitartrate', 'choline chloride', 'alpha-gpc'
-  ],
-  'Biotin': [
-    'biotin', 'vitamin b7', 'vitamin h', 'd-biotin'
-  ],
+  DHA: ['dha', 'docosahexaenoic acid', 'dha (docosahexaenoic acid)'],
+  EPA: ['epa', 'eicosapentaenoic acid', 'epa (eicosapentaenoic acid)'],
+  Inositol: ['inositol', 'myo-inositol', 'd-chiro-inositol'],
+  Choline: ['choline', 'choline bitartrate', 'choline chloride', 'alpha-gpc'],
+  Biotin: ['biotin', 'vitamin b7', 'vitamin h', 'd-biotin'],
   'Alpha lipoic acid': [
-    'alpha lipoic acid', 'ala', 'lipoic acid', 'thioctic acid',
-    'r-lipoic acid', 'r-ala', 'alpha-lipoic acid'
+    'alpha lipoic acid',
+    'ala',
+    'lipoic acid',
+    'thioctic acid',
+    'r-lipoic acid',
+    'r-ala',
+    'alpha-lipoic acid',
   ],
-  'Berberine': [
-    'berberine', 'berberine hcl', 'berberine hydrochloride', 'berberin'
-  ],
-  'Spirulina': [
-    'spirulina', 'spirulina powder', 'arthrospira platensis'
-  ],
-  'Chlorella': [
-    'chlorella', 'chlorella powder', 'chlorella vulgaris'
-  ],
-  'Melatonin': [
-    'melatonin', 'n-acetyl-5-methoxytryptamine'
-  ],
-  'GABA': [
-    'gaba', 'gamma-aminobutyric acid', 'gamma aminobutyric acid'
-  ],
-  '5-HTP': [
-    '5-htp', '5-hydroxytryptophan', '5 htp', 'griffonia simplicifolia'
-  ],
+  Berberine: ['berberine', 'berberine hcl', 'berberine hydrochloride', 'berberin'],
+  Spirulina: ['spirulina', 'spirulina powder', 'arthrospira platensis'],
+  Chlorella: ['chlorella', 'chlorella powder', 'chlorella vulgaris'],
+  Melatonin: ['melatonin', 'n-acetyl-5-methoxytryptamine'],
+  GABA: ['gaba', 'gamma-aminobutyric acid', 'gamma aminobutyric acid'],
+  '5-HTP': ['5-htp', '5-hydroxytryptophan', '5 htp', 'griffonia simplicifolia'],
 };
 
 /**
@@ -404,15 +676,15 @@ export const PHARMA_TERM_DICTIONARY: Record<string, string[]> = {
  */
 const UNIT_NORMALIZATION_MAP: Record<string, string> = {
   // Đơn vị phần triệu
-  'ppm': 'ppm',
+  ppm: 'ppm',
   'mg/kg': 'ppm',
-  'mgg': 'ppm',        // mg/g → đôi khi viết liền
+  mgg: 'ppm', // mg/g → đôi khi viết liền
   'ug/g': 'ppm',
   'mcg/g': 'ppm',
   'µg/g': 'ppm',
   'microg/g': 'ppm',
   // Đơn vị phần tỷ
-  'ppb': 'ppb',
+  ppb: 'ppb',
   'ug/kg': 'ppb',
   'mcg/kg': 'ppb',
   'µg/kg': 'ppb',
@@ -421,22 +693,22 @@ const UNIT_NORMALIZATION_MAP: Record<string, string> = {
   'cfu/ml': 'CFU/mL',
   'cfu/g (kl/g)': 'CFU/g',
   'kl/g': 'CFU/g',
-  'cfug': 'CFU/g',
-  'cfu': 'CFU/g',
+  cfug: 'CFU/g',
+  cfu: 'CFU/g',
   // Phần trăm
   'g/100g': '%',
   'g/100ml': '% (w/v)',
   'w/w': '% (w/w)',
-  'ww': '% (w/w)',
+  ww: '% (w/w)',
   // Gram
-  'gam': 'g',
-  'gram': 'g',
+  gam: 'g',
+  gram: 'g',
   // Milli
-  'milligam': 'mg',
-  'milligram': 'mg',
+  milligam: 'mg',
+  milligram: 'mg',
   // Micro
-  'microgram': 'µg',
-  'mcg': 'µg',
+  microgram: 'µg',
+  mcg: 'µg',
 };
 
 /**
@@ -449,7 +721,7 @@ export const normalizeUnit = (unit: string): string => {
   const cleaned = unit
     .toLowerCase()
     .replace(/\s+/g, '')
-    .replace(/μ/g, 'µ')  // normalize micro ký tự khác nhau
+    .replace(/μ/g, 'µ') // normalize micro ký tự khác nhau
     .replace(/×/g, 'x');
   return UNIT_NORMALIZATION_MAP[cleaned] ?? unit;
 };
@@ -460,11 +732,11 @@ export const normalizeUnit = (unit: string): string => {
 export const normalizeString = (str: string) => {
   if (!str) return '';
   return str
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
-    .replace(/đ/g, "d")
-    .replace(/[^a-z0-9]/g, "") // Bỏ cả khoảng trắng và dấu câu để so khớp chặt hơn
+    .replace(/đ/g, 'd')
+    .replace(/[^a-z0-9]/g, '') // Bỏ cả khoảng trắng và dấu câu để so khớp chặt hơn
     .trim();
 };
 
@@ -523,7 +795,7 @@ export const isCriteriaMatch = (
 ) => {
   // 1. Ưu tiên kiểm tra trong cơ sở dữ liệu đã học (Learned Mappings)
   const relevantMappings = learnedMappings
-    .filter(m => m.systemName === systemCriteriaName)
+    .filter((m) => m.systemName === systemCriteriaName)
     .sort((a, b) => b.frequency - a.frequency);
 
   for (const mapping of relevantMappings) {
@@ -554,7 +826,10 @@ export const isCriteriaMatch = (
   if (dictSystem) {
     const normDictSystem = normalizeString(dictSystem);
     const normAI = normalizeString(aiCriteriaName);
-    if (normDictSystem === normAI || (normDictSystem.length >= 3 && normAI.includes(normDictSystem))) {
+    if (
+      normDictSystem === normAI ||
+      (normDictSystem.length >= 3 && normAI.includes(normDictSystem))
+    ) {
       return true;
     }
   }
@@ -588,10 +863,12 @@ export const mapAIExtractedResultsToCriteria = (
   const usedAiIndexes = new Set<number>();
 
   // Ưu tiên khớp các chỉ tiêu trong TCCS
-  tccsCriteria.forEach(criterion => {
+  tccsCriteria.forEach((criterion) => {
     // Tìm kết quả tốt nhất từ AI (có sử dụng learnedMappings + dictionary)
-    const matchIndex = extractedResults.findIndex((aiRes, index) =>
-      !usedAiIndexes.has(index) && isCriteriaMatch(aiRes.criteriaName, criterion.name, learnedMappings)
+    const matchIndex = extractedResults.findIndex(
+      (aiRes, index) =>
+        !usedAiIndexes.has(index) &&
+        isCriteriaMatch(aiRes.criteriaName, criterion.name, learnedMappings)
     );
 
     if (matchIndex !== -1) {
@@ -601,10 +878,10 @@ export const mapAIExtractedResultsToCriteria = (
       mappedEntries.push({
         criteriaName: criterion.name, // Lấy tên chuẩn của hệ thống
         value: matchedResult.value,
-        unit: normalizeUnit(matchedResult.unit || ''),  // Chuẩn hóa đơn vị
+        unit: normalizeUnit(matchedResult.unit || ''), // Chuẩn hóa đơn vị
         limit: matchedResult.limit,
         // Trick để luân chuyển originalName cho TestResultForm
-        ...({ aiOriginalName: matchedResult.criteriaName } as any)
+        ...({ aiOriginalName: matchedResult.criteriaName } as any),
       });
     }
   });

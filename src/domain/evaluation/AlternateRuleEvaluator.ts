@@ -63,18 +63,40 @@ export class AlternateRuleEvaluator {
     tccsMaps: any,
     existingResultsMap: Map<string, any>
   ): boolean {
-    if (!activeTCCS) return false;
-    const rule = tccsMaps.rulesMap.get(cName);
+    if (!activeTCCS || !tccsMaps?.rulesMap) return false;
+    const lowerName = (cName || '').trim().toLowerCase();
+    let rule = tccsMaps.rulesMap.get(lowerName) || tccsMaps.rulesMap.get(cName);
+    if (!rule) {
+      for (const [key, r] of tccsMaps.rulesMap.entries()) {
+        if (key === lowerName || (r && (r.alt || '').trim().toLowerCase() === lowerName)) {
+          rule = r;
+          break;
+        }
+      }
+    }
     if (!rule) return false;
 
     const mainName = (rule.main || '').trim().toLowerCase();
-    let mainVal = getMapVal(mainName);
+    let mainVal = getMapVal(mainName) ?? getMapVal(rule.main);
     let isMainPass = false;
 
+    let mainDef = tccsMaps.criteriaMap?.get(mainName) || tccsMaps.criteriaMap?.get(rule.main);
+    if (!mainDef && tccsMaps.criteriaMap) {
+      for (const [key, def] of tccsMaps.criteriaMap.entries()) {
+        if (key === mainName || (def && (def.name || '').trim().toLowerCase() === mainName)) {
+          mainDef = def;
+          break;
+        }
+      }
+    }
+
     if (mainVal !== undefined && String(mainVal).trim() !== '') {
-      const mainDef = tccsMaps.criteriaMap.get(mainName);
       if (mainDef) {
         isMainPass = CriterionEvaluator.evaluateCriterion(mainDef, mainVal).isPass === true;
+      } else {
+        // Nếu không tìm thấy mainDef nhưng có kết quả thì kiểm tra qua existingResultsMap
+        const existingRes = existingResultsMap.get(mainName);
+        isMainPass = existingRes ? existingRes.isPass === true : true;
       }
     } else {
       const existingRes = existingResultsMap.get(mainName);
@@ -85,7 +107,7 @@ export class AlternateRuleEvaluator {
     }
 
     if (isMainPass) {
-      // VÁ BUG 1: Dùng CriterionEvaluator để kiểm tra chính xác toán tử của điều kiện
+      // Dùng CriterionEvaluator để kiểm tra chính xác toán tử của điều kiện
       if (rule.type === 'CONDITIONAL_CHECK') {
         const conditionText = rule.conditionValue || '';
         if (!conditionText) return false;

@@ -57,6 +57,7 @@ import { isValidTestResultForBatch } from '../batch/batchIntegrityValidator';
 import { CriterionEvaluator } from '../evaluation/CriterionEvaluator';
 import { AlternateRuleEvaluator } from '../evaluation/AlternateRuleEvaluator';
 import { ensureArray } from '../../utils';
+import { isCriteriaMatch } from '../../utils/aiMapping';
 
 export { resolveQualityStatus, normalizeCriterionPassStatus };
 export type { CriterionEvaluationDetail, EvaluationDecisionTrace };
@@ -424,9 +425,26 @@ export class CanonicalStatusResolver {
 
     const missingCriteriaNames: string[] = [];
 
+    // Helper tra cứu kết quả chỉ tiêu hỗ trợ cả Exact match O(1) và Ngữ nghĩa dược khoa (isCriteriaMatch)
+    const findAuthoritativeEntry = (targetName: string): TestResultEntry | undefined => {
+      if (!targetName) return undefined;
+      const lower = targetName.trim().toLowerCase();
+      // 1. Ưu tiên tra cứu chính xác O(1)
+      if (authoritativeMap.has(lower)) {
+        return authoritativeMap.get(lower);
+      }
+      // 2. Tra cứu đối chiếu ngữ nghĩa dược khoa (từ điển hoạt chất, nguyên tố, alias)
+      for (const [key, val] of authoritativeMap.entries()) {
+        if (isCriteriaMatch(key, targetName) || isCriteriaMatch(targetName, key)) {
+          return val;
+        }
+      }
+      return undefined;
+    };
+
     requiredCriteria.forEach((crit) => {
       const cName = crit.name.trim();
-      const entry = authoritativeMap.get(cName.toLowerCase());
+      const entry = findAuthoritativeEntry(cName);
 
       const minNum = crit.min !== undefined && crit.min !== null ? Number(crit.min) : undefined;
       const maxNum = crit.max !== undefined && crit.max !== null ? Number(crit.max) : undefined;
@@ -451,7 +469,7 @@ export class CanonicalStatusResolver {
           isExempted = AlternateRuleEvaluator.checkRuleExemption(
             cName,
             (name) => {
-              const e = authoritativeMap.get(name.trim().toLowerCase());
+              const e = findAuthoritativeEntry(name);
               return e ? e.value : undefined;
             },
             resolvedTccs,

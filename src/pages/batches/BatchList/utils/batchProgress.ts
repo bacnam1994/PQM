@@ -1,34 +1,36 @@
 import { TestResult } from '../../../../types';
 import { ensureArray, parseNumberFromText } from '../../../../utils';
+import { isCriteriaMatch } from '../../../../utils/aiMapping';
 
 /**
  * Tính toán tiến độ kiểm nghiệm (% hoàn thành và danh sách chỉ tiêu còn thiếu theo TCCS)
  */
 export const calculateBatchProgress = (batch: any, batchResults: TestResult[]) => {
   const tccs = batch.tccs;
-  const requiredCriteria = tccs ? [
-    ...ensureArray(tccs.mainQualityCriteria),
-    ...ensureArray(tccs.safetyCriteria)
-  ].filter(c => c && c.name && c.name.trim() !== '') : [];
+  const requiredCriteria = tccs
+    ? [...ensureArray(tccs.mainQualityCriteria), ...ensureArray(tccs.safetyCriteria)].filter(
+        (c) => c && c.name && c.name.trim() !== ''
+      )
+    : [];
 
   if (requiredCriteria.length === 0) {
     return { progressPercent: 0, missingCriteria: [], requiredCriteria: [] };
   }
-  
+
   const testedCriteriaNames = new Set<string>();
-  const latestResultsMap = new Map<string, { value: any, isPass: boolean }>();
+  const latestResultsMap = new Map<string, { value: any; isPass: boolean }>();
 
   // Sắp xếp tăng dần theo thời gian để kết quả mới nhất ghi đè kết quả cũ
   if (batchResults.length > 0) {
     const sortedBatchResults = [...batchResults]
-      .filter(r => r.batchId === batch.id)
+      .filter((r) => r.batchId === batch.id)
       .sort((a, b) => {
         const dateCmp = a.testDate.localeCompare(b.testDate);
         if (dateCmp !== 0) return dateCmp;
         return (a.createdAt || '').localeCompare(b.createdAt || '');
       });
-    sortedBatchResults.forEach(r => {
-      ensureArray(r.results).forEach(res => { 
+    sortedBatchResults.forEach((r) => {
+      ensureArray(r.results).forEach((res) => {
         if (res && res.criteriaName) {
           const cName = res.criteriaName.trim().toLowerCase();
           testedCriteriaNames.add(cName);
@@ -46,26 +48,67 @@ export const calculateBatchProgress = (batch: any, batchResults: TestResult[]) =
     });
   }
 
-  const missingCriteria = requiredCriteria.filter(c => {
+  const missingCriteria = requiredCriteria.filter((c) => {
     if (!c || !c.name || c.name.trim() === '') return false;
     const cName = c.name.trim().toLowerCase();
-    if (testedCriteriaNames.has(cName)) return false;
 
-    const rule = rulesMap.get(cName);
+    // Kiểm tra đã kiểm tra: exact match hoặc semantic match
+    const isTested =
+      testedCriteriaNames.has(cName) ||
+      Array.from(testedCriteriaNames).some(
+        (tested) => isCriteriaMatch(tested, c.name) || isCriteriaMatch(c.name, tested)
+      );
+    if (isTested) return false;
+
+    // Tìm rule thay thế
+    let rule = rulesMap.get(cName);
+    if (!rule) {
+      for (const [altKey, r] of rulesMap.entries()) {
+        if (isCriteriaMatch(altKey, c.name) || isCriteriaMatch(c.name, altKey)) {
+          rule = r;
+          break;
+        }
+      }
+    }
+
     if (rule) {
       const mainName = (rule.main || '').trim().toLowerCase();
-      const mainRes = latestResultsMap.get(mainName);
+      let mainRes = latestResultsMap.get(mainName);
+      if (mainRes === undefined) {
+        for (const [key, val] of latestResultsMap.entries()) {
+          if (isCriteriaMatch(key, rule.main) || isCriteriaMatch(rule.main, key)) {
+            mainRes = val;
+            break;
+          }
+        }
+      }
+
       if (mainRes !== undefined) {
         if (rule.type === 'CONDITIONAL_CHECK') {
           const extractNum = (val: any) => {
-              const str = String(val || '').trim().toUpperCase();
-              if (['ND', 'KPH', 'K.P.H', 'KHÔNG PHÁT HIỆN', 'NOT DETECTED', 'ÂM TÍNH', 'NEGATIVE', 'KHÔNG CÓ'].some(kw => str.includes(kw))) return 0;
-              const parsed = parseNumberFromText(str);
-              if (!isNaN(parsed)) return parsed;
-              const match = str.match(/[-+]?[0-9]*[.,]?[0-9]+/);
-              return match ? Number(match[0].replace(',', '.')) : 0;
+            const str = String(val || '')
+              .trim()
+              .toUpperCase();
+            if (
+              [
+                'ND',
+                'KPH',
+                'K.P.H',
+                'KHÔNG PHÁT HIỆN',
+                'NOT DETECTED',
+                'ÂM TÍNH',
+                'NEGATIVE',
+                'KHÔNG CÓ',
+              ].some((kw) => str.includes(kw))
+            )
+              return 0;
+            const parsed = parseNumberFromText(str);
+            if (!isNaN(parsed)) return parsed;
+            const match = str.match(/[-+]?[0-9]*[.,]?[0-9]+/);
+            return match ? Number(match[0].replace(',', '.')) : 0;
           };
-          if (mainRes.isPass && extractNum(mainRes.value) <= extractNum(rule.conditionValue)) return false;
+          if (mainRes.isPass && extractNum(mainRes.value) <= extractNum(rule.conditionValue))
+            return false;
         } else {
           if (mainRes.isPass) return false;
         }
@@ -74,6 +117,8 @@ export const calculateBatchProgress = (batch: any, batchResults: TestResult[]) =
     return true;
   });
 
-  const progressPercent = Math.round(((requiredCriteria.length - missingCriteria.length) / requiredCriteria.length) * 100);
+  const progressPercent = Math.round(
+    ((requiredCriteria.length - missingCriteria.length) / requiredCriteria.length) * 100
+  );
   return { progressPercent, missingCriteria, requiredCriteria };
 };

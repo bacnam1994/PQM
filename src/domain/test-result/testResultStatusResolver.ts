@@ -856,70 +856,43 @@ export function resolveAuthoritativeTestResultsForBatch(
   const candidates = primaryCandidates.length > 0 ? primaryCandidates : legacyCandidates;
   if (candidates.length === 0) return [];
 
-  // 2. Xác định phiếu authoritative tối cao cho batch (Mục 8)
-  const finalRes = resolveFinalTestResultForBatch(batch, candidates, boundTccs);
-  const supremeAuth = finalRes.finalTestResult;
-  if (!supremeAuth) return [];
+  // Helper kiểm tra phiếu đã hoàn tất phê duyệt
+  const isFinalized = (tr: TestResult): boolean => {
+    const s = String((tr as any).workflowStatus || (tr as any).status || '').toUpperCase();
+    return ['APPROVED', 'FINAL', 'RELEASED'].includes(s) || (tr as any).isFinal === true;
+  };
 
-  const supremeStatus = String((supremeAuth as any).status || '').toUpperCase();
-  const isSupremeFinalized =
-    ['APPROVED', 'FINAL', 'RELEASED'].includes(supremeStatus) ||
-    (supremeAuth as any).isFinal === true;
-  const supremeVersion = (supremeAuth as any).version || (supremeAuth as any).revision || 0;
-  const supremeDate = supremeAuth.updatedAt || supremeAuth.testDate || supremeAuth.createdAt || '';
-  const supremeCanonicalStatus = resolveTestResultStatus(supremeAuth);
+  // 1. Gom nhóm theo chuỗi sửa đổi (Revision / Report Chain)
+  // Nếu các phiếu có cùng reportNo/code hoặc quan hệ supersedesId/originalResultId -> cùng 1 chuỗi sửa đổi
+  const chainMap = new Map<string, TestResult[]>();
+  candidates.forEach((tr) => {
+    const reportCode = ((tr as any).reportNo || (tr as any).code || '').trim().toLowerCase();
+    const parentId = ((tr as any).supersedesId || (tr as any).originalResultId || '').trim();
 
-  // 3. Lọc các phiếu active không bị superseded bởi supremeAuth (Mục 8, 9, 10, 11)
-  const activeCandidates = candidates.filter((tr) => {
-    if (tr.id === supremeAuth.id) return true;
+    const chainKey = reportCode
+      ? `code:${reportCode}`
+      : parentId
+        ? `parent:${parentId}`
+        : `id:${tr.id}`;
 
-    // Nếu supremeAuth đã FINAL/APPROVED mà tr không FINAL/APPROVED -> tr bị superseded
-    if (isSupremeFinalized) {
-      const s = String((tr as any).status || '').toUpperCase();
-      const isFin = ['APPROVED', 'FINAL', 'RELEASED'].includes(s) || (tr as any).isFinal === true;
-      if (!isFin) return false;
+    if (!chainMap.has(chainKey)) {
+      chainMap.set(chainKey, []);
     }
-
-    // Nếu supremeAuth có version cao hơn tr -> tr là revision cũ -> superseded
-    const v = (tr as any).version || (tr as any).revision || 0;
-    if (supremeVersion > 0 && v < supremeVersion) {
-      return false;
-    }
-
-    // Nếu tr có ngày kiểm nghiệm/tạo cũ hơn supremeAuth và kết quả là FAIL trong khi supremeAuth là PASS
-    // -> Đây là trường hợp re-test / kiểm tra lại sau khi không đạt (Mục 9, 11) -> tr cũ bị superseded
-    const trDate = tr.updatedAt || tr.testDate || tr.createdAt || '';
-    if (trDate && supremeDate && trDate < supremeDate) {
-      const trStatus = resolveTestResultStatus(tr);
-      if (trStatus === 'FAIL' && supremeCanonicalStatus === 'PASS') {
-        return false;
-      }
-    }
-
-    return true;
+    chainMap.get(chainKey)!.push(tr);
   });
 
-  // 4. Gom nhóm activeCandidates theo Lab
-  const labGroups = new Map<string, TestResult[]>();
-  activeCandidates.forEach((tr) => {
-    const key = (tr.labId || tr.labName || 'DEFAULT_LAB').trim().toLowerCase();
-    if (!labGroups.has(key)) {
-      labGroups.set(key, []);
+  // Với mỗi chuỗi sửa đổi, chỉ chọn 1 bản ghi tối ưu nhất (phiếu đã duyệt > version cao > ngày mới)
+  const dedupedByChain: TestResult[] = [];
+  chainMap.forEach((group) => {
+    if (group.length === 1) {
+      dedupedByChain.push(group[0]);
+      return;
     }
-    labGroups.get(key)!.push(tr);
-  });
 
-  // Với mỗi Lab còn active, chọn 1 phiếu có thứ tự ưu tiên cao nhất
-  const authoritativeResults: TestResult[] = [];
-  labGroups.forEach((group) => {
-    const finalized = group.filter((tr) => {
-      const s = String((tr as any).status || '').toUpperCase();
-      return s === 'APPROVED' || s === 'FINAL' || s === 'RELEASED' || (tr as any).isFinal === true;
-    });
+    const finalized = group.filter(isFinalized);
+    const pool = finalized.length > 0 ? finalized : group;
 
-    const working = finalized.length > 0 ? finalized : group;
-
-    const sorted = [...working].sort((a, b) => {
+    const sorted = [...pool].sort((a, b) => {
       const vA = (a as any).version || (a as any).revision || 0;
       const vB = (b as any).version || (b as any).revision || 0;
       if (vA !== vB) return vB - vA;
@@ -929,7 +902,65 @@ export function resolveAuthoritativeTestResultsForBatch(
       return dateB.localeCompare(dateA);
     });
 
-    authoritativeResults.push(sorted[0]);
+    dedupedByChain.push(sorted[0]);
+  });
+
+  // 2. Xác định phiếu supremeAuth cho Lô (để bảo toàn quy tắc re-test superseded)
+  const finalRes = resolveFinalTestResultForBatch(batch, dedupedByChain, boundTccs);
+  const supremeAuth = finalRes.finalTestResult;
+  if (!supremeAuth) return dedupedByChain;
+
+  const supremeCanonicalStatus = resolveTestResultStatus(supremeAuth);
+  const supremeDate = supremeAuth.updatedAt || supremeAuth.testDate || supremeAuth.createdAt || '';
+  const isSupremeFinal = isFinalized(supremeAuth);
+
+  // 3. Lọc bỏ các phiếu cũ bị thay thế toàn diện bởi Re-test hoặc Revision (Mục 9, 11)
+  const authoritativeResults: TestResult[] = dedupedByChain.filter((tr) => {
+    if (tr.id === supremeAuth.id) return true;
+
+    // Trích xuất tập chỉ tiêu của tr và supremeAuth
+    const trCriteria = (tr.results || [])
+      .map((r) => (r.criteriaName || '').trim().toLowerCase())
+      .filter(Boolean);
+    const supremeCriteria = new Set(
+      (supremeAuth.results || [])
+        .map((r) => (r.criteriaName || '').trim().toLowerCase())
+        .filter(Boolean)
+    );
+
+    // Nếu tr không có chỉ tiêu nào thì bỏ qua
+    if (trCriteria.length === 0) return false;
+
+    // Kiểm tra xem tất cả chỉ tiêu của tr có nằm trong supremeAuth hay không
+    const isSubsetOfSupreme = trCriteria.every((c) => supremeCriteria.has(c));
+
+    // Nếu tr là tập con của supremeAuth (cùng kiểm các chỉ tiêu đó) và cũ hơn supremeAuth:
+    const trDate = tr.updatedAt || tr.testDate || tr.createdAt || '';
+    if (isSubsetOfSupreme && trDate && supremeDate && trDate <= supremeDate) {
+      const trStatus = resolveTestResultStatus(tr);
+      // Nếu tr FAIL và supremeAuth PASS -> tr là phiếu re-test cũ bị thay thế -> loại
+      if (trStatus === 'FAIL' && supremeCanonicalStatus === 'PASS') {
+        return false;
+      }
+      // Nếu supremeAuth đã APPROVED/FINAL mà tr chỉ là DRAFT/PENDING -> loại tr
+      if (isSupremeFinal && !isFinalized(tr)) {
+        return false;
+      }
+      // Nếu cả hai đều FINAL/APPROVED và supremeAuth có version cao hơn tr -> tr là bản cũ -> loại
+      const vTr = (tr as any).version || (tr as any).revision || 0;
+      const vSup = (supremeAuth as any).version || (supremeAuth as any).revision || 0;
+      if (vSup > vTr) {
+        return false;
+      }
+    }
+
+    // Nếu supremeAuth đã duyệt (APPROVED/FINAL) và tr là DRAFT không chứa chỉ tiêu mới nào so với các phiếu đã duyệt
+    if (isSupremeFinal && !isFinalized(tr) && isSubsetOfSupreme) {
+      return false;
+    }
+
+    // Các phiếu kiểm tra các chỉ tiêu độc lập hoặc bổ sung cho nhau BẮT BUỘC ĐƯỢC GIỮ LẠI
+    return true;
   });
 
   return authoritativeResults;
