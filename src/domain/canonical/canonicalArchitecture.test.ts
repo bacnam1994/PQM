@@ -290,6 +290,9 @@ describe('12 Core Canonical Models Architecture Suite', () => {
     it('ReleaseRules: cho phép xuất xưởng khi chỉ tiêu rớt được cứu bởi alternateRules (FAIL_RETRY)', () => {
       const tccsWithRetry: TCCS = {
         ...mockTccs,
+        mainQualityCriteria: [
+          { name: 'Độ rã', unit: 'phút', min: 0, max: 15, type: CriterionType.NUMBER },
+        ],
         alternateRules: [
           {
             main: 'Độ rã',

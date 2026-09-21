@@ -1,20 +1,25 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  XMarkIcon, 
-  SparklesIcon, 
-  CheckCircleIcon, 
-  ExclamationTriangleIcon, 
-  ShieldExclamationIcon, 
-  ShieldCheckIcon, 
-  PrinterIcon, 
-  CheckIcon, 
-  ArrowPathIcon, 
-  ArrowRightIcon, 
-  ChartBarSquareIcon, 
-  DocumentCheckIcon, 
-  ExclamationCircleIcon 
+import {
+  XMarkIcon,
+  SparklesIcon,
+  CheckCircleIcon,
+  ExclamationTriangleIcon,
+  ShieldExclamationIcon,
+  ShieldCheckIcon,
+  PrinterIcon,
+  CheckIcon,
+  ArrowPathIcon,
+  ArrowRightIcon,
+  ChartBarSquareIcon,
+  DocumentCheckIcon,
+  ExclamationCircleIcon,
 } from '@heroicons/react/24/outline';
-import { BatchClearanceDossier, evaluateBatchQualityClearance, enrichBatchClearanceWithAI } from '../../services/ai/batchClearanceService';
+import {
+  BatchClearanceDossier,
+  evaluateBatchQualityClearance,
+  enrichBatchClearanceWithAI,
+} from '../../services/ai/batchClearanceService';
+import { CanonicalStatusResolver } from '../../domain/canonical/canonicalResolver';
 import { useAppStore } from '../../store/useAppStore';
 import { TestResult, TCCS, ProductFormula } from '../../types';
 import toast from 'react-hot-toast';
@@ -32,22 +37,38 @@ export const AIBatchClearanceModal: React.FC<AIBatchClearanceModalProps> = ({
   onClose,
   batch,
   batchTestResults,
-  onApplyVerdictNote
+  onApplyVerdictNote,
 }) => {
   const { tccsList, productFormulas, testResults: allTestResults } = useAppStore();
 
   const [dossier, setDossier] = useState<BatchClearanceDossier | null>(null);
+  const [tccsError, setTccsError] = useState<string | null>(null);
   const [isEnriching, setIsEnriching] = useState(false);
   const [activeTab, setActiveTab] = useState<'SUMMARY' | 'CRITERIA' | 'RISKS'>('SUMMARY');
 
   useEffect(() => {
     if (!isOpen || !batch) return;
 
-    const matchedTccs = batch.tccs || tccsList.find(t => t.id === batch.tccsId || t.productId === batch.productId);
-    const matchedFormula = productFormulas.find(f => f.productId === batch.productId);
-    const targetResults = batchTestResults || allTestResults.filter(r => r.batchId === batch.id);
+    // SSoT: Phân giải TCCS theo thứ tự ưu tiên bắt buộc:
+    // 1. batch.tccsSnapshot -> 2. batch.tccsId -> 3. exact TCCS version match -> KHÔNG tự động fallback theo productId
+    const tccsResolution = CanonicalStatusResolver.resolveTccsForBatch(batch, null, tccsList);
+    const matchedTccs = tccsResolution.tccs;
 
-    const initialDossier = evaluateBatchQualityClearance(batch, targetResults, matchedTccs, matchedFormula);
+    if (tccsResolution.resolutionStatus === 'TCCS_RESOLUTION_ERROR') {
+      setTccsError(tccsResolution.errorReason || 'Không xác định được TCCS chính xác cho Lô.');
+    } else {
+      setTccsError(null);
+    }
+
+    const matchedFormula = productFormulas.find((f) => f.productId === batch.productId);
+    const targetResults = batchTestResults || allTestResults.filter((r) => r.batchId === batch.id);
+
+    const initialDossier = evaluateBatchQualityClearance(
+      batch,
+      targetResults,
+      matchedTccs || undefined,
+      matchedFormula
+    );
     setDossier(initialDossier);
   }, [isOpen, batch, batchTestResults, allTestResults, tccsList, productFormulas]);
 
@@ -81,8 +102,8 @@ export const AIBatchClearanceModal: React.FC<AIBatchClearanceModalProps> = ({
   const verdictCls = isRelease
     ? 'bg-emerald-50 text-emerald-800 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800'
     : isConditional
-    ? 'bg-amber-50 text-amber-800 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800'
-    : 'bg-rose-50 text-rose-800 border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-800';
+      ? 'bg-amber-50 text-amber-800 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800'
+      : 'bg-rose-50 text-rose-800 border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-800';
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
@@ -95,15 +116,14 @@ export const AIBatchClearanceModal: React.FC<AIBatchClearanceModalProps> = ({
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="text-base font-bold text-ink">
-                  AI Batch Quality Clearance Dossier
-                </h3>
+                <h3 className="text-base font-bold text-ink">AI Batch Quality Clearance Dossier</h3>
                 <span className="text-[10px] bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 font-bold px-2 py-0.5 rounded-full uppercase tracking-wider border border-emerald-200 dark:border-emerald-800/40">
                   GMP Review
                 </span>
               </div>
               <p className="text-xs text-ink-muted">
-                Thẩm định hồ sơ chất lượng lô <strong className="text-ink">{dossier.batchNo}</strong> — {dossier.productName}
+                Thẩm định hồ sơ chất lượng lô{' '}
+                <strong className="text-ink">{dossier.batchNo}</strong> — {dossier.productName}
               </p>
             </div>
           </div>
@@ -112,10 +132,14 @@ export const AIBatchClearanceModal: React.FC<AIBatchClearanceModalProps> = ({
             <button
               type="button"
               onClick={handleEnrichWithAI}
-              disabled={isEnriching}
+              disabled={isEnriching || !!tccsError}
               className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold transition-all shadow-sm disabled:opacity-50"
             >
-              {isEnriching ? <ArrowPathIcon className="h-3.5 w-3.5 animate-spin" /> : <SparklesIcon className="h-3.5 w-3.5" />}
+              {isEnriching ? (
+                <ArrowPathIcon className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <SparklesIcon className="h-3.5 w-3.5" />
+              )}
               AI Chuyên Sâu
             </button>
             <button
@@ -128,8 +152,27 @@ export const AIBatchClearanceModal: React.FC<AIBatchClearanceModalProps> = ({
           </div>
         </div>
 
+        {/* TCCS Resolution Error Banner */}
+        {tccsError && (
+          <div className="mx-6 mt-4 p-3.5 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 rounded-xl flex items-start gap-3 text-rose-800 dark:text-rose-300 text-xs shadow-xs">
+            <ShieldExclamationIcon className="h-5 w-5 text-rose-600 shrink-0 mt-0.5" />
+            <div>
+              <h5 className="font-bold text-sm text-rose-900 dark:text-rose-200">
+                LỖI PHÂN GIẢI TIÊU CHUẨN (TCCS_RESOLUTION_ERROR)
+              </h5>
+              <p className="mt-1">{tccsError}</p>
+              <p className="mt-1 text-[11px] opacity-85">
+                Quy trình thẩm định chất lượng bị khóa để ngăn ngừa rủi ro áp dụng sai phiên bản
+                tiêu chuẩn cơ sở. Vui lòng kiểm tra lại liên kết TCCS của Lô hàng.
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Verdict Bar */}
-        <div className={`px-6 py-4 border-b flex flex-wrap items-center justify-between gap-4 ${verdictCls}`}>
+        <div
+          className={`px-6 py-4 border-b flex flex-wrap items-center justify-between gap-4 ${verdictCls}`}
+        >
           <div className="flex items-center gap-3">
             <div className="p-2 rounded-xl bg-surface/80 shadow-xs shrink-0">
               {isRelease && <ShieldCheckIcon className="h-7 w-7 text-emerald-600" />}
@@ -137,7 +180,9 @@ export const AIBatchClearanceModal: React.FC<AIBatchClearanceModalProps> = ({
               {isHold && <ShieldExclamationIcon className="h-7 w-7 text-rose-600" />}
             </div>
             <div>
-              <p className="text-[10px] font-bold uppercase tracking-wider opacity-75">Khuyến nghị của Hệ thống:</p>
+              <p className="text-[10px] font-bold uppercase tracking-wider opacity-75">
+                Khuyến nghị của Hệ thống:
+              </p>
               <h4 className="text-base font-bold tracking-tight">
                 {isRelease && '🟢 ĐỦ ĐIỀU KIỆN XUẤT XƯỞNG (RELEASE)'}
                 {isConditional && '🟡 DUYỆT CÓ ĐIỀU KIỆN / CẦN LƯU Ý (CONDITIONAL)'}
@@ -153,7 +198,9 @@ export const AIBatchClearanceModal: React.FC<AIBatchClearanceModalProps> = ({
             </div>
             <div className="px-3 py-1 bg-surface/80 rounded-lg shadow-xs border border-inherit">
               <p className="text-[9px] font-bold uppercase opacity-70">Tiến độ TCCS</p>
-              <p className="text-lg font-bold">{dossier.testedCriteriaCount}/{dossier.totalRequiredCriteria}</p>
+              <p className="text-lg font-bold">
+                {dossier.testedCriteriaCount}/{dossier.totalRequiredCriteria}
+              </p>
             </div>
           </div>
         </div>
@@ -205,7 +252,9 @@ export const AIBatchClearanceModal: React.FC<AIBatchClearanceModalProps> = ({
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                 <div className="p-3.5 bg-emerald-50/50 dark:bg-emerald-950/20 rounded-xl border border-emerald-200/60 dark:border-emerald-900/40">
                   <div className="flex justify-between items-center">
-                    <span className="text-[10px] font-bold uppercase text-emerald-600 dark:text-emerald-400">Chỉ tiêu Đạt</span>
+                    <span className="text-[10px] font-bold uppercase text-emerald-600 dark:text-emerald-400">
+                      Chỉ tiêu Đạt
+                    </span>
                     <CheckCircleIcon className="h-4 w-4 text-emerald-500" />
                   </div>
                   <p className="text-xl font-bold text-emerald-700 dark:text-emerald-300 mt-1">
@@ -215,7 +264,9 @@ export const AIBatchClearanceModal: React.FC<AIBatchClearanceModalProps> = ({
 
                 <div className="p-3.5 bg-amber-50/50 dark:bg-amber-950/20 rounded-xl border border-amber-200/60 dark:border-amber-900/40">
                   <div className="flex justify-between items-center">
-                    <span className="text-[10px] font-bold uppercase text-amber-600 dark:text-amber-400">Sát ngưỡng giới hạn</span>
+                    <span className="text-[10px] font-bold uppercase text-amber-600 dark:text-amber-400">
+                      Sát ngưỡng giới hạn
+                    </span>
                     <ExclamationTriangleIcon className="h-4 w-4 text-amber-500" />
                   </div>
                   <p className="text-xl font-bold text-amber-700 dark:text-amber-300 mt-1">
@@ -225,7 +276,9 @@ export const AIBatchClearanceModal: React.FC<AIBatchClearanceModalProps> = ({
 
                 <div className="p-3.5 bg-rose-50/50 dark:bg-rose-950/20 rounded-xl border border-rose-200/60 dark:border-rose-900/40">
                   <div className="flex justify-between items-center">
-                    <span className="text-[10px] font-bold uppercase text-rose-600 dark:text-rose-400">Không đạt / Thiếu</span>
+                    <span className="text-[10px] font-bold uppercase text-rose-600 dark:text-rose-400">
+                      Không đạt / Thiếu
+                    </span>
                     <ShieldExclamationIcon className="h-4 w-4 text-rose-500" />
                   </div>
                   <p className="text-xl font-bold text-rose-700 dark:text-rose-300 mt-1">
@@ -244,8 +297,11 @@ export const AIBatchClearanceModal: React.FC<AIBatchClearanceModalProps> = ({
                     ⚠️ Chỉ tiêu bắt buộc trong TCCS chưa có kết quả kiểm nghiệm:
                   </p>
                   <div className="flex flex-wrap gap-1.5 mt-1.5">
-                    {dossier.missingCriteria.map(m => (
-                      <span key={m} className="px-2 py-0.5 bg-surface rounded-md font-semibold text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
+                    {dossier.missingCriteria.map((m) => (
+                      <span
+                        key={m}
+                        className="px-2 py-0.5 bg-surface rounded-md font-semibold text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800"
+                      >
                         {m}
                       </span>
                     ))}
@@ -266,21 +322,27 @@ export const AIBatchClearanceModal: React.FC<AIBatchClearanceModalProps> = ({
                   </thead>
                   <tbody className="divide-y divide-border">
                     {dossier.testedItems.map((item, idx) => (
-                      <tr key={idx} className={`hover:bg-surface-2 ${item.isNearLimit ? 'bg-amber-50/40 dark:bg-amber-950/10' : ''}`}>
+                      <tr
+                        key={idx}
+                        className={`hover:bg-surface-2 ${item.isNearLimit ? 'bg-amber-50/40 dark:bg-amber-950/10' : ''}`}
+                      >
                         <td className="p-2.5 font-semibold text-ink">{item.criteriaName}</td>
                         <td className="p-2.5 text-ink-muted font-mono">{item.expectedLimit}</td>
                         <td className="p-2.5 font-semibold font-mono text-ink">
                           {item.actualValue} {item.unit || ''}
                         </td>
                         <td className="p-2.5">
-                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${item.isPass ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300' : 'bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300'}`}>
+                          <span
+                            className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${item.isPass ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300' : 'bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300'}`}
+                          >
                             {item.isPass ? 'ĐẠT' : 'K.ĐẠT'}
                           </span>
                         </td>
                         <td className="p-2.5">
                           {item.nearLimitWarning && (
                             <span className="text-[10px] font-semibold text-amber-600 dark:text-amber-400 flex items-center gap-1">
-                              <ExclamationTriangleIcon className="h-3.5 w-3.5" /> {item.nearLimitWarning}
+                              <ExclamationTriangleIcon className="h-3.5 w-3.5" />{' '}
+                              {item.nearLimitWarning}
                             </span>
                           )}
                         </td>
@@ -297,7 +359,8 @@ export const AIBatchClearanceModal: React.FC<AIBatchClearanceModalProps> = ({
               {/* Risk factors */}
               <div className="space-y-2">
                 <h5 className="font-bold text-ink uppercase tracking-wider text-[11px] flex items-center gap-1.5 text-rose-600">
-                  <ExclamationCircleIcon className="h-4 w-4" /> Các yếu tố rủi ro ghi nhận ({dossier.riskFactors.length}):
+                  <ExclamationCircleIcon className="h-4 w-4" /> Các yếu tố rủi ro ghi nhận (
+                  {dossier.riskFactors.length}):
                 </h5>
                 {dossier.riskFactors.length === 0 ? (
                   <p className="p-3 bg-emerald-50 dark:bg-emerald-950/20 text-emerald-700 dark:text-emerald-300 rounded-xl font-medium">
@@ -306,7 +369,10 @@ export const AIBatchClearanceModal: React.FC<AIBatchClearanceModalProps> = ({
                 ) : (
                   <ul className="space-y-1.5">
                     {dossier.riskFactors.map((r, i) => (
-                      <li key={i} className="p-2.5 bg-rose-50/60 dark:bg-rose-950/20 border border-rose-100 dark:border-rose-900/40 rounded-xl text-rose-800 dark:text-rose-300 font-medium">
+                      <li
+                        key={i}
+                        className="p-2.5 bg-rose-50/60 dark:bg-rose-950/20 border border-rose-100 dark:border-rose-900/40 rounded-xl text-rose-800 dark:text-rose-300 font-medium"
+                      >
                         • {r}
                       </li>
                     ))}
@@ -321,7 +387,10 @@ export const AIBatchClearanceModal: React.FC<AIBatchClearanceModalProps> = ({
                 </h5>
                 <ul className="space-y-1.5">
                   {dossier.recommendations.map((rec, i) => (
-                    <li key={i} className="p-2.5 bg-surface-2 border border-border rounded-xl text-ink font-medium">
+                    <li
+                      key={i}
+                      className="p-2.5 bg-surface-2 border border-border rounded-xl text-ink font-medium"
+                    >
                       ✓ {rec}
                     </li>
                   ))}

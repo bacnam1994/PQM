@@ -3,7 +3,6 @@ import { useAppStore } from '../../store/useAppStore';
 import { logAuditAction } from '../../services/auditService';
 import {
   TEST_RESULT_STATUS,
-  BATCH_STATUS,
   CRITERION_TYPE_CONST,
   evaluateCriterionSmart,
   generateId,
@@ -11,8 +10,9 @@ import {
   ensureArray,
   checkRuleExemption,
 } from '../../utils';
-import { calculateOverallStatus } from './../../utils/evaluation';
+import { QualityEvaluationEngine } from '../../domain/evaluation/QualityEvaluationEngine';
 import { CriterionEvaluator } from '../../domain/evaluation/CriterionEvaluator';
+import { resolveAuthoritativeTestResultsForBatch } from '../../domain/test-result/testResultStatusResolver';
 import { lookupPharmaTerm, isCriteriaMatch } from '../../utils/aiMapping';
 import {
   TestResultEntry,
@@ -51,7 +51,6 @@ export const useTestResultSave = ({
   const updateTestResult = useAppStore((state) => state.updateTestResult);
   const addTestResult = useAppStore((state) => state.addTestResult);
   const updateBatchProgress = useAppStore((state) => state.updateBatchProgress);
-  const updateBatchStatus = useAppStore((state) => state.updateBatchStatus);
   const user = useAppStore((state) => state.user);
 
   const handleSaveResult = useCallback(
@@ -214,26 +213,52 @@ export const useTestResultSave = ({
           });
         }
 
-        const cumulativeResultsMap = new Map<string, TestResultEntry>();
+        // Chuẩn hóa Authoritative Results Selection cho Lô:
+        // Tập hợp danh sách các phiếu kiểm nghiệm ứng viên (bao gồm các phiếu hiện có và phiếu đang lưu)
+        const candidateTestResults: TestResult[] = (existingResultsForBatch || [])
+          .filter((res: any) => !crud.selectedItem || res.id !== crud.selectedItem.id)
+          .map((res: any) => ({ ...res }));
 
-        const addCumulative = (r: TestResultEntry) => {
-          if (!r.isExtra) {
-            const rName = (r.criteriaName || '').trim().toLowerCase();
-            const existing = cumulativeResultsMap.get(rName);
-            if (!existing || (r.isPass === true && existing.isPass !== true)) {
-              cumulativeResultsMap.set(rName, r);
-            }
-          }
+        const currentCandidate: any = {
+          id: crud.selectedItem?.id || 'temp-save-id',
+          batchId: formValues.batchId,
+          labId: finalLabId,
+          labName: finalLabName,
+          testDate,
+          results,
+          createdAt: crud.selectedItem?.createdAt || new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          status: crud.selectedItem?.status || 'DRAFT',
+          version: (crud.selectedItem?.version || 0) + 1,
         };
+        candidateTestResults.push(currentCandidate);
 
-        existingResultsForBatch.forEach((res: any) => {
-          ensureArray(res.results).forEach(addCumulative);
+        // Sử dụng Canonical Multi-Lab Authoritative Selection
+        const authTestResults = currentBatch
+          ? resolveAuthoritativeTestResultsForBatch(currentBatch, candidateTestResults, activeTCCS)
+          : [currentCandidate];
+
+        // Gom nhóm chỉ tiêu authoritative: sắp xếp theo thứ tự ưu tiên thời gian/version
+        const authoritativeCriteriaMap = new Map<string, TestResultEntry>();
+        const sortedAuth = [...authTestResults].sort((a: any, b: any) => {
+          const vA = a.version || a.revision || 0;
+          const vB = b.version || b.revision || 0;
+          if (vA !== vB) return vA - vB;
+          const dateA = a.updatedAt || a.testDate || a.createdAt || '';
+          const dateB = b.updatedAt || b.testDate || b.createdAt || '';
+          return dateA.localeCompare(dateB);
         });
 
-        results.forEach(addCumulative);
+        sortedAuth.forEach((tr: any) => {
+          ensureArray(tr.results).forEach((r: TestResultEntry) => {
+            if (!r.isExtra && r.criteriaName) {
+              const rName = r.criteriaName.trim().toLowerCase();
+              authoritativeCriteriaMap.set(rName, r);
+            }
+          });
+        });
 
         let isCumulativeComplete = true;
-        let isCumulativePass = cumulativeResultsMap.size > 0;
         let cumulativeTotal = 0;
         let cumulativeCompleted = 0;
 
@@ -242,7 +267,7 @@ export const useTestResultSave = ({
           cumulativeTotal = allCriteria.length;
           allCriteria.forEach((c: any) => {
             const cName = c.name.trim().toLowerCase();
-            const entry = cumulativeResultsMap.get(cName);
+            const entry = authoritativeCriteriaMap.get(cName);
 
             const isMissingOrEmpty =
               !entry ||
@@ -255,7 +280,7 @@ export const useTestResultSave = ({
               const rule = rulesMap.get(cName);
               if (rule) {
                 const mainName = (rule.main || '').trim().toLowerCase();
-                const mainEntry = cumulativeResultsMap.get(mainName);
+                const mainEntry = authoritativeCriteriaMap.get(mainName);
                 if (
                   mainEntry &&
                   mainEntry.value !== undefined &&
@@ -302,8 +327,6 @@ export const useTestResultSave = ({
               }
             } else {
               cumulativeCompleted++;
-              // isPass=null nghĩa là extra criteria không có giới hạn → không đánh giá được → không tính là FAIL
-              // FIX 2: Không đánh FAIL inline nữa — dùng calculateOverallStatus() ở dưới
             }
           });
         } else {
@@ -312,13 +335,6 @@ export const useTestResultSave = ({
 
         const newProgressPercent =
           cumulativeTotal > 0 ? Math.round((cumulativeCompleted / cumulativeTotal) * 100) : 0;
-
-        // FIX 2: Dùng calculateOverallStatus() để tính isCumulativePass thay vì logic inline
-        // Điều này đảm bảo alternateRules được xét đúng khi quyết định lô RELEASED/REJECTED
-        const cumulativeResultsArray = Array.from(cumulativeResultsMap.values());
-        isCumulativePass =
-          calculateOverallStatus(cumulativeResultsArray, activeTCCS) === TEST_RESULT_STATUS.PASS &&
-          cumulativeResultsMap.size > 0;
 
         if (!completionStatus.isComplete && !isCumulativeComplete) {
           const confirmIncomplete = window.confirm(
@@ -330,17 +346,15 @@ export const useTestResultSave = ({
           }
         }
 
-        const overallStatus = calculateOverallStatus(results, activeTCCS);
+        const overallStatus = QualityEvaluationEngine.calculateOverallStatus(results, activeTCCS);
 
-        // FIX 1+2: Cảnh báo FAIL dựa trên overallStatus từ calculateOverallStatus()
-        // (đã xét alternateRules, không còn dùng logic inline)
         const failedCriteria = results.filter((r) => r.isPass === false);
         if (overallStatus === TEST_RESULT_STATUS.FAIL && failedCriteria.length > 0) {
           const failedNames = failedCriteria
             .map((r) => `  • ${r.criteriaName} (Nhập: ${r.value})`)
             .join('\n');
           const confirmFail = window.confirm(
-            `CẢNH BÁO KẾT QUẢ KHÔNG ĐẠT:\n\nPhát hiện ${failedCriteria.length} chỉ tiêu bị vượt giới hạn / không đạt tiêu chuẩn:\n${failedNames}\n\nPhiếu kiểm nghiệm này sẽ đưa lô hàng về kết luận KHÔNG ĐẠT. Bạn có chắc chắn muốn lưu dữ liệu này không?`
+            `CẢNH BÁO KẾT QUẢ KHÔNG ĐẠT:\n\nPhát hiện ${failedCriteria.length} chỉ tiêu bị vượt giới hạn / không đạt tiêu chuẩn:\n${failedNames}\n\nPhiếu kiểm nghiệm này có kết quả KHÔNG ĐẠT. Bạn có chắc chắn muốn lưu dữ liệu này không?`
           );
           if (!confirmFail) {
             setIsSubmitting(false);
@@ -402,28 +416,6 @@ export const useTestResultSave = ({
 
         await updateBatchProgress(formValues.batchId, newProgressPercent);
 
-        if (isCumulativeComplete && isCumulativePass) {
-          if (currentBatch?.status !== BATCH_STATUS.RELEASED) {
-            await updateBatchStatus(formValues.batchId, BATCH_STATUS.RELEASED);
-            notify({
-              type: 'INFO',
-              title: 'Hệ thống',
-              message:
-                'Tổng hợp kết quả lô hàng đã hoàn thành 100% và ĐẠT, tự động chuyển trạng thái Phê duyệt (RELEASED).',
-            });
-          }
-        } else if (!isCumulativePass) {
-          if (currentBatch?.status !== BATCH_STATUS.REJECTED) {
-            await updateBatchStatus(formValues.batchId, BATCH_STATUS.REJECTED);
-            notify({
-              type: 'ERROR',
-              title: 'Cảnh báo chất lượng',
-              message:
-                'Phát hiện kết quả KHÔNG ĐẠT, hệ thống tự động chuyển trạng thái lô về Loại bỏ (REJECTED).',
-            });
-          }
-        }
-
         clearDraft();
 
         navigate('/test-results');
@@ -470,7 +462,6 @@ export const useTestResultSave = ({
       existingResultsForBatch,
       currentBatch,
       updateBatchProgress,
-      updateBatchStatus,
       user,
       tccsMaps,
       existingResultsMap,

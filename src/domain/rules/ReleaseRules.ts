@@ -82,6 +82,11 @@ export class ReleaseRules {
       blockers.push(
         `Kết quả kiểm nghiệm chất lượng chưa đạt chuẩn PASS (${qualityRes.criteriaSummary.fail} chỉ tiêu không đạt).`
       );
+      if (qualityRes.blockers && qualityRes.blockers.length > 0) {
+        qualityRes.blockers.forEach((b) => {
+          if (!blockers.includes(b)) blockers.push(b);
+        });
+      }
     }
 
     // 6. Kiểm tra Sai lệch chưa đóng (Open Deviations)
