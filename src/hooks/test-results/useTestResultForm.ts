@@ -309,14 +309,6 @@ export const useTestResultForm = (onInitialBatchSelect?: (batchNo: string) => vo
         setFieldValue('batchId', batchIdParam);
         setBatchSearch(`${batch.batchNo} - ${batch.product?.name}`);
 
-        if (
-          batch.status !== BATCH_STATUS.TESTING &&
-          batch.status !== BATCH_STATUS.RELEASED &&
-          batch.status !== BATCH_STATUS.REJECTED
-        ) {
-          updateBatchStatus(batchIdParam, BATCH_STATUS.TESTING);
-        }
-
         if (onInitialBatchSelectRef.current) {
           onInitialBatchSelectRef.current(batch.batchNo);
         }
@@ -331,7 +323,7 @@ export const useTestResultForm = (onInitialBatchSelect?: (batchNo: string) => vo
     return () => {
       isMounted = false;
     };
-  }, [searchParams, hydratedBatches, navigate, updateBatchStatus, setFieldValue, resetHookForm]);
+  }, [searchParams, hydratedBatches, navigate, setFieldValue, resetHookForm]);
 
   const handleBatchSelect = useCallback(
     (batchId: string, preserveResults: boolean = false) => {
@@ -340,20 +332,8 @@ export const useTestResultForm = (onInitialBatchSelect?: (batchNo: string) => vo
         setFieldValue('testResultsMap', {});
         setFieldValue('extraCriteria', []);
       }
-
-      if (batchId) {
-        const batch = batches.find((b) => b.id === batchId);
-        if (
-          batch &&
-          batch.status !== BATCH_STATUS.TESTING &&
-          batch.status !== BATCH_STATUS.RELEASED &&
-          batch.status !== BATCH_STATUS.REJECTED
-        ) {
-          updateBatchStatus(batchId, BATCH_STATUS.TESTING);
-        }
-      }
     },
-    [setFieldValue, batches, updateBatchStatus]
+    [setFieldValue]
   );
 
   const currentBatch = useMemo(() => {

@@ -61,14 +61,14 @@ export class ReleaseRules {
       const exp = new Date(batch.expDate);
       if (!isNaN(exp.getTime()) && exp.getTime() < asOf.getTime()) {
         isNotExpired = false;
-        blockers.push(`Lô đã quá hạn dùng (${batch.expDate}) tại thời điểm xem xét xuất xưởng.`);
+        blockers.push(`Lô đã hết hạn sử dụng (${batch.expDate}) tại thời điểm xem xét xuất xưởng.`);
       }
     }
 
     // 4. Kiểm tra thẩm quyền người thực hiện
     const hasProperRole = !userRole || ['ADMIN', 'QA'].includes(userRole);
     if (!hasProperRole) {
-      blockers.push(`Vai trò ${userRole} không đủ thẩm quyền xuất xưởng.`);
+      blockers.push(`Vai trò ${userRole} không có thẩm quyền / không đủ thẩm quyền xuất xưởng.`);
     }
 
     // 5. Phân giải chất lượng từ Canonical Status Resolver

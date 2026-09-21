@@ -354,7 +354,7 @@ export const useTestResultSave = ({
             .map((r) => `  • ${r.criteriaName} (Nhập: ${r.value})`)
             .join('\n');
           const confirmFail = window.confirm(
-            `CẢNH BÁO KẾT QUẢ KHÔNG ĐẠT:\n\nPhát hiện ${failedCriteria.length} chỉ tiêu bị vượt giới hạn / không đạt tiêu chuẩn:\n${failedNames}\n\nPhiếu kiểm nghiệm này có kết quả KHÔNG ĐẠT. Bạn có chắc chắn muốn lưu dữ liệu này không?`
+            `CẢNH BÁO: Phiếu kiểm nghiệm có kết quả QUALITY = FAIL.\n\nPhát hiện ${failedCriteria.length} chỉ tiêu bị vượt giới hạn / không đạt tiêu chuẩn:\n${failedNames}\n\nViệc lưu Phiếu sẽ không tự động thay đổi Workflow Status của Lô.\nQuyết định RELEASED / REJECTED / BLOCKED được thực hiện theo Workflow và thẩm quyền tương ứng.\n\nBạn có chắc chắn muốn lưu phiếu này không?`
           );
           if (!confirmFail) {
             setIsSubmitting(false);

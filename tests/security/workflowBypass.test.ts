@@ -152,7 +152,26 @@ describe('PHASE B — Security & Adversarial Testing (B1 - B8)', () => {
       };
       await trRepo.save(initialTestResult);
 
-      await trService.updateWorkflowStatus('TR-SEC-02', 'APPROVED', qaUser);
+      const unsignedSig = {
+        documentType: 'TEST_RESULT' as const,
+        documentId: 'TR-SEC-02',
+        documentVersion: 1,
+        signerUid: qaUser.uid,
+        signerEmail: qaUser.email,
+        role: 'QA' as const,
+        meaning: 'APPROVE' as const,
+        signedAt: new Date().toISOString(),
+      };
+      const { computeSignatureChecksum } = await import('../../src/services/signatureService');
+      const checksum = await computeSignatureChecksum(unsignedSig);
+      const mockSignature = {
+        id: 'SIG-TEST-01',
+        ...unsignedSig,
+        checksum,
+      };
+      await trService.updateWorkflowStatus('TR-SEC-02', 'APPROVED', qaUser, {
+        signature: mockSignature as any,
+      });
 
       const saved = await trRepo.findById('TR-SEC-02');
       expect(saved?.workflowStatus).toBe('APPROVED');
@@ -225,6 +244,146 @@ describe('PHASE B — Security & Adversarial Testing (B1 - B8)', () => {
       });
       expect(check.allowed).toBe(false);
       expect(check.reason).toContain('Chuyển đổi trạng thái không hợp lệ');
+    });
+
+    it('WF-006 & Section 14: SecurityRulesValidator chặn toàn bộ các kịch bản bypass workflow của batch', () => {
+      const prodUser = { uid: 'u-prod', role: 'PRODUCTION' as const, isAdmin: false };
+      const qaActor = { uid: 'u-qa', role: 'QA' as const, isAdmin: false };
+
+      // 1. Tạo batch mới với status != PENDING -> BỊ CHẶN
+      const createTesting = SecurityRulesValidator.evaluate(prodUser, 'CREATE', 'batches/B-NEW', {
+        status: 'TESTING',
+      });
+      expect(createTesting.allowed).toBe(false);
+      expect(createTesting.reason).toContain('PENDING');
+
+      // 2. PENDING -> RELEASED -> BỊ CHẶN bất kể role
+      const pendingToReleased = SecurityRulesValidator.evaluate(
+        qaActor,
+        'UPDATE',
+        'batches/B-01',
+        { status: 'RELEASED' },
+        { status: 'PENDING' }
+      );
+      expect(pendingToReleased.allowed).toBe(false);
+
+      // 3. PENDING -> REJECTED -> PRODUCTION bị chặn, QA được phép
+      const pendingToRejectedProd = SecurityRulesValidator.evaluate(
+        prodUser,
+        'UPDATE',
+        'batches/B-01',
+        { status: 'REJECTED' },
+        { status: 'PENDING' }
+      );
+      expect(pendingToRejectedProd.allowed).toBe(false);
+      const pendingToRejectedQA = SecurityRulesValidator.evaluate(
+        qaActor,
+        'UPDATE',
+        'batches/B-01',
+        { status: 'REJECTED' },
+        { status: 'PENDING' }
+      );
+      expect(pendingToRejectedQA.allowed).toBe(true);
+
+      // 4. TESTING -> PENDING -> BỊ CHẶN bất kể role
+      const testingToPending = SecurityRulesValidator.evaluate(
+        qaActor,
+        'UPDATE',
+        'batches/B-01',
+        { status: 'PENDING' },
+        { status: 'TESTING' }
+      );
+      expect(testingToPending.allowed).toBe(false);
+
+      // 5. TESTING -> RELEASED -> PRODUCTION bị chặn, QA được phép
+      const testingToReleasedProd = SecurityRulesValidator.evaluate(
+        prodUser,
+        'UPDATE',
+        'batches/B-01',
+        { status: 'RELEASED' },
+        { status: 'TESTING' }
+      );
+      expect(testingToReleasedProd.allowed).toBe(false);
+      const testingToReleasedQA = SecurityRulesValidator.evaluate(
+        qaActor,
+        'UPDATE',
+        'batches/B-01',
+        { status: 'RELEASED' },
+        { status: 'TESTING' }
+      );
+      expect(testingToReleasedQA.allowed).toBe(true);
+
+      // 6. TESTING -> REJECTED -> PRODUCTION bị chặn, QA được phép
+      const testingToRejectedProd = SecurityRulesValidator.evaluate(
+        prodUser,
+        'UPDATE',
+        'batches/B-01',
+        { status: 'REJECTED' },
+        { status: 'TESTING' }
+      );
+      expect(testingToRejectedProd.allowed).toBe(false);
+      const testingToRejectedQA = SecurityRulesValidator.evaluate(
+        qaActor,
+        'UPDATE',
+        'batches/B-01',
+        { status: 'REJECTED' },
+        { status: 'TESTING' }
+      );
+      expect(testingToRejectedQA.allowed).toBe(true);
+
+      // 7. BLOCKED -> TESTING -> PRODUCTION bị chặn, QA được phép
+      const blockedToTestingProd = SecurityRulesValidator.evaluate(
+        prodUser,
+        'UPDATE',
+        'batches/B-01',
+        { status: 'TESTING' },
+        { status: 'BLOCKED' }
+      );
+      expect(blockedToTestingProd.allowed).toBe(false);
+      const blockedToTestingQA = SecurityRulesValidator.evaluate(
+        qaActor,
+        'UPDATE',
+        'batches/B-01',
+        { status: 'TESTING' },
+        { status: 'BLOCKED' }
+      );
+      expect(blockedToTestingQA.allowed).toBe(true);
+
+      // 8. REJECTED -> PENDING -> PRODUCTION bị chặn, QA được phép
+      const rejectedToPendingProd = SecurityRulesValidator.evaluate(
+        prodUser,
+        'UPDATE',
+        'batches/B-01',
+        { status: 'PENDING' },
+        { status: 'REJECTED' }
+      );
+      expect(rejectedToPendingProd.allowed).toBe(false);
+      const rejectedToPendingQA = SecurityRulesValidator.evaluate(
+        qaActor,
+        'UPDATE',
+        'batches/B-01',
+        { status: 'PENDING' },
+        { status: 'REJECTED' }
+      );
+      expect(rejectedToPendingQA.allowed).toBe(true);
+
+      // 9. RELEASED -> PENDING & RELEASED -> TESTING -> BỊ CHẶN bất kể role
+      const releasedToPending = SecurityRulesValidator.evaluate(
+        qaActor,
+        'UPDATE',
+        'batches/B-01',
+        { status: 'PENDING' },
+        { status: 'RELEASED' }
+      );
+      expect(releasedToPending.allowed).toBe(false);
+      const releasedToTesting = SecurityRulesValidator.evaluate(
+        qaActor,
+        'UPDATE',
+        'batches/B-01',
+        { status: 'TESTING' },
+        { status: 'RELEASED' }
+      );
+      expect(releasedToTesting.allowed).toBe(false);
     });
   });
 

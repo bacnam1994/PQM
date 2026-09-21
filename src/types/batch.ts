@@ -11,7 +11,7 @@ import { ProductFormula } from './product';
  * ĐÂY LÀ WORKFLOW STATUS, TUYỆT ĐỐI KHÔNG DÙNG LÀM QUALITY STATUS.
  * RELEASED != PASS, REJECTED != FAIL.
  */
-export type BatchWorkflowStatus = 'PENDING' | 'TESTING' | 'RELEASED' | 'REJECTED';
+export type BatchWorkflowStatus = 'PENDING' | 'TESTING' | 'RELEASED' | 'REJECTED' | 'BLOCKED';
 
 export interface Batch {
   id: string;
@@ -26,6 +26,8 @@ export interface Batch {
   packaging?: string;
   /** Trạng thái quy trình xuất xưởng (Batch Workflow Status) */
   status: BatchWorkflowStatus;
+  releasedAt?: string;
+  releasedBy?: string;
   rejectReason?: string;
   progressPercent?: number;
   version?: number;

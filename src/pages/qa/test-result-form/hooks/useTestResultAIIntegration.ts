@@ -369,7 +369,7 @@ export function useTestResultAIIntegration({
           tccsId: activeTccs?.id || '',
           mfgDate: newBatchData.mfgDate || '',
           expDate: newBatchData.expDate || '',
-          status: BATCH_STATUS.TESTING,
+          status: BATCH_STATUS.PENDING,
           theoreticalYield: 0,
           actualYield: 0,
           yieldUnit: 'kg',

@@ -76,8 +76,11 @@ export class BatchStateMachine {
   private static readonly QA_ADMIN_REQUIRED_TRANSITIONS: Partial<
     Record<BatchStatus, BatchStatus[]>
   > = {
-    TESTING: ['RELEASED'],
+    PENDING: ['REJECTED'],
+    TESTING: ['RELEASED', 'REJECTED', 'BLOCKED'],
+    BLOCKED: ['TESTING', 'REJECTED'],
     RELEASED: ['BLOCKED'],
+    REJECTED: ['PENDING'],
   };
 
   /**
@@ -107,7 +110,7 @@ export class BatchStateMachine {
       };
     }
 
-    // Kiểm tra thẩm quyền chuyển sang RELEASED hoặc thu hồi RELEASED
+    // Kiểm tra thẩm quyền chuyển trạng thái quy định bắt buộc QA/ADMIN
     const requiresQA = (this.QA_ADMIN_REQUIRED_TRANSITIONS[fromState] || []).includes(toState);
     if (requiresQA && context?.actorRole && !['ADMIN', 'QA'].includes(String(context.actorRole))) {
       return {
@@ -126,23 +129,47 @@ export class BatchStateMachine {
       }
     }
 
-    // Mở lại lô REJECTED bắt buộc phải có lý do thẩm định (CAPA)
-    if (fromState === 'REJECTED' && toState === 'PENDING') {
+    // Bắt buộc lý do đối với các hành động REJECT lô (PENDING -> REJECTED, TESTING -> REJECTED, BLOCKED -> REJECTED)
+    if (toState === 'REJECTED' && context !== undefined) {
       if (!context?.reason || context.reason.trim().length === 0) {
         return {
           allowed: false,
-          reason:
-            'Mở lại Lô đã bị từ chối bắt buộc phải có biên bản giải trình và lý do xét duyệt.',
+          reason: 'Từ chối (Reject) lô sản xuất bắt buộc phải có lý do giải trình rõ ràng.',
         };
       }
     }
 
-    // Thu hồi RELEASED -> BLOCKED bắt buộc có lý do nghiệp vụ
-    if (fromState === 'RELEASED' && toState === 'BLOCKED') {
+    // Bắt buộc lý do đối với các hành động BLOCK lô (TESTING -> BLOCKED, RELEASED -> BLOCKED)
+    if (toState === 'BLOCKED' && context !== undefined) {
       if (!context?.reason || context.reason.trim().length === 0) {
         return {
           allowed: false,
-          reason: 'Thu hồi lô đã xuất xưởng bắt buộc phải có lý do thu hồi rõ ràng.',
+          reason:
+            fromState === 'RELEASED'
+              ? 'Thu hồi lô đã xuất xưởng bắt buộc phải có lý do thu hồi rõ ràng.'
+              : 'Khóa (Block) lô sản xuất bắt buộc phải có lý do giải trình.',
+        };
+      }
+    }
+
+    // Mở lại lô REJECTED bắt buộc phải có lý do thẩm định (CAPA)
+    if (fromState === 'REJECTED' && toState === 'PENDING' && context !== undefined) {
+      if (!context?.reason || context.reason.trim().length === 0) {
+        return {
+          allowed: false,
+          reason:
+            'Mở lại Lô đã bị từ chối bắt buộc phải có biên bản giải trình và lý do xét duyệt CAPA.',
+        };
+      }
+    }
+
+    // Mở khóa lô BLOCKED sang TESTING bắt buộc phải có lý do / kế hoạch retest (WF-011)
+    if (fromState === 'BLOCKED' && toState === 'TESTING' && context !== undefined) {
+      if (!context?.reason || context.reason.trim().length === 0) {
+        return {
+          allowed: false,
+          reason:
+            'Mở khóa Lô bị chặn (BLOCKED sang TESTING) bắt buộc phải có lý do giải trình hoặc kế hoạch kiểm nghiệm lại (Retest Plan).',
         };
       }
     }
@@ -400,16 +427,27 @@ export class TestResultWorkflowStateMachine {
   > = {
     DRAFT: {
       SUBMITTED: ['LAB', 'QC', 'QA', 'ADMIN'],
+      SUPERSEDED: ['LAB', 'QC', 'QA', 'ADMIN'],
     },
     SUBMITTED: {
       DRAFT: ['LAB', 'QC', 'QA', 'ADMIN'],
       FINAL: ['QC', 'QA', 'ADMIN'],
+      SUPERSEDED: ['QC', 'QA', 'ADMIN'],
     },
     FINAL: {
       APPROVED: ['QA', 'ADMIN'],
+      SUPERSEDED: ['QA', 'ADMIN'],
     },
     APPROVED: {
       RELEASED: ['QA', 'ADMIN'],
+      SUPERSEDED: ['QA', 'ADMIN'],
+    },
+    RELEASED: {
+      SUPERSEDED: ['QA', 'ADMIN'],
+    },
+    REJECTED: {
+      DRAFT: ['QA', 'ADMIN'],
+      SUPERSEDED: ['QA', 'ADMIN'],
     },
   };
 
@@ -452,6 +490,17 @@ export class TestResultWorkflowStateMachine {
         return {
           allowed: false,
           reason: `Vai trò ${context.actorRole} không có thẩm quyền chuyển trạng thái quy trình từ ${fromState} sang ${toState}. Yêu cầu: ${allowedRoles.join(', ')}.`,
+        };
+      }
+    }
+
+    // Bắt buộc lý do đối với SUPERSEDED khi có context truyền vào
+    if (toState === 'SUPERSEDED' && context !== undefined) {
+      if (!context?.reason || context.reason.trim().length === 0) {
+        return {
+          allowed: false,
+          reason:
+            'Đánh dấu thay thế phiếu kiểm nghiệm (SUPERSEDED) bắt buộc phải có lý do giải trình rõ ràng.',
         };
       }
     }

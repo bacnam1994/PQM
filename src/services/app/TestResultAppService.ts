@@ -4,7 +4,7 @@
  * Tự động đánh giá Đạt/Không đạt, ALCOA+ Audit Trail & Optimistic Concurrency Control (OCC)
  */
 
-import { TestResult, Batch, TestResultWorkflowStatus } from '../../types';
+import { TestResult, Batch, TestResultWorkflowStatus, ElectronicSignature } from '../../types';
 import { ITestResultRepository } from '../../repositories/TestResultRepository';
 import { testResultRepository as defaultTestResultRepo } from '../../repositories/firebase/FirebaseTestResultRepository';
 import {
@@ -14,6 +14,7 @@ import {
 import { can } from '../permissionService';
 import { logAuditAction } from '../auditService';
 import { validateOptimisticLock, nextVersion } from '../../utils/concurrency';
+import { signatureService } from '../signatureService';
 import { buildEvaluationSnapshot } from '../../domain/evaluation';
 import {
   resolveTestResultStatus,
@@ -218,9 +219,15 @@ export class TestResultAppService {
       reason?: string;
       oldTestResult?: TestResult;
       batch?: Batch;
+      signature?: ElectronicSignature;
+      requireSignature?: boolean;
     }
   ): Promise<void> {
-    const current = options?.oldTestResult || (await this.repo.findById(id));
+    // WF-018: Luôn đọc bản ghi mới nhất từ DB để làm authoritative source
+    let current = await this.repo.findById(id);
+    if (!current && options?.oldTestResult) {
+      current = options.oldTestResult;
+    }
     if (!current) {
       throw new Error(`Không tìm thấy Phiếu kiểm nghiệm với mã: ${id}`);
     }
@@ -253,6 +260,28 @@ export class TestResultAppService {
       throw new Error(
         'Đánh dấu thay thế phiếu kiểm nghiệm (SUPERSEDED) bắt buộc phải có lý do giải trình.'
       );
+    }
+
+    // 4. Ràng buộc Chữ ký số khi Phê duyệt (21 CFR Part 11 Compliance) (WF-012)
+    if (newWorkflowStatus === 'APPROVED') {
+      if (options?.requireSignature || options?.signature) {
+        if (!options?.signature) {
+          throw new Error(
+            'Quy định 21 CFR Part 11: Yêu cầu chữ ký điện tử hợp lệ của QA/Admin trước khi phê duyệt phiếu kiểm nghiệm.'
+          );
+        }
+        if (
+          (options.signature.documentType !== 'TEST_RESULT_APPROVAL' &&
+            (options.signature.documentType as string) !== 'TEST_RESULT') ||
+          options.signature.documentId !== id
+        ) {
+          throw new Error('Chữ ký điện tử không khớp với Phiếu kiểm nghiệm đang phê duyệt.');
+        }
+        const isValid = await signatureService.verifySignatureIntegrity(options.signature);
+        if (!isValid) {
+          throw new Error('Chữ ký điện tử không hợp lệ hoặc đã bị can thiệp trái phép.');
+        }
+      }
     }
 
     const newVersion = nextVersion(current.version ?? 1);

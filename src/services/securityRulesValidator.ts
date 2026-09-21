@@ -118,30 +118,104 @@ export class SecurityRulesValidator {
       };
     }
 
-    // 7. Ràng buộc Lô sản xuất (Batches)
+    // 7. Ràng buộc Lô sản xuất (Batches) (WF-006, WF-009, WF-010, WF-011)
     if (rootCollection === 'batches') {
       if (action === 'READ') return { allowed: true };
-      // Chuyển trạng thái sang RELEASED hoặc REJECTED: BẮT BUỘC QA
-      if (payload?.status === 'RELEASED' || payload?.status === 'REJECTED') {
-        if (user.role !== 'QA') {
+
+      const isQaOrAdmin = user.role === 'QA' || (user as any).isAdmin === true;
+
+      // 7.1. Tạo mới lô: Bắt buộc trạng thái ban đầu là PENDING (WF-004)
+      if (action === 'CREATE') {
+        if (payload?.status && payload.status !== 'PENDING') {
           return {
             allowed: false,
-            reason:
-              'Chỉ QA mới có thẩm quyền Phê duyệt xuất xưởng (RELEASED) hoặc Từ chối (REJECTED) lô sản xuất.',
+            reason: 'Lô sản xuất mới tạo bắt buộc phải có trạng thái PENDING.',
+          };
+        }
+        return { allowed: true };
+      }
+
+      // 7.2. Kiểm tra thay đổi trạng thái (Workflow Status Mutation Guard)
+      if (action === 'UPDATE') {
+        // Chuyển trạng thái sang RELEASED, REJECTED, BLOCKED: BẮT BUỘC QA hoặc ADMIN
+        if (
+          payload?.status === 'RELEASED' ||
+          payload?.status === 'REJECTED' ||
+          payload?.status === 'BLOCKED'
+        ) {
+          if (!isQaOrAdmin) {
+            return {
+              allowed: false,
+              reason:
+                'Chỉ QA mới có thẩm quyền Phê duyệt xuất xưởng (RELEASED) hoặc Từ chối (REJECTED) lô sản xuất.',
+            };
+          }
+        }
+
+        if (payload?.status && currentData?.status && payload.status !== currentData.status) {
+          const from = currentData.status;
+          const to = payload.status;
+
+          // Bất biến: Chống các chuyển đổi bất hợp pháp bất kể vai trò
+          if (from === 'PENDING' && to === 'RELEASED') {
+            return {
+              allowed: false,
+              reason:
+                'Chuyển trạng thái bất hợp pháp: Không thể chuyển trực tiếp PENDING -> RELEASED.',
+            };
+          }
+          if (from === 'TESTING' && to === 'PENDING') {
+            return {
+              allowed: false,
+              reason: 'Chuyển trạng thái bất hợp pháp: Không thể quay lại PENDING từ TESTING.',
+            };
+          }
+          if (from === 'RELEASED' && (to === 'PENDING' || to === 'TESTING' || to === 'REJECTED')) {
+            return {
+              allowed: false,
+              reason: `Chuyển trạng thái bất hợp pháp: Lô đã RELEASED không thể chuyển sang ${to}.`,
+            };
+          }
+          if (from === 'REJECTED' && (to === 'RELEASED' || to === 'TESTING')) {
+            return {
+              allowed: false,
+              reason: `Chuyển trạng thái bất hợp pháp: Lô đã REJECTED không thể chuyển sang ${to}.`,
+            };
+          }
+
+          if (from === 'REJECTED' && to === 'PENDING') {
+            if (!isQaOrAdmin) {
+              return {
+                allowed: false,
+                reason:
+                  'Chỉ QA hoặc Quản trị viên mới có thẩm quyền mở lại Lô REJECTED sang PENDING theo quy trình CAPA.',
+              };
+            }
+          }
+          if (from === 'BLOCKED' && to === 'TESTING') {
+            if (!isQaOrAdmin) {
+              return {
+                allowed: false,
+                reason: 'Chỉ QA hoặc Quản trị viên mới có thẩm quyền mở khóa BLOCKED sang TESTING.',
+              };
+            }
+          }
+        }
+
+        // 7.3. Lô đã đóng (RELEASED / REJECTED / BLOCKED): Không cho phép người dùng thường sửa đổi
+        if (
+          (currentData?.status === 'RELEASED' ||
+            currentData?.status === 'REJECTED' ||
+            currentData?.status === 'BLOCKED') &&
+          !isQaOrAdmin
+        ) {
+          return {
+            allowed: false,
+            reason: `Lô sản xuất ở trạng thái ${currentData.status} bị khóa, chỉ QA hoặc Quản trị viên mới có quyền cập nhật.`,
           };
         }
       }
-      // Lô đã RELEASED hoặc REJECTED: không cho user bình thường chỉnh sửa
-      if (
-        (currentData?.status === 'RELEASED' || currentData?.status === 'REJECTED') &&
-        user.role !== 'QA'
-      ) {
-        return {
-          allowed: false,
-          reason:
-            'Lô sản xuất đã xuất xưởng (RELEASED) hoặc từ chối (REJECTED) bị khóa, không thể chỉnh sửa.',
-        };
-      }
+
       return { allowed: true };
     }
 

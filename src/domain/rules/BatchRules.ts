@@ -5,7 +5,7 @@
 
 import { Batch, TestResult, TCCS, QualityDeviation, BatchWorkflowStatus } from '../../types';
 import { Role } from '../../types/permissions';
-import { CanonicalStatusResolver } from '../canonical/canonicalResolver';
+import { ReleaseRules } from './ReleaseRules';
 
 export interface BatchRuleEvaluationResult {
   allowed: boolean;
@@ -16,6 +16,7 @@ export interface BatchRuleEvaluationResult {
 export class BatchRules {
   /**
    * Kiểm tra điều kiện xuất xưởng Lô sản xuất (canReleaseBatch)
+   * Ủy quyền trực tiếp cho ReleaseRules.evaluateReleasePrerequisites (Single Source of Truth)
    */
   public static canRelease(
     batch: Batch,
@@ -25,74 +26,19 @@ export class BatchRules {
     deviations?: QualityDeviation[],
     options?: { asOfDate?: string | Date }
   ): BatchRuleEvaluationResult {
-    const blockers: string[] = [];
-
-    // 1. Kiểm tra quyền hạn (Role check: ADMIN hoặc QA)
-    if (userRole && userRole !== 'ADMIN' && userRole !== 'QA') {
-      blockers.push(
-        `Vai trò ${userRole} không có thẩm quyền ký duyệt xuất xưởng Lô (yêu cầu QA hoặc ADMIN).`
-      );
-    }
-
-    // 2. Trạng thái hiện tại của Lô
-    if (batch.status === 'RELEASED') {
-      blockers.push('Lô này đã ở trạng thái Xuất xưởng (RELEASED).');
-    }
-    if (batch.status === 'REJECTED') {
-      blockers.push('Lô đã bị Từ chối (REJECTED), không thể xuất xưởng trực tiếp.');
-    }
-
-    // 3. Kiểm tra hạn sử dụng (Expiration Date Check)
-    if (batch.expDate) {
-      const asOf = options?.asOfDate ? new Date(options.asOfDate) : new Date();
-      const exp = new Date(batch.expDate);
-      if (!isNaN(exp.getTime()) && exp.getTime() < asOf.getTime()) {
-        blockers.push(
-          `Lô sản xuất đã hết hạn sử dụng (${batch.expDate}), không được phép xuất xưởng.`
-        );
-      }
-    }
-
-    // 4. Kiểm tra tính hợp lý của sản lượng (Yield sanity)
-    if (batch.theoreticalYield !== undefined && batch.theoreticalYield <= 0) {
-      blockers.push('Sản lượng lý thuyết của Lô phải lớn hơn 0.');
-    }
-    if (batch.actualYield !== undefined && batch.actualYield < 0) {
-      blockers.push('Sản lượng thực tế của Lô không được là số âm.');
-    }
-
-    // 5. Kết quả kiểm nghiệm đạt chuẩn (Canonical Quality Resolution)
-    const qualityRes = CanonicalStatusResolver.resolveBatchQuality(batch, testResults, boundTccs);
-    if (qualityRes.batchQualityStatus !== 'PASS') {
-      blockers.push(
-        `Kết quả kiểm nghiệm chất lượng chưa đạt chuẩn PASS (Hiện tại: ${qualityRes.batchQualityStatus}).`
-      );
-    }
-
-    // 6. Kiểm tra chỉ tiêu không đạt
-    if (qualityRes.criteriaSummary.fail > 0) {
-      blockers.push(`Còn ${qualityRes.criteriaSummary.fail} chỉ tiêu kiểm nghiệm không đạt.`);
-    }
-
-    // 7. Kiểm tra hồ sơ sai lệch nghiêm trọng chưa đóng (Open Critical Deviations)
-    if (deviations && deviations.length > 0) {
-      const openCritical = deviations.filter(
-        (d) =>
-          (d.batchId === batch.id || d.batchNo === batch.batchNo) &&
-          d.severity === 'CRITICAL' &&
-          d.status !== 'CLOSED'
-      );
-      if (openCritical.length > 0) {
-        blockers.push(
-          `Còn ${openCritical.length} hồ sơ sai lệch nghiêm trọng (CRITICAL) chưa được xử lý đóng (CLOSED).`
-        );
-      }
-    }
+    const prereq = ReleaseRules.evaluateReleasePrerequisites({
+      batch,
+      testResults,
+      userRole,
+      boundTccs,
+      deviations,
+      asOfDate: options?.asOfDate,
+    });
 
     return {
-      allowed: blockers.length === 0,
-      reason: blockers.length > 0 ? blockers[0] : undefined,
-      blockers,
+      allowed: prereq.isEligibleForRelease,
+      reason: prereq.blockers[0],
+      blockers: prereq.blockers,
     };
   }
 

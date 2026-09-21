@@ -791,7 +791,7 @@ export const AIAssistantChat: React.FC<AIAssistantChatProps> = ({
         batchNo: (extractedData.batchNo || '').trim(),
         mfgDate,
         expDate,
-        status: BATCH_STATUS.TESTING,
+        status: BATCH_STATUS.PENDING,
         theoreticalYield: 0,
         actualYield: 0,
         yieldUnit: 'kg',
