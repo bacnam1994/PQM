@@ -7,7 +7,7 @@ import {
   ArrowDownRightIcon,
   LinkIcon,
 } from '@heroicons/react/24/outline';
-import { CriterionType, Criterion } from '../../../types';
+import { CriterionType, Criterion, AlternateRule } from '../../../types';
 import {
   DosageFormType,
   checkTCCSFormulaConflicts,
@@ -168,6 +168,7 @@ interface TccsMainCriteriaTableProps {
   productId: string;
   selectedFormula: any;
   productIngredients: any[];
+  alternateRules?: AlternateRule[];
   onApplyPharmacopoeiaTemplate: (dosageForm: DosageFormType) => void;
   onFetchCriteriaFromFormula: (tolerancePercent: number) => void;
   onAddCriterion: () => void;
@@ -183,6 +184,7 @@ export const TccsMainCriteriaTable: React.FC<TccsMainCriteriaTableProps> = ({
   productId,
   selectedFormula,
   productIngredients,
+  alternateRules = [],
   onApplyPharmacopoeiaTemplate,
   onFetchCriteriaFromFormula,
   onAddCriterion,
@@ -343,6 +345,39 @@ export const TccsMainCriteriaTable: React.FC<TccsMainCriteriaTableProps> = ({
                     <LinkIcon className="w-2.5 h-2.5" /> Master
                   </span>
                 )}
+                {/* Badge Quy tắc thay thế */}
+                {(() => {
+                  const cNorm = (c.name || '').trim().toLowerCase();
+                  if (!cNorm) return null;
+                  const ruleAsMain = alternateRules.find(
+                    (r) => r.main && r.main.trim().toLowerCase() === cNorm
+                  );
+                  const ruleAsAlt = alternateRules.find(
+                    (r) => r.alt && r.alt.trim().toLowerCase() === cNorm
+                  );
+
+                  if (ruleAsMain) {
+                    return (
+                      <span
+                        className="absolute -top-1.5 left-1 inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[8.5px] font-bold bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300 border border-blue-200/70"
+                        title={`Áp dụng quy tắc thay thế với: ${ruleAsMain.alt}`}
+                      >
+                        🔗 Có thay thế
+                      </span>
+                    );
+                  }
+                  if (ruleAsAlt) {
+                    return (
+                      <span
+                        className="absolute -top-1.5 left-1 inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[8.5px] font-bold bg-indigo-50 text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-300 border border-indigo-200/70"
+                        title={`Phụ thuộc vào chỉ tiêu: ${ruleAsAlt.main}`}
+                      >
+                        ↳ Phụ thuộc: {ruleAsAlt.main}
+                      </span>
+                    );
+                  }
+                  return null;
+                })()}
               </div>
 
               <input

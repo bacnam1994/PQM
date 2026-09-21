@@ -6,7 +6,7 @@ import {
   LinkIcon,
   MagnifyingGlassIcon,
 } from '@heroicons/react/24/outline';
-import { CriterionType, Criterion } from '../../../types';
+import { CriterionType, Criterion, AlternateRule } from '../../../types';
 import { useMasterCriteriaActiveQuery } from '../../../hooks/queries/useMasterCriterionQueries';
 import { MasterCriterion } from '../../../types';
 
@@ -14,6 +14,7 @@ interface TccsSafetyCriteriaTableProps {
   microbiologicalCriteria: Criterion[];
   heavyMetalCriteria: Criterion[];
   mycotoxinCriteria: Criterion[];
+  alternateRules?: AlternateRule[];
   onAdd: (category: 'microbiologicalCriteria' | 'heavyMetalCriteria' | 'mycotoxinCriteria') => void;
   onUpdate: (
     category: 'microbiologicalCriteria' | 'heavyMetalCriteria' | 'mycotoxinCriteria',
@@ -145,6 +146,7 @@ export const TccsSafetyCriteriaTable: React.FC<TccsSafetyCriteriaTableProps> = (
   microbiologicalCriteria,
   heavyMetalCriteria,
   mycotoxinCriteria,
+  alternateRules = [],
   onAdd,
   onUpdate,
   onRemove,
@@ -219,6 +221,39 @@ export const TccsSafetyCriteriaTable: React.FC<TccsSafetyCriteriaTableProps> = (
                 Master
               </span>
             )}
+            {/* Badge Quy tắc thay thế */}
+            {(() => {
+              const cNorm = (c.name || '').trim().toLowerCase();
+              if (!cNorm) return null;
+              const ruleAsMain = alternateRules.find(
+                (r) => r.main && r.main.trim().toLowerCase() === cNorm
+              );
+              const ruleAsAlt = alternateRules.find(
+                (r) => r.alt && r.alt.trim().toLowerCase() === cNorm
+              );
+
+              if (ruleAsMain) {
+                return (
+                  <span
+                    className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[8.5px] font-bold bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300 border border-blue-200/70 shrink-0"
+                    title={`Áp dụng quy tắc thay thế với: ${ruleAsMain.alt}`}
+                  >
+                    🔗 Có thay thế
+                  </span>
+                );
+              }
+              if (ruleAsAlt) {
+                return (
+                  <span
+                    className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[8.5px] font-bold bg-indigo-50 text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-300 border border-indigo-200/70 shrink-0"
+                    title={`Phụ thuộc vào chỉ tiêu: ${ruleAsAlt.main}`}
+                  >
+                    ↳ Phụ thuộc: {ruleAsAlt.main}
+                  </span>
+                );
+              }
+              return null;
+            })()}
 
             <input
               placeholder="ĐVT"

@@ -4,6 +4,7 @@ import { useDataGraph, HydratedTestResult } from './useDataGraph';
 import { TestResultEntry } from '../types';
 import { ensureArray, parseNumberFromText, TEST_RESULT_STATUS, getFromCache } from '../utils';
 import { calculateOverallStatusForTestResult } from '../domain/test-result/testResultStatusResolver';
+import { AlternateRuleResolver } from '../domain/evaluation';
 import { ref, query, orderByChild, equalTo, get } from 'firebase/database';
 import { db } from '../firebase';
 
@@ -123,64 +124,28 @@ export const useTestResultPrint = () => {
             ...ensureArray(tccsForEvaluation.safetyCriteria),
           ].filter((c) => c && c.name && c.name.trim() !== '');
 
-          const rulesMap = new Map<string, any>();
-          (tccsForEvaluation.alternateRules || []).forEach((r) => {
-            if (r && r.alt && r.alt.trim() !== '') rulesMap.set(r.alt.trim().toLowerCase(), r);
-          });
-
+          const currentEntries = Array.from(consolidatedResultsMap.values());
           allCriteria.forEach((c) => {
             const cName = c.name.trim().toLowerCase();
             if (!consolidatedResultsMap.has(cName)) {
-              const rule = rulesMap.get(cName);
-              if (rule) {
-                const mainName = (rule.main || '').trim().toLowerCase();
-                const mainEntry = consolidatedResultsMap.get(mainName);
-                if (
-                  mainEntry &&
-                  mainEntry.isPass === true &&
-                  mainEntry.value !== undefined &&
-                  String(mainEntry.value).trim() !== ''
-                ) {
-                  let ruleSatisfied = false;
-                  if (rule.type === 'CONDITIONAL_CHECK') {
-                    const extractNum = (val: any) => {
-                      const str = String(val || '')
-                        .trim()
-                        .toUpperCase();
-                      if (
-                        [
-                          'ND',
-                          'KPH',
-                          'K.P.H',
-                          'KHÔNG PHÁT HIỆN',
-                          'NOT DETECTED',
-                          'ÂM TÍNH',
-                          'NEGATIVE',
-                          'KHÔNG CÓ',
-                          'KHÔNG ĐƯỢC CÓ',
-                        ].some((kw) => str.includes(kw))
-                      )
-                        return 0;
-                      const parsed = parseNumberFromText(str);
-                      if (!isNaN(parsed)) return parsed;
-                      const match = str.match(/[-+]?[0-9]*[.,]?[0-9]+/);
-                      return match ? Number(match[0].replace(',', '.')) : 0;
-                    };
-                    if (extractNum(mainEntry.value) <= extractNum(rule.conditionValue))
-                      ruleSatisfied = true;
-                  } else {
-                    ruleSatisfied = true;
-                  }
-                  if (ruleSatisfied) {
-                    consolidatedResultsMap.set(cName, {
-                      criteriaName: c.name,
-                      value: 'Miễn kiểm',
-                      isPass: true,
-                      isExtra: false,
-                      unit: c.unit,
-                    });
-                  }
-                }
+              const altStatus = AlternateRuleResolver.resolveCriterionState(
+                c.name,
+                undefined,
+                currentEntries,
+                tccsForEvaluation,
+                c
+              );
+
+              if (altStatus.isExempted) {
+                consolidatedResultsMap.set(cName, {
+                  criteriaName: c.name,
+                  value: 'Miễn kiểm',
+                  isPass: true,
+                  isExtra: false,
+                  unit: c.unit,
+                  alternateState: 'EXEMPTED',
+                  alternateNote: altStatus.displayNote,
+                });
               }
             }
           });

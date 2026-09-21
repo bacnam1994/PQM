@@ -490,6 +490,7 @@ const TCCSFormPage = () => {
             calculateRangePreview={calculateRangePreview}
             autoFormatInput={autoFormatInput}
             parseNumberFromText={parseNumberFromText}
+            alternateRules={formValues.alternateRules}
           />
 
           {/* Sub-component 3: Chỉ tiêu an toàn */}
@@ -497,6 +498,7 @@ const TCCSFormPage = () => {
             microbiologicalCriteria={formValues.microbiologicalCriteria}
             heavyMetalCriteria={formValues.heavyMetalCriteria}
             mycotoxinCriteria={formValues.mycotoxinCriteria}
+            alternateRules={formValues.alternateRules}
             onAdd={(cat) =>
               addToArray(cat, {
                 name: '',

@@ -1,11 +1,13 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   ArrowsRightLeftIcon,
   PlusIcon,
   XMarkIcon,
   ArrowRightIcon,
+  DocumentTextIcon,
 } from '@heroicons/react/24/outline';
 import { AlternateRule } from '../../../types';
+import { AlternateRuleResolver } from '../../../domain/evaluation';
 
 interface TccsAlternateRulesSectionProps {
   alternateRules: AlternateRule[];
@@ -22,6 +24,10 @@ export const TccsAlternateRulesSection: React.FC<TccsAlternateRulesSectionProps>
   onUpdateRule,
   onRemoveRule,
 }) => {
+  const autoNotes = useMemo(() => {
+    return AlternateRuleResolver.generateAlternateRuleNotes(alternateRules);
+  }, [alternateRules]);
+
   return (
     <div className="space-y-3 pt-4 border-t border-border">
       <div className="flex justify-between items-center">
@@ -101,6 +107,23 @@ export const TccsAlternateRulesSection: React.FC<TccsAlternateRulesSectionProps>
           </div>
         </div>
       ))}
+
+      {/* Khối Ghi chú Quy tắc Thay thế tự sinh */}
+      {autoNotes.length > 0 && (
+        <div className="mt-4 p-4 bg-surface-2 border border-border rounded-xl space-y-2">
+          <div className="flex items-center gap-2 text-xs font-bold text-emerald-700 dark:text-emerald-400 uppercase tracking-wide">
+            <DocumentTextIcon className="w-4 h-4" /> Ghi chú quy tắc thay thế (Tự động sinh theo
+            TCCS):
+          </div>
+          <div className="space-y-1 pl-2">
+            {autoNotes.map((note, idx) => (
+              <p key={idx} className="text-xs text-ink-soft leading-relaxed italic">
+                {note}
+              </p>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

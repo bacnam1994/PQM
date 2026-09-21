@@ -508,6 +508,8 @@ export function calculateOverallStatusForTestResult(
 
   const rules = boundTccs?.alternateRules || [];
 
+  let hasPendingRetry = false;
+
   // 1. Xác định các chỉ tiêu áp dụng (Applicable Criteria)
   // và phát hiện các lỗi không thể cứu (Unrescued Failures)
   const failures = currentResults.filter((r) => normalizeCriterionPassStatus(r.isPass) === false);
@@ -532,7 +534,46 @@ export function calculateOverallStatusForTestResult(
       }
     }
 
-    // b. FAIL_RETRY: Kiểm tra xem có quy tắc thử lại cứu chỉ tiêu rớt này không
+    // b. CONDITIONAL_CHECK: Nếu chỉ tiêu rớt này là chỉ tiêu CHÍNH kích hoạt kiểm tra chỉ tiêu phụ
+    const condRuleWhereThisIsMain = rules.find(
+      (r) =>
+        r.type === EVALUATION_RULE.CONDITIONAL_CHECK &&
+        isCriteriaNameMatch(r.main, fail.criteriaName)
+    );
+
+    if (condRuleWhereThisIsMain) {
+      const isTriggered = CriterionEvaluator.checkRange(
+        condRuleWhereThisIsMain.conditionValue || '',
+        String(fail.value)
+      );
+
+      if (isTriggered === true) {
+        const altResult = getLookupEntry(condRuleWhereThisIsMain.alt);
+        const altValStr =
+          altResult?.value !== undefined && altResult?.value !== null
+            ? String(altResult.value).trim()
+            : '';
+
+        // Nếu chỉ tiêu phụ chưa có kết quả -> Đang chờ kết quả phụ (PENDING), không kết luận FAIL
+        if (
+          !altResult ||
+          altValStr === '' ||
+          normalizeCriterionPassStatus(altResult.isPass) === null
+        ) {
+          hasPendingRetry = true;
+          continue;
+        }
+
+        if (normalizeCriterionPassStatus(altResult.isPass) === true) {
+          // Đã được cứu bởi chỉ tiêu phụ đạt
+          continue;
+        }
+
+        return 'FAIL';
+      }
+    }
+
+    // c. FAIL_RETRY: Kiểm tra xem có quy tắc thử lại cứu chỉ tiêu rớt này không
     const retryRule = rules.find(
       (r: any) =>
         isCriteriaNameMatch(r.main, fail.criteriaName) &&
@@ -541,15 +582,27 @@ export function calculateOverallStatusForTestResult(
 
     if (retryRule) {
       const altResult = getLookupEntry(retryRule.alt);
+      const altValStr =
+        altResult?.value !== undefined && altResult?.value !== null
+          ? String(altResult.value).trim()
+          : '';
+
+      // Nếu chỉ tiêu phụ chưa có kết quả -> Đang chờ kết quả phụ (PENDING), không kết luận FAIL
       if (
-        altResult &&
-        altResult.value !== undefined &&
-        altResult.value !== '' &&
-        normalizeCriterionPassStatus(altResult.isPass) === true
+        !altResult ||
+        altValStr === '' ||
+        normalizeCriterionPassStatus(altResult.isPass) === null
       ) {
+        hasPendingRetry = true;
+        continue;
+      }
+
+      if (normalizeCriterionPassStatus(altResult.isPass) === true) {
         // Đã được cứu bởi chỉ tiêu thử lại đạt có kết quả thực tế
         continue;
       }
+
+      return 'FAIL';
     }
 
     // Không được miễn và không có luật cứu hợp lệ -> THẤT BẠI
@@ -595,7 +648,7 @@ export function calculateOverallStatusForTestResult(
       return false;
     }
 
-    // Giá trị rỗng: Kiểm tra xem chỉ tiêu chưa có kết quả này có được miễn kiểm không
+    // Giá trị rỗng: Kiểm tra xem chỉ tiêu chưa có kết quả này có được miễn kiểm theo CONDITIONAL_CHECK không
     const condRule = rules.find(
       (rule) =>
         rule.type === EVALUATION_RULE.CONDITIONAL_CHECK &&
@@ -614,6 +667,19 @@ export function calculateOverallStatusForTestResult(
       }
     }
 
+    // Kiểm tra xem có được miễn kiểm theo FAIL_RETRY không (nếu chỉ tiêu chính đã đạt)
+    const retryRule = rules.find(
+      (rule: any) =>
+        (!rule.type || rule.type === EVALUATION_RULE.FAIL_RETRY) &&
+        isCriteriaNameMatch(rule.alt, r.criteriaName)
+    );
+    if (retryRule) {
+      const mainResult = getLookupEntry(retryRule.main);
+      if (mainResult && normalizeCriterionPassStatus(mainResult.isPass) === true) {
+        return false; // Chỉ tiêu chính đạt -> chỉ tiêu phụ được miễn kiểm
+      }
+    }
+
     // Nếu là chỉ tiêu phụ tự do không có giới hạn (isExtra và không có limit) -> không bắt buộc
     if (r.isExtra && (!r.limit || r.limit.trim() === '')) {
       return false;
@@ -622,7 +688,7 @@ export function calculateOverallStatusForTestResult(
     return true; // Không có kết quả -> PENDING
   });
 
-  if (pendingCriteria.length > 0) {
+  if (pendingCriteria.length > 0 || hasPendingRetry) {
     return 'PENDING';
   }
 

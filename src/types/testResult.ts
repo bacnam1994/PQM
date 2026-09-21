@@ -26,6 +26,14 @@ export type TestResultWorkflowStatus =
   | 'REJECTED'
   | 'SUPERSEDED';
 
+export type AlternateCriterionState =
+  | 'NONE'
+  | 'NOT_TRIGGERED'
+  | 'TRIGGERED_PENDING'
+  | 'TRIGGERED_PASS'
+  | 'TRIGGERED_FAIL'
+  | 'EXEMPTED';
+
 export type CriterionResult = TestResultEntry;
 
 export interface TestResultEntry {
@@ -45,6 +53,12 @@ export interface TestResultEntry {
   limit?: string;
   analysisMethod?: string;
   confidence?: string;
+
+  /** Trạng thái quy tắc thay thế / phụ thuộc */
+  alternateState?: AlternateCriterionState;
+  alternateRuleId?: string;
+  alternateSourceCriterion?: string;
+  alternateNote?: string;
 }
 
 export interface Attachment {
@@ -62,6 +76,12 @@ export interface EvaluationSnapshotCriterionResult {
   ruleApplied?: string;
   usedAlternate?: boolean;
   note?: string;
+
+  /** Trạng thái quy tắc thay thế trong snapshot */
+  alternateState?: AlternateCriterionState;
+  alternateRuleId?: string;
+  alternateSourceCriterion?: string;
+  alternateNote?: string;
 }
 
 export interface EvaluationSnapshot {

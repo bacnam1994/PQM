@@ -13,6 +13,8 @@ import { normalizeName } from '../../services/criteriaAliasService';
 import { CriterionEvaluator } from './CriterionEvaluator';
 import { AlternateRuleEvaluator } from './AlternateRuleEvaluator';
 
+import { AlternateRuleResolver } from './AlternateRuleResolver';
+
 export type CanonicalTestStatus = 'PASS' | 'FAIL' | 'PENDING' | 'UNKNOWN';
 
 export class OverallResultEvaluator {
@@ -34,23 +36,62 @@ export class OverallResultEvaluator {
       return normalizeName(nameA) === normalizeName(nameB);
     };
 
+    let hasPendingRetry = false;
+
     // 1. Duyệt qua các chỉ tiêu rớt (Failures) để xem có được cứu/miễn không
     for (const fail of failures) {
-      // Kiểm tra xem lỗi này có thuộc chỉ tiêu phụ được miễn kiểm không?
-      const condRuleWhereThisIsAlt = rules.find(
-        (r) => r.type === EVALUATION_RULE.CONDITIONAL_CHECK && isNameMatch(r.alt, fail.criteriaName)
+      // Kiểm tra trạng thái phân giải quy tắc thay thế cho chỉ tiêu này
+      const failAltStatus = AlternateRuleResolver.resolveCriterionState(
+        fail.criteriaName,
+        fail.value,
+        results,
+        tccs
       );
-      if (condRuleWhereThisIsAlt) {
-        const mainResult = results.find((r) =>
-          isNameMatch(r.criteriaName, condRuleWhereThisIsAlt.main)
+
+      // Nếu chỉ tiêu phụ này thuộc diện MIỄN KIỂM (chưa kích hoạt) -> Bỏ qua lỗi
+      if (failAltStatus.isExempted) {
+        continue;
+      }
+
+      // Xử lý CONDITIONAL_CHECK: Nếu chỉ tiêu rớt này là chỉ tiêu CHÍNH kích hoạt kiểm tra chỉ tiêu phụ
+      const condRuleWhereThisIsMain = rules.find(
+        (r) =>
+          r.type === EVALUATION_RULE.CONDITIONAL_CHECK && isNameMatch(r.main, fail.criteriaName)
+      );
+
+      if (condRuleWhereThisIsMain) {
+        const isTriggered = CriterionEvaluator.checkRange(
+          condRuleWhereThisIsMain.conditionValue || '',
+          String(fail.value)
         );
-        if (mainResult) {
-          const isTriggered = CriterionEvaluator.checkRange(
-            condRuleWhereThisIsAlt.conditionValue || '',
-            String(mainResult.value)
+
+        if (isTriggered === true) {
+          const altResult = results.find((r) =>
+            isNameMatch(r.criteriaName, condRuleWhereThisIsMain.alt)
           );
-          // Nếu điều kiện KHÔNG bị kích hoạt -> chỉ tiêu phụ này được MIỄN KIỂM -> Bỏ qua lỗi FAIL của nó
-          if (isTriggered !== true) continue;
+          const altValStr =
+            altResult?.value !== undefined && altResult?.value !== null
+              ? String(altResult.value).trim()
+              : '';
+
+          // Nếu chỉ tiêu phụ chưa có kết quả -> Chờ kết quả phụ (PENDING), không kết luận FAIL ngay
+          if (
+            !altResult ||
+            altValStr === '' ||
+            altResult.isPass === null ||
+            altResult.isPass === undefined
+          ) {
+            hasPendingRetry = true;
+            continue;
+          }
+
+          // Chỉ khi chỉ tiêu phụ CÓ KẾT QUẢ VÀ RỚT -> mới kết luận FAIL
+          if (altResult.isPass === false) {
+            return 'FAIL';
+          }
+
+          // Chỉ tiêu phụ đạt -> Đã giải quyết được điều kiện, tiếp tục kiểm tra các lỗi khác
+          continue;
         }
       }
 
@@ -60,20 +101,37 @@ export class OverallResultEvaluator {
           isNameMatch(r.main, fail.criteriaName) &&
           (!r.type || r.type === EVALUATION_RULE.FAIL_RETRY)
       );
+
       if (retryRule) {
         const altResult = results.find((r) => isNameMatch(r.criteriaName, retryRule.alt));
+        const altValStr =
+          altResult?.value !== undefined && altResult?.value !== null
+            ? String(altResult.value).trim()
+            : '';
+
+        // Nếu chỉ tiêu phụ THỬ LẠI chưa có kết quả (hoặc chưa đánh giá xong)
+        // -> Phiếu ở trạng thái CHỜ KẾT QUẢ (PENDING), tuyệt đối KHÔNG đánh FAIL!
         if (
           !altResult ||
-          altResult.value === undefined ||
-          altResult.value === '' ||
-          altResult.isPass === false
+          altValStr === '' ||
+          altResult.isPass === null ||
+          altResult.isPass === undefined
         ) {
+          hasPendingRetry = true;
+          continue;
+        }
+
+        // Chỉ khi chỉ tiêu phụ CÓ KẾT QUẢ VÀ BỊ RỚT (FAIL) thì mới kết luận toàn phiếu FAIL
+        if (altResult.isPass === false) {
           return 'FAIL';
         }
-      } else {
-        // Không thuộc diện miễn kiểm, cũng không có luật FAIL_RETRY cứu -> Đánh rớt phiếu
-        return 'FAIL';
+
+        // Nếu altResult.isPass === true -> Đã được cứu bởi chỉ tiêu thay thế, tiếp tục duyệt các lỗi khác
+        continue;
       }
+
+      // Không thuộc diện miễn kiểm, cũng không có luật thay thế cứu -> Đánh rớt phiếu
+      return 'FAIL';
     }
 
     // 2. Rà soát xem có CONDITIONAL_CHECK nào BỊ KÍCH HOẠT mà chưa đạt hoặc chưa có kết quả không?
@@ -90,12 +148,20 @@ export class OverallResultEvaluator {
 
         if (isTriggered === true) {
           const altResult = results.find((r) => isNameMatch(r.criteriaName, rule.alt));
-          if (!altResult || altResult.value === undefined || altResult.value === '') {
+          const altValStr =
+            altResult?.value !== undefined && altResult?.value !== null
+              ? String(altResult.value).trim()
+              : '';
+
+          if (
+            !altResult ||
+            altValStr === '' ||
+            altResult.isPass === null ||
+            altResult.isPass === undefined
+          ) {
             hasPendingConditional = true;
           } else if (altResult.isPass === false) {
             return 'FAIL';
-          } else if (altResult.isPass === null) {
-            hasPendingConditional = true;
           }
         }
       }
@@ -106,20 +172,23 @@ export class OverallResultEvaluator {
     for (const r of results) {
       if (r.isExtra && (!r.limit || r.limit.trim() === '')) continue;
 
-      // Kiểm tra xem có được miễn kiểm theo CONDITIONAL_CHECK không
-      const condRule = rules.find(
-        (rule) =>
-          rule.type === EVALUATION_RULE.CONDITIONAL_CHECK && isNameMatch(rule.alt, r.criteriaName)
+      // Phân giải xem chỉ tiêu này có được miễn kiểm không (FAIL_RETRY hoặc CONDITIONAL_CHECK)
+      const altStatus = AlternateRuleResolver.resolveCriterionState(
+        r.criteriaName,
+        r.value,
+        results,
+        tccs
       );
-      if (condRule) {
-        const mainResult = results.find((m) => isNameMatch(m.criteriaName, condRule.main));
-        if (mainResult && mainResult.value !== undefined && mainResult.value !== '') {
-          const isTriggered = CriterionEvaluator.checkRange(
-            condRule.conditionValue || '',
-            String(mainResult.value)
-          );
-          if (isTriggered !== true) continue; // Được miễn kiểm
-        }
+
+      // Nếu chỉ tiêu này được miễn kiểm -> không bắt buộc nhập giá trị
+      if (altStatus.isExempted) {
+        continue;
+      }
+
+      // Nếu chỉ tiêu bắt buộc nhưng đang chờ kết quả
+      if (altStatus.isRequired && altStatus.isPending) {
+        hasUnresolved = true;
+        continue;
       }
 
       const valStr = r.value !== undefined && r.value !== null ? String(r.value).trim() : '';
@@ -128,7 +197,7 @@ export class OverallResultEvaluator {
       }
     }
 
-    if (hasUnresolved || hasPendingConditional) {
+    if (hasUnresolved || hasPendingConditional || hasPendingRetry) {
       return 'PENDING';
     }
 

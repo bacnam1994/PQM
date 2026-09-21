@@ -34,10 +34,14 @@ export interface SensoryCharacteristics {
 }
 
 export interface AlternateRule {
+  id?: string;
   main: string;
   alt: string;
   type?: 'FAIL_RETRY' | 'CONDITIONAL_CHECK';
   conditionValue?: string;
+  enabled?: boolean;
+  note?: string;
+  displayNote?: string;
 }
 
 export interface TCCS {

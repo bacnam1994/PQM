@@ -222,7 +222,7 @@ describe('Audit Remediation — 42 Scenarios Regression Suite (GMP & ALCOA+)', (
         results as any,
         tccsWithConditional
       );
-      expect(status).toBe('FAIL');
+      expect(status).toBe('PENDING');
     });
 
     it('21. missing main result -> NOT exempt (không thể miễn nếu chưa có kết quả chính)', () => {

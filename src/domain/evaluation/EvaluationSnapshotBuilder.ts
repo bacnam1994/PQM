@@ -18,6 +18,7 @@ import {
   TCCS,
 } from '../../types';
 import { calculateSha256Sync } from '../../utils/cryptoUtils';
+import { AlternateRuleResolver } from './AlternateRuleResolver';
 
 export const CURRENT_ENGINE_VERSION = '4.0.0-deterministic';
 
@@ -277,16 +278,44 @@ export function buildEvaluationSnapshot(
   const evaluatedAt = new Date().toISOString();
   const evaluatedBy = currentUser?.email || 'system';
 
+  const targetTccs = options?.tccs;
   const criterionResults: EvaluationSnapshotCriterionResult[] = (testResult.results || []).map(
-    (entry) => ({
-      criteriaName: entry.criteriaName,
-      value: entry.value,
-      isPass: entry.isPass,
-      note: entry.limit ? `Giới hạn: ${entry.limit}` : undefined,
-    })
+    (entry) => {
+      let altState = entry.alternateState;
+      let altRuleId = entry.alternateRuleId;
+      let altSource = entry.alternateSourceCriterion;
+      let altNote = entry.alternateNote;
+
+      if (!altState && targetTccs) {
+        const resolved = AlternateRuleResolver.resolveCriterionState(
+          entry.criteriaName,
+          entry.value,
+          testResult.results || [],
+          targetTccs
+        );
+        altState = resolved.alternateState;
+        altRuleId = resolved.rule?.id;
+        altSource = resolved.pairedCriterionName;
+        altNote = resolved.displayNote;
+      }
+
+      return {
+        criteriaName: entry.criteriaName,
+        value: entry.value,
+        isPass: entry.isPass,
+        note: entry.limit ? `Giới hạn: ${entry.limit}` : undefined,
+        alternateState: altState,
+        alternateRuleId: altRuleId,
+        alternateSourceCriterion: altSource,
+        alternateNote: altNote,
+        usedAlternate: (entry as any).usedAlternate,
+      };
+    }
   );
 
-  const alternateUsed = (testResult.results || []).some((r: any) => r.usedAlternate);
+  const alternateUsed =
+    (testResult.results || []).some((r: any) => r.usedAlternate) ||
+    criterionResults.some((c) => c.alternateState && c.alternateState !== 'NONE');
   const reasons: string[] = [];
   const warnings: string[] = [];
 

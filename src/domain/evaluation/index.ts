@@ -8,6 +8,7 @@ export * from './ValueNormalizer';
 export * from './SpecificationParser';
 export * from './CriterionEvaluator';
 export * from './AlternateRuleEvaluator';
+export * from './AlternateRuleResolver';
 export * from './OverallResultEvaluator';
 export * from './QualityEvaluationEngine';
 export * from './EvaluationSnapshotBuilder';

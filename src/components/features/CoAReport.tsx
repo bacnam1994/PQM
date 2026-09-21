@@ -21,6 +21,7 @@ import {
 import { useCriteriaResolver } from '../../hooks/useCriteriaResolver';
 import { normalizeName, diceScore } from '../../services/criteriaAliasService';
 import { lookupPharmaTerm, isCriteriaMatch } from '../../utils/aiMapping';
+import { AlternateRuleResolver } from '../../domain/evaluation';
 
 interface ExtraTestResultEntry extends TestResultEntry {
   limit?: string;
@@ -223,17 +224,15 @@ const CoAReport = memo(({ res, batch, product, tccs, formula }: CoAReportProps) 
       }
     });
 
-    // Tự động nội suy các chỉ tiêu "Miễn kiểm" bị thiếu (Dành cho bản in phiếu cũ chưa có dữ liệu DB)
+    // Tự động phân giải các chỉ tiêu "Miễn kiểm" bị thiếu hoặc rỗng qua AlternateRuleResolver (Single Source of Truth)
     if (tccs) {
-      const rulesMap = new Map<string, any>();
-      (tccs.alternateRules || []).forEach((r) => {
-        if (r && r.alt && r.alt.trim() !== '') rulesMap.set(resolver.resolveKey(r.alt), r);
-      });
-
       const allCriteria = [
         ...(tccs.mainQualityCriteria || []),
         ...(tccs.safetyCriteria || []),
       ].filter((c) => c && c.name && c.name.trim() !== '');
+
+      const currentEntries = Array.from(uniqueMap.values());
+
       allCriteria.forEach((c) => {
         const cKey = normalizeName(c.name);
         const existingEntry = uniqueMap.get(cKey);
@@ -246,56 +245,24 @@ const CoAReport = memo(({ res, batch, product, tccs, formula }: CoAReportProps) 
           String(existingEntry.value).trim() === '';
 
         if (isMissingOrEmpty) {
-          const rule = rulesMap.get(cKey);
-          if (rule) {
-            const mainKey = resolver.resolveKey(rule.main || '');
-            const mainEntry = uniqueMap.get(mainKey);
-            if (
-              mainEntry &&
-              mainEntry.isPass === true &&
-              mainEntry.value !== undefined &&
-              String(mainEntry.value).trim() !== ''
-            ) {
-              let ruleSatisfied = false;
-              if (rule.type === 'CONDITIONAL_CHECK') {
-                const extractNum = (val: any) => {
-                  const str = String(val || '')
-                    .trim()
-                    .toUpperCase();
-                  if (
-                    [
-                      'ND',
-                      'KPH',
-                      'K.P.H',
-                      'KHÔNG PHÁT HIỆN',
-                      'NOT DETECTED',
-                      'ÂM TÍNH',
-                      'NEGATIVE',
-                      'KHÔNG CÓ',
-                      'KHÔNG ĐƯỢC CÓ',
-                    ].some((kw) => str.includes(kw))
-                  )
-                    return 0;
-                  const parsed = parseNumberFromText(str);
-                  if (!isNaN(parsed)) return parsed;
-                  const match = str.match(/[-+]?[0-9]*[.,]?[0-9]+/);
-                  return match ? Number(match[0].replace(',', '.')) : 0;
-                };
-                if (extractNum(mainEntry.value) <= extractNum(rule.conditionValue))
-                  ruleSatisfied = true;
-              } else {
-                ruleSatisfied = true;
-              }
-              if (ruleSatisfied) {
-                uniqueMap.set(cKey, {
-                  criteriaName: c.name,
-                  value: 'Miễn kiểm',
-                  isPass: true,
-                  isExtra: false,
-                  unit: c.unit,
-                });
-              }
-            }
+          const altStatus = AlternateRuleResolver.resolveCriterionState(
+            c.name,
+            undefined,
+            currentEntries,
+            tccs,
+            c
+          );
+
+          if (altStatus.isExempted) {
+            uniqueMap.set(cKey, {
+              criteriaName: c.name,
+              value: 'Miễn kiểm',
+              isPass: true,
+              isExtra: false,
+              unit: c.unit,
+              alternateState: 'EXEMPTED',
+              alternateNote: altStatus.displayNote,
+            });
           }
         }
       });
