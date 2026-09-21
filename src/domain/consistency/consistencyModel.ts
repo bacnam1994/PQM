@@ -248,6 +248,16 @@ export class ConsistencyIssueFactory {
 }
 
 /**
+ * Trong các hàm rà soát TCCS, cập nhật logic tìm kiếm khóa ngoại thành 3 tầng:
+ * - Ưu tiên 1: Lấy trực tiếp trên Phiếu (tr.tccsId)
+ * - Ưu tiên 2: Lấy theo Lô sản xuất liên kết (batch?.tccsId)
+ * - Ưu tiên 3: Lấy trong mã băm lịch sử Snapshot (tr.evaluationSnapshot?.tccsId)
+ */
+export function getEffectiveTccsId(tr: TestResult, batch?: Batch): string | undefined {
+  return tr.tccsId || batch?.tccsId || tr.evaluationSnapshot?.tccsId;
+}
+
+/**
  * Động cơ Kiểm toán & Đối chiếu Toàn vẹn Dữ liệu (Consistency Auditor & Reconciler)
  */
 export class ConsistencyAuditor {
@@ -376,10 +386,10 @@ export class ConsistencyAuditor {
     // A. Kiểm toán trạng thái Phiếu kiểm nghiệm (Stored vs Canonical computed)
     testResults.forEach((tr) => {
       const boundBatch = batches.find((b) => b.id === tr.batchId);
-      const boundTccs =
-        tccsList.find((t) => t.id === tr.tccsId) ||
-        tccsList.find((t) => t.id === boundBatch?.tccsId) ||
-        tccsList.find((t) => t.id === tr.evaluationSnapshot?.tccsId);
+      const effectiveTccsId = getEffectiveTccsId(tr, boundBatch);
+      const boundTccs = effectiveTccsId
+        ? tccsList.find((t) => t.id === effectiveTccsId)
+        : undefined;
 
       const computedStatus = resolveTestResultStatus(tr, boundTccs);
 
@@ -388,9 +398,11 @@ export class ConsistencyAuditor {
         return;
       }
 
-      // Phân loại bản chất: Chỉ tiêu FAIL đối đầu với Stored PASS mới là CRITICAL CONTRADICTORY
-      const isCriticalFail = tr.overallStatus === 'PASS' && computedStatus === 'FAIL';
-      const isPendingMismatch = computedStatus === 'PENDING' || computedStatus === 'UNKNOWN';
+      // Khi không tìm thấy TCCS sau 3 tầng: Đánh dấu lỗi là INCOMPLETE (chưa hoàn tất) thay vì CONTRADICTORY (Vá lỗi CONFLICT-003)
+      const hasTccs = !!boundTccs;
+      const isCriticalFail = hasTccs && tr.overallStatus === 'PASS' && computedStatus === 'FAIL';
+      const isPendingMismatch =
+        !hasTccs || computedStatus === 'PENDING' || computedStatus === 'UNKNOWN';
 
       issues.push(
         ConsistencyIssueFactory.createStatusMismatchIssue({
@@ -405,6 +417,8 @@ export class ConsistencyAuditor {
             computedFromCriteria: true,
             totalCriteria: tr.results?.length || 0,
             boundTccsId: boundTccs?.id,
+            effectiveTccsId,
+            missingTccs: !hasTccs,
           },
         })
       );

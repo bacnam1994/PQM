@@ -52,6 +52,25 @@ describe('PQM VIBE CODING — MODEL 1: CANONICAL DATA MODEL HARDENING', () => {
     expect(normalizeCriterionPassStatus(null)).toBe(null);
     expect(normalizeCriterionPassStatus('')).toBe(null);
 
+    // Ép kiểu các từ khóa định tính đạt thành true
+    expect(normalizeCriterionPassStatus('Đạt')).toBe(true);
+    expect(normalizeCriterionPassStatus('DAT')).toBe(true);
+    expect(normalizeCriterionPassStatus('Âm tính')).toBe(true);
+    expect(normalizeCriterionPassStatus('KPH')).toBe(true);
+    expect(normalizeCriterionPassStatus('Không phát hiện')).toBe(true);
+    expect(normalizeCriterionPassStatus('NEGATIVE')).toBe(true);
+    expect(normalizeCriterionPassStatus(true)).toBe(true);
+    expect(normalizeCriterionPassStatus(1)).toBe(true);
+
+    // Ép kiểu các từ khóa định tính không đạt thành false
+    expect(normalizeCriterionPassStatus('Không đạt')).toBe(false);
+    expect(normalizeCriterionPassStatus('Dương tính')).toBe(false);
+    expect(normalizeCriterionPassStatus('OOS')).toBe(false);
+    expect(normalizeCriterionPassStatus('FAIL')).toBe(false);
+    expect(normalizeCriterionPassStatus('POSITIVE')).toBe(false);
+    expect(normalizeCriterionPassStatus(false)).toBe(false);
+    expect(normalizeCriterionPassStatus(0)).toBe(false);
+
     const entry: TestResultEntry = {
       criteriaName: 'Độ rã',
       value: '15 phút',

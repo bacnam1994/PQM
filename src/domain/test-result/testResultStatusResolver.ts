@@ -234,20 +234,46 @@ export const resolveCanonicalTestStatus = normalizeTestResultStatus;
  * về boolean hoặc null. Tuyệt đối không đánh đồng null/undefined với FAIL.
  */
 export function normalizeCriterionPassStatus(value: unknown): boolean | null {
-  if (value === null || value === undefined || value === '') {
-    return null;
-  }
-  if (typeof value === 'boolean') {
-    return value;
-  }
+  if (value === null || value === undefined || value === '') return null; // Giữ null cho chỉ tiêu cảm quan
+  if (typeof value === 'boolean') return value;
   if (typeof value === 'number') {
     if (value === 1) return true;
     if (value === 0) return false;
     return null;
   }
-  const norm = normalizeTestResultStatus(value);
-  if (norm === 'PASS') return true;
-  if (norm === 'FAIL') return false;
+
+  const str = String(value).trim().toUpperCase();
+
+  // Nhóm tự động ép thành FALSE (kiểm tra trước để tránh 'KHÔNG ĐẠT' dính 'ĐẠT')
+  const failKeywords = [
+    'FAIL',
+    'FAILED',
+    'KHÔNG ĐẠT',
+    'KHONG DAT',
+    'DƯƠNG TÍNH',
+    'DUONG TINH',
+    'OOS',
+    'POSITIVE',
+  ];
+  if (failKeywords.some((kw) => str.includes(kw))) return false;
+
+  // Nhóm tự động ép thành TRUE
+  const passKeywords = [
+    'PASS',
+    'PASSED',
+    'ĐẠT',
+    'ĐAT',
+    'DAT',
+    'OK',
+    'ÂM TÍNH',
+    'AM TINH',
+    'KPH',
+    'KHÔNG PHÁT HIỆN',
+    'KHONG PHAT HIEN',
+    'NEGATIVE',
+  ];
+  if (passKeywords.some((kw) => str.includes(kw))) return true;
+
   return null;
 }
 
@@ -1056,7 +1082,7 @@ export function detectTestResultStatusMismatch(
       ? failures.length > 0
       : computedCanonical === 'PASS' &&
         (failures.length === 0 ||
-          (boundTccs?.alternateRules && boundTccs.alternateRules.length > 0)));
+          (boundTccs?.alternateRules && boundTccs.alternateRules.length > 0))); // Cho phép PASS an toàn nếu có alternateRules
 
   return {
     ...defaultDiagnostic,

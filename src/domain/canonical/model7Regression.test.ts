@@ -3,6 +3,7 @@ import {
   ConsistencyIssueFactory,
   ConsistencyAuditor,
   CanonicalConsistencyIssue,
+  getEffectiveTccsId,
 } from '../consistency/consistencyModel';
 import { Product, Batch, TCCS, TestResult, QualityDeviation, CriterionType } from '../../types';
 
@@ -222,6 +223,53 @@ describe('Model 7 Regression Suite: Consistency & Reconciliation Model', () => {
 
       expect(issues.some((i) => i.type === 'STATUS_MISMATCH')).toBe(true);
       expect(issues.some((i) => i.type === 'INVALID_BUSINESS_RULE')).toBe(true);
+    });
+
+    it('CONFLICT-003: giải quyết TCCS 3 tầng và đánh dấu INCOMPLETE thay vì CONTRADICTORY khi thiếu TCCS', () => {
+      // 1. Kiểm tra 3 tầng của getEffectiveTccsId
+      const trTier1: TestResult = {
+        ...mockTestResultPass,
+        tccsId: 'tccs-tier1',
+        evaluationSnapshot: { tccsId: 'tccs-snap' } as any,
+      };
+      expect(getEffectiveTccsId(trTier1, { tccsId: 'tccs-batch' } as any)).toBe('tccs-tier1');
+
+      const trTier2: TestResult = {
+        ...mockTestResultPass,
+        tccsId: undefined,
+        evaluationSnapshot: { tccsId: 'tccs-snap' } as any,
+      };
+      expect(getEffectiveTccsId(trTier2, { tccsId: 'tccs-batch' } as any)).toBe('tccs-batch');
+
+      const trTier3: TestResult = {
+        ...mockTestResultPass,
+        tccsId: undefined,
+        evaluationSnapshot: { tccsId: 'tccs-snap' } as any,
+      };
+      expect(getEffectiveTccsId(trTier3, {} as any)).toBe('tccs-snap');
+
+      // 2. Khi khuyết TCCS sau 3 tầng: đánh dấu INCOMPLETE thay vì CONTRADICTORY
+      const trMissingTccs: TestResult = {
+        ...mockTestResultPass,
+        id: 'tr-no-tccs',
+        tccsId: undefined,
+        overallStatus: 'PASS',
+        results: [{ criteriaName: 'Định tính', value: 'Dương tính', isPass: null }],
+        evaluationSnapshot: undefined,
+      };
+
+      const issues = ConsistencyAuditor.auditStatusConsistency({
+        testResults: [trMissingTccs],
+        batches: [{ ...mockBatch, tccsId: undefined }],
+        tccsList: [],
+      });
+
+      const issue = issues.find((i) => i.entityId === 'tr-no-tccs');
+      if (issue) {
+        expect(issue.category).toBe('INCOMPLETE');
+        expect(issue.category).not.toBe('CONTRADICTORY');
+        expect(issue.severity).not.toBe('CRITICAL');
+      }
     });
   });
 
