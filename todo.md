@@ -202,15 +202,15 @@ _Đặc tả 25 màn hình: Purpose, Actor, Permission, Data Source, States (Loa
 
 ---
 
-## 🔹 PHASE 12: APPLICATION SERVICES [⏳ ĐANG THỰC HIỆN]
+## 🔹 PHASE 12: APPLICATION SERVICES [✅ HOÀN THÀNH]
 
-- [ ] **Task 12.01**: Chuẩn hóa `BatchAppService`, `TestResultAppService`, `TCCSAppService`
-- [ ] **Task 12.02**: Chuẩn hóa `ApprovalWorkflowService`, `ReleaseService`, `CoAService`
-- [ ] **Task 12.03**: Chuẩn hóa `OOSService`, `DeviationService`, `CAPAService`, `AuditService`
+- [x] **Task 12.01**: Chuẩn hóa `BatchAppService`, `TestResultAppService`, `TCCSAppService` (OCC, Schema snapshotting, SSoT)
+- [x] **Task 12.02**: Chuẩn hóa `ApprovalWorkflowService`, `ReleaseService`, `CoAService` (`ReleaseService.ts`, `CoAService.ts`)
+- [x] **Task 12.03**: Chuẩn hóa `OOSService`, `DeviationService`, `CAPAService`, `AuditService` (`OOSService.ts`, `CAPAService.ts`)
 
 ---
 
-## 🔹 PHASE 13: PKN IMPLEMENTATION [⏳ CHỜ]
+## 🔹 PHASE 13: PKN IMPLEMENTATION [⏳ ĐANG THỰC HIỆN]
 
 - [ ] **Task 13.01**: PKN Editor hiển thị 100% tiêu chí từ TCCS Snapshot (không filter mất chỉ tiêu)
 - [ ] **Task 13.02**: Badge trực quan: `PASS`, `FAIL`, `PENDING`, `MIỄN KIỂM`, `CHỜ KẾT QUẢ`
