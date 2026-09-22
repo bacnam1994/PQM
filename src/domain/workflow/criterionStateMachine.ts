@@ -164,3 +164,6 @@ export class AlternateRuleStateMachine {
     return 'NOT_TRIGGERED';
   }
 }
+
+/** Alias chuẩn hóa theo STATE_MACHINES.md */
+export const CriterionStateMachine = CriterionResultStateMachine;

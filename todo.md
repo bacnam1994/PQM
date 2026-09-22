@@ -182,27 +182,27 @@ _Đặc tả 25 màn hình: Purpose, Actor, Permission, Data Source, States (Loa
 
 ---
 
-## 🔹 PHASE 10: DOMAIN ENGINE REBUILD [⏳ ĐANG THỰC HIỆN]
+## 🔹 PHASE 10: DOMAIN ENGINE REBUILD [✅ HOÀN THÀNH]
 
-- [ ] **Task 10.01**: Types & Enums
-- [ ] **Task 10.02**: Validation Layer
-- [ ] **Task 10.03**: State Machines Layer
-- [ ] **Task 10.04**: Business Rules Engines
-- [ ] **Task 10.05**: Criterion Evaluator & Alternate Rule Evaluator
-- [ ] **Task 10.06**: Quality Evaluation Engine & Evaluation Snapshot Builder
-- [ ] **Task 10.07**: Canonical Status Resolver (Single Source of Truth)
-
----
-
-## 🔹 PHASE 11: TEST FIRST [⏳ CHỜ]
-
-- [ ] **Task 11.01**: Unit Tests cho 100% Business Rules
-- [ ] **Task 11.02**: Integration Tests cho State Machine & Snapshot Engine
-- [ ] **Task 11.03**: E2E Automated Tests cho Scenarios S-001 -> S-018
+- [x] **Task 10.01**: Types & Enums (`src/types/batch.ts`, `src/types/testResult.ts`, `src/types/tccs.ts`)
+- [x] **Task 10.02**: Validation Layer (`src/domain/validation/validationEngine.ts`)
+- [x] **Task 10.03**: State Machines Layer (`src/domain/workflow/stateMachine.ts`, `src/domain/workflow/criterionStateMachine.ts`)
+- [x] **Task 10.04**: Business Rules Engines (`src/domain/rules/ReleaseRules.ts` - 7 Release Gates, `BatchRules.ts`, `TestResultRules.ts`)
+- [x] **Task 10.05**: Criterion Evaluator & Alternate Rule Evaluator (`src/domain/evaluation/CriterionEvaluator.ts`, `AlternateRuleEvaluator.ts`)
+- [x] **Task 10.06**: Quality Evaluation Engine & Evaluation Snapshot Builder (`src/domain/evaluation/QualityEvaluationEngine.ts`, `EvaluationSnapshotBuilder.ts`)
+- [x] **Task 10.07**: Canonical Status Resolver (Single Source of Truth: `src/domain/canonical/canonicalResolver.ts`)
 
 ---
 
-## 🔹 PHASE 12: APPLICATION SERVICES [⏳ CHỜ]
+## 🔹 PHASE 11: TEST FIRST [✅ HOÀN THÀNH]
+
+- [x] **Task 11.01**: Unit Tests cho 100% Business Rules (`tests/unit/businessRules/batchRules.test.ts`, `testResultRules.test.ts`, `tccsRules.test.ts`)
+- [x] **Task 11.02**: Integration Tests cho State Machine & Snapshot Engine (`tests/integration/stateMachineSnapshot.test.ts`)
+- [x] **Task 11.03**: E2E Automated Tests cho Scenarios S-001 -> S-018 (`tests/scenarios/e2eScenarios.test.ts`)
+
+---
+
+## 🔹 PHASE 12: APPLICATION SERVICES [⏳ ĐANG THỰC HIỆN]
 
 - [ ] **Task 12.01**: Chuẩn hóa `BatchAppService`, `TestResultAppService`, `TCCSAppService`
 - [ ] **Task 12.02**: Chuẩn hóa `ApprovalWorkflowService`, `ReleaseService`, `CoAService`
