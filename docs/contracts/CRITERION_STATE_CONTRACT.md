@@ -29,10 +29,10 @@ export type CriterionExecutionState =
  * Trạng thái chất lượng chuẩn tắc của chỉ tiêu
  */
 export type CriterionQualityStatus =
-  | 'PASS' // Kết quả thực nghiệm nằm trong giới hạn cho phép
+  | 'PASS' // Kết quả thực nghiệm nằm trong giới hạn cho phép hoặc được cứu bởi Alternate Rule
   | 'FAIL' // Kết quả thực nghiệm nằm ngoài tiêu chuẩn (kích hoạt OOS)
   | 'PENDING' // Đang chờ thêm số liệu hoặc chưa đủ căn cứ kết luận
-  | 'NOT_EVALUATED'; // Chưa thực hiện đánh giá chất lượng
+  | 'NOT_APPLICABLE'; // Không áp dụng cho lô này (loại khỏi mẫu số)
 
 /**
  * Kiểu chỉ tiêu kiểm nghiệm theo Dược điển

@@ -17,12 +17,12 @@
   - `altCriterion`: Chỉ tiêu thử nghiệm lần 2 (Ví dụ: `Độ rã lần 2 - Thử thêm 12 viên`).
 - **Bảng Quyết Định (Decision Table)**:
 
-| Kết quả Chỉ tiêu chính (`main`) | Kết quả Chỉ tiêu phụ (`alt`) |   Trạng thái `altCriterion`    | Trạng thái cụm chỉ tiêu |       Trạng thái toàn phiếu        |
-| :-----------------------------: | :--------------------------: | :----------------------------: | :---------------------: | :--------------------------------: |
-|             `PASS`              |     _Chưa nhập / Bất kỳ_     |     `EXEMPTED` (Miễn kiểm)     |         `PASS`          | `PASS` (nếu các chỉ tiêu khác đạt) |
-|             `FAIL`              |      _Chưa nhập (Rỗng)_      | `TRIGGERED_PENDING` (Bắt buộc) |        `PENDING`        |  `PENDING` (Chặn Submit/Approve)   |
-|             `FAIL`              |            `PASS`            |        `TRIGGERED_PASS`        |    `PASS (THAY THẾ)`    |    `PASS` (Được cứu thành công)    |
-|             `FAIL`              |            `FAIL`            |        `TRIGGERED_FAIL`        |         `FAIL`          |       `FAIL` (Kích hoạt OOS)       |
+| Kết quả Chỉ tiêu chính (`main`) | Kết quả Chỉ tiêu phụ (`alt`) |    Trạng thái `altCriterion`     | Trạng thái cụm chỉ tiêu |       Trạng thái toàn phiếu        |
+| :-----------------------------: | :--------------------------: | :------------------------------: | :---------------------: | :--------------------------------: |
+|             `PASS`              |     _Chưa nhập / Bất kỳ_     | `NOT_APPLICABLE` (Không cần thử) |         `PASS`          | `PASS` (nếu các chỉ tiêu khác đạt) |
+|             `FAIL`              |      _Chưa nhập (Rỗng)_      |  `TRIGGERED_PENDING` (Bắt buộc)  |        `PENDING`        |  `PENDING` (Chặn Submit/Approve)   |
+|             `FAIL`              |            `PASS`            |         `TRIGGERED_PASS`         |    `PASS (THAY THẾ)`    |    `PASS` (Được cứu thành công)    |
+|             `FAIL`              |            `FAIL`            |         `TRIGGERED_FAIL`         |         `FAIL`          |       `FAIL` (Kích hoạt OOS)       |
 
 - **UI Behavior**: Khi `main` là `FAIL`, ô nhập của `alt` tự động sáng lên, viền màu cam, nhãn badge đổi sang _"CHỜ KẾT QUẢ"_.
 - **Test Cases**: `TC-BR-ALT-001-A` (Main PASS ➔ Alt EXEMPTED), `TC-BR-ALT-001-B` (Main FAIL + Alt rỗng ➔ PENDING), `TC-BR-ALT-001-C` (Main FAIL + Alt PASS ➔ Đạt theo thay thế).

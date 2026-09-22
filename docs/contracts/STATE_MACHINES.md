@@ -110,47 +110,51 @@ stateDiagram-v2
 
 ---
 
-## 3. FSM 3: CRITERION STATE FINITE STATE MACHINE
+## 3. FSM 3: CRITERION EXECUTION FINITE STATE MACHINE (FSM 3A) & QUALITY RESOLVER
 
-### 3.1. Danh Sách Trạng Thái
+> **QUY TẮC KIẾN TRÚC BẤT BIẾN (ORTHOGONAL DIMENSIONS)**:  
+> Trạng thái thực thi phép thử (`CriterionExecutionState`) và Đánh giá chất lượng (`CriterionQualityStatus`) là hai chiều độc lập, tuyệt đối không trộn lẫn vào cùng một enum trạng thái:
+>
+> - **Execution State**: Phản ánh tiến trình thao tác thực nghiệm của Kỹ thuật viên trong phòng Lab.
+> - **Quality Status**: Là kết quả thẩm định toán học thuần túy của Domain Engine dựa trên tiêu chuẩn TCCS và quy tắc thay thế.
+
+### 3.1. Danh Sách Trạng Thái Thực Thi (CriterionExecutionState)
 
 - `NOT_STARTED`: Chỉ tiêu chưa được lấy mẫu kiểm nghiệm.
-- `REQUIRED`: Chỉ tiêu bắt buộc phải làm theo quy định của TCCS.
+- `REQUIRED`: Chỉ tiêu bắt buộc phải làm theo quy định của TCCS Snapshot.
 - `TESTING`: Đang trong quá trình thử nghiệm trong phòng lab.
-- `COMPLETED`: Đã đo xong và ghi nhận kết quả số/chữ.
-- `PASS`: Đạt tiêu chuẩn chấp nhận.
-- `FAIL`: Vượt ngưỡng cho phép (Không đạt chuẩn).
-- `EXEMPTED`: Miễn kiểm nghiệm thực tế do kích hoạt quy tắc thay thế hợp lệ.
-- `NOT_APPLICABLE`: Không áp dụng cho lô hàng này.
+- `COMPLETED`: Đã hoàn thành phép thử và ghi nhận kết quả đo thô (số hoặc chữ).
+- `EXEMPTED`: Miễn kiểm nghiệm thực tế do kích hoạt quy tắc thay thế `CONDITIONAL_CHECK` hợp lệ.
+- `NOT_APPLICABLE`: Không áp dụng cho lô cụ thể này (do khác quy cách hoặc chỉ tiêu phụ khi chỉ tiêu chính đã PASS trong `FAIL_RETRY`).
 
-### 3.2. Sơ Đồ Chuyển Đổi Trạng Thái
+### 3.2. Sơ Đồ Chuyển Đổi Tiến Trình Thực Thi (FSM 3A)
 
 ```mermaid
 stateDiagram-v2
     [*] --> NOT_STARTED
     NOT_STARTED --> REQUIRED: Gán theo Snapshot TCCS
-    NOT_STARTED --> NOT_APPLICABLE: Miễn trừ theo quy cách lô
+    NOT_STARTED --> NOT_APPLICABLE: Miễn trừ theo quy cách lô hoặc quy tắc thay thế
 
-    REQUIRED --> TESTING: Bắt đầu tiến hành phép thử
-    REQUIRED --> EXEMPTED: Quy tắc thay thế CONDITIONAL_CHECK hợp lệ
+    REQUIRED --> TESTING: Analyst mở sổ tay lab & bắt đầu thử nghiệm
+    REQUIRED --> EXEMPTED: Kích hoạt quy tắc CONDITIONAL_CHECK hợp lệ
 
-    TESTING --> COMPLETED: Ghi nhận kết quả đo thô
-    COMPLETED --> PASS: Giá trị nằm trong [Min, Max] hoặc Khớp chuẩn định tính
-    COMPLETED --> FAIL: Giá trị vượt ngoài [Min, Max] (Kích hoạt OOS)
-
-    FAIL --> PASS: Quy tắc thay thế FAIL_RETRY cứu thành công lần 2
+    TESTING --> COMPLETED: Ghi nhận kết quả đo thô (số liệu đo đạc)
+    COMPLETED --> TESTING: Yêu cầu đo lại do nghi ngờ thao tác (trước khi ký duyệt)
 ```
 
-### 3.3. Bảng Chuyển Đổi & Quy Tắc Toán Học
+### 3.3. Phân Giải Chất Lượng Chuẩn Tắc (Criterion Quality Resolver)
 
-| Trạng thái hiện tại | Kết quả thử nghiệm                    | Trạng thái tiếp theo | Quy tắc logic                          |
-| :------------------ | :------------------------------------ | :------------------- | :------------------------------------- |
-| `NOT_STARTED`       | Khởi tạo Lô                           | `REQUIRED`           | Nếu `criterion.isMandatory === true`   |
-| `REQUIRED`          | Analyst mở sổ tay phòng lab           | `TESTING`            | Ghi nhận thời gian bắt đầu làm         |
-| `TESTING`           | Nhập $X \in [Min, Max]$               | `PASS`               | Đạt tiêu chuẩn                         |
-| `TESTING`           | Nhập $X \notin [Min, Max]$            | `FAIL`               | Tự động kích hoạt thông báo OOS        |
-| `FAIL`              | Thử lại lần 2 theo Alternate Rule đạt | `PASS`               | Áp dụng BR-ALT-001 (FAIL_RETRY)        |
-| `REQUIRED`          | Chỉ tiêu điều kiện đạt                | `EXEMPTED`           | Áp dụng BR-ALT-002 (CONDITIONAL_CHECK) |
+Đánh giá chất lượng của một chỉ tiêu (`CriterionQualityStatus`) là hàm thuần túy (Pure Function):
+$$\text{resolveCriterionQuality}(state, rawValue, spec, alternateResolution) \longrightarrow \text{PASS} \mid \text{FAIL} \mid \text{PENDING}$$
+
+| `CriterionExecutionState` | Dữ liệu đo đạc / Ngữ cảnh                                  | `CriterionQualityStatus` | Giải thích nghiệp vụ                                            |
+| :------------------------ | :--------------------------------------------------------- | :----------------------- | :-------------------------------------------------------------- |
+| `EXEMPTED`                | Miễn kiểm theo quy tắc thay thế hợp lệ                     | **`PASS`**               | Được công nhận đạt theo quy định Dược điển (không kéo lùi Lô)   |
+| `NOT_APPLICABLE`          | Không áp dụng cho lô hàng này                              | **`NOT_APPLICABLE`**     | Loại khỏi mẫu số tính toán tiến độ của Lô                       |
+| `COMPLETED`               | Giá trị đo $X \in [Min, Max]$ hoặc khớp văn bản định tính  | **`PASS`**               | Phép thử đạt chuẩn chấp nhận TCCS                               |
+| `COMPLETED`               | Giá trị đo $X \notin [Min, Max]$ (Chưa áp dụng cứu thế)    | **`FAIL`**               | Vượt ngoài tiêu chuẩn (kích hoạt OOS)                           |
+| `COMPLETED`               | $X \notin [Min, Max]$ nhưng chỉ tiêu phụ `FAIL_RETRY` PASS | **`PASS`**               | Được cứu đạt thành công qua phép thử mở rộng lần 2 (BR-ALT-001) |
+| `NOT_STARTED` / `TESTING` | Đang trong tiến trình thử nghiệm                           | **`PENDING`**            | Chưa đủ căn cứ để kết luận chất lượng                           |
 
 ---
 

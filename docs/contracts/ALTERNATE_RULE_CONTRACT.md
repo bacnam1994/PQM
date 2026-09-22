@@ -4,13 +4,35 @@ Tài liệu này chuẩn hóa toàn bộ cấu trúc dữ liệu, các loại h�
 
 ---
 
-## 1. Bản Chất Nghiệp Vụ Của Quy Tắc Thay Thế
+## 1. Bản Chất Nghiệp Vụ Của Quy Tắc Thay Thế (V2 Supported Scope)
 
-Trong kiểm nghiệm dược phẩm theo Dược điển (USP, BP, Dược điển Việt Nam), có những chỉ tiêu có mối liên hệ logic phụ thuộc hoặc thay thế:
+Trong kiểm nghiệm dược phẩm theo Dược điển (USP, BP, Dược điển Việt Nam), PQM V2 hỗ trợ chính thức và duy nhất **2 loại quan hệ quy tắc thay thế**:
 
-1. **FAIL_RETRY (Thử lại khi không đạt)**: Khi phép thử sơ bộ 1 không đạt (ví dụ: Độ tan rã lần 1 còn 1 viên chưa rã), quy chuẩn cho phép thử lại lần 2 với cỡ mẫu mở rộng (12 viên tiếp theo). Nếu lần 2 đạt thì toàn bộ chỉ tiêu được công nhận Đạt.
-2. **CONDITIONAL_CHECK (Kiểm tra có điều kiện / Miễn thử)**: Nếu chỉ tiêu A đạt mức an toàn cao (ví dụ: Quy trình vô trùng được thẩm định hoặc hàm lượng nước cực thấp), chỉ tiêu vi sinh B được miễn kiểm tra thường quy.
-3. **SUBSTITUTION (Thay thế phương pháp)**: Phép thử HPLC có thể thay thế hoàn toàn phép thử Quang phổ UV nếu được thẩm định tương đương.
+1. **`FAIL_RETRY` (Thử lại khi không đạt)**: Khi phép thử sơ bộ 1 không đạt (ví dụ: Độ tan rã lần 1 còn 1 viên chưa rã), quy chuẩn cho phép thử lại lần 2 với cỡ mẫu mở rộng (12 viên tiếp theo). Nếu lần 2 đạt thì toàn bộ chỉ tiêu được công nhận Đạt.
+2. **`CONDITIONAL_CHECK` (Kiểm tra có điều kiện / Miễn thử)**: Nếu chỉ tiêu A đạt mức an toàn cao (ví dụ: Arsen tổng số $\le$ 1.5 ppm hoặc Quy trình vô trùng được thẩm định), chỉ tiêu vi sinh/hóa vô cơ B được miễn kiểm tra thường quy (`EXEMPTED`).
+
+> **LƯU Ý VỀ PHẠM VI (SCOPE FREEZE)**:  
+> Các quy tắc `SUBSTITUTION` (thay thế phương pháp) và `PERIODIC_SKIP` (kiểm nghiệm luân phiên) được xác định là **`FUTURE / OUT OF SCOPE (V3+)`**. Tuyệt đối không tạo nghĩa vụ cài đặt hay cam kết hỗ trợ trong Domain Engine V2.
+
+### 1.1. Ma Trận Phân Giải Logic Chuẩn Tắc (Canonical Resolution Matrix)
+
+#### A. Đối với `FAIL_RETRY`:
+
+| Chỉ tiêu chính (Main) | Chỉ tiêu phụ (Dependent) | Trạng thái phụ thuộc (Execution) | Kết luận chất lượng chỉ tiêu chính |
+| :-------------------- | :----------------------- | :------------------------------- | :--------------------------------- |
+| **`PASS`**            | Bất kỳ / Chưa làm        | `NOT_APPLICABLE`                 | **`PASS`** (Đạt ngay lần 1)        |
+| **`FAIL`**            | Chưa làm / Trống         | `REQUIRED` (`TRIGGERED_PENDING`) | **`PENDING`** (Chờ thử lần 2)      |
+| **`FAIL`**            | **`PASS`**               | `COMPLETED` (`TRIGGERED_PASS`)   | **`PASS`** (Được cứu thành công)   |
+| **`FAIL`**            | **`FAIL`**               | `COMPLETED` (`TRIGGERED_FAIL`)   | **`FAIL`** (Khẳng định hỏng, OOS)  |
+
+#### B. Đối với `CONDITIONAL_CHECK`:
+
+| Điều kiện kích hoạt (Condition)     | Chỉ tiêu phụ thuộc (Dependent) | Trạng thái thực thi | Kết luận chất lượng chỉ tiêu phụ  |
+| :---------------------------------- | :----------------------------- | :------------------ | :-------------------------------- |
+| **`FALSE`** (Đạt điều kiện an toàn) | Không cần làm                  | **`EXEMPTED`**      | **`PASS`** (Miễn kiểm hợp lệ)     |
+| **`TRUE`** (Vi phạm điều kiện)      | Chưa làm / Trống               | **`REQUIRED`**      | **`PENDING`** (Bắt buộc kiểm tra) |
+| **`TRUE`** (Vi phạm điều kiện)      | **`PASS`**                     | **`COMPLETED`**     | **`PASS`** (Phép thử phụ đạt)     |
+| **`TRUE`** (Vi phạm điều kiện)      | **`FAIL`**                     | **`COMPLETED`**     | **`FAIL`** (Phép thử phụ hỏng)    |
 
 ---
 
@@ -18,13 +40,11 @@ Trong kiểm nghiệm dược phẩm theo Dược điển (USP, BP, Dược đi�
 
 ```typescript
 /**
- * Loại quan hệ thay thế giữa các chỉ tiêu
+ * Loại quan hệ thay thế giữa các chỉ tiêu (V2 Supported Scope)
  */
 export type AlternateRuleType =
   | 'FAIL_RETRY' // Chỉ tiêu chính Fail -> Cho phép thử chỉ tiêu phụ/mở rộng
-  | 'CONDITIONAL_CHECK' // Chỉ tiêu chính Pass -> Miễn kiểm chỉ tiêu phụ
-  | 'SUBSTITUTION' // Chọn 1 trong 2 chỉ tiêu (A hoặc B)
-  | 'PERIODIC_SKIP'; // Kiểm nghiệm luân phiên (1 trong 10 lô)
+  | 'CONDITIONAL_CHECK'; // Điều kiện an toàn -> Miễn kiểm hoặc kích hoạt chỉ tiêu phụ
 
 /**
  * Trạng thái kích hoạt và giải quyết của Quy tắc Thay thế

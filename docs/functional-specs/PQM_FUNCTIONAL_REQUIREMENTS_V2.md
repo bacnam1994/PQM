@@ -80,10 +80,18 @@
 
 ## 4. NHÓM CHỨC NĂNG RELEASE GATE & BÁO CÁO COA
 
-### FRS-REL-001: Rào Chắn Xuất Xưởng Lô (Release Gate)
+### FRS-REL-001: Rào Chắn Xuất Xưởng Lô 7 Cổng (7 Release Gates)
 
-- **Mô tả**: Hệ thống kiểm tra đồng thời 5 điều kiện an toàn trước khi cho phép QA Director ký lệnh xuất xưởng. Nếu `qualityStatus !== 'PASS'`, chức năng xuất xưởng bị khóa cứng.
-- **Quy tắc thỏa mãn**: `BR-REL-001`, `BR-SEC-001`.
+- **Mô tả**: Hệ thống kiểm tra đồng thời 7 cổng kiểm soát an toàn (7 Release Gates) trước khi cho phép QA Director / Authorized Person ký lệnh xuất xưởng (`RELEASED`):
+  1. **Gate 1 (Batch Lifecycle State)**: Lô đang ở trạng thái tác nghiệp hợp lệ (`TESTING` hoặc `QA_REVIEW`), không bị tạm đình chỉ (`HOLD`) hoặc từ chối (`REJECTED`).
+  2. **Gate 2 (Canonical Quality Status)**: Đánh giá chất lượng chuẩn tắc của Lô phải là `PASS` (tuyệt đối cấm xuất xưởng nếu còn chỉ tiêu `FAIL`, `PENDING` hoặc `INDETERMINATE`).
+  3. **Gate 3 (Criteria Completeness)**: 100% chỉ tiêu bắt buộc theo TCCS Snapshot đã được thử nghiệm và đánh giá đầy đủ (`completionPercentage === 100`).
+  4. **Gate 4 (OOS Investigation Resolution)**: 100% hồ sơ sự cố ngoài tiêu chuẩn (OOS) liên quan đến Lô đã được điều tra xong và phê duyệt đóng bởi QA Manager (không có OOS nào ở trạng thái `OPEN` hoặc `IN_PROGRESS`).
+  5. **Gate 5 (Deviation Containment)**: 100% phiếu sai lệch quy trình (Deviation) mức Major / Critical liên đới đã hoàn tất biện pháp cô lập rủi ro và được QA ký chấp thuận.
+  6. **Gate 6 (Raw Materials & Batch Expiry)**: 100% nguyên vật liệu cấu thành trong công thức không bị quá hạn dùng tại thời điểm sản xuất, và bản thân Lô thành phẩm còn trong hạn sử dụng hợp lệ.
+  7. **Gate 7 (Part 11 Electronic Signature & Authorization)**: Chữ ký số điện tử bắt buộc xác thực mật khẩu, ghi nhận vai trò được ủy quyền (`QA_DIRECTOR` hoặc `QUALIFIED_PERSON`), lý do ký xuất xưởng và mã băm toàn vẹn SHA-256.
+- **Ràng buộc an ninh**: Nếu bất kỳ cổng nào trong 7 cổng trên không thỏa mãn, nút "Ký lệnh xuất xưởng" tại `SC-10` bị khóa cứng; hành vi bypass ở backend/API bị chặn hoàn toàn.
+- **Quy tắc thỏa mãn**: `BR-REL-001`, `BR-REL-002`, `BR-SEC-001`.
 
 ### FRS-COA-001: Xuất Bản Báo Cáo CoA Độc Quyền Từ Snapshot
 

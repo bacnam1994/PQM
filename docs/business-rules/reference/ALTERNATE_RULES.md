@@ -65,6 +65,7 @@
 - **Input**: `mainResult: CriterionResult`, `condition: StructuredCondition`, `altResult?: CriterionResult`.
 - **Preconditions**: Quy tắc thay thế có `type === 'CONDITIONAL_CHECK'`.
 - **Decision Logic**:
+
   ```
   // BẤT BIẾN: NẾU TC1 RỚT THÌ FAIL LẬP TỨC ĐỘC LẬP
   IF (mainResult.status == 'FAIL')
@@ -89,6 +90,7 @@
           THEN altCriterion.state = 'TRIGGERED_FAIL'
           overallVerdict = 'FAIL'
   ```
+
 - **Decision Table**:
   | TC1 (Arsen tổng số ≤ 5) | Ngưỡng kích hoạt (> 1.5) | Kích hoạt TC2? | TC2 (Arsen vô cơ ≤ 1.5) | Kết luận tổng thể |
   | :--- | :--- | :--- | :--- | :--- |
