@@ -25,7 +25,8 @@ import { resolveDeclaredBasis, calculateRelativePercentage } from '../../utils/b
 import { useCriteriaResolver } from '../../hooks/useCriteriaResolver';
 import { fetchTestResultsByBatchId } from '../../services/testResultService';
 import { TestResult, Criterion, FormulaIngredient } from '../../types';
-import { CircularProgress, BatchCriteriaHistory } from '../../components';
+import { CircularProgress, BatchCriteriaHistory, BatchTestingQABadge } from '../../components';
+
 import { OOSInvestigationModal } from '../../components/features/OOSInvestigationModal';
 import { AIBatchClearanceModal } from '../../components/features/AIBatchClearanceModal';
 import { DeviationReportModal } from '../../components/features/DeviationReportModal';
@@ -284,16 +285,31 @@ const BatchDetailPage = () => {
         ]}
         badge={
           isAdmin || role === 'ADMIN' || role === 'QA' ? (
-            <div className="flex items-center gap-1.5" title="Nhấp để chuyển trạng thái Lô">
+            <div
+              className="flex items-center gap-1.5 flex-wrap"
+              title="Nhấp để chuyển trạng thái Lô"
+            >
               <BatchStatusSelect
                 status={batch.status}
                 batchId={batch.id}
                 onUpdate={handleStatusChangeClick}
                 isAdmin={true}
+                batch={batch}
+                testResults={viewBatchResults}
+                tccs={(batch as any)?.tccs}
               />
             </div>
           ) : (
-            <StatusBadge status={batch.status} />
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <StatusBadge status={batch.status} />
+              {batch.status === 'TESTING' && (
+                <BatchTestingQABadge
+                  batch={batch}
+                  testResults={viewBatchResults}
+                  tccs={(batch as any)?.tccs}
+                />
+              )}
+            </div>
           )
         }
         actions={

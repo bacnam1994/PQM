@@ -15,3 +15,7 @@ export { default as BatchCriteriaHistory } from './features/BatchCriteriaHistory
 export { default as CriteriaInputGroup } from './features/CriteriaInputGroup';
 export { default as MappingConfirmModal } from './features/MappingConfirmModal';
 export type { AIExtractedItem, ConfirmedMapping } from './features/MappingConfirmModal';
+export {
+  BatchTestingQABadge,
+  default as BatchTestingQABadgeDefault,
+} from './features/BatchTestingQABadge';

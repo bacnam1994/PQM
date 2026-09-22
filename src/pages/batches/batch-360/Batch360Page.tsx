@@ -20,6 +20,8 @@ import {
 import { useDataGraph } from '../../../hooks/useDataGraph';
 import { useAppStore } from '../../../store/useAppStore';
 import { formatDateStandard, ensureArray } from '../../../utils';
+import { BatchTestingQABadge } from '../../../components';
+
 import {
   buildBatchGenealogy,
   BatchGenealogyReport,
@@ -240,6 +242,7 @@ export const Batch360Page: React.FC = () => {
               >
                 {batch.status}
               </span>
+              <BatchTestingQABadge batch={batch} testResults={batchTestResults} tccs={batch.tccs} />
             </div>
             <h1 className="text-xl sm:text-2xl font-bold text-ink tracking-tight mt-1">
               Lô {batch.batchNo} — {batch.product?.name || 'Sản phẩm'}

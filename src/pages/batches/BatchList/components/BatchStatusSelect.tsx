@@ -7,13 +7,18 @@ import {
   ChevronUpDownIcon,
   LockClosedIcon,
 } from '@heroicons/react/24/outline';
-import { StatusBadge } from '../../../../components';
+import { StatusBadge, BatchTestingQABadge } from '../../../../components';
+import { Batch, TestResult, TCCS } from '../../../../types';
+import { useAppStore } from '../../../../store/useAppStore';
 
 interface BatchStatusSelectProps {
   status: string;
   batchId: string;
   onUpdate: (status: string, batchId: string) => void;
   isAdmin: boolean;
+  batch?: Batch;
+  testResults?: TestResult[];
+  tccs?: TCCS | null;
 }
 
 export const BatchStatusSelect: React.FC<BatchStatusSelectProps> = ({
@@ -21,7 +26,13 @@ export const BatchStatusSelect: React.FC<BatchStatusSelectProps> = ({
   batchId,
   onUpdate,
   isAdmin,
+  batch,
+  testResults,
+  tccs,
 }) => {
+  const storeBatches = useAppStore((state) => state.batches);
+  const effectiveBatch = batch || storeBatches.find((b) => b.id === batchId);
+
   const getStatusColor = (s: string) => {
     switch (s) {
       case 'RELEASED':
@@ -56,40 +67,54 @@ export const BatchStatusSelect: React.FC<BatchStatusSelectProps> = ({
   const iconColor = status === 'PENDING' ? 'text-ink-muted' : 'text-current';
 
   if (!isAdmin) {
-    return <StatusBadge type="BATCH" status={status} />;
+    return (
+      <div className="inline-flex items-center gap-1.5 flex-wrap">
+        <StatusBadge type="BATCH" status={status} />
+        {effectiveBatch && status === 'TESTING' && (
+          <BatchTestingQABadge batch={effectiveBatch} testResults={testResults} tccs={tccs} />
+        )}
+      </div>
+    );
   }
 
   return (
-    <div className="relative inline-block group/select" onClick={(e) => e.stopPropagation()}>
-      <div className={`absolute left-2 top-1/2 -translate-y-1/2 pointer-events-none ${iconColor}`}>
-        <IconComponent className={`h-3 w-3 ${status === 'TESTING' ? 'animate-spin' : ''}`} />
+    <div className="inline-flex items-center gap-1.5 flex-wrap">
+      <div className="relative inline-block group/select" onClick={(e) => e.stopPropagation()}>
+        <div
+          className={`absolute left-2 top-1/2 -translate-y-1/2 pointer-events-none ${iconColor}`}
+        >
+          <IconComponent className={`h-3 w-3 ${status === 'TESTING' ? 'animate-spin' : ''}`} />
+        </div>
+        <select
+          value={status}
+          onChange={(e) => onUpdate(e.target.value, batchId)}
+          className={`appearance-none pl-6 pr-5 py-1 rounded-full text-xs font-medium border cursor-pointer outline-none focus:ring-2 focus:ring-emerald-500/20 transition-colors ${getStatusColor(status)}`}
+        >
+          <option value="PENDING" className="bg-surface text-ink">
+            Chờ kiểm
+          </option>
+          <option value="TESTING" className="bg-surface text-ink">
+            Đang kiểm
+          </option>
+          <option value="RELEASED" className="bg-surface text-ink">
+            Phê duyệt
+          </option>
+          <option value="REJECTED" className="bg-surface text-ink">
+            Từ chối
+          </option>
+          <option value="BLOCKED" className="bg-surface text-ink">
+            Khóa lô
+          </option>
+        </select>
+        <div
+          className={`absolute right-1.5 top-1/2 -translate-y-1/2 pointer-events-none opacity-50 group-hover/select:opacity-100 transition-opacity ${iconColor}`}
+        >
+          <ChevronUpDownIcon className="h-3 w-3" />
+        </div>
       </div>
-      <select
-        value={status}
-        onChange={(e) => onUpdate(e.target.value, batchId)}
-        className={`appearance-none pl-6 pr-5 py-1 rounded-full text-xs font-medium border cursor-pointer outline-none focus:ring-2 focus:ring-emerald-500/20 transition-colors ${getStatusColor(status)}`}
-      >
-        <option value="PENDING" className="bg-surface text-ink">
-          Chờ kiểm
-        </option>
-        <option value="TESTING" className="bg-surface text-ink">
-          Đang kiểm
-        </option>
-        <option value="RELEASED" className="bg-surface text-ink">
-          Phê duyệt
-        </option>
-        <option value="REJECTED" className="bg-surface text-ink">
-          Từ chối
-        </option>
-        <option value="BLOCKED" className="bg-surface text-ink">
-          Khóa lô
-        </option>
-      </select>
-      <div
-        className={`absolute right-1.5 top-1/2 -translate-y-1/2 pointer-events-none opacity-50 group-hover/select:opacity-100 transition-opacity ${iconColor}`}
-      >
-        <ChevronUpDownIcon className="h-3 w-3" />
-      </div>
+      {effectiveBatch && status === 'TESTING' && (
+        <BatchTestingQABadge batch={effectiveBatch} testResults={testResults} tccs={tccs} />
+      )}
     </div>
   );
 };

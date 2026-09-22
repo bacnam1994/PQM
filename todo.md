@@ -171,3 +171,4 @@ _(Đặc tả chi tiết từng quy tắc: Rule ID, Trigger, Input, Precondition
 - [x] **Task 10.4**: Tái thiết kế Batch Detail, Dashboard, OOS, Approval.
 - [x] **Task 10.5**: Hoàn thiện Visual Hierarchy, Animations, Responsive & Design System.
 - [x] **Task 10.6**: Build, Deploy Firebase, Push GitHub & Export `FULL_SOURCE_CODE.md`.
+- [x] **Task 10.7**: Render Dynamic QA Badge (Nhãn động hỗ trợ QA: "Đã kiểm xong - Chờ QA duyệt" màu xanh dương bên cạnh chữ `TESTING` khi `percentage === 100` và `batchQualityStatus === 'PASS'`, giữ nguyên status DB là `TESTING`).

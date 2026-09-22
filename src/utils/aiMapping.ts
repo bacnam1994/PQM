@@ -793,13 +793,33 @@ export const isCriteriaMatch = (
   systemCriteriaName: string,
   learnedMappings: AILearnedMapping[] = []
 ) => {
+  const norm1 = normalizeString(aiCriteriaName);
+  const norm2 = normalizeString(systemCriteriaName);
+
+  if (!norm1 || !norm2) return false;
+  if (norm1 === norm2) return true;
+
+  // RÀO CHẮN NGHIỆP VỤ DƯỢC KHOA (PHARMA TEST TYPE GUARD):
+  // Định tính (Identification) và Định lượng/Hàm lượng (Assay/Content) là 2 loại phép thử hoàn toàn khác nhau.
+  // Tuyệt đối không tự động map giữa Định tính và Định lượng dù có cùng tên hoạt chất trong từ điển.
+  const isIdentity1 = norm1.includes('dinhtinh') || norm1.includes('identification');
+  const isIdentity2 = norm2.includes('dinhtinh') || norm2.includes('identification');
+  const isAssay1 =
+    norm1.includes('dinhluong') || norm1.includes('assay') || norm1.includes('hamluong');
+  const isAssay2 =
+    norm2.includes('dinhluong') || norm2.includes('assay') || norm2.includes('hamluong');
+
+  if ((isIdentity1 && isAssay2) || (isAssay1 && isIdentity2)) {
+    return false;
+  }
+
   // 1. Ưu tiên kiểm tra trong cơ sở dữ liệu đã học (Learned Mappings)
   const relevantMappings = learnedMappings
     .filter((m) => m.systemName === systemCriteriaName)
     .sort((a, b) => b.frequency - a.frequency);
 
   for (const mapping of relevantMappings) {
-    if (normalizeString(aiCriteriaName) === normalizeString(mapping.originalName)) {
+    if (norm1 === normalizeString(mapping.originalName)) {
       return true;
     }
   }
