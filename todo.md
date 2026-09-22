@@ -68,121 +68,121 @@
 
 ---
 
-## 🔹 PHASE 1: BUSINESS RULE CATALOG (21 CATALOGS) [⏳ TIẾP THEO]
+## 🔹 PHASE 1: BUSINESS RULE CATALOG (21 CATALOGS) [✅ HOÀN THÀNH]
 
 _Mỗi Business Rule bắt buộc có: Rule ID, Purpose, Actor, Trigger, Input, Preconditions, Decision Logic, Decision Table, Output, State Transition, UI Behavior, Report/CoA Behavior, Audit Requirement, Forbidden Behavior, Exception Handling, Test Cases._
 
-- [ ] **Task 1.01**: `docs/business-rules/MASTER_DATA_RULES.md`
-- [ ] **Task 1.02**: `docs/business-rules/PRODUCT_RULES.md`
-- [ ] **Task 1.03**: `docs/business-rules/TCCS_RULES.md`
-- [ ] **Task 1.04**: `docs/business-rules/FORMULA_RULES.md`
-- [ ] **Task 1.05**: `docs/business-rules/RAW_MATERIAL_RULES.md`
-- [ ] **Task 1.06**: `docs/business-rules/BATCH_RULES.md`
-- [ ] **Task 1.07**: `docs/business-rules/TEST_RESULT_RULES.md`
-- [ ] **Task 1.08**: `docs/business-rules/QUALITY_EVALUATION_RULES.md`
-- [ ] **Task 1.09**: `docs/business-rules/ALTERNATE_RULES.md`
-- [ ] **Task 1.10**: `docs/business-rules/OOS_RULES.md`
-- [ ] **Task 1.11**: `docs/business-rules/DEVIATION_RULES.md`
-- [ ] **Task 1.12**: `docs/business-rules/CAPA_RULES.md`
-- [ ] **Task 1.13**: `docs/business-rules/APPROVAL_RULES.md`
-- [ ] **Task 1.14**: `docs/business-rules/RELEASE_RULES.md`
-- [ ] **Task 1.15**: `docs/business-rules/COA_RULES.md`
-- [ ] **Task 1.16**: `docs/business-rules/SIGNATURE_RULES.md`
-- [ ] **Task 1.17**: `docs/business-rules/AUDIT_RULES.md`
-- [ ] **Task 1.18**: `docs/business-rules/GENEALOGY_RULES.md`
-- [ ] **Task 1.19**: `docs/business-rules/REPORTING_RULES.md`
-- [ ] **Task 1.20**: `docs/business-rules/AI_RULES.md`
-- [ ] **Task 1.21**: `docs/business-rules/RBAC_RULES.md`
+- [x] **Task 1.01**: [`docs/business-rules/MASTER_DATA_RULES.md`](file:///d:/26%20Kiem%20nghiem/PQM/docs/business-rules/MASTER_DATA_RULES.md) (BR-MST-001 -> BR-MST-003)
+- [x] **Task 1.02**: [`docs/business-rules/PRODUCT_RULES.md`](file:///d:/26%20Kiem%20nghiem/PQM/docs/business-rules/PRODUCT_RULES.md) (BR-PRD-001 -> BR-PRD-003)
+- [x] **Task 1.03**: [`docs/business-rules/TCCS_RULES.md`](file:///d:/26%20Kiem%20nghiem/PQM/docs/business-rules/TCCS_RULES.md) (BR-TCS-001 -> BR-TCS-003)
+- [x] **Task 1.04**: [`docs/business-rules/FORMULA_RULES.md`](file:///d:/26%20Kiem%20nghiem/PQM/docs/business-rules/FORMULA_RULES.md) (BR-FOR-001 -> BR-FOR-002)
+- [x] **Task 1.05**: [`docs/business-rules/RAW_MATERIAL_RULES.md`](file:///d:/26%20Kiem%20nghiem/PQM/docs/business-rules/RAW_MATERIAL_RULES.md) (BR-MAT-001 -> BR-MAT-002)
+- [x] **Task 1.06**: [`docs/business-rules/BATCH_RULES.md`](file:///d:/26%20Kiem%20nghiem/PQM/docs/business-rules/BATCH_RULES.md) (BR-BAT-001 -> BR-BAT-003)
+- [x] **Task 1.07**: [`docs/business-rules/TEST_RESULT_RULES.md`](file:///d:/26%20Kiem%20nghiem/PQM/docs/business-rules/TEST_RESULT_RULES.md) (BR-TST-001 -> BR-TST-002)
+- [x] **Task 1.08**: [`docs/business-rules/QUALITY_EVALUATION_RULES.md`](file:///d:/26%20Kiem%20nghiem/PQM/docs/business-rules/QUALITY_EVALUATION_RULES.md) (BR-QEV-001 -> BR-QEV-002)
+- [x] **Task 1.09**: [`docs/business-rules/ALTERNATE_RULES.md`](file:///d:/26%20Kiem%20nghiem/PQM/docs/business-rules/ALTERNATE_RULES.md) (BR-ALT-001 -> BR-ALT-002)
+- [x] **Task 1.10**: [`docs/business-rules/OOS_RULES.md`](file:///d:/26%20Kiem%20nghiem/PQM/docs/business-rules/OOS_RULES.md) (BR-OOS-001 -> BR-OOS-002)
+- [x] **Task 1.11**: [`docs/business-rules/DEVIATION_RULES.md`](file:///d:/26%20Kiem%20nghiem/PQM/docs/business-rules/DEVIATION_RULES.md) (BR-DEV-001 -> BR-DEV-002)
+- [x] **Task 1.12**: [`docs/business-rules/CAPA_RULES.md`](file:///d:/26%20Kiem%20nghiem/PQM/docs/business-rules/CAPA_RULES.md) (BR-CAP-001 -> BR-CAP-002)
+- [x] **Task 1.13**: [`docs/business-rules/APPROVAL_RULES.md`](file:///d:/26%20Kiem%20nghiem/PQM/docs/business-rules/APPROVAL_RULES.md) (BR-APP-001 -> BR-APP-002)
+- [x] **Task 1.14**: [`docs/business-rules/RELEASE_RULES.md`](file:///d:/26%20Kiem%20nghiem/PQM/docs/business-rules/RELEASE_RULES.md) (BR-REL-001 -> BR-REL-002)
+- [x] **Task 1.15**: [`docs/business-rules/COA_RULES.md`](file:///d:/26%20Kiem%20nghiem/PQM/docs/business-rules/COA_RULES.md) (BR-COA-001 -> BR-COA-002)
+- [x] **Task 1.16**: [`docs/business-rules/SIGNATURE_RULES.md`](file:///d:/26%20Kiem%20nghiem/PQM/docs/business-rules/SIGNATURE_RULES.md) (BR-SIG-001 -> BR-SIG-002)
+- [x] **Task 1.17**: [`docs/business-rules/AUDIT_RULES.md`](file:///d:/26%20Kiem%20nghiem/PQM/docs/business-rules/AUDIT_RULES.md) (BR-AUD-001 -> BR-AUD-002)
+- [x] **Task 1.18**: [`docs/business-rules/GENEALOGY_RULES.md`](file:///d:/26%20Kiem%20nghiem/PQM/docs/business-rules/GENEALOGY_RULES.md) (BR-GEN-001 -> BR-GEN-002)
+- [x] **Task 1.19**: [`docs/business-rules/REPORTING_RULES.md`](file:///d:/26%20Kiem%20nghiem/PQM/docs/business-rules/REPORTING_RULES.md) (BR-REP-001 -> BR-REP-002)
+- [x] **Task 1.20**: [`docs/business-rules/AI_RULES.md`](file:///d:/26%20Kiem%20nghiem/PQM/docs/business-rules/AI_RULES.md) (BR-AI-001 -> BR-AI-002)
+- [x] **Task 1.21**: [`docs/business-rules/RBAC_RULES.md`](file:///d:/26%20Kiem%20nghiem/PQM/docs/business-rules/RBAC_RULES.md) (BR-RBC-001 -> BR-RBC-002)
 
 ---
 
-## 🔹 PHASE 2: DOMAIN CONTRACTS (17 CONTRACTS) [⏳ CHỜ]
+## 🔹 PHASE 2: DOMAIN CONTRACTS (17 CONTRACTS) [✅ HOÀN THÀNH]
 
 _Chuẩn hóa cấu trúc 17 thực thể cốt lõi, tách bạch tuyệt đối Quality Status (`PASS/FAIL/PENDING/UNKNOWN`), Execution State (`NOT_STARTED/REQUIRED/TESTING/COMPLETED/NOT_APPLICABLE/EXEMPTED`), Alternate State và Workflow Status._
 
-- [ ] **Task 2.01**: Contract Product, TCCS, Criterion, AlternateRule
-- [ ] **Task 2.02**: Contract ProductFormula, RawMaterial, Batch
-- [ ] **Task 2.03**: Contract TestResult, CriterionResult, Evaluation, EvaluationSnapshot
-- [ ] **Task 2.04**: Contract OOS, Deviation, CAPA, ApprovalTask
-- [ ] **Task 2.05**: Contract ElectronicSignature, AuditRecord
-- [ ] **Task 2.06**: Tài liệu tổng hợp `docs/contracts/DATA_CONTRACTS.md`
+- [x] **Task 2.01**: Contract Product, TCCS, Criterion, AlternateRule ([`CRITERION_STATE_CONTRACT.md`](file:///d:/26%20Kiem%20nghiem/PQM/docs/contracts/CRITERION_STATE_CONTRACT.md), [`ALTERNATE_RULE_CONTRACT.md`](file:///d:/26%20Kiem%20nghiem/PQM/docs/contracts/ALTERNATE_RULE_CONTRACT.md), [`PRODUCT_TCCS_CONTRACT.md`](file:///d:/26%20Kiem%20nghiem/PQM/docs/contracts/PRODUCT_TCCS_CONTRACT.md))
+- [x] **Task 2.02**: Contract ProductFormula, RawMaterial, Batch ([`FORMULA_MATERIAL_CONTRACT.md`](file:///d:/26%20Kiem%20nghiem/PQM/docs/contracts/FORMULA_MATERIAL_CONTRACT.md), [`BATCH_GENEALOGY_CONTRACT.md`](file:///d:/26%20Kiem%20nghiem/PQM/docs/contracts/BATCH_GENEALOGY_CONTRACT.md))
+- [x] **Task 2.03**: Contract TestResult, CriterionResult, Evaluation, EvaluationSnapshot ([`TEST_RESULT_CONTRACT.md`](file:///d:/26%20Kiem%20nghiem/PQM/docs/contracts/TEST_RESULT_CONTRACT.md), [`QUALITY_STATUS_CONTRACT.md`](file:///d:/26%20Kiem%20nghiem/PQM/docs/contracts/QUALITY_STATUS_CONTRACT.md), [`WORKFLOW_STATUS_CONTRACT.md`](file:///d:/26%20Kiem%20nghiem/PQM/docs/contracts/WORKFLOW_STATUS_CONTRACT.md), [`COA_SNAPSHOT_CONTRACT.md`](file:///d:/26%20Kiem%20nghiem/PQM/docs/contracts/COA_SNAPSHOT_CONTRACT.md))
+- [x] **Task 2.04**: Contract OOS, Deviation, CAPA, ApprovalTask ([`QMS_INCIDENT_CONTRACT.md`](file:///d:/26%20Kiem%20nghiem/PQM/docs/contracts/QMS_INCIDENT_CONTRACT.md), [`APPROVAL_CONTRACT.md`](file:///d:/26%20Kiem%20nghiem/PQM/docs/contracts/APPROVAL_CONTRACT.md))
+- [x] **Task 2.05**: Contract ElectronicSignature, AuditRecord, AI Advisory ([`SIGNATURE_AUDIT_CONTRACT.md`](file:///d:/26%20Kiem%20nghiem/PQM/docs/contracts/SIGNATURE_AUDIT_CONTRACT.md), [`AI_ADVISORY_CONTRACT.md`](file:///d:/26%20Kiem%20nghiem/PQM/docs/contracts/AI_ADVISORY_CONTRACT.md))
+- [x] **Task 2.06**: Tài liệu tổng hợp [`docs/contracts/DATA_CONTRACTS.md`](file:///d:/26%20Kiem%20nghiem/PQM/docs/contracts/DATA_CONTRACTS.md)
 
 ---
 
-## 🔹 PHASE 3: STATE MACHINES [⏳ CHỜ]
+## 🔹 PHASE 3: STATE MACHINES [✅ HOÀN THÀNH]
 
 _Đặc tả 4 FSM độc lập với đầy đủ: Trigger, Actor, Precondition, Allowed Transitions, Forbidden Transitions, Output, Audit._
 
-- [ ] **Task 3.01**: Batch State Machine (`DRAFT -> TESTING -> QA_REVIEW -> APPROVED -> RELEASED` / `TESTING -> REJECTED`)
-- [ ] **Task 3.02**: TestResult State Machine (`DRAFT -> SUBMITTED -> FINAL -> APPROVED`)
-- [ ] **Task 3.03**: Criterion State Machine (`NOT_STARTED -> REQUIRED -> TESTING -> PASS / FAIL / PENDING`)
-- [ ] **Task 3.04**: Alternate Rule State Machine (`NOT_APPLICABLE -> NOT_TRIGGERED -> TRIGGERED_PENDING -> TRIGGERED_PASS / TRIGGERED_FAIL`)
-- [ ] **Task 3.05**: Ban hành tài liệu `docs/contracts/STATE_MACHINES.md`
+- [x] **Task 3.01**: Batch State Machine (`DRAFT -> TESTING -> QA_REVIEW -> APPROVED -> RELEASED` / `TESTING -> REJECTED`) ([`STATE_MACHINES.md`](file:///d:/26%20Kiem%20nghiem/PQM/docs/contracts/STATE_MACHINES.md#1-fsm-1-batch-workflow-finite-state-machine))
+- [x] **Task 3.02**: TestResult State Machine (`DRAFT -> SUBMITTED -> FINAL -> APPROVED`) ([`STATE_MACHINES.md`](file:///d:/26%20Kiem%20nghiem/PQM/docs/contracts/STATE_MACHINES.md#2-fsm-2-testresult-workflow-finite-state-machine))
+- [x] **Task 3.03**: Criterion State Machine (`NOT_STARTED -> REQUIRED -> TESTING -> PASS / FAIL / PENDING`) ([`STATE_MACHINES.md`](file:///d:/26%20Kiem%20nghiem/PQM/docs/contracts/STATE_MACHINES.md#3-fsm-3-criterion-state-finite-state-machine))
+- [x] **Task 3.04**: Alternate Rule State Machine (`NOT_APPLICABLE -> NOT_TRIGGERED -> TRIGGERED_PENDING -> TRIGGERED_PASS / TRIGGERED_FAIL`) ([`STATE_MACHINES.md`](file:///d:/26%20Kiem%20nghiem/PQM/docs/contracts/STATE_MACHINES.md#4-fsm-4-alternate-rule-finite-state-machine))
+- [x] **Task 3.05**: Ban hành tài liệu [`docs/contracts/STATE_MACHINES.md`](file:///d:/26%20Kiem%20nghiem/PQM/docs/contracts/STATE_MACHINES.md)
 
 ---
 
-## 🔹 PHASE 4: FUNCTIONAL SPECIFICATIONS V2 [⏳ CHỜ]
+## 🔹 PHASE 4: FUNCTIONAL SPECIFICATIONS V2 [✅ HOÀN THÀNH]
 
 _Mỗi Module có FRS riêng: Input, Output, Validation, Business Rules, State, Service, Domain, Permission, Error, Audit, Acceptance Criteria._
 
-- [ ] **Task 4.01**: FRS-MOD-01 đến FRS-MOD-05 (Master Data, Product, TCCS, Formula, Raw Material)
-- [ ] **Task 4.02**: FRS-MOD-06 đến FRS-MOD-09 (Batch, PKN, Evaluation Engine, Alternate Rules)
-- [ ] **Task 4.03**: FRS-MOD-10 đến FRS-MOD-15 (OOS, Deviation, CAPA, Approval, Release, CoA)
-- [ ] **Task 4.04**: FRS-MOD-16 đến FRS-MOD-20 (Signature, Audit, Genealogy, Reporting, AI)
+- [x] **Task 4.01**: FRS-MOD-01 đến FRS-MOD-05 (Master Data, Product, TCCS, Formula, Raw Material) ([`FRS_01`](file:///d:/26%20Kiem%20nghiem/PQM/docs/specs/FRS_01_MASTER_DATA.md), [`FRS_02`](file:///d:/26%20Kiem%20nghiem/PQM/docs/specs/FRS_02_PRODUCT.md), [`FRS_03`](file:///d:/26%20Kiem%20nghiem/PQM/docs/specs/FRS_03_TCCS.md), [`FRS_04`](file:///d:/26%20Kiem%20nghiem/PQM/docs/specs/FRS_04_FORMULA.md), [`FRS_05`](file:///d:/26%20Kiem%20nghiem/PQM/docs/specs/FRS_05_RAW_MATERIAL.md))
+- [x] **Task 4.02**: FRS-MOD-06 đến FRS-MOD-09 (Batch, PKN, Evaluation Engine, Alternate Rules) ([`FRS_06`](file:///d:/26%20Kiem%20nghiem/PQM/docs/specs/FRS_06_BATCH.md), [`FRS_07`](file:///d:/26%20Kiem%20nghiem/PQM/docs/specs/FRS_07_TEST_RESULT.md), [`FRS_08`](file:///d:/26%20Kiem%20nghiem/PQM/docs/specs/FRS_08_QUALITY_EVALUATION.md), [`FRS_09`](file:///d:/26%20Kiem%20nghiem/PQM/docs/specs/FRS_09_ALTERNATE_RULES.md))
+- [x] **Task 4.03**: FRS-MOD-10 đến FRS-MOD-15 (OOS, Deviation, CAPA, Approval, Release, CoA) ([`FRS_10`](file:///d:/26%20Kiem%20nghiem/PQM/docs/specs/FRS_10_OOS.md), [`FRS_11`](file:///d:/26%20Kiem%20nghiem/PQM/docs/specs/FRS_11_DEVIATION.md), [`FRS_12`](file:///d:/26%20Kiem%20nghiem/PQM/docs/specs/FRS_12_CAPA.md), [`FRS_13`](file:///d:/26%20Kiem%20nghiem/PQM/docs/specs/FRS_13_APPROVAL_PIPELINE.md), [`FRS_14`](file:///d:/26%20Kiem%20nghiem/PQM/docs/specs/FRS_14_BATCH_RELEASE.md), [`FRS_15`](file:///d:/26%20Kiem%20nghiem/PQM/docs/specs/FRS_15_COA_REPORT.md))
+- [x] **Task 4.04**: FRS-MOD-16 đến FRS-MOD-20 (Signature, Audit, Genealogy, Reporting, AI) ([`FRS_16`](file:///d:/26%20Kiem%20nghiem/PQM/docs/specs/FRS_16_SIGNATURE_SECURITY.md), [`FRS_17`](file:///d:/26%20Kiem%20nghiem/PQM/docs/specs/FRS_17_AUDIT_TRAIL.md), [`FRS_18`](file:///d:/26%20Kiem%20nghiem/PQM/docs/specs/FRS_18_GENEALOGY_TRACEABILITY.md), [`FRS_19`](file:///d:/26%20Kiem%20nghiem/PQM/docs/specs/FRS_19_REPORTING_SPC.md), [`FRS_20`](file:///d:/26%20Kiem%20nghiem/PQM/docs/specs/FRS_20_AI_ADVISORY.md))
 
 ---
 
-## 🔹 PHASE 5: E2E BUSINESS SCENARIOS (S-001 ➔ S-018) [⏳ CHỜ]
+## 🔹 PHASE 5: E2E BUSINESS SCENARIOS (S-001 ➔ S-018) [✅ HOÀN THÀNH]
 
-- [ ] **Task 5.01**: S-001 (Happy Path - Batch đạt) & S-002 (Batch không đạt)
-- [ ] **Task 5.02**: S-003 (PKN chưa hoàn tất) & S-004 (Alternate Rule FAIL_RETRY)
-- [ ] **Task 5.03**: S-005 (Alternate Rule CONDITIONAL_CHECK) & S-006 (Alternate Dependency Missing)
-- [ ] **Task 5.04**: S-007 (TCCS Version Change) & S-008 (TestResult Approval)
-- [ ] **Task 5.05**: S-009 (Batch Release) & S-010 (OOS Investigation)
-- [ ] **Task 5.06**: S-011 (Deviation) & S-012 (CAPA)
-- [ ] **Task 5.07**: S-013 (CoA Generation) & S-014 (Audit Trail)
-- [ ] **Task 5.08**: S-015 (Electronic Signature) & S-016 (Concurrent Modification)
-- [ ] **Task 5.09**: S-017 (Legacy Data) & S-018 (AI Advisory)
+- [x] **Task 5.01**: S-001 (Happy Path - Batch đạt) & S-002 (Batch không đạt) ([`E2E_BUSINESS_SCENARIOS.md`](file:///d:/26%20Kiem%20nghiem/PQM/docs/scenarios/E2E_BUSINESS_SCENARIOS.md#s-001-happy-path---lo-san-xuat-dat-chat-luong-hoan-hao))
+- [x] **Task 5.02**: S-003 (PKN chưa hoàn tất) & S-004 (Alternate Rule FAIL_RETRY) ([`E2E_BUSINESS_SCENARIOS.md`](file:///d:/26%20Kiem%20nghiem/PQM/docs/scenarios/E2E_BUSINESS_SCENARIOS.md#s-003-testing-incomplete---lo-chua-hoan-tat-kiem-nghiem))
+- [x] **Task 5.03**: S-005 (Alternate Rule CONDITIONAL_CHECK) & S-006 (Alternate Dependency Missing) ([`E2E_BUSINESS_SCENARIOS.md`](file:///d:/26%20Kiem%20nghiem/PQM/docs/scenarios/E2E_BUSINESS_SCENARIOS.md#s-005-alternate-rule---mien-kiem-co-dieu-kien-conditional_check))
+- [x] **Task 5.04**: S-007 (TCCS Version Change) & S-008 (TestResult Approval) ([`E2E_BUSINESS_SCENARIOS.md`](file:///d:/26%20Kiem%20nghiem/PQM/docs/scenarios/E2E_BUSINESS_SCENARIOS.md#s-007-tccs-version-change--snapshot-immutability))
+- [x] **Task 5.05**: S-009 (Batch Release) & S-010 (OOS Investigation) ([`E2E_BUSINESS_SCENARIOS.md`](file:///d:/26%20Kiem%20nghiem/PQM/docs/scenarios/E2E_BUSINESS_SCENARIOS.md#s-009-batch-release-gates---7-cong-kiem-soat-xuat-xuong))
+- [x] **Task 5.06**: S-011 (Deviation) & S-012 (CAPA) ([`E2E_BUSINESS_SCENARIOS.md`](file:///d:/26%20Kiem%20nghiem/PQM/docs/scenarios/E2E_BUSINESS_SCENARIOS.md#s-011-deviation-management---xu-ly-su-co-sai-lech-quy-trinh))
+- [x] **Task 5.07**: S-013 (CoA Generation) & S-014 (Audit Trail) ([`E2E_BUSINESS_SCENARIOS.md`](file:///d:/26%20Kiem%20nghiem/PQM/docs/scenarios/E2E_BUSINESS_SCENARIOS.md#s-013-immutable-coa-generation--qr-verification))
+- [x] **Task 5.08**: S-015 (Electronic Signature) & S-016 (Concurrent Modification) ([`E2E_BUSINESS_SCENARIOS.md`](file:///d:/26%20Kiem%20nghiem/PQM/docs/scenarios/E2E_BUSINESS_SCENARIOS.md#s-015-21-cfr-part-11-electronic-signature))
+- [x] **Task 5.09**: S-017 (Legacy Data) & S-018 (AI Advisory) ([`E2E_BUSINESS_SCENARIOS.md`](file:///d:/26%20Kiem%20nghiem/PQM/docs/scenarios/E2E_BUSINESS_SCENARIOS.md#s-017-legacy-data-ingestion--sanitation))
 
 ---
 
-## 🔹 PHASE 6: SCREEN CONTRACTS (SC-01 ➔ SC-25) [⏳ CHỜ]
+## 🔹 PHASE 6: SCREEN CONTRACTS (SC-01 ➔ SC-25) [✅ HOÀN THÀNH]
 
 _Đặc tả 25 màn hình: Purpose, Actor, Permission, Data Source, States (Loading, Empty, Error, Normal), Form Fields, Actions, Validation, Business Rules, State Rendering, Navigation, Audit, Forbidden UI Behavior (Cấm UI tự evaluate)._
 
-- [ ] **Task 6.01**: SC-01 đến SC-05 (Dashboard, Product List/Detail/Form, TCCS List)
-- [ ] **Task 6.02**: SC-06 đến SC-10 (TCCS Detail/Form, Formula, Material, Batch List)
-- [ ] **Task 6.03**: SC-11 đến SC-15 (Batch Detail, Batch Form, PKN List, PKN Form/Editor, CoA Report)
-- [ ] **Task 6.04**: SC-16 đến SC-20 (OOS, Deviation, CAPA, Approval, Audit Log)
-- [ ] **Task 6.05**: SC-21 đến SC-25 (Batch 360, Product 360, Trend Analysis, AI Assistant, System Settings)
+- [x] **Task 6.01**: SC-01 đến SC-05 (Dashboard, Product List/Detail/Form, TCCS List) ([`SCREEN_CONTRACTS.md`](file:///d:/26%20Kiem%20nghiem/PQM/docs/contracts/SCREEN_CONTRACTS.md#sc-01-bang-dieu-khien-tong-quan-quality-executive-dashboard))
+- [x] **Task 6.02**: SC-06 đến SC-10 (TCCS Detail/Form, Formula, Material, Batch List) ([`SCREEN_CONTRACTS.md`](file:///d:/26%20Kiem%20nghiem/PQM/docs/contracts/SCREEN_CONTRACTS.md#sc-06-chi-tiet-tieu-chuan-co-so-tccs-detail--criteria-view))
+- [x] **Task 6.03**: SC-11 đến SC-15 (Batch Detail, Batch Form, PKN List, PKN Form/Editor, CoA Report) ([`SCREEN_CONTRACTS.md`](file:///d:/26%20Kiem%20nghiem/PQM/docs/contracts/SCREEN_CONTRACTS.md#sc-11-ho-so-chi-tiet-lo-batch-dossier--360-overview))
+- [x] **Task 6.04**: SC-16 đến SC-20 (OOS, Deviation, CAPA, Approval, Audit Log) ([`SCREEN_CONTRACTS.md`](file:///d:/26%20Kiem%20nghiem/PQM/docs/contracts/SCREEN_CONTRACTS.md#sc-16-quan-ly-dieu-tra-ket-qua-ngoai-tieu-chuan-oos-investigation-view))
+- [x] **Task 6.05**: SC-21 đến SC-25 (Batch 360, Product 360, Trend Analysis, AI Assistant, System Settings) ([`SCREEN_CONTRACTS.md`](file:///d:/26%20Kiem%20nghiem/PQM/docs/contracts/SCREEN_CONTRACTS.md#sc-21-mang-luoi-pha-he-lo-batch-360-genealogy-graph))
 
 ---
 
-## 🔹 PHASE 7: ACCEPTANCE CRITERIA (GHERKIN FORMAT) [⏳ CHỜ]
+## 🔹 PHASE 7: ACCEPTANCE CRITERIA (GHERKIN FORMAT) [✅ HOÀN THÀNH]
 
-- [ ] **Task 7.01**: Acceptance Criteria cho Master Data, Product, TCCS, Formula, Material
-- [ ] **Task 7.02**: Acceptance Criteria cho Batch, PKN, Evaluation Engine, Alternate Rules
-- [ ] **Task 7.03**: Acceptance Criteria cho OOS, Deviation, CAPA, Approval, Release Gate
-- [ ] **Task 7.04**: Acceptance Criteria cho CoA, Signature, Audit, AI Governance
-
----
-
-## 🔹 PHASE 8: TRACEABILITY MATRIX V2 [⏳ CHỜ]
-
-- [ ] **Task 8.01**: Ánh xạ 8 chiều: `Business Requirement ➔ Business Rule ➔ Domain Contract ➔ Functional Requirement ➔ Screen Contract ➔ Code ➔ Test ➔ Evidence`.
-- [ ] **Task 8.02**: Ban hành `docs/traceability/PQM_TRACEABILITY_MATRIX_V2.md`.
+- [x] **Task 7.01**: Acceptance Criteria cho Master Data, Product, TCCS, Formula, Material ([`ACCEPTANCE_CRITERIA_MASTER.md`](file:///d:/26%20Kiem%20nghiem/PQM/docs/acceptance/ACCEPTANCE_CRITERIA_MASTER.md#1-phan-1-master-data-product-tccs-formula--raw-material-task-701))
+- [x] **Task 7.02**: Acceptance Criteria cho Batch, PKN, Evaluation Engine, Alternate Rules ([`ACCEPTANCE_CRITERIA_MASTER.md`](file:///d:/26%20Kiem%20nghiem/PQM/docs/acceptance/ACCEPTANCE_CRITERIA_MASTER.md#2-phan-2-batch-pkn-evaluation-engine--alternate-rules-task-702))
+- [x] **Task 7.03**: Acceptance Criteria cho OOS, Deviation, CAPA, Approval, Release Gate ([`ACCEPTANCE_CRITERIA_MASTER.md`](file:///d:/26%20Kiem%20nghiem/PQM/docs/acceptance/ACCEPTANCE_CRITERIA_MASTER.md#3-phan-3-oos-deviation-capa-approval--release-gates-task-703))
+- [x] **Task 7.04**: Acceptance Criteria cho CoA, Signature, Audit, AI Governance ([`ACCEPTANCE_CRITERIA_MASTER.md`](file:///d:/26%20Kiem%20nghiem/PQM/docs/acceptance/ACCEPTANCE_CRITERIA_MASTER.md#4-phan-4-coa-signature-audit--ai-governance-task-704))
 
 ---
 
-## 🔹 PHASE 9: CODEBASE CONFORMANCE AUDIT [⏳ CHỜ]
+## 🔹 PHASE 8: TRACEABILITY MATRIX V2 [✅ HOÀN THÀNH]
 
-- [ ] **Task 9.01**: Rà soát Domain, Services, Repositories, Hooks, Components, Pages, Reports, Tests, Security Rules.
-- [ ] **Task 9.02**: Phân loại: `COMPLIANT`, `PARTIAL`, `CONFLICT`, `LEGACY`, `UNUSED`, `DUPLICATED`, `MISSING`.
-- [ ] **Task 9.03**: Khóa danh mục cần refactor trước khi sửa code.
+- [x] **Task 8.01**: Ánh xạ 8 chiều: `Business Requirement ➔ Business Rule ➔ Domain Contract ➔ Functional Requirement ➔ Screen Contract ➔ Code ➔ Test ➔ Evidence`
+- [x] **Task 8.02**: Ban hành [`docs/traceability/PQM_TRACEABILITY_MATRIX_V2.md`](file:///d:/26%20Kiem%20nghiem/PQM/docs/traceability/PQM_TRACEABILITY_MATRIX_V2.md)
 
 ---
 
-## 🔹 PHASE 10: DOMAIN ENGINE REBUILD [⏳ CHỜ]
+## 🔹 PHASE 9: CODEBASE CONFORMANCE AUDIT [✅ HOÀN THÀNH]
+
+- [x] **Task 9.01**: Rà soát 9 phân vùng: Domain, Services, Repositories, Hooks, Components, Pages, Reports, Tests, Security Rules.
+- [x] **Task 9.02**: Phân loại: `COMPLIANT`, `PARTIAL`, `CONFLICT`, `LEGACY`, `UNUSED`, `DUPLICATED`, `MISSING`.
+- [x] **Task 9.03**: Khóa danh mục cần refactor trước khi sửa code ([`CODEBASE_CONFORMANCE_REPORT.md`](file:///d:/26%20Kiem%20nghiem/PQM/docs/audit/CODEBASE_CONFORMANCE_REPORT.md)).
+
+---
+
+## 🔹 PHASE 10: DOMAIN ENGINE REBUILD [⏳ ĐANG THỰC HIỆN]
 
 - [ ] **Task 10.01**: Types & Enums
 - [ ] **Task 10.02**: Validation Layer
