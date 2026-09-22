@@ -3,6 +3,7 @@ import { ChangeImpactEngine } from '../../../services/changeImpactEngine';
 import { ApprovalWorkflowService } from '../../../services/app/ApprovalWorkflowService';
 import { signatureService } from '../../../services/signatureService';
 import { Criterion, CriterionType, TCCS, Batch, TestResult } from '../../../types';
+import { AlternateRuleResolver } from '../../../domain/evaluation/AlternateRuleResolver';
 
 vi.mock('../../../services/signatureService', () => ({
   signatureService: {
@@ -17,39 +18,39 @@ vi.mock('../../../services/signatureService', () => ({
       documentId: 'tccs_001',
       documentVersion: 1,
       meaning: 'Phê duyệt TCCS',
-      signatureHash: 'hash_abc_123'
-    })
-  }
+      signatureHash: 'hash_abc_123',
+    }),
+  },
 }));
 
 describe('TASK-014: TCCS Versioning & Workflow Integration', () => {
   const oldCriteria: Criterion[] = [
     { name: 'Định lượng Paracetamol', unit: '%', min: 90, max: 110, type: CriterionType.NUMBER },
     { name: 'Độ hòa tan', unit: '%', min: 75, type: CriterionType.NUMBER },
-    { name: 'Tạp chất A', unit: '%', max: 0.5, type: CriterionType.NUMBER }
+    { name: 'Tạp chất A', unit: '%', max: 0.5, type: CriterionType.NUMBER },
   ];
 
   const newCriteria: Criterion[] = [
     { name: 'Định lượng Paracetamol', unit: '%', min: 95, max: 105, type: CriterionType.NUMBER }, // Siết chặt Min & Max
     { name: 'Độ hòa tan', unit: '%', min: 75, type: CriterionType.NUMBER }, // Giữ nguyên
-    { name: 'Tạp chất B mới', unit: '%', max: 0.2, type: CriterionType.NUMBER } // Thêm mới, xóa Tạp chất A
+    { name: 'Tạp chất B mới', unit: '%', max: 0.2, type: CriterionType.NUMBER }, // Thêm mới, xóa Tạp chất A
   ];
 
   it('so sánh độ lệch chỉ tiêu giữa 2 phiên bản chính xác (compareCriteria)', () => {
     const diffs = ChangeImpactEngine.compareCriteria(oldCriteria, newCriteria);
     expect(diffs).toHaveLength(4);
 
-    const paraDiff = diffs.find(d => d.name === 'Định lượng Paracetamol');
+    const paraDiff = diffs.find((d) => d.name === 'Định lượng Paracetamol');
     expect(paraDiff?.type).toBe('MODIFIED');
     expect(paraDiff?.changes.length).toBeGreaterThan(0);
 
-    const tanDiff = diffs.find(d => d.name === 'Độ hòa tan');
+    const tanDiff = diffs.find((d) => d.name === 'Độ hòa tan');
     expect(tanDiff?.type).toBe('UNCHANGED');
 
-    const removedDiff = diffs.find(d => d.name === 'Tạp chất A');
+    const removedDiff = diffs.find((d) => d.name === 'Tạp chất A');
     expect(removedDiff?.type).toBe('REMOVED');
 
-    const addedDiff = diffs.find(d => d.name === 'Tạp chất B mới');
+    const addedDiff = diffs.find((d) => d.name === 'Tạp chất B mới');
     expect(addedDiff?.type).toBe('ADDED');
   });
 
@@ -63,7 +64,7 @@ describe('TASK-014: TCCS Versioning & Workflow Integration', () => {
       isActive: true,
       composition: '',
       mainQualityCriteria: oldCriteria,
-      safetyCriteria: []
+      safetyCriteria: [],
     };
 
     const newTccs: TCCS = {
@@ -75,23 +76,23 @@ describe('TASK-014: TCCS Versioning & Workflow Integration', () => {
       isActive: true,
       composition: '',
       mainQualityCriteria: newCriteria,
-      safetyCriteria: []
+      safetyCriteria: [],
     };
 
     const batches: Batch[] = [
-      { 
-        id: 'b1', 
-        batchNo: 'L2601', 
-        productId: 'prod_1', 
-        status: 'TESTING', 
-        mfgDate: '2026-01-01', 
+      {
+        id: 'b1',
+        batchNo: 'L2601',
+        productId: 'prod_1',
+        status: 'TESTING',
+        mfgDate: '2026-01-01',
         expDate: '2028-01-01',
         tccsId: 'tccs_old',
         theoreticalYield: 1000,
         actualYield: 990,
         yieldUnit: 'hộp',
-        createdAt: '2026-01-01'
-      }
+        createdAt: '2026-01-01',
+      },
     ];
 
     const testResults: TestResult[] = [
@@ -104,9 +105,9 @@ describe('TASK-014: TCCS Versioning & Workflow Integration', () => {
         createdAt: '2026-01-02',
         results: [
           // 92% đạt chuẩn cũ (90-110%) nhưng không đạt chuẩn mới (95-105%)!
-          { criteriaName: 'Định lượng Paracetamol', value: 92, isPass: true }
-        ]
-      }
+          { criteriaName: 'Định lượng Paracetamol', value: 92, isPass: true },
+        ],
+      },
     ];
 
     const report = ChangeImpactEngine.assessImpact(oldTccs, newTccs, batches, testResults);
@@ -119,7 +120,12 @@ describe('TASK-014: TCCS Versioning & Workflow Integration', () => {
   });
 
   it('khởi tạo và duyệt tuần tự 2 bước cho TCCS theo chuẩn 21 CFR Part 11', async () => {
-    const task = ApprovalWorkflowService.createStandardTask('TCCS', 'tccs_101', 'Phê duyệt TCCS Paracetamol v2.0', 'initiator@pqm.com');
+    const task = ApprovalWorkflowService.createStandardTask(
+      'TCCS',
+      'tccs_101',
+      'Phê duyệt TCCS Paracetamol v2.0',
+      'initiator@pqm.com'
+    );
     expect(task.entityType).toBe('TCCS');
     expect(task.status).toBe('PENDING');
     expect(task.steps).toHaveLength(2);
@@ -139,7 +145,7 @@ describe('TASK-014: TCCS Versioning & Workflow Integration', () => {
       documentVersion: 1,
       meaning: 'Thẩm tra Kỹ thuật QC',
       checksum: 'hash_qc',
-      signedAt: new Date().toISOString()
+      signedAt: new Date().toISOString(),
     };
 
     const afterStep1 = await ApprovalWorkflowService.processStepDecision(
@@ -167,7 +173,7 @@ describe('TASK-014: TCCS Versioning & Workflow Integration', () => {
       documentVersion: 1,
       meaning: 'Phê duyệt Ban hành TCCS',
       checksum: 'hash_qa',
-      signedAt: new Date().toISOString()
+      signedAt: new Date().toISOString(),
     };
 
     const finalApproved = await ApprovalWorkflowService.processStepDecision(
@@ -181,5 +187,68 @@ describe('TASK-014: TCCS Versioning & Workflow Integration', () => {
     expect(finalApproved.status).toBe('APPROVED');
     expect(finalApproved.steps[1].status).toBe('APPROVED');
     expect(finalApproved.history).toHaveLength(3); // INIT + STEP1 + STEP2
+  });
+
+  describe('PHASE 14: TCCS Alternate Rules Visualization & Auto Notes Generation', () => {
+    const tccsWithAlternates: TCCS = {
+      id: 'tccs_alt_01',
+      productId: 'prod_para',
+      code: 'TCCS-ALT-01',
+      issueDate: '2026-01-01',
+      isActive: true,
+      createdAt: '2026-01-01',
+      mainQualityCriteria: [
+        {
+          id: 'c1',
+          name: 'Định lượng Paracetamol (UV-Vis)',
+          min: 90,
+          max: 110,
+          unit: '%',
+          type: CriterionType.NUMBER,
+        },
+        {
+          id: 'c2',
+          name: 'Định lượng Paracetamol (HPLC kiểm tra lại)',
+          min: 90,
+          max: 110,
+          unit: '%',
+          type: CriterionType.NUMBER,
+        },
+      ],
+      safetyCriteria: [],
+      alternateRules: [
+        {
+          id: 'alt_rule_01',
+          main: 'Định lượng Paracetamol (UV-Vis)',
+          alt: 'Định lượng Paracetamol (HPLC kiểm tra lại)',
+          type: 'FAIL_RETRY',
+          note: 'Khi phương pháp UV-Vis không đạt, bắt buộc kiểm nghiệm lại bằng phương pháp HPLC',
+        },
+      ],
+    };
+
+    it('Task 14.01: Nhận diện chính xác chỉ tiêu chính (Có thay thế) và chỉ tiêu phụ (Phụ thuộc)', () => {
+      const rules = tccsWithAlternates.alternateRules || [];
+
+      // Kiểm tra chỉ tiêu 1 là Main
+      const ruleAsMain = rules.find((r) => r.main === 'Định lượng Paracetamol (UV-Vis)');
+      expect(ruleAsMain).toBeDefined();
+      expect(ruleAsMain?.alt).toBe('Định lượng Paracetamol (HPLC kiểm tra lại)');
+
+      // Kiểm tra chỉ tiêu 2 là Alt
+      const ruleAsAlt = rules.find((r) => r.alt === 'Định lượng Paracetamol (HPLC kiểm tra lại)');
+      expect(ruleAsAlt).toBeDefined();
+      expect(ruleAsAlt?.main).toBe('Định lượng Paracetamol (UV-Vis)');
+    });
+
+    it('Task 14.02: Tự động sinh khối văn bản Ghi chú quy tắc thay thế chuẩn pháp lý', () => {
+      const notes = AlternateRuleResolver.generateAlternateRuleNotes(
+        tccsWithAlternates.alternateRules
+      );
+
+      expect(notes).toHaveLength(1);
+      expect(notes[0]).toContain('Định lượng Paracetamol (UV-Vis)');
+      expect(notes[0]).toContain('Định lượng Paracetamol (HPLC kiểm tra lại)');
+    });
   });
 });

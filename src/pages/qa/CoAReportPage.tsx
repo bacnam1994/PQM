@@ -280,20 +280,37 @@ const CoAReportPage = () => {
           const latestResult = resultsForBatch[resultsForBatch.length - 1];
 
           let tccsForEvaluation = batch.tccs || null;
+          const batchSnapshot = batch.evaluationSnapshot;
 
           if (isMounted) {
-            setResult({
-              id: `consolidated-${batchId}`,
-              batchId: batchId,
-              labName: 'Tổng hợp',
-              testDate: latestResult.testDate,
-              results: finalResults,
-              overallStatus: calculateOverallStatus(finalResults, tccsForEvaluation),
-              notes: `Phiếu tổng hợp từ ${resultsForBatch.length} kết quả.`,
-              createdAt: new Date().toISOString(),
-              batch: { ...batch, tccs: tccsForEvaluation },
-              product: batch.product,
-            } as HydratedTestResult);
+            if (batchSnapshot) {
+              setResult({
+                id: `coa-${batchId}`,
+                batchId: batchId,
+                labName: 'Phòng Kiểm Nghiệm',
+                testDate: latestResult?.testDate || new Date().toISOString(),
+                results: finalResults,
+                evaluationSnapshot: batchSnapshot,
+                overallStatus: batchSnapshot.overallStatus === 'PASS' ? 'PASS' : 'FAIL',
+                notes: `CoA chính thức phát hành từ Bản chụp thẩm định niêm phong.`,
+                createdAt: batchSnapshot.timestamp || new Date().toISOString(),
+                batch: { ...batch, tccs: tccsForEvaluation, evaluationSnapshot: batchSnapshot },
+                product: batch.product,
+              } as HydratedTestResult);
+            } else {
+              setResult({
+                id: `consolidated-${batchId}`,
+                batchId: batchId,
+                labName: 'Tổng hợp',
+                testDate: latestResult.testDate,
+                results: finalResults,
+                overallStatus: calculateOverallStatus(finalResults, tccsForEvaluation),
+                notes: `Phiếu tổng hợp từ ${resultsForBatch.length} kết quả.`,
+                createdAt: new Date().toISOString(),
+                batch: { ...batch, tccs: tccsForEvaluation },
+                product: batch.product,
+              } as HydratedTestResult);
+            }
           }
 
           // Tải công thức sản phẩm liên quan

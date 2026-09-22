@@ -207,27 +207,32 @@ const CoAReport = memo(({ res, batch, product, tccs, formula }: CoAReportProps) 
     };
   }, [formulaItemMap]);
 
-  // Lọc và loại bỏ các chỉ tiêu trùng lặp (khi gộp từ nhiều phiếu kiểm nghiệm)
-  // Ưu tiên số 1: Nếu TestResult hoặc Batch đã có Frozen EvaluationSnapshot -> Đọc trực tiếp từ snapshot!
-  // Tuân thủ 100% Hợp đồng SC-14 & Quy tắc BR-COA-001 (Single Source of Truth)
+  // Kiểm tra xem Lô / Phiếu kiểm nghiệm đã có EvaluationSnapshot niêm phong chính thức chưa (SC-14 & BR-COA-001)
+  const snapshot = res.evaluationSnapshot || (batch as any)?.evaluationSnapshot;
+  const isOfficialSnapshot = Boolean(
+    snapshot && Array.isArray(snapshot.criterionResults) && snapshot.criterionResults.length > 0
+  );
+
+  // Lọc và trích xuất danh sách chỉ tiêu
+  // Ưu tiên số 1: Nếu TestResult hoặc Batch đã có Frozen EvaluationSnapshot -> Đọc 100% trực tiếp từ snapshot!
+  // Tuân thủ 100% Hợp đồng SC-14 & Quy tắc BR-COA-001 (Single Source of Truth) - CẤM TỰ TÍNH TOÁN LẠI
   const deduplicatedResults = useMemo(() => {
-    const snapshot = res.evaluationSnapshot || (batch as any)?.evaluationSnapshot;
-    if (
-      snapshot &&
-      Array.isArray(snapshot.criterionResults) &&
-      snapshot.criterionResults.length > 0
-    ) {
-      return snapshot.criterionResults.map((snapCrit) => ({
-        criteriaName: snapCrit.criteriaName,
-        criterionId: snapCrit.criterionId,
-        value: snapCrit.alternateState === 'EXEMPTED' ? 'Miễn kiểm (*)' : snapCrit.value,
-        isPass: snapCrit.isPass ?? true,
-        isExempted: snapCrit.alternateState === 'EXEMPTED' || (snapCrit as any).isExempted,
-        alternateState: snapCrit.alternateState,
-        alternateNote: snapCrit.alternateNote,
-        unit: (snapCrit as any).unit,
-        limit: (snapCrit as any).note || (snapCrit as any).limit,
-      }));
+    if (isOfficialSnapshot && snapshot) {
+      return snapshot.criterionResults.map((snapCrit: any) => {
+        const c = allCriteriaMap.get(normalizeName(snapCrit.criteriaName));
+        return {
+          criteriaName: snapCrit.criteriaName,
+          criterionId: snapCrit.criterionId,
+          value: snapCrit.alternateState === 'EXEMPTED' ? 'Miễn kiểm (*)' : snapCrit.value,
+          isPass: snapCrit.isPass ?? true,
+          isExempted: snapCrit.alternateState === 'EXEMPTED' || Boolean(snapCrit.isExempted),
+          alternateState: snapCrit.alternateState,
+          alternateNote: snapCrit.alternateNote,
+          unit: snapCrit.unit || c?.unit,
+          limit: snapCrit.note || snapCrit.limit || c?.expectedText,
+          analysisMethod: snapCrit.analysisMethod || c?.analysisMethod,
+        };
+      });
     }
 
     if (!res.results) return [];
@@ -491,9 +496,36 @@ const CoAReport = memo(({ res, batch, product, tccs, formula }: CoAReportProps) 
   return (
     <div
       id="coa-report-container"
-      className="bg-white p-10 text-slate-900 max-w-[21cm] mx-auto print:shadow-none print:border-0 print:p-0 print:max-w-none print:mx-0"
+      className="relative bg-white p-10 text-slate-900 max-w-[21cm] mx-auto print:shadow-none print:border-0 print:p-0 print:max-w-none print:mx-0 overflow-hidden"
       style={{ fontFamily: "'Times New Roman', Times, serif" }}
     >
+      {/* Banner cảnh báo bản nháp nếu chưa có EvaluationSnapshot chính thức (SC-14) */}
+      {!isOfficialSnapshot && (
+        <div className="mb-6 p-4 rounded-xl border-2 border-amber-400 bg-amber-50 text-amber-900 print:hidden flex items-start gap-3">
+          <span className="text-xl">⚠️</span>
+          <div>
+            <h4 className="font-bold text-sm uppercase tracking-wide">
+              Cảnh báo: Bản nháp CoA nội bộ (DRAFT)
+            </h4>
+            <p className="text-xs mt-0.5 leading-relaxed">
+              Lô này chưa hoàn tất thẩm định chất lượng chính thức (chưa có Bản chụp niêm phong
+              EvaluationSnapshot). Bản in dưới đây chỉ mang tính chất dự thảo nội bộ, không có giá
+              trị pháp lý làm Phiếu phân tích (CoA) thương mại.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Watermark DRAFT in mờ nếu chưa có snapshot chính thức */}
+      {!isOfficialSnapshot && (
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center opacity-[0.06] select-none z-0">
+          <span className="text-6xl md:text-7xl font-black uppercase text-red-600 tracking-widest rotate-[-30deg] border-8 border-dashed border-red-600 p-8 rounded-3xl text-center">
+            DRAFT
+            <br />
+            CHƯA PHÊ DUYỆT
+          </span>
+        </div>
+      )}
       {/* CSS đặc biệt để máy in tự động căn chỉnh khổ giấy A4 và đổ màu nền (Background graphics) */}
       <style>{`
         @media print {
@@ -760,9 +792,11 @@ const CoAReport = memo(({ res, batch, product, tccs, formula }: CoAReportProps) 
                     const actualValue = parseNumberFromText(String(r.value));
                     let percentageView = null;
 
-                    // Đánh giá lại isPass theo ±20% nếu chỉ tiêu không có TCCS nhưng có trong Công thức
+                    // Đánh giá lại isPass theo ±20% nếu chỉ tiêu không có TCCS nhưng có trong Công thức (chỉ áp dụng cho bản nháp DRAFT)
+                    // Đối với bản chính thức có EvaluationSnapshot: tuyệt đối tôn trọng r.isPass từ snapshot
                     let effectiveIsPass = r.isPass;
                     if (
+                      !isOfficialSnapshot &&
                       formulaDefaultMin !== undefined &&
                       formulaDefaultMax !== undefined &&
                       !isNaN(actualValue) &&
@@ -876,9 +910,105 @@ const CoAReport = memo(({ res, batch, product, tccs, formula }: CoAReportProps) 
               (*) Miễn kiểm tra theo quy định của Tiêu chuẩn cơ sở khi chỉ tiêu chính tương ứng đã
               đạt yêu cầu.
             </p>
+            {deduplicatedResults
+              .filter((r: any) => r.alternateNote && String(r.alternateNote).trim() !== '')
+              .map((r: any, idx: number) => (
+                <p key={`alt-note-${idx}`}>
+                  - {r.criteriaName}: {r.alternateNote}
+                </p>
+              ))}
             {res.evaluationSnapshot?.footnotes?.map((fn, idx) => (
               <p key={idx}>{fn}</p>
             ))}
+          </div>
+        )}
+      </div>
+
+      {/* Khối Kết luận Chất lượng chuẩn tắc (SC-14 & BR-COA-001) */}
+      <div className="mb-8 print:mb-6 p-4 border border-slate-800 bg-slate-50 break-inside-avoid">
+        <div className="text-[13px] font-bold text-slate-900 leading-relaxed">
+          <span className="uppercase font-black">KẾT LUẬN / CONCLUSION: </span>
+          {isOfficialSnapshot && snapshot ? (
+            <span
+              className={
+                snapshot.overallStatus === 'PASS'
+                  ? 'text-emerald-700 font-black uppercase'
+                  : 'text-red-700 font-black uppercase'
+              }
+            >
+              {snapshot.overallStatus === 'PASS'
+                ? 'MẪU KIỂM NGHIỆM ĐẠT TIÊU CHUẨN CHẤT LƯỢNG THEO TIÊU CHUẨN CƠ SỞ ĐÃ BAN HÀNH.'
+                : 'MẪU KIỂM NGHIỆM KHÔNG ĐẠT TIÊU CHUẨN CHẤT LƯỢNG THEO TIÊU CHUẨN CƠ SỞ ĐÃ BAN HÀNH.'}
+            </span>
+          ) : (
+            <span className="text-amber-700 font-black uppercase">
+              {conclusion.label === 'ĐẠT'
+                ? 'BẢN DỰ THẢO: MẪU ĐẠT TIÊU CHUẨN (CHƯA THẨM ĐỊNH CHÍNH THỨC)'
+                : conclusion.label === 'KHÔNG ĐẠT'
+                  ? 'BẢN DỰ THẢO: MẪU KHÔNG ĐẠT TIÊU CHUẨN'
+                  : 'BẢN DỰ THẢO: CHƯA HOÀN THIỆN ĐỦ CÁC CHỈ TIÊU BẮT BUỘC'}
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* Khối Chữ ký 3 bên theo quy chuẩn Dược điển & GMP (SC-14) */}
+      <div className="mb-8 print:mb-6 break-inside-avoid">
+        <div className="grid grid-cols-3 gap-6 text-center text-[12px] text-slate-800">
+          {/* Cột 1: Người kiểm nghiệm */}
+          <div className="flex flex-col justify-between h-36 border border-slate-200 p-2 rounded-lg bg-slate-50/50 print:border-none print:p-0 print:bg-transparent">
+            <div>
+              <p className="font-black uppercase text-slate-900">Người kiểm nghiệm</p>
+              <p className="text-[10px] italic text-slate-500">Analyst</p>
+            </div>
+            <div className="text-[11px] font-semibold text-slate-700">
+              {(res as any).testedBy || (res as any).creator || 'KTV. Kiểm nghiệm'}
+            </div>
+          </div>
+
+          {/* Cột 2: Trưởng phòng kiểm nghiệm */}
+          <div className="flex flex-col justify-between h-36 border border-slate-200 p-2 rounded-lg bg-slate-50/50 print:border-none print:p-0 print:bg-transparent">
+            <div>
+              <p className="font-black uppercase text-slate-900">Trưởng phòng K.Nghiệm</p>
+              <p className="text-[10px] italic text-slate-500">Head of QC Lab</p>
+            </div>
+            <div className="text-[11px] font-semibold text-slate-700">
+              {(res as any).reviewedBy || 'Trưởng phòng QC'}
+            </div>
+          </div>
+
+          {/* Cột 3: Giám đốc đảm bảo chất lượng / Người được ủy quyền */}
+          <div className="flex flex-col justify-between h-36 border border-slate-200 p-2 rounded-lg bg-slate-50/50 print:border-none print:p-0 print:bg-transparent">
+            <div>
+              <p className="font-black uppercase text-slate-900">Phụ trách Chất lượng</p>
+              <p className="text-[10px] italic text-slate-500">QA Director / Authorized Person</p>
+            </div>
+            <div>
+              {isOfficialSnapshot && (
+                <div className="text-[10px] text-emerald-800 bg-emerald-100 border border-emerald-300 rounded px-2 py-0.5 mb-1 inline-block font-semibold">
+                  ✓ Đã ký số điện tử
+                </div>
+              )}
+              <div className="text-[11px] font-bold text-slate-900">
+                {snapshot?.evaluatedBy || (res as any).approvedBy || 'Giám đốc QA'}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Chân trang ALCOA+ SHA-256 Hash niêm phong */}
+        {isOfficialSnapshot && snapshot?.evaluationHash && (
+          <div className="mt-4 pt-2 border-t border-slate-300 flex flex-wrap justify-between items-center text-[10px] text-slate-500 font-mono">
+            <span>
+              Mã bảo mật ALCOA+ SHA-256:{' '}
+              <span className="font-bold text-slate-800">{snapshot.evaluationHash}</span>
+            </span>
+            <span>
+              Niêm phong:{' '}
+              {snapshot.timestamp
+                ? formatDateStandard(snapshot.timestamp)
+                : formatDateStandard(res.testDate)}
+            </span>
           </div>
         )}
       </div>

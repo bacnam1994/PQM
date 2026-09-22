@@ -22,6 +22,7 @@ describe('ReleaseService Unit Tests', () => {
     code: 'TCCS-01',
     productName: 'Paracetamol 500mg',
     isActive: true,
+    createdAt: '2026-01-01T00:00:00.000Z',
     mainQualityCriteria: [
       { id: 'c1', name: 'Định lượng', min: 95, max: 105, unit: '%', type: 'NUMBER' as any },
     ],
@@ -142,6 +143,73 @@ describe('ReleaseService Unit Tests', () => {
         'RELEASED',
         expect.objectContaining({ role: 'ADMIN' }),
         expect.objectContaining({ reason: 'Quản trị viên xuất xưởng' })
+      );
+    });
+  });
+
+  describe('executeBatchHold & executeBatchRecall (BR-REL-002)', () => {
+    it('Chặn tạm dừng lưu thông (Hold) nếu người dùng không phải QA/ADMIN', async () => {
+      await expect(
+        service.executeBatchHold({
+          batchId: 'batch-01',
+          currentBatch: mockBatch,
+          reason: 'Nghi ngờ hàm lượng tạp chất cao',
+          currentUser: { email: 'prod@pqm.com', role: 'PRODUCTION' },
+        })
+      ).rejects.toThrow('Từ chối quyền: Chỉ Quản lý chất lượng (QA) hoặc Quản trị viên');
+    });
+
+    it('Yêu cầu lý do giải trình khi ban hành Lệnh giữ Lô', async () => {
+      await expect(
+        service.executeBatchHold({
+          batchId: 'batch-01',
+          currentBatch: mockBatch,
+          reason: '   ',
+          currentUser: { email: 'qa@pqm.com', role: 'QA' },
+        })
+      ).rejects.toThrow('ERR_HOLD_REASON_REQUIRED');
+    });
+
+    it('QA ban hành Lệnh giữ Lô (Batch Hold) thành công, cập nhật trạng thái BLOCKED', async () => {
+      const updateStatusSpy = vi
+        .spyOn(batchAppService, 'updateStatus')
+        .mockResolvedValue(undefined);
+
+      const res = await service.executeBatchHold({
+        batchId: 'batch-01',
+        currentBatch: { ...mockBatch, status: 'RELEASED' },
+        reason: 'Có khiếu nại khách hàng về vỡ viên',
+        currentUser: { email: 'qa@pqm.com', role: 'QA' },
+      });
+
+      expect(res.success).toBe(true);
+      expect(updateStatusSpy).toHaveBeenCalledWith(
+        'batch-01',
+        'BLOCKED',
+        expect.objectContaining({ role: 'QA' }),
+        expect.objectContaining({ reason: expect.stringContaining('LỆNH GIỮ LÔ') })
+      );
+    });
+
+    it('QA ban hành Lệnh thu hồi Lô (Batch Recall) thành công với cấp độ Class I', async () => {
+      const updateStatusSpy = vi
+        .spyOn(batchAppService, 'updateStatus')
+        .mockResolvedValue(undefined);
+
+      const res = await service.executeBatchRecall({
+        batchId: 'batch-01',
+        currentBatch: { ...mockBatch, status: 'RELEASED' },
+        recallClass: 'CLASS_I',
+        reason: 'Phát hiện tạp chất lạ vượt ngưỡng độc tính theo cảnh báo Cục Quản lý Dược',
+        currentUser: { email: 'qa@pqm.com', role: 'QA' },
+      });
+
+      expect(res.success).toBe(true);
+      expect(updateStatusSpy).toHaveBeenCalledWith(
+        'batch-01',
+        'BLOCKED',
+        expect.objectContaining({ role: 'QA' }),
+        expect.objectContaining({ reason: expect.stringContaining('THU HỒI CLASS_I') })
       );
     });
   });

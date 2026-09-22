@@ -159,16 +159,24 @@ export const useTestResultPrint = () => {
         const overallStatus =
           canonicalStatus === 'PASS' ? TEST_RESULT_STATUS.PASS : TEST_RESULT_STATUS.FAIL;
 
+        const batchSnapshot = (batch as any).evaluationSnapshot;
         const virtualResult: HydratedTestResult = {
-          id: `consolidated-${batchId}`,
+          id: batchSnapshot ? `coa-${batchId}` : `consolidated-${batchId}`,
           batchId: batchId,
-          labName: 'Tổng hợp',
+          labName: batchSnapshot ? 'Phòng Kiểm Nghiệm' : 'Tổng hợp',
           testDate: latestResult.testDate,
           results: finalResults,
-          overallStatus: overallStatus,
-          notes: `Phiếu tổng hợp từ ${resultsForBatch.length} kết quả.`,
-          createdAt: new Date().toISOString(),
-          batch: { ...batch, tccs: tccsForEvaluation }, // Override TCCS for the report
+          evaluationSnapshot: batchSnapshot,
+          overallStatus: batchSnapshot
+            ? batchSnapshot.overallStatus === 'PASS'
+              ? TEST_RESULT_STATUS.PASS
+              : TEST_RESULT_STATUS.FAIL
+            : overallStatus,
+          notes: batchSnapshot
+            ? 'CoA phát hành từ Bản chụp thẩm định niêm phong.'
+            : `Phiếu tổng hợp từ ${resultsForBatch.length} kết quả.`,
+          createdAt: batchSnapshot?.timestamp || new Date().toISOString(),
+          batch: { ...batch, tccs: tccsForEvaluation, evaluationSnapshot: batchSnapshot }, // Override TCCS & Snapshot for the report
           product: batch.product,
         };
 

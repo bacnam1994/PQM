@@ -141,5 +141,64 @@ describe('OOSService & CAPAService Unit Tests', () => {
         expect.objectContaining({ email: 'qa@pqm.com' })
       );
     });
+
+    it('Chặn đóng CAPA nếu thiếu bằng chứng đánh giá hiệu quả chi tiết (BR-CAP-002)', async () => {
+      await expect(
+        capaService.verifyAndCloseCAPA({
+          deviationId: 'dev-01',
+          effectivenessEvidence: 'Đã xong', // quá ngắn (< 20 ký tự)
+          currentUser: { email: 'qa@pqm.com', role: 'QA' },
+        })
+      ).rejects.toThrow('ERR_CAPA_EFFECTIVENESS_MISSING');
+    });
+
+    it('Chặn đóng CAPA nếu còn hành động khắc phục chưa hoàn thành (BR-CAP-002)', async () => {
+      vi.spyOn(deviationAppService, 'findById').mockResolvedValue({
+        id: 'dev-01',
+        deviationNo: 'DEV-2026-0001',
+        capaItems: [
+          { id: 'c1', status: 'COMPLETED' },
+          { id: 'c2', status: 'PENDING' },
+        ],
+      } as any);
+
+      await expect(
+        capaService.verifyAndCloseCAPA({
+          deviationId: 'dev-01',
+          effectivenessEvidence: 'Theo dõi 3 tháng liên tiếp không phát hiện tái diễn lỗi nhiệt độ',
+          currentUser: { email: 'qa@pqm.com', role: 'QA' },
+        })
+      ).rejects.toThrow('ERR_CAPA_ITEMS_INCOMPLETE');
+    });
+
+    it('Đóng CAPA thành công khi 100% hành động hoàn thành và thẩm định hiệu quả đạt', async () => {
+      vi.spyOn(deviationAppService, 'findById').mockResolvedValue({
+        id: 'dev-01',
+        deviationNo: 'DEV-2026-0001',
+        capaItems: [
+          { id: 'c1', status: 'COMPLETED' },
+          { id: 'c2', status: 'COMPLETED' },
+        ],
+      } as any);
+
+      const updateStatusSpy = vi
+        .spyOn(deviationAppService, 'updateStatus')
+        .mockResolvedValue(undefined as any);
+
+      const res = await capaService.verifyAndCloseCAPA({
+        deviationId: 'dev-01',
+        effectivenessEvidence:
+          'Theo dõi 90 ngày liên tiếp không ghi nhận bất kỳ sự cố tương tự nào tái diễn',
+        currentUser: { email: 'qa_manager@pqm.com', role: 'QA' },
+      });
+
+      expect(updateStatusSpy).toHaveBeenCalledWith(
+        'dev-01',
+        'CLOSED',
+        expect.objectContaining({ email: 'qa_manager@pqm.com' }),
+        expect.objectContaining({ notes: expect.stringContaining('[CAPA ĐÃ ĐÓNG]') })
+      );
+      expect(res.id).toBe('dev-01');
+    });
   });
 });

@@ -111,5 +111,77 @@ describe('ReleaseRules - 7 Mandatory Release Gates (BR-REL-001)', () => {
     expect(res.allGatesPassed).toBe(false);
     expect(res.gates[2].gateIndex).toBe(3);
     expect(res.gates[2].passed).toBe(false); // Gate 3: OOS failed
+    expect(res.blockers.some((b) => b.includes('ERR_OOS_PENDING'))).toBe(true);
+  });
+
+  it('nên chặn Gate 6 khi Hồ sơ sản xuất (BPR) chưa được QA duyệt (ERR_BPR_NOT_APPROVED)', () => {
+    const passingTestResult: TestResult = {
+      id: 'tr-01',
+      batchId: 'batch-01',
+      status: 'APPROVED',
+      overallStatus: 'PASS',
+      labName: 'Lab QC',
+      testDate: '2026-01-02',
+      results: [
+        { criteriaName: 'Định lượng', value: 100.2, isPass: true },
+        { criteriaName: 'Độ rã', value: 8, isPass: true },
+      ],
+      createdAt: '2026-01-02',
+    };
+
+    const batchWithPendingBPR = {
+      ...mockBatch,
+      bprReviewStatus: 'PENDING' as any,
+    };
+
+    const res = ReleaseRules.evaluate7ReleaseGates({
+      batch: batchWithPendingBPR,
+      testResults: [passingTestResult],
+      boundTccs: mockTccs,
+      userRole: 'QA',
+    });
+
+    expect(res.allGatesPassed).toBe(false);
+    expect(res.gates[5].gateIndex).toBe(6);
+    expect(res.gates[5].passed).toBe(false); // Gate 6 failed
+    expect(res.gates[5].details).toContain('BPR_NOT_APPROVED');
+    expect(res.blockers.some((b) => b.includes('ERR_BPR_NOT_APPROVED'))).toBe(true);
+  });
+
+  it('nên chặn Gate 4 khi có sai lệch nghiêm trọng (CRITICAL) chưa đóng (ERR_DEV_PENDING)', () => {
+    const passingTestResult: TestResult = {
+      id: 'tr-01',
+      batchId: 'batch-01',
+      status: 'APPROVED',
+      overallStatus: 'PASS',
+      labName: 'Lab QC',
+      testDate: '2026-01-02',
+      results: [
+        { criteriaName: 'Định lượng', value: 100.2, isPass: true },
+        { criteriaName: 'Độ rã', value: 8, isPass: true },
+      ],
+      createdAt: '2026-01-02',
+    };
+
+    const openDeviation = {
+      id: 'dev-01',
+      batchId: 'batch-01',
+      severity: 'CRITICAL',
+      status: 'OPEN',
+      title: 'Mất điện phòng sạch',
+    } as any;
+
+    const res = ReleaseRules.evaluate7ReleaseGates({
+      batch: mockBatch,
+      testResults: [passingTestResult],
+      boundTccs: mockTccs,
+      userRole: 'QA',
+      deviations: [openDeviation],
+    });
+
+    expect(res.allGatesPassed).toBe(false);
+    expect(res.gates[3].gateIndex).toBe(4);
+    expect(res.gates[3].passed).toBe(false); // Gate 4 failed
+    expect(res.blockers.some((b) => b.includes('ERR_DEV_PENDING'))).toBe(true);
   });
 });

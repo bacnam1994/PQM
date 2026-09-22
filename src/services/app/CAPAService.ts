@@ -7,8 +7,9 @@
  * - ICH Q10 Pharmaceutical Quality System & Closed-Loop CAPA
  */
 
-import { QualityDeviation, CAPAActionItem } from '../../types';
+import { QualityDeviation, CAPAActionItem, ElectronicSignature } from '../../types';
 import { deviationAppService } from './DeviationAppService';
+import { signatureService } from '../signatureService';
 import { logAuditAction } from '../auditService';
 
 export interface CreateCapaPlanDto {
@@ -86,6 +87,75 @@ export class CAPAService {
     });
 
     return updated;
+  }
+
+  /**
+   * Đánh giá hiệu quả và phê duyệt đóng CAPA theo chuẩn BR-CAP-002
+   */
+  public async verifyAndCloseCAPA(options: {
+    deviationId: string;
+    effectivenessEvidence: string;
+    currentUser: any;
+    signature?: ElectronicSignature;
+  }): Promise<QualityDeviation> {
+    const { deviationId, effectivenessEvidence, currentUser, signature } = options;
+
+    const isAuthorized =
+      currentUser?.isAdmin || currentUser?.role === 'ADMIN' || currentUser?.role === 'QA';
+
+    if (!isAuthorized) {
+      throw new Error(
+        'Từ chối quyền: Chỉ Trưởng phòng QA hoặc Quản trị viên mới có thẩm quyền thẩm định hiệu quả và đóng CAPA (BR-CAP-002).'
+      );
+    }
+
+    if (!effectivenessEvidence || effectivenessEvidence.trim().length < 20) {
+      throw new Error(
+        'ERR_CAPA_EFFECTIVENESS_MISSING: Bắt buộc phải có báo cáo đánh giá hiệu quả chi tiết (tối thiểu 20 ký tự) trước khi đóng CAPA (BR-CAP-002).'
+      );
+    }
+
+    const deviation = await deviationAppService.findById(deviationId);
+    if (!deviation) {
+      throw new Error(`Không tìm thấy hồ sơ sai lệch/CAPA: ${deviationId}`);
+    }
+
+    const capaItems = deviation.capaItems || [];
+    if (capaItems.length === 0) {
+      throw new Error(
+        'ERR_CAPA_NO_ACTIONS: Hồ sơ CAPA chưa có hành động khắc phục/phòng ngừa nào được thiết lập.'
+      );
+    }
+
+    const hasPendingItems = capaItems.some((item) => item.status !== 'COMPLETED');
+    if (hasPendingItems) {
+      throw new Error(
+        'ERR_CAPA_ITEMS_INCOMPLETE: Không thể đóng CAPA khi vẫn còn hành động khắc phục/phòng ngừa chưa hoàn thành (COMPLETED).'
+      );
+    }
+
+    if (signature) {
+      const isSigValid = await signatureService.verifySignatureIntegrity(signature);
+      if (!isSigValid) {
+        throw new Error('Chữ ký điện tử xác nhận đóng CAPA không hợp lệ hoặc đã bị can thiệp.');
+      }
+    }
+
+    const closureNotes = `[CAPA ĐÃ ĐÓNG] Thẩm định hiệu quả đạt: ${effectivenessEvidence.trim()}`;
+    await deviationAppService.updateStatus(deviationId, 'CLOSED', currentUser, {
+      notes: closureNotes,
+    });
+
+    logAuditAction({
+      action: 'UPDATE',
+      collection: 'DEVIATIONS',
+      documentId: deviationId,
+      details: `Đóng hồ sơ CAPA ${deviation.deviationNo || deviationId} sau khi thẩm định hiệu quả: ${effectivenessEvidence.trim()}`,
+      performedBy: currentUser?.email || 'unknown',
+    });
+
+    const closedDeviation = await deviationAppService.findById(deviationId);
+    return closedDeviation || deviation;
   }
 }
 

@@ -113,6 +113,8 @@ export interface EvaluationSnapshot {
   batchId?: string;
   tccsId?: string;
   tccsVersion?: string | number;
+  /** ISO timestamp khi snapshot được tạo/niêm phong */
+  timestamp?: string;
   evaluatedAt: string;
   evaluatedBy: string;
   overallStatus: CanonicalQualityStatus;

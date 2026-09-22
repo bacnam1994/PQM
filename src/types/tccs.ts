@@ -40,6 +40,8 @@ export interface Criterion {
    * Khi có, Analytics sẽ Group By ID này thay vì chuỗi `name`.
    */
   masterCriterionId?: string;
+  /** Phương pháp thử nghiệm (VD: DĐVN V, HPLC, TCVN...) */
+  analysisMethod?: string;
 }
 
 export interface SensoryCharacteristics {
@@ -72,8 +74,10 @@ export interface AlternateRule {
 export interface TCCS {
   id: string;
   productId: string;
+  /** Tên sản phẩm gắn với TCCS (cache/de-normalized để tiện hiển thị) */
+  productName?: string;
   code: string;
-  issueDate: string;
+  issueDate?: string;
   isActive: boolean;
   sensory?: SensoryCharacteristics;
   packaging?: string;
@@ -83,7 +87,7 @@ export interface TCCS {
   shelfLife?: string;
   standardRefs?: string;
   mainQualityCriteria: Criterion[];
-  safetyCriteria: Criterion[];
+  safetyCriteria?: Criterion[];
   alternateRules?: AlternateRule[];
   version?: number;
   createdAt: string;

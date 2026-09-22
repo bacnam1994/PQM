@@ -26,6 +26,13 @@ export class DeviationAppService {
   constructor(private repo: IDeviationRepository = firebaseDeviationRepository) {}
 
   /**
+   * Tìm kiếm hồ sơ sai lệch theo ID
+   */
+  async findById(id: string): Promise<QualityDeviation | null> {
+    return this.repo.findById(id);
+  }
+
+  /**
    * Tạo mới một sai lệch chất lượng
    */
   async createDeviation(input: CreateDeviationInput, currentUser: any): Promise<QualityDeviation> {

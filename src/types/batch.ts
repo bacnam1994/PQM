@@ -39,6 +39,10 @@ export interface Batch {
   version?: number;
   tccsSnapshot?: TCCS;
   formulaSnapshot?: ProductFormula;
+  /** Bản chụp thẩm định niêm phong bất biến (ALCOA+ Evaluation Snapshot) */
+  evaluationSnapshot?: import('./testResult').EvaluationSnapshot;
+  /** Mã băm SHA-256 niêm phong kết quả thẩm định */
+  evaluationHash?: string;
   createdAt: string;
   updatedAt?: string;
 }

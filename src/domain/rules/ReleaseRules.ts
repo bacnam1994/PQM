@@ -166,9 +166,46 @@ export class ReleaseRules {
     const gate3Passed = !batch.hasActiveOOS;
     const gate4Passed = prereq.criteriaMet.noCriticalOpenDeviations;
     const gate5Passed = true; // CAPA containment cleared
-    const gate6Passed = batch.status === 'TESTING' || batch.status === 'PENDING'; // BPR ready
+    const bprApproved = (batch as any).bprReviewStatus
+      ? (batch as any).bprReviewStatus === 'APPROVED'
+      : batch.status === 'TESTING' || batch.status === 'PENDING';
+    const gate6Passed = bprApproved;
     const gate7Passed =
       (prereq.criteriaMet.isNotExpired ?? true) && prereq.criteriaMet.hasProperRole;
+
+    const gateBlockers: string[] = [...prereq.blockers];
+    if (!gate1Passed && !gateBlockers.some((b) => b.includes('ERR_TEST_INCOMPLETE'))) {
+      gateBlockers.push(
+        `ERR_TEST_INCOMPLETE: Chỉ tiêu kiểm nghiệm chưa hoàn tất 100% (${completionPct}%).`
+      );
+    }
+    if (!gate2Passed && !gateBlockers.some((b) => b.includes('ERR_QUALITY_NOT_PASS'))) {
+      gateBlockers.push(
+        `ERR_QUALITY_NOT_PASS: Đánh giá chất lượng Lô chưa đạt chuẩn PASS (${qualityRes.batchQualityStatus}).`
+      );
+    }
+    if (!gate3Passed && !gateBlockers.some((b) => b.includes('ERR_OOS_PENDING'))) {
+      gateBlockers.push('ERR_OOS_PENDING: Lô có hồ sơ điều tra OOS chưa được xử lý đóng (CLOSED).');
+    }
+    if (!gate4Passed && !gateBlockers.some((b) => b.includes('ERR_DEV_PENDING'))) {
+      gateBlockers.push('ERR_DEV_PENDING: Còn hồ sơ sai lệch nghiêm trọng (CRITICAL) chưa đóng.');
+    }
+    if (!gate5Passed && !gateBlockers.some((b) => b.includes('ERR_CAPA_BLOCKING'))) {
+      gateBlockers.push('ERR_CAPA_BLOCKING: Biện pháp CAPA khẩn cấp chưa hoàn thành.');
+    }
+    if (!gate6Passed && !gateBlockers.some((b) => b.includes('ERR_BPR_NOT_APPROVED'))) {
+      gateBlockers.push(
+        'ERR_BPR_NOT_APPROVED: Hồ sơ sản xuất (BPR Review) chưa được QA thẩm định phê duyệt.'
+      );
+    }
+    if (
+      !gate7Passed &&
+      !gateBlockers.some((b) => b.includes('ERR_SIGNATURE_MISSING') || b.includes('ERR_EXPIRED'))
+    ) {
+      gateBlockers.push(
+        'ERR_SIGNATURE_MISSING: Chưa đủ thẩm quyền xuất xưởng hoặc Lô đã hết hạn sử dụng.'
+      );
+    }
 
     const gates = [
       {
@@ -205,7 +242,7 @@ export class ReleaseRules {
         gateIndex: 6,
         gateName: 'Thẩm tra Hồ sơ sản xuất (BPR Review)',
         passed: gate6Passed,
-        details: 'Đạt yêu cầu',
+        details: gate6Passed ? 'Đạt yêu cầu' : 'Chưa được QA duyệt (BPR_NOT_APPROVED)',
       },
       {
         gateIndex: 7,
@@ -220,7 +257,7 @@ export class ReleaseRules {
     return {
       allGatesPassed,
       gates,
-      blockers: prereq.blockers,
+      blockers: gateBlockers,
     };
   }
 

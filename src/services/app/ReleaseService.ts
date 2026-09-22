@@ -154,6 +154,115 @@ export class ReleaseService {
       message: `Lô sản xuất ${currentBatch.batchNo || batchId} đã được xuất xưởng thành công.`,
     };
   }
+
+  /**
+   * Tạm dừng lưu thông / Giữ lại Lô sản xuất để thẩm định khẩn cấp (Batch Hold - BR-REL-002)
+   */
+  public async executeBatchHold(options: {
+    batchId: string;
+    currentBatch: Batch;
+    reason: string;
+    currentUser: any;
+    signature?: ElectronicSignature;
+  }): Promise<{ success: boolean; message: string }> {
+    const { batchId, currentBatch, reason, currentUser, signature } = options;
+
+    const isAuthorized =
+      currentUser?.role === 'ADMIN' || currentUser?.isAdmin === true || currentUser?.role === 'QA';
+
+    if (!isAuthorized) {
+      throw new Error(
+        'Từ chối quyền: Chỉ Quản lý chất lượng (QA) hoặc Quản trị viên mới có thẩm quyền ban hành Lệnh giữ lô (Batch Hold).'
+      );
+    }
+
+    if (!reason || !reason.trim()) {
+      throw new Error(
+        'ERR_HOLD_REASON_REQUIRED: Bắt buộc phải nhập lý do giải trình khi tạm đình chỉ lưu thông lô.'
+      );
+    }
+
+    if (signature) {
+      const isSigValid = await signatureService.verifySignatureIntegrity(signature);
+      if (!isSigValid) {
+        throw new Error('Chữ ký điện tử không hợp lệ hoặc đã bị can thiệp trái phép.');
+      }
+    }
+
+    await batchAppService.updateStatus(batchId, 'BLOCKED', currentUser, {
+      reason: `[LỆNH GIỮ LÔ] ${reason}`,
+      currentBatch,
+      signature,
+    });
+
+    logAuditAction({
+      action: 'UPDATE',
+      collection: 'BATCHES',
+      documentId: batchId,
+      details: `[TẠM ĐÌNH CHỈ / HOLD] Lô ${currentBatch.batchNo || batchId} bị giữ lại. Lý do: ${reason}`,
+      performedBy: currentUser?.email || 'unknown',
+    });
+
+    return {
+      success: true,
+      message: `Đã ban hành Lệnh giữ Lô ${currentBatch.batchNo || batchId} thành công.`,
+    };
+  }
+
+  /**
+   * Thu hồi Lô khẩn cấp theo các cấp độ Class I / II / III (Batch Recall - BR-REL-002)
+   */
+  public async executeBatchRecall(options: {
+    batchId: string;
+    currentBatch: Batch;
+    recallClass: 'CLASS_I' | 'CLASS_II' | 'CLASS_III' | string;
+    reason: string;
+    currentUser: any;
+    signature?: ElectronicSignature;
+  }): Promise<{ success: boolean; message: string }> {
+    const { batchId, currentBatch, recallClass, reason, currentUser, signature } = options;
+
+    const isAuthorized =
+      currentUser?.role === 'ADMIN' || currentUser?.isAdmin === true || currentUser?.role === 'QA';
+
+    if (!isAuthorized) {
+      throw new Error(
+        'Từ chối quyền: Chỉ Quản lý chất lượng (QA) hoặc Quản trị viên mới có thẩm quyền ban hành Lệnh thu hồi lô (Batch Recall).'
+      );
+    }
+
+    if (!reason || !reason.trim()) {
+      throw new Error(
+        'ERR_RECALL_REASON_REQUIRED: Bắt buộc phải nhập lý do giải trình khi ban hành Lệnh thu hồi lô.'
+      );
+    }
+
+    if (signature) {
+      const isSigValid = await signatureService.verifySignatureIntegrity(signature);
+      if (!isSigValid) {
+        throw new Error('Chữ ký điện tử không hợp lệ hoặc đã bị can thiệp trái phép.');
+      }
+    }
+
+    await batchAppService.updateStatus(batchId, 'BLOCKED', currentUser, {
+      reason: `[THU HỒI ${recallClass}] ${reason}`,
+      currentBatch,
+      signature,
+    });
+
+    logAuditAction({
+      action: 'UPDATE',
+      collection: 'BATCHES',
+      documentId: batchId,
+      details: `[THU HỒI KHẨN CẤP / RECALL] Lô ${currentBatch.batchNo || batchId} bị thu hồi (${recallClass}). Lý do: ${reason}`,
+      performedBy: currentUser?.email || 'unknown',
+    });
+
+    return {
+      success: true,
+      message: `Đã ban hành Lệnh thu hồi Lô ${currentBatch.batchNo || batchId} (${recallClass}) thành công.`,
+    };
+  }
 }
 
 export const releaseService = new ReleaseService();
