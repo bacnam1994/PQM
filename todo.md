@@ -170,4 +170,4 @@ _(Đặc tả chi tiết từng quy tắc: Rule ID, Trigger, Input, Precondition
 - [x] **Task 10.3**: Chuẩn hóa Màn hình Xem/In CoA (lấy trực tiếp từ snapshot, không tính lại).
 - [x] **Task 10.4**: Tái thiết kế Batch Detail, Dashboard, OOS, Approval.
 - [x] **Task 10.5**: Hoàn thiện Visual Hierarchy, Animations, Responsive & Design System.
-- [ ] **Task 10.6**: Build, Deploy Firebase, Push GitHub & Export `FULL_SOURCE_CODE.md`.
+- [x] **Task 10.6**: Build, Deploy Firebase, Push GitHub & Export `FULL_SOURCE_CODE.md`.
