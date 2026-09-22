@@ -273,12 +273,12 @@ export function validateEvaluationSnapshot(
 export function buildEvaluationSnapshot(
   testResult: TestResult,
   currentUser: any,
-  options?: { batch?: Batch; tccs?: TCCS }
+  options?: { batch?: Batch; tccs?: TCCS; boundTccs?: TCCS }
 ): EvaluationSnapshot {
   const evaluatedAt = new Date().toISOString();
   const evaluatedBy = currentUser?.email || 'system';
 
-  const targetTccs = options?.tccs;
+  const targetTccs = options?.tccs || options?.boundTccs;
   const criterionResults: EvaluationSnapshotCriterionResult[] = (testResult.results || []).map(
     (entry) => {
       let altState = entry.alternateState;
@@ -300,6 +300,7 @@ export function buildEvaluationSnapshot(
       }
 
       return {
+        criterionId: entry.criterionId,
         criteriaName: entry.criteriaName,
         value: entry.value,
         isPass: entry.isPass,
@@ -328,8 +329,8 @@ export function buildEvaluationSnapshot(
     }
   }
 
-  const tccsId = options?.tccs?.id || options?.batch?.tccsId;
-  const tccsVersion = options?.tccs?.version || 1;
+  const tccsId = targetTccs?.id || options?.batch?.tccsId || testResult.tccsId;
+  const tccsVersion = targetTccs?.version || 1;
 
   const baseSnapshot: Omit<EvaluationSnapshot, 'evaluationHash'> = {
     engineVersion: CURRENT_ENGINE_VERSION,

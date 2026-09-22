@@ -26,6 +26,12 @@ export interface Batch {
   packaging?: string;
   /** Trạng thái quy trình xuất xưởng (Batch Workflow Status) */
   status: BatchWorkflowStatus;
+  /** Trạng thái chất lượng thẩm định kỹ thuật (Canonical Quality Status) */
+  qualityStatus?: import('./testResult').CanonicalQualityStatus;
+  /** Cờ cảnh báo có hồ sơ OOS chưa đóng */
+  hasActiveOOS?: boolean;
+  /** Cờ cảnh báo có sai lệch (Deviation) chưa đóng */
+  hasActiveDeviation?: boolean;
   releasedAt?: string;
   releasedBy?: string;
   rejectReason?: string;

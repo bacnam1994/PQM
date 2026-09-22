@@ -46,22 +46,32 @@ export class AlternateRuleResolver {
 
   /**
    * Tìm quy tắc mà chỉ tiêu này là chỉ tiêu chính (Main)
+   * Ưu tiên so khớp qua ID, fallback sang so khớp tên
    */
   static findRuleWhereMain(
-    criterionName: string,
+    criterionIdentifier: string,
     rules: AlternateRule[] = []
   ): AlternateRule | undefined {
-    return rules.find((r) => this.isNameMatch(r.main, criterionName));
+    return rules.find(
+      (r) =>
+        (r.mainCriterionId && r.mainCriterionId === criterionIdentifier) ||
+        this.isNameMatch(r.main, criterionIdentifier)
+    );
   }
 
   /**
    * Tìm quy tắc mà chỉ tiêu này là chỉ tiêu phụ thuộc (Alt)
+   * Ưu tiên so khớp qua ID, fallback sang so khớp tên
    */
   static findRuleWhereAlt(
-    criterionName: string,
+    criterionIdentifier: string,
     rules: AlternateRule[] = []
   ): AlternateRule | undefined {
-    return rules.find((r) => this.isNameMatch(r.alt, criterionName));
+    return rules.find(
+      (r) =>
+        (r.altCriterionId && r.altCriterionId === criterionIdentifier) ||
+        this.isNameMatch(r.alt, criterionIdentifier)
+    );
   }
 
   /**
@@ -503,5 +513,44 @@ export class AlternateRuleResolver {
     });
 
     return notes;
+  }
+
+  /**
+   * Đánh giá điều kiện có cấu trúc (StructuredCondition)
+   */
+  static isStructuredConditionMet(
+    condition?: import('../../types').StructuredCondition,
+    actualValue?: any
+  ): boolean {
+    if (!condition) return false;
+    if (actualValue === undefined || actualValue === null || String(actualValue).trim() === '') {
+      return false;
+    }
+
+    const num = Number(actualValue);
+    const target = Number(condition.thresholdValue);
+
+    if (isNaN(num) || isNaN(target)) {
+      const actStr = String(actualValue).trim().toLowerCase();
+      const targetStr = String(condition.thresholdValue).trim().toLowerCase();
+      if (condition.operator === 'EQUALS') return actStr === targetStr;
+      if (condition.operator === 'CONTAINS') return actStr.includes(targetStr);
+      return false;
+    }
+
+    switch (condition.operator) {
+      case 'GREATER_THAN':
+        return num > target;
+      case 'LESS_THAN':
+        return num < target;
+      case 'EQUALS':
+        return num === target;
+      case 'BETWEEN':
+        return condition.thresholdValueMax !== undefined
+          ? num >= target && num <= Number(condition.thresholdValueMax)
+          : num >= target;
+      default:
+        return false;
+    }
   }
 }

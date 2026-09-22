@@ -34,9 +34,24 @@ export type AlternateCriterionState =
   | 'TRIGGERED_FAIL'
   | 'EXEMPTED';
 
+/**
+ * Trạng thái đánh giá chi tiết cấp Chỉ tiêu (Criterion-Level Evaluation State)
+ */
+export type CriterionEvaluationState =
+  | 'NOT_STARTED'
+  | 'REQUIRED'
+  | 'TESTING'
+  | 'PASS'
+  | 'FAIL'
+  | 'PENDING'
+  | 'EXEMPTED'
+  | 'NOT_APPLICABLE';
+
 export type CriterionResult = TestResultEntry;
 
 export interface TestResultEntry {
+  /** ID chỉ tiêu (Tham chiếu Criterion.id) */
+  criterionId?: string;
   criteriaName: string;
   value: string | number;
   /**
@@ -54,11 +69,15 @@ export interface TestResultEntry {
   analysisMethod?: string;
   confidence?: string;
 
+  /** Trạng thái đánh giá chuẩn hóa */
+  evaluationState?: CriterionEvaluationState;
   /** Trạng thái quy tắc thay thế / phụ thuộc */
   alternateState?: AlternateCriterionState;
   alternateRuleId?: string;
   alternateSourceCriterion?: string;
   alternateNote?: string;
+  /** Bằng chứng đính kèm (sắc ký đồ HPLC, file đo quang) */
+  evidenceUrls?: string[];
 }
 
 export interface Attachment {
@@ -69,6 +88,8 @@ export interface Attachment {
 }
 
 export interface EvaluationSnapshotCriterionResult {
+  /** ID chỉ tiêu */
+  criterionId?: string;
   criteriaName: string;
   value: string | number | boolean | null;
   normalizedValue?: string | number | null;
@@ -77,6 +98,8 @@ export interface EvaluationSnapshotCriterionResult {
   usedAlternate?: boolean;
   note?: string;
 
+  /** Trạng thái đánh giá chuẩn hóa */
+  evaluationState?: CriterionEvaluationState;
   /** Trạng thái quy tắc thay thế trong snapshot */
   alternateState?: AlternateCriterionState;
   alternateRuleId?: string;
@@ -98,6 +121,7 @@ export interface EvaluationSnapshot {
   reasons: string[];
   warnings: string[];
   evaluationHash: string;
+  footnotes?: string[];
   isInvalidated?: boolean;
 }
 

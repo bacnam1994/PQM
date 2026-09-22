@@ -1,0 +1,14 @@
+# BUSINESS RULES CATALOG (LEVEL 1)
+
+Thư mục này chứa toàn bộ các quy tắc nghiệp vụ chi tiết của hệ thống PQM theo chuẩn cấu trúc:
+
+- `BR_01_PRODUCT_RULES.md`
+- `BR_02_TCCS_RULES.md`
+- `BR_03_BATCH_RULES.md`
+- `BR_04_TEST_RESULT_RULES.md`
+- `BR_05_QUALITY_EVALUATION_RULES.md`
+- `BR_06_ALTERNATE_RULES.md`
+- `BR_07_OOS_DEVIATION_RULES.md`
+- `BR_08_APPROVAL_RELEASE_RULES.md`
+- `BR_09_COA_REPORT_RULES.md`
+- `BR_10_AUDIT_SECURITY_RULES.md`

@@ -7,7 +7,19 @@ export enum CriterionType {
   TEXT = 'TEXT',
 }
 
+export type ConditionOperator = 'GREATER_THAN' | 'LESS_THAN' | 'EQUALS' | 'CONTAINS' | 'BETWEEN';
+
+export interface StructuredCondition {
+  operator: ConditionOperator;
+  thresholdValue: number | string;
+  thresholdValueMax?: number;
+}
+
 export interface Criterion {
+  /** Định danh bất biến toàn hệ thống (UUID v4 hoặc NanoID) */
+  id?: string;
+  /** Mã ngắn chỉ tiêu dùng cho phân tích (VD: CRIT_DO_AM) */
+  code?: string;
   name: string;
   unit: string;
   min?: number;
@@ -18,6 +30,10 @@ export interface Criterion {
   declaredContent?: string | number;
   formulaIngredientId?: string;
   calculationBasis?: 'DECLARED' | 'ELEMENTAL';
+  /** Đánh dấu chỉ tiêu bắt buộc phải có kết quả */
+  isRequired?: boolean;
+  /** Thứ tự hiển thị */
+  orderIndex?: number;
   /**
    * Khóa ngoại liên kết về MasterCriterion (`master_criteria/`).
    * Optional — tương thích ngược với dữ liệu TCCS cũ không có liên kết.
@@ -35,9 +51,18 @@ export interface SensoryCharacteristics {
 
 export interface AlternateRule {
   id?: string;
+  /** ID chỉ tiêu chính (Tham chiếu về Criterion.id) */
+  mainCriterionId?: string;
+  /** ID chỉ tiêu phụ thuộc/thay thế (Tham chiếu về Criterion.id) */
+  altCriterionId?: string;
+  /** Tên chỉ tiêu chính (Tương thích ngược) */
   main: string;
+  /** Tên chỉ tiêu thay thế (Tương thích ngược) */
   alt: string;
   type?: 'FAIL_RETRY' | 'CONDITIONAL_CHECK';
+  /** Điều kiện có cấu trúc chuẩn */
+  condition?: StructuredCondition;
+  /** Chuỗi điều kiện cũ (Tương thích ngược) */
   conditionValue?: string;
   enabled?: boolean;
   note?: string;

@@ -208,9 +208,28 @@ const CoAReport = memo(({ res, batch, product, tccs, formula }: CoAReportProps) 
   }, [formulaItemMap]);
 
   // Lọc và loại bỏ các chỉ tiêu trùng lặp (khi gộp từ nhiều phiếu kiểm nghiệm)
-  // Ư u tiên giữ lại kết quả ĐẠT nếu có sự sai khác giữa các lần kiểm tra
-  // [ALIAS FIX] Dùng resolveKey làm key dedup — "Độ am" và "Độ ẩm" sẽ gộp lại thành 1 entry
+  // Ưu tiên số 1: Nếu TestResult hoặc Batch đã có Frozen EvaluationSnapshot -> Đọc trực tiếp từ snapshot!
+  // Tuân thủ 100% Hợp đồng SC-14 & Quy tắc BR-COA-001 (Single Source of Truth)
   const deduplicatedResults = useMemo(() => {
+    const snapshot = res.evaluationSnapshot || (batch as any)?.evaluationSnapshot;
+    if (
+      snapshot &&
+      Array.isArray(snapshot.criterionResults) &&
+      snapshot.criterionResults.length > 0
+    ) {
+      return snapshot.criterionResults.map((snapCrit) => ({
+        criteriaName: snapCrit.criteriaName,
+        criterionId: snapCrit.criterionId,
+        value: snapCrit.alternateState === 'EXEMPTED' ? 'Miễn kiểm (*)' : snapCrit.value,
+        isPass: snapCrit.isPass ?? true,
+        isExempted: snapCrit.alternateState === 'EXEMPTED' || (snapCrit as any).isExempted,
+        alternateState: snapCrit.alternateState,
+        alternateNote: snapCrit.alternateNote,
+        unit: (snapCrit as any).unit,
+        limit: (snapCrit as any).note || (snapCrit as any).limit,
+      }));
+    }
+
     if (!res.results) return [];
     const uniqueMap = new Map<string, TestResultEntry>();
     res.results.forEach((r) => {
@@ -848,6 +867,20 @@ const CoAReport = memo(({ res, batch, product, tccs, formula }: CoAReportProps) 
             ))}
           </tbody>
         </table>
+
+        {/* Chú thích pháp lý chân trang theo Screen Contract SC-14 & BR-ALT-004 */}
+        {(deduplicatedResults.some((r: any) => r.isExempted || r.alternateState === 'EXEMPTED') ||
+          (res.evaluationSnapshot?.footnotes && res.evaluationSnapshot.footnotes.length > 0)) && (
+          <div className="mt-2 text-[11px] text-slate-600 italic space-y-0.5 border-t border-slate-300 pt-1.5 print:mt-1">
+            <p>
+              (*) Miễn kiểm tra theo quy định của Tiêu chuẩn cơ sở khi chỉ tiêu chính tương ứng đã
+              đạt yêu cầu.
+            </p>
+            {res.evaluationSnapshot?.footnotes?.map((fn, idx) => (
+              <p key={idx}>{fn}</p>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Tài liệu đính kèm (Attachments) */}

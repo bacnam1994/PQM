@@ -33,6 +33,7 @@ export * from './audit/alcoaAuditModel';
 
 // Model 10: Workflow & State Machine
 export * from './workflow/stateMachine';
+export * from './workflow/criterionStateMachine';
 
 // Model 11: Concurrency & Versioning Model
 export * from './concurrency/concurrencyModel';
