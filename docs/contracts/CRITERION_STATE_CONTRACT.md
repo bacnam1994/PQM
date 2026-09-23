@@ -7,7 +7,7 @@ Tài liệu này chuẩn hóa toàn bộ cấu trúc dữ liệu và vòng đờ
 ## 1. Nguyên Tắc Cốt Lõi Tách Bạch Trạng Thái
 
 - **Quality ≠ Execution**: Một chỉ tiêu có thể đã làm xong (`ExecutionState = COMPLETED`) nhưng chất lượng lại Không Đạt (`QualityStatus = FAIL`); hoặc một chỉ tiêu được miễn kiểm hợp lệ (`ExecutionState = EXEMPTED`) nhưng chất lượng chuẩn tắc vẫn được công nhận Đạt (`QualityStatus = PASS`).
-- **No Implicit Pass / Fail**: Giá trị `QualityStatus` bắt buộc phải là một trong các enum tường minh (`PASS`, `FAIL`, `PENDING`, `NOT_EVALUATED`), tuyệt đối không dùng giá trị boolean (`isPass: boolean`).
+- **No Implicit Pass / Fail**: Giá trị `QualityStatus` bắt buộc phải là một trong các enum tường minh (`PASS`, `FAIL`, `PENDING`, `NOT_APPLICABLE`), tuyệt đối không dùng giá trị boolean (`isPass: boolean`).
 
 ---
 

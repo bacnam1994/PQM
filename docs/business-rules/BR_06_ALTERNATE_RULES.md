@@ -25,7 +25,18 @@
 |             `FAIL`              |            `FAIL`            |         `TRIGGERED_FAIL`         |         `FAIL`          |       `FAIL` (Kích hoạt OOS)       |
 
 - **UI Behavior**: Khi `main` là `FAIL`, ô nhập của `alt` tự động sáng lên, viền màu cam, nhãn badge đổi sang _"CHỜ KẾT QUẢ"_.
-- **Test Cases**: `TC-BR-ALT-001-A` (Main PASS ➔ Alt EXEMPTED), `TC-BR-ALT-001-B` (Main FAIL + Alt rỗng ➔ PENDING), `TC-BR-ALT-001-C` (Main FAIL + Alt PASS ➔ Đạt theo thay thế).
+- **Test Cases**: `TC-BR-ALT-001-A` (Main PASS ➔ Alt NOT_APPLICABLE), `TC-BR-ALT-001-B` (Main FAIL + Alt rỗng ➔ PENDING), `TC-BR-ALT-001-C` (Main FAIL + Alt PASS ➔ Đạt theo thay thế).
+
+---
+
+### BR-ALT-SCOPE: Đóng Băng Phạm Vi Quy Tắc Thay Thế V2 (V2 Scope Freeze)
+
+- **Quy tắc được hỗ trợ chính thức trong V2**:
+  1. `FAIL_RETRY` (Thử nghiệm lặp lại khi chỉ tiêu chính không đạt - BR-ALT-001).
+  2. `CONDITIONAL_CHECK` (Kiểm tra có điều kiện theo ngưỡng an toàn - BR-ALT-002).
+- **Quy tắc ngoài phạm vi (OUT_OF_SCOPE / FUTURE V3+)**:
+  - `SUBSTITUTION` (Thay thế phương pháp thử nghiệm tương đương): Đánh dấu `FUTURE_FEATURE`, không cài đặt trong V2 Domain Engine.
+  - `PERIODIC_SKIP` (Kiểm nghiệm luân phiên / giảm tần suất lô): Đánh dấu `FUTURE_FEATURE`, không thuộc phạm vi xử lý V2.
 
 ---
 

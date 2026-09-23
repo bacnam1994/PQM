@@ -187,13 +187,16 @@ stateDiagram-v2
 
 ### 4.3. Bảng Chuyển Đổi & Pháp Lý Footnote
 
-| Loại quy tắc  | Kết quả Primary | Trạng thái FSM      | Kết quả Substitute | Phán quyết cuối cùng | Hiển thị CoA                          |
-| :------------ | :-------------- | :------------------ | :----------------- | :------------------- | :------------------------------------ |
-| `FAIL_RETRY`  | `PASS`          | `NOT_APPLICABLE`    | Không cần làm      | `PASS`               | Hiển thị kết quả lần 1                |
-| `FAIL_RETRY`  | `FAIL`          | `TRIGGERED_PENDING` | Đang làm lần 2     | `PENDING`            | Chưa xuất bản được CoA                |
-| `FAIL_RETRY`  | `FAIL`          | `TRIGGERED_PASS`    | `PASS`             | `PASS`               | Kết quả lần 2 kèm footnote giải trình |
-| `FAIL_RETRY`  | `FAIL`          | `TRIGGERED_FAIL`    | `FAIL`             | `FAIL`               | Kết luận Không Đạt chính thức         |
-| `CONDITIONAL` | `PASS`          | `TRIGGERED_PASS`    | Miễn làm           | `PASS`               | Ghi "Miễn thử" kèm căn cứ footnote    |
+| Loại quy tắc        | Điều kiện kích hoạt / Primary       | Trạng thái FSM (AlternateRuleState) | Kết quả Substitute | Trạng thái thực thi Alt | Phán quyết cuối cùng | Hiển thị CoA                            |
+| :------------------ | :---------------------------------- | :---------------------------------- | :----------------- | :---------------------- | :------------------- | :-------------------------------------- |
+| `FAIL_RETRY`        | Primary `PASS`                      | `NOT_APPLICABLE`                    | Không cần làm      | `NOT_APPLICABLE`        | `PASS`               | Hiển thị kết quả lần 1                  |
+| `FAIL_RETRY`        | Primary `FAIL`                      | `TRIGGERED_PENDING`                 | Đang làm lần 2     | `REQUIRED`              | `PENDING`            | Chặn xuất bản CoA                       |
+| `FAIL_RETRY`        | Primary `FAIL`                      | `TRIGGERED_PASS`                    | Substitute `PASS`  | `COMPLETED`             | `PASS`               | Kết quả lần 2 kèm footnote giải trình   |
+| `FAIL_RETRY`        | Primary `FAIL`                      | `TRIGGERED_FAIL`                    | Substitute `FAIL`  | `COMPLETED`             | `FAIL`               | Kết luận Không Đạt chính thức           |
+| `CONDITIONAL_CHECK` | Condition `FALSE` (An toàn)         | `NOT_TRIGGERED`                     | Miễn làm           | `EXEMPTED`              | `PASS`               | Ghi "Miễn thử (\*)" kèm footnote căn cứ |
+| `CONDITIONAL_CHECK` | Condition `TRUE` (Ngưỡng kích hoạt) | `TRIGGERED_PENDING`                 | Chưa có kết quả    | `REQUIRED`              | `PENDING`            | Chặn xuất bản CoA                       |
+| `CONDITIONAL_CHECK` | Condition `TRUE` (Ngưỡng kích hoạt) | `TRIGGERED_PASS`                    | Substitute `PASS`  | `COMPLETED`             | `PASS`               | Kết quả đạt kèm footnote                |
+| `CONDITIONAL_CHECK` | Condition `TRUE` (Ngưỡng kích hoạt) | `TRIGGERED_FAIL`                    | Substitute `FAIL`  | `COMPLETED`             | `FAIL`               | Kết luận Không Đạt chính thức           |
 
 ---
 

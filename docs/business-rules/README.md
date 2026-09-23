@@ -19,6 +19,37 @@
 
 ---
 
-## 2. Thư Mục Tài Liệu Tham Khảo Chi Tiết (Reference Catalog)
+## 2. Phân Loại Toàn Bộ 21 Tài Liệu Tham Khảo (Reference Catalog Classification)
 
-Thư mục [`reference/`](file:///d:/26%20Kiem%20nghiem/PQM/docs/business-rules/reference) chứa các bản tài liệu bóc tách chuyên sâu theo từng module nghiệp vụ cũ. Các tài liệu này phục vụ mục đích tham khảo chi tiết, giải thích bối cảnh kỹ thuật và **KHÔNG THAY THẾ HOẶC XUNG ĐỘT** với 10 bộ quy tắc SSoT ở trên.
+Thư mục [`reference/`](file:///d:/26%20Kiem%20nghiem/PQM/docs/business-rules/reference) chứa các tài liệu bóc tách chuyên sâu theo từng module nghiệp vụ. Toàn bộ 21 tài liệu được phân loại rõ ràng theo quyền hạn định nghĩa nghiệp vụ:
+
+| Tên tài liệu trong `reference/` | Phân loại phân cấp     | Trạng thái quyền lực | Tài liệu SSoT thay thế              | Ghi chú & Phạm vi               |
+| :------------------------------ | :--------------------- | :------------------- | :---------------------------------- | :------------------------------ |
+| `PRODUCT_RULES.md`              | `SUPERSEDED`           | Thay thế bởi SSoT    | `BR_01_PRODUCT_RULES.md`            | Đã tổng hợp toàn bộ vào BR_01   |
+| `TCCS_RULES.md`                 | `SUPERSEDED`           | Thay thế bởi SSoT    | `BR_02_TCCS_RULES.md`               | Đã tổng hợp toàn bộ vào BR_02   |
+| `BATCH_RULES.md`                | `SUPERSEDED`           | Thay thế bởi SSoT    | `BR_03_BATCH_RULES.md`              | Đã tổng hợp toàn bộ vào BR_03   |
+| `TEST_RESULT_RULES.md`          | `SUPERSEDED`           | Thay thế bởi SSoT    | `BR_04_TEST_RESULT_RULES.md`        | Đã tổng hợp toàn bộ vào BR_04   |
+| `QUALITY_EVALUATION_RULES.md`   | `SUPERSEDED`           | Thay thế bởi SSoT    | `BR_05_QUALITY_EVALUATION_RULES.md` | Đã tổng hợp toàn bộ vào BR_05   |
+| `ALTERNATE_RULES.md`            | `SUPERSEDED`           | Thay thế bởi SSoT    | `BR_06_ALTERNATE_RULES.md`          | Đã tổng hợp toàn bộ vào BR_06   |
+| `OOS_RULES.md`                  | `SUPERSEDED`           | Thay thế bởi SSoT    | `BR_07_OOS_DEVIATION_RULES.md`      | Đã tổng hợp vào BR_07           |
+| `DEVIATION_RULES.md`            | `SUPERSEDED`           | Thay thế bởi SSoT    | `BR_07_OOS_DEVIATION_RULES.md`      | Đã tổng hợp vào BR_07           |
+| `APPROVAL_RULES.md`             | `SUPERSEDED`           | Thay thế bởi SSoT    | `BR_08_APPROVAL_RELEASE_RULES.md`   | Đã tổng hợp vào BR_08           |
+| `RELEASE_RULES.md`              | `SUPERSEDED`           | Thay thế bởi SSoT    | `BR_08_APPROVAL_RELEASE_RULES.md`   | Đã tổng hợp vào BR_08           |
+| `COA_RULES.md`                  | `SUPERSEDED`           | Thay thế bởi SSoT    | `BR_09_COA_REPORT_RULES.md`         | Đã tổng hợp vào BR_09           |
+| `AUDIT_RULES.md`                | `SUPERSEDED`           | Thay thế bởi SSoT    | `BR_10_AUDIT_SECURITY_RULES.md`     | Đã tổng hợp vào BR_10           |
+| `MASTER_DATA_RULES.md`          | `SUPPORTING_REFERENCE` | Tham khảo kỹ thuật   | `DATA_CONTRACTS.md` / `BR_01`       | Quy chuẩn chi tiết danh mục gốc |
+| `FORMULA_RULES.md`              | `SUPPORTING_REFERENCE` | Tham khảo kỹ thuật   | `FORMULA_MATERIAL_CONTRACT.md`      | Quy chuẩn định mức BOM ±20%     |
+| `RAW_MATERIAL_RULES.md`         | `SUPPORTING_REFERENCE` | Tham khảo kỹ thuật   | `FORMULA_MATERIAL_CONTRACT.md`      | Quản lý kho, hạn retest         |
+| `CAPA_RULES.md`                 | `SUPPORTING_REFERENCE` | Tham khảo kỹ thuật   | `QMS_INCIDENT_CONTRACT.md`          | Vòng đời CAPA 90 ngày           |
+| `SIGNATURE_RULES.md`            | `SUPPORTING_REFERENCE` | Tham khảo kỹ thuật   | `SIGNATURE_AUDIT_CONTRACT.md`       | Chi tiết 21 CFR Part 11         |
+| `GENEALOGY_RULES.md`            | `SUPPORTING_REFERENCE` | Tham khảo kỹ thuật   | `BATCH_GENEALOGY_CONTRACT.md`       | Thuật toán đồ thị phả hệ        |
+| `REPORTING_RULES.md`            | `SUPPORTING_REFERENCE` | Tham khảo kỹ thuật   | `DATA_CONTRACTS.md`                 | Quy chuẩn SPC và APQR           |
+| `AI_RULES.md`                   | `SUPPORTING_REFERENCE` | Tham khảo kỹ thuật   | `AI_ADVISORY_CONTRACT.md`           | Quy chuẩn an toàn AI Gateway    |
+| `RBAC_RULES.md`                 | `SUPPORTING_REFERENCE` | Tham khảo kỹ thuật   | `APPROVAL_CONTRACT.md`              | Chi tiết ma trận 8 vai trò      |
+
+---
+
+## 3. Sổ Bộ Định Danh Quy Tắc Chuẩn Tắc (Rule ID Registry)
+
+Toàn bộ các mã định danh quy tắc nghiệp vụ (`BR-xxx`) được quản lý và đối chiếu duy nhất tại:
+👉 [`docs/business-rules/RULE_ID_REGISTRY.md`](file:///d:/26%20Kiem%20nghiem/PQM/docs/business-rules/RULE_ID_REGISTRY.md)

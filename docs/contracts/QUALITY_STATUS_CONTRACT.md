@@ -16,12 +16,14 @@ Tài liệu này chuẩn hóa toàn bộ cấu trúc kết quả đánh giá ch�
 ```typescript
 /**
  * Trạng thái chất lượng chuẩn tắc ở cấp độ Lô sản phẩm
+ * Lưu ý: 'INDETERMINATE' chỉ dùng độc quyền ở cấp Lô khi phát hiện xung đột dữ liệu đa phòng lab
+ * hoặc bất thường toán học cần hội đồng QA can thiệp; không áp dụng cho chỉ tiêu đơn lẻ.
  */
 export type CanonicalQualityStatus =
   | 'PASS' // 100% chỉ tiêu bắt buộc đạt chuẩn
   | 'FAIL' // Có ít nhất một chỉ tiêu không đạt (sau khi đã tính quy tắc thay thế)
   | 'PENDING' // Chưa kiểm nghiệm xong toàn bộ chỉ tiêu
-  | 'INDETERMINATE'; // Thiếu dữ liệu hoặc có xung đột logic cần chuyên gia xử lý
+  | 'INDETERMINATE'; // Xung đột dữ liệu hoặc ngoại lệ kỹ thuật cần QA can thiệp
 
 /**
  * Chi tiết đánh giá của từng chỉ tiêu cấu thành
@@ -30,7 +32,14 @@ export interface EvaluatedCriterionSummary {
   criterionId: string;
   criterionCode: string;
   criterionName: string;
-  status: 'PASS' | 'FAIL' | 'PENDING' | 'EXEMPTED';
+  status: 'PASS' | 'FAIL' | 'PENDING' | 'NOT_APPLICABLE';
+  executionState:
+    | 'NOT_STARTED'
+    | 'REQUIRED'
+    | 'TESTING'
+    | 'COMPLETED'
+    | 'NOT_APPLICABLE'
+    | 'EXEMPTED';
   isMandatory: boolean;
   actualValueDisplay: string;
   specificationDisplay: string;
@@ -68,7 +77,12 @@ export interface CanonicalBatchEvaluationContract {
     ruleId: string;
     ruleCode: string;
     ruleType: string;
-    state: 'NOT_APPLICABLE' | 'NOT_TRIGGERED' | 'TRIGGERED_PASS' | 'TRIGGERED_FAIL';
+    state:
+      | 'NOT_APPLICABLE'
+      | 'NOT_TRIGGERED'
+      | 'TRIGGERED_PENDING'
+      | 'TRIGGERED_PASS'
+      | 'TRIGGERED_FAIL';
     explanation: string;
   }>;
 

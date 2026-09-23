@@ -15,7 +15,7 @@ Tài liệu này chuẩn hóa toàn bộ các trạng thái vòng đời tác ng
 
 ```typescript
 /**
- * Vòng đời tác nghiệp chính thức của Lô sản phẩm
+ * Vòng đời tác nghiệp chính thức của Lô sản phẩm (9 trạng thái FSM 1)
  */
 export type BatchWorkflowStatus =
   | 'DRAFT' // Mới lập hồ sơ lô, chưa sản xuất
@@ -27,6 +27,18 @@ export type BatchWorkflowStatus =
   | 'REJECTED' // Bị từ chối xuất xưởng, chuyển kho phế phẩm
   | 'HOLD' // Tạm đình chỉ lưu thông để kiểm tra bổ sung
   | 'RECALLED'; // Thu hồi sản phẩm trên toàn quốc
+
+/**
+ * Vòng đời tác nghiệp chính thức của Phiếu kiểm nghiệm (6 trạng thái FSM 2)
+ * Lưu ý: Trạng thái này phản ánh vòng đời văn bản/hồ sơ, tách bạch hoàn toàn với kết quả kỹ thuật PASS/FAIL.
+ */
+export type TestResultWorkflowStatus =
+  | 'DRAFT' // Kỹ thuật viên đang tạo và nhập số liệu thô
+  | 'SUBMITTED' // Đã nhập đủ dữ liệu, nộp lên cho Trưởng nhóm KCS thẩm định
+  | 'REVIEWED' // Trưởng nhóm KCS / QA Reviewer đã thẩm tra số liệu gốc
+  | 'APPROVED' // Trưởng phòng QA đã ký số điện tử phê duyệt chính thức
+  | 'REJECTED' // Bị từ chối tại bước Thẩm tra hoặc Phê duyệt, trả về làm lại
+  | 'REVOKED'; // Đã duyệt nhưng bị thu hồi vô hiệu do phát hiện bất thường
 
 /**
  * Bản ghi chuyển đổi trạng thái có gắn vết kiểm toán

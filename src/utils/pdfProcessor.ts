@@ -1,111 +1,87 @@
-let pdfjsLibInstance: any = null;
-
 /**
- * Lazy loader cho pdfjs-dist và worker của nó.
- * Giúp cô lập thư viện ~3MB khỏi main bundle, chỉ tải khi người dùng xử lý file PDF.
+ * src/utils/pdfProcessor.ts
+ * ─────────────────────────────────────────────────────────────────────────────
+ * Bộ điều phối xử lý PDF client-side (Tích hợp OCR-02, OCR-03, OCR-04).
+ * Cung cấp API tương thích ngược convertPdfToImages và mở rộng các năng lực:
+ * - High-DPI Rendering (200-300 DPI, hỗ trợ PNG không nén suy hao)
+ * - Tích hợp phân tích PDF Analyzer (phát hiện text layer vs scan)
+ * - Tiền xử lý ảnh Canvas (Grayscale, Contrast stretching, Sharpen, Deskew)
+ * ─────────────────────────────────────────────────────────────────────────────
  */
-async function getPdfJs() {
-  if (!pdfjsLibInstance) {
-    const [pdfjsLib, workerModule] = await Promise.all([
-      import('pdfjs-dist'),
-      import('pdfjs-dist/build/pdf.worker.min.mjs?url'),
-    ]);
-    if (typeof window !== 'undefined') {
-      try {
-        pdfjsLib.GlobalWorkerOptions.workerSrc = workerModule.default;
-      } catch {
-        pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjsLib.version || '6.2.108'}/build/pdf.worker.min.mjs`;
-      }
-    }
-    pdfjsLibInstance = pdfjsLib;
-  }
-  return pdfjsLibInstance;
-}
+
+import { renderPdfHighDpi } from '../services/ocr/highDpiRenderer';
+import { preprocessCanvasImage } from '../services/ocr/imagePreprocessor';
+import { analyzePdf } from '../services/ocr/pdfAnalyzer';
 
 export interface RenderedPdfPage {
   pageNumber: number;
-  base64: string; // Chuỗi base64 thuần (không có prefix data:image/jpeg;base64,)
+  base64: string; // Chuỗi base64 thuần (không có prefix data:image/...;base64,)
   dataUrl: string;
   width: number;
   height: number;
+  mimeType?: 'image/png' | 'image/jpeg';
 }
 
 export interface PdfConversionOptions {
-  /** Chiều rộng tối đa khi render để tối ưu dung lượng (Mặc định: 1600px - cực kỳ sắc nét cho OCR mà dung lượng chỉ ~150-250KB) */
+  /** Chiều rộng tối đa khi render (Mặc định: 2000px cho độ sắc nét cao) */
   targetWidth?: number;
-  /** Chất lượng nén JPEG từ 0.1 đến 1.0 (Mặc định: 0.85) */
+  /** Target DPI mong muốn (200 - 300 DPI). Nếu được cung cấp, sẽ ưu tiên hơn targetWidth */
+  targetDpi?: number;
+  /** Định dạng xuất: PNG (lossless, tối ưu chữ nhỏ) hoặc JPEG */
+  format?: 'image/png' | 'image/jpeg';
+  /** Chất lượng nén JPEG từ 0.1 đến 1.0 (Mặc định: 0.90) */
   quality?: number;
-  /** Số trang tối đa cần render (Mặc định: không giới hạn) */
+  /** Số trang tối đa cần render (Mặc định: 50) */
   maxPages?: number;
+  /** Áp dụng tiền xử lý ảnh nâng cao (Tăng tương phản, khử nhiễu nền xám, làm sắc nét) */
+  applyPreprocessing?: boolean;
   /** Callback tiến độ render từng trang */
   onProgress?: (renderedPages: number, totalPages: number) => void;
 }
 
 /**
- * Chuyển đổi một file PDF thành mảng các ảnh JPEG tối ưu dung lượng bằng HTML5 Canvas.
- * Giúp giảm tải 80-90% dung lượng gửi lên AI và loại bỏ hoàn toàn lỗi quá tải / timeout của Gemini khi đọc file PDF thô.
+ * Chuyển đổi một file PDF thành mảng các ảnh chất lượng cao tối ưu cho OCR bằng Canvas.
+ * Bảo đảm tương thích ngược 100% với các dịch vụ gọi hiện có.
  */
 export async function convertPdfToImages(
   file: File | Blob,
   options: PdfConversionOptions = {}
 ): Promise<RenderedPdfPage[]> {
-  const { targetWidth = 1600, quality = 0.85, maxPages = 50, onProgress } = options;
+  const {
+    targetWidth = 2000,
+    targetDpi,
+    format = 'image/png',
+    quality = 0.9,
+    maxPages = 50,
+    applyPreprocessing = false,
+    onProgress,
+  } = options;
 
-  const [pdfjsLib, arrayBuffer] = await Promise.all([getPdfJs(), file.arrayBuffer()]);
-  const loadingTask = pdfjsLib.getDocument({
-    data: new Uint8Array(arrayBuffer),
-    cMapUrl: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@6.2.108/cmaps/',
-    cMapPacked: true,
+  // Tính targetDpi: Nếu không truyền trực tiếp, ước tính từ targetWidth trên khổ A4 (~595 pt)
+  // targetDpi ≈ (targetWidth / 595.28) * 72
+  const effectiveDpi =
+    targetDpi || Math.min(300, Math.max(180, Math.round((targetWidth / 595.28) * 72)));
+
+  const renderedResults = await renderPdfHighDpi(file, {
+    targetDpi: effectiveDpi,
+    maxWidthPx: Math.max(targetWidth, 2400),
+    format,
+    quality,
+    maxPages,
+    onProgress: (current, total) => {
+      onProgress?.(current, total);
+    },
   });
 
-  const pdfDocument = await loadingTask.promise;
-  const totalPages = Math.min(pdfDocument.numPages, maxPages);
-  const renderedPages: RenderedPdfPage[] = [];
-
-  for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
-    const page = await pdfDocument.getPage(pageNum);
-    const originalViewport = page.getViewport({ scale: 1.0 });
-
-    // Tính toán tỷ lệ scale tối ưu
-    const scale = targetWidth / originalViewport.width;
-    const viewport = page.getViewport({ scale: Math.min(scale, 2.5) }); // Giới hạn scale tối đa 2.5x
-
-    // Tạo canvas offscreen
-    const canvas = document.createElement('canvas');
-    canvas.width = Math.floor(viewport.width);
-    canvas.height = Math.floor(viewport.height);
-
-    const context = canvas.getContext('2d', { alpha: false });
-    if (!context) {
-      throw new Error(`Không thể khởi tạo 2D context cho trang ${pageNum}`);
-    }
-
-    // Vẽ nền trắng để tránh trong suốt làm mờ chữ
-    context.fillStyle = '#FFFFFF';
-    context.fillRect(0, 0, canvas.width, canvas.height);
-
-    const renderContext = {
-      canvasContext: context,
-      viewport: viewport,
-      intent: 'print',
-    };
-
-    await page.render(renderContext as any).promise;
-
-    // Xuất ra định dạng JPEG tối ưu dung lượng
-    const dataUrl = canvas.toDataURL('image/jpeg', quality);
-    const base64 = dataUrl.split(',')[1];
-
-    renderedPages.push({
-      pageNumber: pageNum,
-      base64,
-      dataUrl,
-      width: canvas.width,
-      height: canvas.height,
-    });
-
-    onProgress?.(pageNum, totalPages);
-  }
-
-  return renderedPages;
+  return renderedResults.map((item) => ({
+    pageNumber: item.pageNumber,
+    base64: item.base64,
+    dataUrl: item.dataUrl,
+    width: item.width,
+    height: item.height,
+    mimeType: item.mimeType,
+  }));
 }
+
+// Re-export các module chuyên sâu phục vụ pipeline OCR mới
+export { renderPdfHighDpi, analyzePdf, preprocessCanvasImage };

@@ -81,6 +81,37 @@ QUY TẮC CHUẨN HÓA SỐ:
 `;
 
 /**
+ * Bộ quy tắc bảo toàn dữ liệu kiểm nghiệm Dược phẩm (OCR-06: Schema Hardening & Integrity)
+ */
+export const PHARMA_DATA_INTEGRITY_GUIDE = `
+BỘ QUY TẮC BẢO TOÀN DỮ LIỆU DƯỢC PHẨM (MANDATORY OCR INTEGRITY RULES):
+
+1. BẢO TOÀN DẤU THẬP PHÂN & SỐ 0 (Rule 3):
+   - Số 0 là kết quả định lượng hợp lệ! Nếu kết quả là "0" hoặc "0.0" hoặc "0%", BẮT BUỘC giữ nguyên "0" hoặc "0.0", TUYỆT ĐỐI KHÔNG để trống "".
+   - Dấu thập phân: "0.05" khác hoàn toàn "0.5" hay "50". Tuyệt đối không làm mất số 0 sau dấu chấm. Không tự ý làm tròn số (ví dụ: 502.48 không được làm tròn thành 502.5 trừ khi trên phiếu ghi vậy).
+   - Dấu phẩy kiểu Châu Âu: "1,50" chuyển thành "1.50".
+
+2. PHÂN BIỆT KẾT QUẢ THỰC TẾ VÀ MỨC TIÊU CHUẨN (Rule 5):
+   - Cột "Yêu cầu / Mức tiêu chuẩn / Giới hạn" (ví dụ: "≤ 10.0 ppm", "90.0 - 110.0%") ĐƯA VÀO field "limit".
+   - Cột "Kết quả thử nghiệm" (ví dụ: "1.2 ppm", "98.5%") ĐƯA VÀO field "value".
+   - TUYỆT ĐỐI KHÔNG đưa giá trị mức giới hạn vào ô kết quả thực tế ("value").
+
+3. BẢO TOÀN KÝ HIỆU SO SÁNH & KHOA HỌC (Rule 6):
+   - Giữ nguyên các ký tự toán học: ≤, ≥, <, >, ±, =, ~.
+   - Không được cắt bỏ ký tự "<" hoặc ">" (ví dụ: "< 0.01" KHÔNG ĐƯỢC biến thành "0.01").
+   - Ký hiệu số mũ vi sinh: "×10³", "×10⁴", "1.5 x 10^3 CFU/g", "1.5E3" giữ nguyên dạng chuỗi.
+
+4. ĐƠN VỊ ĐO LƯỜNG (Rule 4):
+   - Đưa đơn vị vào field "unit": %, mg, g, CFU/g, CFU/ml, ppm, ppb, pH...
+   - Tách rời đơn vị khỏi giá trị: nếu kết quả ghi "1.2 ppm" thì "value" = "1.2", "unit" = "ppm".
+
+5. ĐIỂM TIN CẬY (confidenceScore: 0-100) & PHÂN LOẠI (Rule 11, 12):
+   - 90 - 100: Chữ in rõ nét, số rõ ràng, đơn vị minh bạch (confidence = "high").
+   - 75 - 89: Chữ rõ nhưng tên cần suy luận hoặc có ký tự mờ nhẹ (confidence = "medium").
+   - Dưới 75: Chữ viết tay mờ nhòe, vết mực che khuất, số không chắc chắn (confidence = "low").
+`;
+
+/**
  * Hướng dẫn phân tích cấu trúc bảng phức tạp trong phiếu kiểm nghiệm.
  */
 const TABLE_PARSING_GUIDE = `
@@ -338,6 +369,8 @@ CẤU TRÚC JSON YÊU CẦU (Trả về đúng định dạng này, bao gồm đ
 }
 
 ${ABBREVIATION_GUIDE}
+
+${PHARMA_DATA_INTEGRITY_GUIDE}
 
 ${TABLE_PARSING_GUIDE}
 

@@ -19,6 +19,65 @@ import { Criterion, TCCS, Product, AILearnedMapping } from '../../../../types';
 import { normalizeAIData } from '../../../../services/ai/aiDraftManager';
 import { generateId, BATCH_STATUS } from '../../../../utils';
 import { resolveCanonicalLab } from '../../../../services/laboratoryService';
+import { evaluateDocumentConfidenceGuard } from '../../../../services/ocr/confidenceGuard';
+
+/**
+ * OCR-09: Áp dụng Confidence Guard lên danh sách chỉ tiêu đã được AI làm giàu.
+ * - Tính `assessment` cho từng item (Rule 11: Decoupled Confidence Score).
+ * - Item bị guard đánh là LOW (score < 75 hoặc có trường nghi vấn) sẽ bị buộc
+ *   chuyển sang vòng xác nhận thủ công dù AI đã đánh là 'high' (Rule 12: LOW Confidence Guard).
+ * Trả về { highItems, lowItems, hasCriticalSuspicion }.
+ */
+function applyConfidenceGuard(enrichedItems: AIExtractedItem[]): {
+  highItems: AIExtractedItem[];
+  lowItems: AIExtractedItem[];
+  hasCriticalSuspicion: boolean;
+} {
+  // Chuyển đổi AIExtractedItem → ExtractedCriterionItem tương thích với guard
+  const guardInput = enrichedItems.map((item) => ({
+    criteriaName: item.criteriaName,
+    mappedName: item.mappedName,
+    confidence: (item.confidence === 'high' ? 'high' : 'low') as 'high' | 'low',
+    confidenceScore: item.confidenceScore,
+    value: item.value ?? '',
+    unit: item.unit,
+    limit: item.limit,
+    sourcePageNumber: item.sourcePageNumber ?? 1,
+  }));
+
+  const report = evaluateDocumentConfidenceGuard(guardInput);
+
+  // Ánh xạ kết quả guard trở lại AIExtractedItem với assessment bổ sung
+  const highItems: AIExtractedItem[] = [];
+  const lowItems: AIExtractedItem[] = [];
+
+  report.guardedItems.forEach((guarded, idx) => {
+    const original = enrichedItems[idx];
+    const enriched: AIExtractedItem = {
+      ...original,
+      confidenceScore: guarded.assessment.overallScore,
+      warningMessages:
+        guarded.assessment.warningMessages.length > 0
+          ? guarded.assessment.warningMessages
+          : original.warningMessages,
+      isSuspicious: guarded.assessment.isLowConfidence,
+    };
+
+    // Rule 12: Nếu guard yêu cầu xác nhận thủ công → buộc vào lowItems
+    if (guarded.assessment.requiresManualConfirmation) {
+      lowItems.push(enriched);
+    } else {
+      // Chỉ điền tự động nếu cả AI VÀ guard đều tin tưởng
+      if (original.confidence === 'high' && original.mappedName) {
+        highItems.push(enriched);
+      } else {
+        lowItems.push(enriched);
+      }
+    }
+  });
+
+  return { highItems, lowItems, hasCriticalSuspicion: report.hasCriticalSuspicion };
+}
 
 interface UseTestResultAIIntegrationProps {
   allActiveTccsNames: string[];
@@ -512,6 +571,7 @@ export function useTestResultAIIntegration({
             value: r.value || '',
             unit: r.unit || '',
             limit: r.limit || '',
+            sourcePageNumber: r.sourcePageNumber,
           }));
 
           const enrichedItems = rawItems.map((item) => {
@@ -520,16 +580,25 @@ export function useTestResultAIIntegration({
               isCriteriaMatch(item.criteriaName, m.systemName, aiLearnedMappings)
             );
             if (learnedMatch)
-              return { ...item, mappedName: learnedMatch.systemName, confidence: 'high' };
+              return { ...item, mappedName: learnedMatch.systemName, confidence: 'high' as const };
             const fuzzyMatch = allActiveTccsNames.find((tccsName) =>
               isCriteriaMatch(item.criteriaName, tccsName, aiLearnedMappings)
             );
-            if (fuzzyMatch) return { ...item, mappedName: fuzzyMatch, confidence: 'high' };
+            if (fuzzyMatch) return { ...item, mappedName: fuzzyMatch, confidence: 'high' as const };
             return item;
           });
 
-          const highItems = enrichedItems.filter((i) => i.confidence === 'high' && i.mappedName);
-          const lowItems = enrichedItems.filter((i) => i.confidence !== 'high' || !i.mappedName);
+          // OCR-09: Chạy Confidence Guard (Rule 11 & Rule 12)
+          const { highItems, lowItems, hasCriticalSuspicion } = applyConfidenceGuard(enrichedItems);
+          if (hasCriticalSuspicion) {
+            toast(
+              '⚠️ Phát hiện giá trị nghi ngờ OCR — vui lòng kiểm tra kỹ các chỉ tiêu được đánh dấu.',
+              {
+                duration: 5000,
+                icon: '🔍',
+              }
+            );
+          }
 
           setPendingAiRawData(result);
           setPendingHighItems(highItems);
@@ -667,16 +736,25 @@ export function useTestResultAIIntegration({
               isCriteriaMatch(item.criteriaName, m.systemName, aiLearnedMappings)
             );
             if (learnedMatch)
-              return { ...item, mappedName: learnedMatch.systemName, confidence: 'high' };
+              return { ...item, mappedName: learnedMatch.systemName, confidence: 'high' as const };
             const fuzzyMatch = allActiveTccsNames.find((tccsName) =>
               isCriteriaMatch(item.criteriaName, tccsName, aiLearnedMappings)
             );
-            if (fuzzyMatch) return { ...item, mappedName: fuzzyMatch, confidence: 'high' };
+            if (fuzzyMatch) return { ...item, mappedName: fuzzyMatch, confidence: 'high' as const };
             return item;
           });
 
-          const highItems = enrichedItems.filter((i) => i.confidence === 'high' && i.mappedName);
-          const lowItems = enrichedItems.filter((i) => i.confidence !== 'high' || !i.mappedName);
+          // OCR-09: Chạy Confidence Guard (Rule 11 & Rule 12)
+          const { highItems, lowItems, hasCriticalSuspicion } = applyConfidenceGuard(enrichedItems);
+          if (hasCriticalSuspicion) {
+            toast(
+              '⚠️ Phát hiện giá trị nghi ngờ OCR — vui lòng kiểm tra kỹ các chỉ tiêu được đánh dấu.',
+              {
+                duration: 5000,
+                icon: '🔍',
+              }
+            );
+          }
 
           if (extraFromDuplicates.length > 0) {
             mergedData._extraDuplicates = extraFromDuplicates;
@@ -880,6 +958,7 @@ export function useTestResultAIIntegration({
           value: r.value || '',
           unit: r.unit || '',
           limit: r.limit || '',
+          sourcePageNumber: r.sourcePageNumber,
         }));
 
         const enrichedItems = rawItems.map((item) => {
@@ -888,16 +967,25 @@ export function useTestResultAIIntegration({
             isCriteriaMatch(item.criteriaName, m.systemName, aiLearnedMappings)
           );
           if (learnedMatch)
-            return { ...item, mappedName: learnedMatch.systemName, confidence: 'high' };
+            return { ...item, mappedName: learnedMatch.systemName, confidence: 'high' as const };
           const fuzzyMatch = allActiveTccsNames.find((tccsName) =>
             isCriteriaMatch(item.criteriaName, tccsName, aiLearnedMappings)
           );
-          if (fuzzyMatch) return { ...item, mappedName: fuzzyMatch, confidence: 'high' };
+          if (fuzzyMatch) return { ...item, mappedName: fuzzyMatch, confidence: 'high' as const };
           return item;
         });
 
-        const highItems = enrichedItems.filter((i) => i.confidence === 'high' && i.mappedName);
-        const lowItems = enrichedItems.filter((i) => i.confidence !== 'high' || !i.mappedName);
+        // OCR-09: Chạy Confidence Guard (Rule 11 & Rule 12)
+        const { highItems, lowItems, hasCriticalSuspicion } = applyConfidenceGuard(enrichedItems);
+        if (hasCriticalSuspicion) {
+          toast(
+            '⚠️ Phát hiện giá trị nghi ngờ OCR — vui lòng kiểm tra kỹ các chỉ tiêu được đánh dấu.',
+            {
+              duration: 5000,
+              icon: '🔍',
+            }
+          );
+        }
 
         setPendingAiRawData(result);
         setPendingHighItems(highItems);

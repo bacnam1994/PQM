@@ -1,17 +1,22 @@
-import { GoogleGenerativeAI, SchemaType, Content } from "@google/generative-ai";
+import { GoogleGenerativeAI, SchemaType, Content } from '@google/generative-ai';
 import { GEMINI_TOOL_DECLARATIONS, executeTool } from './aiTools';
 import type { RenderedPdfPage } from '../../utils/pdfProcessor';
 import type { TesseractFallbackResult } from './tesseractFallback';
 
 export const getApiKey = (): string => {
-  const localKey = typeof window !== 'undefined' ? localStorage.getItem('GEMINI_API_KEY')?.trim() : '';
+  const localKey =
+    typeof window !== 'undefined' ? localStorage.getItem('GEMINI_API_KEY')?.trim() : '';
   if (localKey) return localKey;
-  return import.meta.env.VITE_GEMINI_API_KEY || "";
+  return import.meta.env.VITE_GEMINI_API_KEY || '';
 };
 
 export const formatGeminiError = (error: any): string => {
   const msg = error?.message || String(error || '');
-  if (msg.includes('API_KEY_INVALID') || msg.includes('API key not valid') || msg.includes('API_KEY_SERVICE_BLOCKED')) {
+  if (
+    msg.includes('API_KEY_INVALID') ||
+    msg.includes('API key not valid') ||
+    msg.includes('API_KEY_SERVICE_BLOCKED')
+  ) {
     return 'Khóa API Gemini không hợp lệ hoặc đã hết hạn. Vui lòng vào mục "Cài đặt" > "Cấu hình AI" để cập nhật API Key mới (lấy miễn phí tại https://aistudio.google.com/app/apikey) hoặc cập nhật file .env.local.';
   }
   if (msg.includes('RESOURCE_EXHAUSTED') || msg.includes('429')) {
@@ -29,7 +34,9 @@ export const formatGeminiError = (error: any): string => {
 const getGenAI = () => {
   const key = getApiKey();
   if (!key) {
-    throw new Error("Chưa cấu hình Gemini API Key. Vui lòng nhập API Key trong phần Cài đặt hệ thống hoặc file .env của dự án.");
+    throw new Error(
+      'Chưa cấu hình Gemini API Key. Vui lòng nhập API Key trong phần Cài đặt hệ thống hoặc file .env của dự án.'
+    );
   }
   return new GoogleGenerativeAI(key);
 };
@@ -48,10 +55,16 @@ const MAX_OCR_FILE_SIZE_BYTES = 20 * 1024 * 1024; // 20MB
 
 export const validateOCRFile = (file: File): { valid: boolean; error?: string } => {
   if (file.size > MAX_OCR_FILE_SIZE_BYTES) {
-    return { valid: false, error: `File quá lớn (${(file.size / 1024 / 1024).toFixed(1)}MB). Giới hạn tối đa là 20MB.` };
+    return {
+      valid: false,
+      error: `File quá lớn (${(file.size / 1024 / 1024).toFixed(1)}MB). Giới hạn tối đa là 20MB.`,
+    };
   }
   if (!ALLOWED_OCR_MIME_TYPES.includes(file.type)) {
-    return { valid: false, error: `Định dạng file không hỗ trợ (${file.type}). Vui lòng upload PDF hoặc ảnh (JPG, PNG, WEBP, HEIC).` };
+    return {
+      valid: false,
+      error: `Định dạng file không hỗ trợ (${file.type}). Vui lòng upload PDF hoặc ảnh (JPG, PNG, WEBP, HEIC).`,
+    };
   }
   return { valid: true };
 };
@@ -71,7 +84,8 @@ export const AVAILABLE_GEMINI_MODELS: GeminiModelOption[] = [
     name: 'Gemini 2.5 Flash',
     badge: '⚡ 2.5 Flash (Tiêu chuẩn)',
     group: 'Gemini 2.5',
-    description: 'Mô hình chuẩn cân bằng tốt giữa tốc độ phản hồi và khả năng hiểu ngôn ngữ dược điển.',
+    description:
+      'Mô hình chuẩn cân bằng tốt giữa tốc độ phản hồi và khả năng hiểu ngôn ngữ dược điển.',
   },
   {
     id: 'gemini-2.5-pro',
@@ -135,35 +149,45 @@ const OCR_RESPONSE_SCHEMA = {
   properties: {
     labName: {
       type: SchemaType.STRING,
-      description: "Tên đơn vị kiểm nghiệm / Phòng thí nghiệm. Để rỗng nếu không tìm thấy.",
+      description: 'Tên đơn vị kiểm nghiệm / Phòng thí nghiệm. Để rỗng nếu không tìm thấy.',
     },
     documentType: {
       type: SchemaType.STRING,
-      description: "Loại phiếu: External_Lab | Internal | CoA | Supplier_CoA",
+      description: 'Loại phiếu: External_Lab | Internal | CoA | Supplier_CoA',
     },
     pageCount: {
       type: SchemaType.NUMBER,
-      description: "Số trang thực tế đã đọc được trong tài liệu (số nguyên dương)",
+      description: 'Số trang thực tế đã đọc được trong tài liệu (số nguyên dương)',
+    },
+    productCode: {
+      type: SchemaType.STRING,
+      description: 'Mã số / Mã hàng hóa / Mã sản phẩm / SKU đọc được từ phiếu (nếu có)',
+    },
+    productName: {
+      type: SchemaType.STRING,
+      description: 'Tên sản phẩm đầy đủ đọc được từ phiếu (nếu có)',
     },
     batchNo: {
       type: SchemaType.STRING,
-      description: "Số lô sản xuất (nếu có, không có thì để rỗng)",
+      description: 'Số lô sản xuất (nếu có, không có thì để rỗng)',
     },
     mfgDate: {
       type: SchemaType.STRING,
-      description: "Ngày sản xuất (định dạng DD/MM/YYYY, nếu không có để rỗng)",
+      description: 'Ngày sản xuất (định dạng DD/MM/YYYY, nếu không có để rỗng)',
     },
     expDate: {
       type: SchemaType.STRING,
-      description: "Hạn sử dụng (định dạng DD/MM/YYYY, nếu không có để rỗng)",
+      description: 'Hạn sử dụng (định dạng DD/MM/YYYY, nếu không có để rỗng)',
     },
     testDate: {
       type: SchemaType.STRING,
-      description: "Ngày kiểm nghiệm / Ngày xuất phiếu kết quả (định dạng DD/MM/YYYY, nếu không có để rỗng)",
+      description:
+        'Ngày kiểm nghiệm / Ngày xuất phiếu kết quả (định dạng DD/MM/YYYY, nếu không có để rỗng)',
     },
     notes: {
       type: SchemaType.STRING,
-      description: "Ghi chú đặc biệt từ phiếu (ghi chú cuối bảng, phát hiện giá trị sửa tay, ảnh chất lượng thấp...); để rỗng nếu không có",
+      description:
+        'Ghi chú đặc biệt từ phiếu (ghi chú cuối bảng, phát hiện giá trị sửa tay, ảnh chất lượng thấp...); để rỗng nếu không có',
     },
     testResults: {
       type: SchemaType.ARRAY,
@@ -172,34 +196,49 @@ const OCR_RESPONSE_SCHEMA = {
         properties: {
           criteriaName: {
             type: SchemaType.STRING,
-            description: "Tên chỉ tiêu NGUYÊN BẢN từ phiếu (giữ nguyên, không dịch)",
+            description: 'Tên chỉ tiêu NGUYÊN BẢN từ phiếu (giữ nguyên, không dịch)',
           },
           mappedName: {
             type: SchemaType.STRING,
-            description: "Tên chỉ tiêu chuẩn trong TCCS nếu map được, để rỗng nếu không chắc",
+            description: 'Tên chỉ tiêu chuẩn trong TCCS nếu map được, để rỗng nếu không chắc',
           },
           confidence: {
             type: SchemaType.STRING,
-            description: "'high' nếu map được tên TCCS chắc chắn, 'low' nếu không chắc hoặc không tìm được",
+            description:
+              "'high' nếu map được tên TCCS chắc chắn, 'medium' nếu suy luận nhẹ, 'low' nếu không chắc",
+          },
+          confidenceScore: {
+            type: SchemaType.NUMBER,
+            description: 'Điểm tin cậy từ 0 đến 100 phản ánh độ nét và độ rõ của số liệu',
           },
           value: {
             type: SchemaType.STRING,
-            description: "Kết quả kiểm nghiệm (ví dụ: 1.5, Đạt, Trắng trong). Trả về dưới dạng chuỗi.",
+            description:
+              'Kết quả kiểm nghiệm (ví dụ: 1.5, Đạt, Trắng trong, 0, < 10). Trả về dưới dạng chuỗi.',
           },
           unit: {
             type: SchemaType.STRING,
-            description: "Đơn vị tính (ví dụ: %, mg, CFU/g. Nếu không có để rỗng)",
+            description: 'Đơn vị tính (ví dụ: %, mg, CFU/g. Nếu không có để rỗng)',
           },
           limit: {
             type: SchemaType.STRING,
-            description: "Yêu cầu / Mức tiêu chuẩn / Giới hạn cho phép (nếu có)",
+            description: 'Yêu cầu / Mức tiêu chuẩn / Giới hạn cho phép (nếu có)',
           },
           analysisMethod: {
             type: SchemaType.STRING,
-            description: "Phương pháp thử nghiệm nếu ghi trên phiếu (ví dụ: HPLC, UV-Vis, TCVN...); để rỗng nếu không có",
+            description:
+              'Phương pháp thử nghiệm nếu ghi trên phiếu (ví dụ: HPLC, UV-Vis, TCVN...); để rỗng nếu không có',
+          },
+          sourcePageNumber: {
+            type: SchemaType.INTEGER,
+            description: 'Số thứ tự trang chứa chỉ tiêu này trên tài liệu (bắt đầu từ 1)',
+          },
+          rawText: {
+            type: SchemaType.STRING,
+            description: 'Dòng văn bản thô nguyên bản trên phiếu của chỉ tiêu này',
           },
         },
-        required: ["criteriaName", "value", "mappedName", "confidence"],
+        required: ['criteriaName', 'value', 'mappedName', 'confidence'],
       },
     },
   },
@@ -207,7 +246,6 @@ const OCR_RESPONSE_SCHEMA = {
 
 // Model dự phòng khi model chính bị 503/429
 const FALLBACK_OCR_MODEL = 'gemini-2.0-flash';
-
 
 // ─── Helper gọi Gemini OCR với danh sách inlineData parts ─────────────────────
 async function executeGeminiOcrCall(
@@ -222,7 +260,7 @@ async function executeGeminiOcrCall(
     genAI.getGenerativeModel({
       model: modelName,
       generationConfig: {
-        responseMimeType: "application/json",
+        responseMimeType: 'application/json',
         responseSchema: OCR_RESPONSE_SCHEMA as any,
       },
     });
@@ -238,7 +276,7 @@ async function executeGeminiOcrCall(
         onProgress?.(`Chuyển sang model dự phòng (${FALLBACK_OCR_MODEL})...`, progressBase + 5);
       }
       const model = buildModel(modelName);
-      onProgress?.("AI đang phân tích tài liệu...", progressBase + 15 + attempt * 10);
+      onProgress?.('AI đang phân tích tài liệu...', progressBase + 15 + attempt * 10);
 
       // Gửi prompt cùng tất cả image parts lên Gemini API
       const result = await model.generateContent([systemPrompt, ...contentParts]);
@@ -251,25 +289,33 @@ async function executeGeminiOcrCall(
       const errorMessage = error?.message || '';
       const backoffMs = Math.pow(2, attempt) * 1000;
 
-      if ((errorMessage.includes('503') || errorMessage.includes('429')) && !useFallback && attempt < maxRetries) {
-        console.warn(`Gemini OCR overloaded. Switching to fallback '${FALLBACK_OCR_MODEL}' (attempt ${attempt})...`);
+      if (
+        (errorMessage.includes('503') || errorMessage.includes('429')) &&
+        !useFallback &&
+        attempt < maxRetries
+      ) {
+        console.warn(
+          `Gemini OCR overloaded. Switching to fallback '${FALLBACK_OCR_MODEL}' (attempt ${attempt})...`
+        );
         useFallback = true;
         onProgress?.(`Model bị quá tải, đang thử lại với model dự phòng...`, progressBase + 5);
         await new Promise((res) => setTimeout(res, backoffMs));
         continue;
       }
       if ((errorMessage.includes('503') || errorMessage.includes('429')) && attempt < maxRetries) {
-        console.warn(`Gemini OCR fallback overloaded. Retrying attempt ${attempt} in ${backoffMs}ms...`);
+        console.warn(
+          `Gemini OCR fallback overloaded. Retrying attempt ${attempt} in ${backoffMs}ms...`
+        );
         onProgress?.(`Đang thử lại (lần ${attempt})...`, progressBase + 10);
         await new Promise((res) => setTimeout(res, backoffMs));
         continue;
       }
 
-      console.error("Error calling Gemini API:", error);
+      console.error('Error calling Gemini API:', error);
       throw error;
     }
   }
-  throw new Error("Gemini OCR: Đã vượt quá số lần thử lại tối đa mà không thành công.");
+  throw new Error('Gemini OCR: Đã vượt quá số lần thử lại tối đa mà không thành công.');
 }
 
 export const geminiService = {
@@ -295,130 +341,74 @@ export const geminiService = {
 
     // ─── Outer try: bắt mọi lỗi mạng để kích hoạt Tesseract.js fallback ────────
     try {
-
       // ─── TRƯỜNG HỢP 1: FILE PDF ──────────────────────────────────────────────
       if (file.type === 'application/pdf') {
         try {
-          onProgress?.("Đang tối ưu & phân tích cấu trúc PDF...", 10);
+          onProgress?.('Đang tối ưu & phân tích cấu trúc PDF...', 10);
 
-          // Render từng trang PDF sang ảnh JPEG tối ưu bằng Canvas
+          // Render từng trang PDF sang ảnh High-DPI (250 DPI) định dạng PNG lossless tối ưu cho OCR
           const { convertPdfToImages } = await import('../../utils/pdfProcessor');
           const renderedPages: RenderedPdfPage[] = await convertPdfToImages(file, {
-            targetWidth: 1600,
-            quality: 0.85,
+            targetDpi: 250,
+            format: 'image/png',
             maxPages: 50,
             onProgress: (current, total) => {
-              onProgress?.(`Đang xử lý trang PDF ${current}/${total}...`, Math.round(10 + (current / total) * 20));
+              onProgress?.(
+                `Đang xử lý trang PDF High-DPI ${current}/${total}...`,
+                Math.round(10 + (current / total) * 20)
+              );
             },
           });
 
           const totalPages = renderedPages.length;
           if (totalPages === 0) {
-            throw new Error("Không thể đọc được trang nào từ file PDF này.");
+            throw new Error('Không thể đọc được trang nào từ file PDF này.');
           }
 
-          // Nếu PDF ngắn (1 - 3 trang): Gửi tất cả trang trong 1 request duy nhất
-          if (totalPages <= 3) {
-            onProgress?.(`Đang gửi ${totalPages} trang lên AI phân tích...`, 35);
-            const imageParts = renderedPages.map((page) => ({
-              inlineData: {
-                data: page.base64,
-                mimeType: 'image/jpeg',
+          // OCR-05: Per-Page Extraction & Context Tracking
+          // Bóc tách từng trang độc lập, bảo tồn ngữ cảnh bảng nối trang và gắn cứng sourcePageNumber
+          const { extractAllPagesSequentially } = await import('../ocr/pageExtractor');
+          const mergedFinalResult = await extractAllPagesSequentially(
+            renderedPages,
+            systemPrompt,
+            async (decoratedPrompt, page) => {
+              const imagePart = {
+                inlineData: {
+                  data: page.base64,
+                  mimeType: page.mimeType || 'image/png',
+                },
+              };
+              return await executeGeminiOcrCall(
+                genAI,
+                decoratedPrompt,
+                [imagePart],
+                onProgress,
+                35
+              );
+            },
+            {
+              continueOnPageError: true,
+              maxRetriesPerPage: 2,
+              onPageProgress: (current, total, stepText) => {
+                const percent = Math.round(30 + (current / total) * 65);
+                onProgress?.(stepText, percent);
               },
-            }));
-
-            const result = await executeGeminiOcrCall(genAI, systemPrompt, imageParts, onProgress, 40);
-            result.pageCount = totalPages;
-            onProgress?.("Hoàn tất!", 100);
-            return result;
-          }
-
-          // Nếu PDF dài (> 3 trang): Tự động chia theo đợt (Chunk 3 trang/lượt) để tránh tràn token / timeout
-          const CHUNK_SIZE = 3;
-          const chunks: RenderedPdfPage[][] = [];
-          for (let i = 0; i < totalPages; i += CHUNK_SIZE) {
-            chunks.push(renderedPages.slice(i, i + CHUNK_SIZE));
-          }
-
-          const chunkResults: any[] = [];
-          for (let idx = 0; idx < chunks.length; idx++) {
-            const chunk = chunks[idx];
-            const startPage = idx * CHUNK_SIZE + 1;
-            const endPage = Math.min(startPage + chunk.length - 1, totalPages);
-            const chunkPercentBase = Math.round(35 + (idx / chunks.length) * 55);
-
-            onProgress?.(
-              `Đang đọc PDF (${totalPages} trang) – Đợt ${idx + 1}/${chunks.length} (Trang ${startPage}-${endPage})...`,
-              chunkPercentBase
-            );
-
-            const imageParts = chunk.map((page) => ({
-              inlineData: {
-                data: page.base64,
-                mimeType: 'image/jpeg',
-              },
-            }));
-
-            try {
-              const chunkRes = await executeGeminiOcrCall(genAI, systemPrompt, imageParts, onProgress, chunkPercentBase);
-              chunkResults.push(chunkRes);
-            } catch (chunkErr) {
-              console.warn(`Lỗi khi đọc đợt ${idx + 1} (Trang ${startPage}-${endPage}):`, chunkErr);
-              // Nếu là đợt đầu tiên mà lỗi thì ném ra, nếu đợt sau lỗi thì vẫn giữ kết quả đợt trước
-              if (chunkResults.length === 0 && idx === chunks.length - 1) {
-                throw chunkErr;
-              }
             }
-          }
+          );
 
-          if (chunkResults.length === 0) {
-            throw new Error("Không thể trích xuất dữ liệu từ các trang của file PDF.");
-          }
-
-          // Gộp kết quả thông minh từ các đợt
-          const firstResult = chunkResults[0] || {};
-          const mergedTestResults: any[] = [];
-          const seenCriteriaKeys = new Set<string>();
-
-          const allNotes: string[] = [];
-
-          for (const res of chunkResults) {
-            if (res.notes && !allNotes.includes(res.notes)) {
-              allNotes.push(res.notes);
-            }
-            for (const item of res.testResults || []) {
-              const key = (item.mappedName || item.criteriaName || '').toLowerCase().trim();
-              if (key && !seenCriteriaKeys.has(key)) {
-                seenCriteriaKeys.add(key);
-                mergedTestResults.push(item);
-              } else if (!key) {
-                mergedTestResults.push(item);
-              }
-            }
-          }
-
-          const mergedFinalResult = {
-            labName: chunkResults.find((r) => r.labName)?.labName || firstResult.labName || '',
-            documentType: chunkResults.find((r) => r.documentType)?.documentType || firstResult.documentType || 'External_Lab',
-            pageCount: totalPages,
-            batchNo: chunkResults.find((r) => r.batchNo)?.batchNo || firstResult.batchNo || '',
-            mfgDate: chunkResults.find((r) => r.mfgDate)?.mfgDate || firstResult.mfgDate || '',
-            expDate: chunkResults.find((r) => r.expDate)?.expDate || firstResult.expDate || '',
-            testDate: chunkResults.find((r) => r.testDate)?.testDate || firstResult.testDate || '',
-            notes: allNotes.filter(Boolean).join(' | ') || firstResult.notes || '',
-            testResults: mergedTestResults,
-          };
-
-          onProgress?.("Hoàn tất!", 100);
+          onProgress?.('Hoàn tất!', 100);
           return mergedFinalResult;
         } catch (pdfError: any) {
-          console.warn("Lỗi khi xử lý PDF qua Canvas, chuyển sang phương thức gửi file gốc:", pdfError);
+          console.warn(
+            'Lỗi khi xử lý PDF qua Canvas, chuyển sang phương thức gửi file gốc:',
+            pdfError
+          );
           // Fallback: Nếu lỗi Canvas hoặc PDF đặc thù, tiếp tục với phương thức gửi file Base64 truyền thống bên dưới
         }
       }
 
       // ─── TRƯỜNG HỢP 2: FILE ẢNH HOẶC FALLBACK FILE GỐC ─────────────────────────
-      onProgress?.("Đang đọc file...", 10);
+      onProgress?.('Đang đọc file...', 10);
 
       const base64Data = await new Promise<string>((resolve, reject) => {
         const reader = new FileReader();
@@ -431,7 +421,7 @@ export const geminiService = {
         reader.readAsDataURL(file);
       });
 
-      onProgress?.("Đang gửi lên AI...", 30);
+      onProgress?.('Đang gửi lên AI...', 30);
 
       const filePart = {
         inlineData: {
@@ -441,9 +431,15 @@ export const geminiService = {
       };
 
       const result = await executeGeminiOcrCall(genAI, systemPrompt, [filePart], onProgress, 40);
-      onProgress?.("Hoàn tất!", 100);
+      result.pageCount = 1;
+      if (Array.isArray(result?.testResults)) {
+        result.testResults = result.testResults.map((it: any) => ({
+          ...it,
+          sourcePageNumber: it.sourcePageNumber || 1,
+        }));
+      }
+      onProgress?.('Hoàn tất!', 100);
       return result;
-
     } catch (geminiError: any) {
       // ─── FALLBACK CUỐI CÙNG: Tesseract.js Offline OCR ──────────────────────────
       // Chỉ kích hoạt khi Gemini API hoàn toàn không khả dụng (mất mạng, API sập)
@@ -458,7 +454,9 @@ export const geminiService = {
         msg.includes('502');
 
       if (isNetworkError) {
-        console.warn('[geminiService] Gemini API không khả dụng. Chuyển sang Tesseract.js offline fallback...');
+        console.warn(
+          '[geminiService] Gemini API không khả dụng. Chuyển sang Tesseract.js offline fallback...'
+        );
         try {
           const { extractRawTextWithTesseract } = await import('./tesseractFallback');
           const fallbackResult = await extractRawTextWithTesseract(file, onProgress);
@@ -472,6 +470,7 @@ export const geminiService = {
             fileName: file.name,
             lang: 'n/a',
             confidence: 0,
+            pageCount: 0,
             offlineMessage:
               '⚠️ **Không thể đọc tài liệu** — Cả Gemini AI và OCR offline đều không khả dụng. ' +
               'Vui lòng kiểm tra kết nối mạng và thử lại, hoặc nhập kết quả thủ công.',
@@ -516,7 +515,10 @@ export const geminiService = {
           systemPrompt,
           (_step, _percent) => {
             // Truyền trạng thái progress ra ngoài nếu cần
-            onFileProgress?.(index, file.name, 'processing', { _progressStep: _step, _progressPercent: _percent });
+            onFileProgress?.(index, file.name, 'processing', {
+              _progressStep: _step,
+              _progressPercent: _percent,
+            });
           }
         );
         onFileProgress?.(index, file.name, 'done', data);
@@ -529,12 +531,12 @@ export const geminiService = {
     });
 
     // Chạy song song tất cả file
-    const results = await Promise.all(tasks.map(t => t()));
+    const results = await Promise.all(tasks.map((t) => t()));
 
-    const success = results.filter(r => r.ok).map(r => (r as any).data);
+    const success = results.filter((r) => r.ok).map((r) => (r as any).data);
     const errors = results
-      .filter(r => !r.ok)
-      .map(r => ({ fileName: (r as any).fileName, error: (r as any).error }));
+      .filter((r) => !r.ok)
+      .map((r) => ({ fileName: (r as any).fileName, error: (r as any).error }));
 
     return { success, errors };
   },
@@ -545,12 +547,16 @@ export const geminiService = {
    * @param prompt Nội dung yêu cầu phân tích
    * @param systemPrompt Lệnh định hướng hệ thống
    */
-  generateText: async (prompt: string, systemPrompt?: string, modelName?: string): Promise<string> => {
+  generateText: async (
+    prompt: string,
+    systemPrompt?: string,
+    modelName?: string
+  ): Promise<string> => {
     const genAI = getGenAI();
     const activeModel = modelName || getGeminiModel();
     const model = genAI.getGenerativeModel({
       model: activeModel,
-      ...(systemPrompt ? { systemInstruction: systemPrompt } : {})
+      ...(systemPrompt ? { systemInstruction: systemPrompt } : {}),
     });
     const result = await model.generateContent(prompt);
     return result.response.text();
@@ -602,8 +608,13 @@ export const geminiService = {
         const errorMessage = error?.message || '';
         const backoffMs = Math.pow(2, attempt) * 1000;
 
-        if ((errorMessage.includes('503') || errorMessage.includes('429')) && attempt < maxRetries) {
-          console.warn(`Gemini generateStructuredJson overloaded. Retrying attempt ${attempt} in ${backoffMs}ms...`);
+        if (
+          (errorMessage.includes('503') || errorMessage.includes('429')) &&
+          attempt < maxRetries
+        ) {
+          console.warn(
+            `Gemini generateStructuredJson overloaded. Retrying attempt ${attempt} in ${backoffMs}ms...`
+          );
           await new Promise((res) => setTimeout(res, backoffMs));
           continue;
         }
@@ -611,7 +622,9 @@ export const geminiService = {
         throw error;
       }
     }
-    throw new Error('generateStructuredJson: Đã vượt quá số lần thử lại tối đa mà không thành công.');
+    throw new Error(
+      'generateStructuredJson: Đã vượt quá số lần thử lại tối đa mà không thành công.'
+    );
   },
 
   /**
@@ -620,7 +633,13 @@ export const geminiService = {
    * @param appContextData Object chứa toàn bộ dữ liệu ứng dụng
    * @param history Lịch sử đoạn chat trước đó để hỗ trợ Multi-turn
    */
-  chatWithAppContext: async (message: string, appContextData: any, history: Content[] = [], modelName?: string, sessionMemoryPrompt?: string) => {
+  chatWithAppContext: async (
+    message: string,
+    appContextData: any,
+    history: Content[] = [],
+    modelName?: string,
+    sessionMemoryPrompt?: string
+  ) => {
     const genAI = getGenAI();
     const activeModel = modelName || getGeminiModel();
     const isThinkingEnabled = getIsThinkingEnabled();
@@ -641,33 +660,60 @@ export const geminiService = {
       const testResults = data.testResults || [];
 
       // Bước 1: Tìm sản phẩm/lô được đề cập trong câu hỏi
-      const mentionedProducts = products.filter((p: any) =>
-        p.name && msgLower.includes(p.name.toLowerCase()) ||
-        p.code && msgLower.includes(p.code.toLowerCase())
+      const mentionedProducts = products.filter(
+        (p: any) =>
+          (p.name && msgLower.includes(p.name.toLowerCase())) ||
+          (p.code && msgLower.includes(p.code.toLowerCase()))
       );
-      const mentionedBatches = batches.filter((b: any) =>
-        b.batchNo && msgLower.includes(b.batchNo.toLowerCase())
+      const mentionedBatches = batches.filter(
+        (b: any) => b.batchNo && msgLower.includes(b.batchNo.toLowerCase())
       );
 
       const mentionedProductIds = new Set([
         ...mentionedProducts.map((p: any) => p.id),
-        ...mentionedBatches.map((b: any) => b.productId)
+        ...mentionedBatches.map((b: any) => b.productId),
       ]);
 
       // Bước 2: Nếu có sản phẩm cụ thể được đề cập → trả về đầy đủ data của sản phẩm đó
       if (mentionedProductIds.size > 0) {
         const relevantBatches = batches.filter((b: any) => mentionedProductIds.has(b.productId));
         const relevantBatchIds = new Set(relevantBatches.map((b: any) => b.id));
-        const relevantTestResults = testResults.filter((tr: any) => relevantBatchIds.has(tr.batchId));
+        const relevantTestResults = testResults.filter((tr: any) =>
+          relevantBatchIds.has(tr.batchId)
+        );
         const relevantTccs = tccsList.filter((t: any) => mentionedProductIds.has(t.productId));
 
         return {
           _note: `Context ưu tiên: ${mentionedProductIds.size} sản phẩm được đề cập trong câu hỏi`,
-          products: mentionedProducts.map((p: any) => ({ id: p.id, code: p.code, name: p.name, status: p.status })),
+          products: mentionedProducts.map((p: any) => ({
+            id: p.id,
+            code: p.code,
+            name: p.name,
+            status: p.status,
+          })),
           allProducts_summary: `Tổng ${products.length} sản phẩm. Đang hiển thị ${mentionedProducts.length} sản phẩm liên quan.`,
-          batches: relevantBatches.map((b: any) => ({ id: b.id, batchNo: b.batchNo, productId: b.productId, status: b.status, mfg: b.mfgDate, exp: b.expDate })),
-          tccs: relevantTccs.map((t: any) => ({ id: t.id, code: t.code, isActive: t.isActive, issueDate: t.issueDate, productId: t.productId })),
-          testResults: relevantTestResults.map((tr: any) => ({ id: tr.id, lab: tr.labName, date: tr.testDate, status: tr.overallStatus, batchId: tr.batchId })),
+          batches: relevantBatches.map((b: any) => ({
+            id: b.id,
+            batchNo: b.batchNo,
+            productId: b.productId,
+            status: b.status,
+            mfg: b.mfgDate,
+            exp: b.expDate,
+          })),
+          tccs: relevantTccs.map((t: any) => ({
+            id: t.id,
+            code: t.code,
+            isActive: t.isActive,
+            issueDate: t.issueDate,
+            productId: t.productId,
+          })),
+          testResults: relevantTestResults.map((tr: any) => ({
+            id: tr.id,
+            lab: tr.labName,
+            date: tr.testDate,
+            status: tr.overallStatus,
+            batchId: tr.batchId,
+          })),
         };
       }
 
@@ -676,12 +722,38 @@ export const geminiService = {
       const MAX_GENERAL = 20;
       return {
         _note: 'Context tổng hợp: không có sản phẩm cụ thể được đề cập',
-        products: products.slice(0, MAX_GENERAL).map((p: any) => ({ id: p.id, code: p.code, name: p.name, status: p.status })),
+        products: products
+          .slice(0, MAX_GENERAL)
+          .map((p: any) => ({ id: p.id, code: p.code, name: p.name, status: p.status })),
         products_total: products.length,
-        batches: batches.slice(0, MAX_GENERAL).map((b: any) => ({ id: b.id, batchNo: b.batchNo, productId: b.productId, status: b.status, mfg: b.mfgDate, exp: b.expDate })),
+        batches: batches
+          .slice(0, MAX_GENERAL)
+          .map((b: any) => ({
+            id: b.id,
+            batchNo: b.batchNo,
+            productId: b.productId,
+            status: b.status,
+            mfg: b.mfgDate,
+            exp: b.expDate,
+          })),
         batches_total: batches.length,
-        tccs: tccsList.slice(0, MAX_GENERAL).map((t: any) => ({ code: t.code, isActive: t.isActive, issueDate: t.issueDate, productId: t.productId })),
-        testResults: testResults.slice(0, MAX_GENERAL).map((tr: any) => ({ id: tr.id, lab: tr.labName, date: tr.testDate, status: tr.overallStatus, batchId: tr.batchId })),
+        tccs: tccsList
+          .slice(0, MAX_GENERAL)
+          .map((t: any) => ({
+            code: t.code,
+            isActive: t.isActive,
+            issueDate: t.issueDate,
+            productId: t.productId,
+          })),
+        testResults: testResults
+          .slice(0, MAX_GENERAL)
+          .map((tr: any) => ({
+            id: tr.id,
+            lab: tr.labName,
+            date: tr.testDate,
+            status: tr.overallStatus,
+            batchId: tr.batchId,
+          })),
         testResults_total: testResults.length,
       };
     };
@@ -714,7 +786,7 @@ QUY TẮC:
 17. [ACTION] Nếu người dùng yêu cầu tự động sửa / hàn gắn dữ liệu ("chạy auto-heal", "tự động hàn gắn dữ liệu", "quét và sửa lỗi dữ liệu") → GỌI triggerAutoHealingAction.
 18. [ACTION] Nếu người dùng yêu cầu cập nhật trạng thái lô ("duyệt xuất xưởng lô X", "từ chối lô X", "chuyển lô X về kiểm nghiệm") → GỌI updateBatchStatusAction với batchNo, newStatus ('RELEASED' | 'REJECTED' | 'TESTING') và reason.
 19. [PREDICTIVE] Nếu người dùng hỏi về rủi ro trước khi kiểm nghiệm lô ("lô X có nguy cơ gì không?", "dự báo rủi ro lô X") → GỌI predictBatchRiskAction với batchNo.
-${sessionMemoryPrompt ? sessionMemoryPrompt : ""}
+${sessionMemoryPrompt ? sessionMemoryPrompt : ''}
 ${isThinkingEnabled ? `20. [QUAN TRỌNG - BẮT BUỘC] Bạn phải luôn bắt đầu phản hồi của mình bằng việc lập luận chi tiết quy trình suy nghĩ và phân tích dữ liệu bên trong cặp thẻ <thinking>...</thinking> (ví dụ: giải thích tại sao bạn chọn hành động hay quyết định gọi tool nào, đối chiếu số liệu thế nào). Chỉ đưa ra câu trả lời chính thức hoặc định dạng markdown cho người dùng bên ngoài cặp thẻ <thinking>...</thinking>. Không được hiển thị thẻ <thinking> trong markdown code blocks.` : ''}`;
 
     const maxRetries = 3;
@@ -724,13 +796,20 @@ ${isThinkingEnabled ? `20. [QUAN TRỌNG - BẮT BUỘC] Bạn phải luôn bắ
       try {
         const chat = model.startChat({
           history: [
-            { role: "user", parts: [{ text: systemPrompt }] },
-            { role: "model", parts: [{ text: "Tôi đã hiểu quy tắc và bối cảnh dữ liệu. Tôi sẵn sàng hỗ trợ và sẽ gọi các tool khi cần thiết." }] },
-            ...history
+            { role: 'user', parts: [{ text: systemPrompt }] },
+            {
+              role: 'model',
+              parts: [
+                {
+                  text: 'Tôi đã hiểu quy tắc và bối cảnh dữ liệu. Tôi sẵn sàng hỗ trợ và sẽ gọi các tool khi cần thiết.',
+                },
+              ],
+            },
+            ...history,
           ],
         });
 
-        let accumulatedThinking = "";
+        let accumulatedThinking = '';
 
         // Gửi tin nhắn đầu tiên
         let result = await chat.sendMessage(message);
@@ -742,7 +821,7 @@ ${isThinkingEnabled ? `20. [QUAN TRỌNG - BẮT BUỘC] Bạn phải luôn bắ
           if (firstText) {
             const parsed = extractThinking(firstText);
             if (parsed.thinking) {
-              accumulatedThinking += (accumulatedThinking ? "\n\n" : "") + parsed.thinking;
+              accumulatedThinking += (accumulatedThinking ? '\n\n' : '') + parsed.thinking;
             }
           }
         } catch (e) {
@@ -754,7 +833,10 @@ ${isThinkingEnabled ? `20. [QUAN TRỌNG - BẮT BUỘC] Bạn phải luôn bắ
         let iterationCount = 0;
         const MAX_TOOL_ITERATIONS = 5; // Giới hạn để tránh vòng lặp vô tận
 
-        while (response.candidates?.[0]?.content?.parts?.some((p: any) => p.functionCall) && iterationCount < MAX_TOOL_ITERATIONS) {
+        while (
+          response.candidates?.[0]?.content?.parts?.some((p: any) => p.functionCall) &&
+          iterationCount < MAX_TOOL_ITERATIONS
+        ) {
           iterationCount++;
           const toolCallParts = response.candidates[0].content.parts;
           const functionResponseParts: any[] = [];
@@ -772,8 +854,8 @@ ${isThinkingEnabled ? `20. [QUAN TRỌNG - BẮT BUỘC] Bạn phải luôn bắ
               functionResponseParts.push({
                 functionResponse: {
                   name: part.functionCall.name,
-                  response: { result: toolResult }
-                }
+                  response: { result: toolResult },
+                },
               });
             }
           }
@@ -788,7 +870,7 @@ ${isThinkingEnabled ? `20. [QUAN TRỌNG - BẮT BUỘC] Bạn phải luôn bắ
             if (stepText) {
               const parsed = extractThinking(stepText);
               if (parsed.thinking) {
-                accumulatedThinking += (accumulatedThinking ? "\n\n" : "") + parsed.thinking;
+                accumulatedThinking += (accumulatedThinking ? '\n\n' : '') + parsed.thinking;
               }
             }
           } catch (e) {
@@ -800,31 +882,33 @@ ${isThinkingEnabled ? `20. [QUAN TRỌNG - BẮT BUỘC] Bạn phải luôn bắ
         let finalResponseText = response.text();
         const finalParsed = extractThinking(finalResponseText);
         if (finalParsed.thinking) {
-          accumulatedThinking += (accumulatedThinking ? "\n\n" : "") + finalParsed.thinking;
+          accumulatedThinking += (accumulatedThinking ? '\n\n' : '') + finalParsed.thinking;
           finalResponseText = finalParsed.cleanText;
         }
 
         return {
           text: finalResponseText,
-          thinking: accumulatedThinking || undefined
+          thinking: accumulatedThinking || undefined,
         };
-
       } catch (error: any) {
         attempt++;
         const errorMessage = error?.message || '';
 
         // Chỉ retry với lỗi quá tải (503) hoặc rate limit (429)
-        if ((errorMessage.includes('503') || errorMessage.includes('429')) && attempt < maxRetries) {
+        if (
+          (errorMessage.includes('503') || errorMessage.includes('429')) &&
+          attempt < maxRetries
+        ) {
           console.warn(`Gemini API overloaded. Retrying attempt ${attempt}...`);
-          await new Promise(res => setTimeout(res, 2000 * attempt));
+          await new Promise((res) => setTimeout(res, 2000 * attempt));
           continue;
         }
 
-        console.error("Error in chatWithAppContext:", error);
+        console.error('Error in chatWithAppContext:', error);
         throw error;
       }
     }
     // Sau vòng while, ném lỗi rõ ràng thay vì trả về undefined im lặng
-    throw new Error("Gemini Chat: Đã vượt quá số lần thử lại tối đa mà không thành công.");
-  }
+    throw new Error('Gemini Chat: Đã vượt quá số lần thử lại tối đa mà không thành công.');
+  },
 };
