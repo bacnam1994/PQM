@@ -12,7 +12,6 @@ import { useAppStore } from '../../store/useAppStore';
 import { DSFormInput } from '../../components';
 import { PRODUCT_STATUS, generateId } from '../../utils';
 import { Product, ProductStatus } from '../../types';
-import { logAuditAction } from '../../services/auditService';
 import { useUIStore } from '../../store/useUIStore';
 import { uploadStorageFile } from '../../services/storageService';
 
@@ -218,14 +217,6 @@ const ProductFormPage = () => {
           title: 'Đã cập nhật',
           message: 'Thông tin sản phẩm đã được lưu.',
         });
-
-        logAuditAction({
-          action: 'UPDATE',
-          collection: 'PRODUCTS',
-          documentId: productToEdit.id,
-          details: `Cập nhật sản phẩm: ${data.code} - ${data.name}`,
-          performedBy: user?.email || 'unknown',
-        });
       } else {
         const newId = generateId('prod');
         await addProduct({
@@ -235,14 +226,6 @@ const ProductFormPage = () => {
           updatedAt: new Date().toISOString(),
         });
         notify({ type: 'SUCCESS', title: 'Thành công', message: 'Đã thêm sản phẩm mới.' });
-
-        logAuditAction({
-          action: 'CREATE',
-          collection: 'PRODUCTS',
-          documentId: newId,
-          details: `Thêm mới sản phẩm: ${data.code} - ${data.name}`,
-          performedBy: user?.email || 'unknown',
-        });
       }
       navigate('/products');
     } catch (error) {

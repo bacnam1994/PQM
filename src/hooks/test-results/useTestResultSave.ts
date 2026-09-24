@@ -1,6 +1,5 @@
 import { useState, useCallback } from 'react';
 import { useAppStore } from '../../store/useAppStore';
-import { logAuditAction } from '../../services/auditService';
 import {
   TEST_RESULT_STATUS,
   CRITERION_TYPE_CONST,
@@ -381,18 +380,6 @@ export const useTestResultSave = ({
             ...cleanResult,
             ...resultData,
           });
-
-          try {
-            logAuditAction({
-              action: 'UPDATE',
-              collection: 'TEST_RESULTS',
-              documentId: crud.selectedItem.id,
-              details: `Sửa kết quả kiểm nghiệm lô: ${batch?.batchNo || resultData.batchId}`,
-              performedBy: user?.email || 'unknown',
-            });
-          } catch (e) {
-            console.warn('Lỗi ghi log:', e);
-          }
         } else {
           const newId = generateId('res');
           await addTestResult({
@@ -400,18 +387,6 @@ export const useTestResultSave = ({
             ...resultData,
             createdAt: new Date().toISOString(),
           });
-
-          try {
-            logAuditAction({
-              action: 'CREATE',
-              collection: 'TEST_RESULTS',
-              documentId: newId,
-              details: `Tạo kết quả kiểm nghiệm lô: ${currentBatch?.batchNo || resultData.batchId}`,
-              performedBy: user?.email || 'unknown',
-            });
-          } catch (e) {
-            console.warn('Lỗi ghi log:', e);
-          }
         }
 
         await updateBatchProgress(formValues.batchId, newProgressPercent);

@@ -71,6 +71,37 @@ export const createTestResultSlice: StoreSlice<TestResultSlice> = (set, get) => 
     }
   },
 
+  updateTestResultWorkflowStatus: async (id: string, newStatus: any, options?: any) => {
+    try {
+      const state = get();
+      const oldResult = state.testResults.find((item: TestResult) => item.id === id);
+      const batch = oldResult?.batchId
+        ? state.batches.find((b: any) => b.id === oldResult.batchId)
+        : undefined;
+      const currentUser = resolveCurrentIdentity(state);
+      await testResultAppService.updateWorkflowStatus(id, newStatus, currentUser, {
+        ...options,
+        oldTestResult: oldResult,
+        batch,
+      });
+      queryClient.invalidateQueries({ queryKey: TEST_RESULT_QUERY_KEYS.all });
+      queryClient.invalidateQueries({ queryKey: TEST_RESULT_QUERY_KEYS.detail(id) });
+      if (oldResult?.batchId) {
+        queryClient.invalidateQueries({
+          queryKey: TEST_RESULT_QUERY_KEYS.byBatch(oldResult.batchId),
+        });
+      }
+      await get().syncQualityAlerts();
+    } catch (error: any) {
+      get().notify({
+        type: 'ERROR',
+        title: 'Lỗi cập nhật trạng thái quy trình',
+        message: error.message,
+      });
+      throw error;
+    }
+  },
+
   loadMoreTestResults: () =>
     set((state) => ({ testResultLimit: state.testResultLimit + 50 }), false, 'loadMoreTestResults'),
 

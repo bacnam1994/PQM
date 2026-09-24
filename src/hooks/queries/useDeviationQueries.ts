@@ -118,7 +118,13 @@ export function useUpdateDeviationStatusMutation() {
       status: DeviationStatus;
       notes?: string;
     }) => {
-      await firebaseDeviationRepository.updateStatus(id, status, notes);
+      const state = useAppStore.getState();
+      const currentUser = {
+        email: state.user?.email || 'system',
+        role: state.role,
+        isAdmin: state.role === 'ADMIN',
+      };
+      await deviationAppService.updateStatus(id, status, currentUser, { notes });
       return { id, status, notes };
     },
     onSuccess: ({ id }) => {
@@ -129,14 +135,20 @@ export function useUpdateDeviationStatusMutation() {
 }
 
 /**
- * Mutation xóa hồ sơ sai lệch
+ * Mutation xóa hồ sơ sai lệch qua Application Service
  */
 export function useDeleteDeviationMutation() {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (id: string) => {
-      await firebaseDeviationRepository.delete(id);
+      const state = useAppStore.getState();
+      const currentUser = {
+        email: state.user?.email || 'system',
+        role: state.role,
+        isAdmin: state.role === 'ADMIN',
+      };
+      await deviationAppService.deleteDeviation(id, currentUser);
       return id;
     },
     onSuccess: (deletedId) => {

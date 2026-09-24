@@ -252,6 +252,27 @@ export class DeviationAppService {
 
     return updatedDeviation;
   }
+
+  /**
+   * Xóa hồ sơ sai lệch có kiểm soát quyền và Audit Trail
+   */
+  async deleteDeviation(id: string, currentUser: any): Promise<void> {
+    const isQAOrAdmin =
+      currentUser?.isAdmin || currentUser?.role === 'QA' || currentUser?.role === 'ADMIN';
+    if (!isQAOrAdmin) {
+      throw new Error('Từ chối quyền: Chỉ QA hoặc Quản trị viên mới có quyền xóa hồ sơ sai lệch.');
+    }
+    const existing = await this.repo.findById(id);
+    await this.repo.delete(id);
+
+    logAuditAction({
+      action: 'DELETE',
+      collection: 'DEVIATIONS',
+      documentId: id,
+      details: `Xóa hồ sơ sai lệch: ${existing?.deviationNo || id}`,
+      performedBy: currentUser?.email || 'unknown',
+    });
+  }
 }
 
 export const deviationAppService = new DeviationAppService();

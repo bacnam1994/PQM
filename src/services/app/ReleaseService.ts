@@ -103,29 +103,29 @@ export class ReleaseService {
 
     const isAdmin = currentUser?.role === 'ADMIN' || currentUser?.isAdmin === true;
 
-    // 2. Thẩm tra 7 Release Gates
-    if (!isAdmin) {
-      const evaluation = this.evaluateReleaseReadiness({
-        batch: currentBatch,
-        testResults,
-        boundTccs,
-        deviations,
-        userRole: currentUser?.role,
-      });
+    // 2. Thẩm tra 7 Release Gates (Bắt buộc 100% người dùng bao gồm Admin, không có ngoại lệ)
+    const evaluation = this.evaluateReleaseReadiness({
+      batch: currentBatch,
+      testResults,
+      boundTccs,
+      deviations,
+      userRole: currentUser?.role,
+    });
 
-      if (!evaluation.isEligible || !evaluation.allGatesPassed) {
-        throw new Error(
-          `Từ chối xuất xưởng: Còn rào cản chưa thỏa mãn (${evaluation.blockers.join('; ')})`
-        );
-      }
+    if (!evaluation.isEligible || !evaluation.allGatesPassed) {
+      throw new Error(
+        `Từ chối xuất xưởng: Còn rào cản chưa thỏa mãn (${evaluation.blockers.join('; ')})`
+      );
+    }
 
-      // 3. Kiểm tra chữ ký điện tử 21 CFR Part 11
-      if (!signature) {
-        throw new Error(
-          'Quy chuẩn 21 CFR Part 11: Yêu cầu chữ ký điện tử hợp lệ của QA trước khi xuất xưởng.'
-        );
-      }
+    // 3. Kiểm tra chữ ký điện tử 21 CFR Part 11 (Bắt buộc cho QA; nếu có chữ ký thì bắt buộc kiểm tra tính hợp lệ)
+    if (!isAdmin && !signature) {
+      throw new Error(
+        'Quy chuẩn 21 CFR Part 11: Yêu cầu chữ ký điện tử hợp lệ của QA trước khi xuất xưởng.'
+      );
+    }
 
+    if (signature) {
       const isSigValid = await signatureService.verifySignatureIntegrity(signature);
       if (!isSigValid) {
         throw new Error('Chữ ký điện tử không hợp lệ hoặc đã bị can thiệp trái phép.');

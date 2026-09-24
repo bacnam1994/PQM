@@ -1,29 +1,34 @@
 /**
  * PQM V4 Platform - Change Control Application Service
  * Quản lý vòng đời Yêu cầu Thay đổi (Change Control) chuẩn GMP-WHO và ICH Q10
+ * Lưu trữ bền vững thông qua IChangeControlRepository (Firebase RTDB).
  */
 
-import { 
-  ChangeRequest, CreateChangeRequestInput, ChangeStatus, 
-  FMEARiskAssessment, ChangeActionItem 
+import {
+  ChangeRequest,
+  CreateChangeRequestInput,
+  ChangeStatus,
+  FMEARiskAssessment,
+  ChangeActionItem,
 } from '../../types/changeControl';
 import { generateId } from '../../utils';
 import { nextVersion } from '../../utils/concurrency';
 import { logAuditAction } from '../auditService';
-import { ApprovalWorkflowService } from './ApprovalWorkflowService';
+import { IChangeControlRepository } from '../../repositories/IChangeControlRepository';
+import { firebaseChangeControlRepository } from '../../repositories/firebase/FirebaseChangeControlRepository';
 
 const STORAGE_KEY = 'PQM_CHANGE_CONTROL_RECORDS';
 
 export class ChangeControlAppService {
   private records: ChangeRequest[] = [];
 
-  constructor() {
+  constructor(private repo: IChangeControlRepository = firebaseChangeControlRepository) {
     this.loadFromStorage();
   }
 
   private loadFromStorage() {
     try {
-      const raw = localStorage.getItem(STORAGE_KEY);
+      const raw = typeof localStorage !== 'undefined' ? localStorage.getItem(STORAGE_KEY) : null;
       if (raw) {
         this.records = JSON.parse(raw);
       } else {
@@ -37,7 +42,9 @@ export class ChangeControlAppService {
 
   private saveToStorage() {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(this.records));
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(this.records));
+      }
     } catch {
       // Bỏ qua nếu lỗi quota
     }
@@ -55,8 +62,10 @@ export class ChangeControlAppService {
         status: 'IMPLEMENTATION',
         productId: 'prod_para_500',
         productName: 'Viên nén Paracetamol 500mg',
-        justification: 'Rút ngắn thời gian sấy tầng sôi từ 45 phút xuống 30 phút nhằm tối ưu hóa nhiệt phân hủy hoạt chất.',
-        description: 'Thay đổi thông số nhiệt độ khí vào từ 60°C lên 65°C và tăng lưu lượng gió 10%.',
+        justification:
+          'Rút ngắn thời gian sấy tầng sôi từ 45 phút xuống 30 phút nhằm tối ưu hóa nhiệt phân hủy hoạt chất.',
+        description:
+          'Thay đổi thông số nhiệt độ khí vào từ 60°C lên 65°C và tăng lưu lượng gió 10%.',
         targetImplementationDate: '2026-06-30',
         proposedBy: 'production_lead@pqm.com',
         proposedAt: now,
@@ -66,7 +75,8 @@ export class ChangeControlAppService {
           detectability: 2,
           rpn: 12,
           riskLevel: 'LOW',
-          mitigationPlan: 'Sản xuất thử nghiệm 03 lô pilot và kiểm nghiệm độ hòa tan tại phút thứ 15 và 30.'
+          mitigationPlan:
+            'Sản xuất thử nghiệm 03 lô pilot và kiểm nghiệm độ hòa tan tại phút thứ 15 và 30.',
         },
         actionItems: [
           {
@@ -75,26 +85,36 @@ export class ChangeControlAppService {
             responsible: 'qa_tech@pqm.com',
             deadline: '2026-03-01',
             status: 'COMPLETED',
-            completedAt: now
+            completedAt: now,
           },
           {
             id: 'act_2',
             title: 'Sản xuất và theo dõi độ ổn định 03 lô thẩm định',
             responsible: 'prod_lead@pqm.com',
             deadline: '2026-05-15',
-            status: 'IN_PROGRESS'
-          }
+            status: 'IN_PROGRESS',
+          },
         ],
         version: 1,
-        updatedAt: now
-      }
+        updatedAt: now,
+      },
     ];
   }
 
   /**
-   * Lấy toàn bộ danh sách Change Requests
+   * Lấy toàn bộ danh sách Change Requests từ Repository
    */
   async getAll(): Promise<ChangeRequest[]> {
+    try {
+      const items = await this.repo.findAll();
+      if (items && items.length > 0) {
+        this.records = items;
+        this.saveToStorage();
+        return [...items].sort((a, b) => (b.proposedAt || '').localeCompare(a.proposedAt || ''));
+      }
+    } catch (e) {
+      console.warn('[ChangeControlAppService] Lỗi tải từ repository, chuyển sang local cache:', e);
+    }
     return [...this.records].sort((a, b) => (b.proposedAt || '').localeCompare(a.proposedAt || ''));
   }
 
@@ -102,14 +122,20 @@ export class ChangeControlAppService {
    * Lấy chi tiết một Change Request theo ID
    */
   async getById(id: string): Promise<ChangeRequest | null> {
-    return this.records.find(r => r.id === id) || null;
+    try {
+      const item = await this.repo.findById(id);
+      if (item) return item;
+    } catch (e) {
+      console.warn('[ChangeControlAppService] Lỗi tìm theo ID trên repository:', e);
+    }
+    return this.records.find((r) => r.id === id) || null;
   }
 
   /**
    * Khởi tạo Change Request mới
    */
   async createChangeRequest(
-    input: CreateChangeRequestInput, 
+    input: CreateChangeRequestInput,
     currentUser: { email?: string }
   ): Promise<ChangeRequest> {
     const id = generateId('cr');
@@ -136,8 +162,14 @@ export class ChangeControlAppService {
       proposedAt: now.toISOString(),
       actionItems: [],
       version: 1,
-      updatedAt: now.toISOString()
+      updatedAt: now.toISOString(),
     };
+
+    try {
+      await this.repo.save(newCR);
+    } catch (e) {
+      console.warn('[ChangeControlAppService] Lưu repository cảnh báo, lưu bộ nhớ dự phòng:', e);
+    }
 
     this.records.unshift(newCR);
     this.saveToStorage();
@@ -147,7 +179,7 @@ export class ChangeControlAppService {
       collection: 'DEVIATIONS',
       documentId: id,
       details: `Khởi tạo Yêu cầu Thay đổi GMP: ${crNo} (${input.changeType}) - Nhóm: ${input.category}`,
-      performedBy: currentUser?.email || 'SYSTEM'
+      performedBy: currentUser?.email || 'SYSTEM',
     });
 
     return newCR;
@@ -165,19 +197,24 @@ export class ChangeControlAppService {
     if (!cr) throw new Error(`Không tìm thấy Change Request: ${id}`);
 
     const rpn = fmea.severity * fmea.probability * fmea.detectability;
-    const riskLevel: 'LOW' | 'MEDIUM' | 'HIGH' = 
-      rpn >= 60 ? 'HIGH' : rpn >= 25 ? 'MEDIUM' : 'LOW';
+    const riskLevel: 'LOW' | 'MEDIUM' | 'HIGH' = rpn >= 60 ? 'HIGH' : rpn >= 25 ? 'MEDIUM' : 'LOW';
 
     const updatedAssessment: FMEARiskAssessment = {
       ...fmea,
       rpn,
-      riskLevel
+      riskLevel,
     };
 
     cr.riskAssessment = updatedAssessment;
     cr.status = cr.status === 'DRAFT' ? 'IMPACT_ASSESSMENT' : cr.status;
     cr.version = nextVersion(cr.version);
     cr.updatedAt = new Date().toISOString();
+
+    try {
+      await this.repo.update(cr);
+    } catch (e) {
+      console.warn('[ChangeControlAppService] Lỗi update repository:', e);
+    }
 
     this.saveToStorage();
 
@@ -186,7 +223,7 @@ export class ChangeControlAppService {
       collection: 'DEVIATIONS',
       documentId: id,
       details: `Cập nhật FMEA Risk Assessment cho ${cr.crNo}: RPN=${rpn} (${riskLevel})`,
-      performedBy: currentUser?.email || 'SYSTEM'
+      performedBy: currentUser?.email || 'SYSTEM',
     });
 
     return cr;
@@ -197,7 +234,9 @@ export class ChangeControlAppService {
    */
   async addActionItem(
     id: string,
-    item: Omit<ChangeActionItem, 'id' | 'status'> & { status?: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' },
+    item: Omit<ChangeActionItem, 'id' | 'status'> & {
+      status?: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED';
+    },
     currentUser: { email?: string }
   ): Promise<ChangeRequest> {
     const cr = await this.getById(id);
@@ -206,12 +245,18 @@ export class ChangeControlAppService {
     const newItem: ChangeActionItem = {
       ...item,
       id: generateId('cr_act'),
-      status: item.status || 'PENDING'
+      status: item.status || 'PENDING',
     };
 
     cr.actionItems = [...(cr.actionItems || []), newItem];
     cr.version = nextVersion(cr.version);
     cr.updatedAt = new Date().toISOString();
+
+    try {
+      await this.repo.update(cr);
+    } catch (e) {
+      console.warn('[ChangeControlAppService] Lỗi update repository:', e);
+    }
 
     this.saveToStorage();
 
@@ -220,7 +265,7 @@ export class ChangeControlAppService {
       collection: 'DEVIATIONS',
       documentId: id,
       details: `Thêm hành động thay đổi vào ${cr.crNo}: ${newItem.title} (Phụ trách: ${newItem.responsible})`,
-      performedBy: currentUser?.email || 'SYSTEM'
+      performedBy: currentUser?.email || 'SYSTEM',
     });
 
     return cr;
@@ -237,12 +282,12 @@ export class ChangeControlAppService {
     const cr = await this.getById(id);
     if (!cr) throw new Error(`Không tìm thấy Change Request: ${id}`);
 
-    cr.actionItems = (cr.actionItems || []).map(act => {
+    cr.actionItems = (cr.actionItems || []).map((act) => {
       if (act.id === actionId) {
         return {
           ...act,
           status: 'COMPLETED' as const,
-          completedAt: new Date().toISOString()
+          completedAt: new Date().toISOString(),
         };
       }
       return act;
@@ -251,6 +296,12 @@ export class ChangeControlAppService {
     cr.version = nextVersion(cr.version);
     cr.updatedAt = new Date().toISOString();
 
+    try {
+      await this.repo.update(cr);
+    } catch (e) {
+      console.warn('[ChangeControlAppService] Lỗi update repository:', e);
+    }
+
     this.saveToStorage();
 
     logAuditAction({
@@ -258,7 +309,7 @@ export class ChangeControlAppService {
       collection: 'DEVIATIONS',
       documentId: id,
       details: `Hoàn tất hành động ${actionId} trong ${cr.crNo}`,
-      performedBy: currentUser?.email || 'SYSTEM'
+      performedBy: currentUser?.email || 'SYSTEM',
     });
 
     return cr;
@@ -278,15 +329,20 @@ export class ChangeControlAppService {
 
     // Kiểm tra quy định khi đóng thay đổi
     if (newStatus === 'CLOSED') {
-      const isAuthorized = currentUser?.isAdmin || currentUser?.role === 'QA' || currentUser?.role === 'ADMIN';
+      const isAuthorized =
+        currentUser?.isAdmin || currentUser?.role === 'QA' || currentUser?.role === 'ADMIN';
       if (!isAuthorized) {
-        throw new Error('Từ chối quyền: Chỉ Quản lý QA hoặc Quản trị viên mới có thẩm quyền Đóng (Close) Change Request.');
+        throw new Error(
+          'Từ chối quyền: Chỉ Quản lý QA hoặc Quản trị viên mới có thẩm quyền Đóng (Close) Change Request.'
+        );
       }
 
       // Kiểm tra tất cả hành động đã hoàn tất chưa
-      const hasUnfinished = (cr.actionItems || []).some(a => a.status !== 'COMPLETED');
+      const hasUnfinished = (cr.actionItems || []).some((a) => a.status !== 'COMPLETED');
       if (hasUnfinished) {
-        throw new Error('Không thể đóng thay đổi: Vẫn còn các hành động trong kế hoạch chưa hoàn thành.');
+        throw new Error(
+          'Không thể đóng thay đổi: Vẫn còn các hành động trong kế hoạch chưa hoàn thành.'
+        );
       }
 
       cr.closedBy = currentUser?.email || 'QA_ADMIN';
@@ -303,6 +359,12 @@ export class ChangeControlAppService {
     cr.version = nextVersion(cr.version);
     cr.updatedAt = new Date().toISOString();
 
+    try {
+      await this.repo.update(cr);
+    } catch (e) {
+      console.warn('[ChangeControlAppService] Lỗi update repository:', e);
+    }
+
     this.saveToStorage();
 
     logAuditAction({
@@ -310,7 +372,7 @@ export class ChangeControlAppService {
       collection: 'DEVIATIONS',
       documentId: id,
       details: `Chuyển trạng thái Change Request ${cr.crNo}: -> ${newStatus}${notes ? ` (${notes})` : ''}`,
-      performedBy: currentUser?.email || 'SYSTEM'
+      performedBy: currentUser?.email || 'SYSTEM',
     });
 
     return cr;

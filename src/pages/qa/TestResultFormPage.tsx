@@ -47,6 +47,9 @@ const TestResultFormPage: React.FC = () => {
   const products = useAppStore((state) => state.products);
   const tccsList = useAppStore((state) => state.tccsList);
   const addBatch = useAppStore((state) => state.addBatch);
+  const updateTestResultWorkflowStatus = useAppStore(
+    (state) => state.updateTestResultWorkflowStatus
+  );
   const { batches: hydratedBatches } = useDataGraph();
 
   const {
@@ -106,6 +109,21 @@ const TestResultFormPage: React.FC = () => {
   const [isComparisonModalOpen, setIsComparisonModalOpen] = useState(false);
   const aiDraftAppliedRef = useRef(false);
   const [isApplyingAIDraft, setIsApplyingAIDraft] = useState(false);
+  const [isTransitioning, setIsTransitioning] = useState(false);
+
+  const handleWorkflowTransition = async (targetStatus: string) => {
+    if (!crud.selectedItem) return;
+    try {
+      setIsTransitioning(true);
+      await updateTestResultWorkflowStatus(crud.selectedItem.id, targetStatus);
+      toast.success(`Đã chuyển trạng thái quy trình: ${targetStatus}`);
+      navigate('/test-results');
+    } catch (err: any) {
+      toast.error(err.message || 'Lỗi khi chuyển trạng thái quy trình');
+    } finally {
+      setIsTransitioning(false);
+    }
+  };
 
   // Criteria list from active TCCS for matching
   const allCriteria = useMemo(() => {
@@ -485,16 +503,52 @@ const TestResultFormPage: React.FC = () => {
             }
             right={
               <div className="flex items-center gap-3">
+                {crud.mode === 'EDIT' && crud.selectedItem && (
+                  <>
+                    {((crud.selectedItem as any).workflowStatus || 'DRAFT') === 'DRAFT' && (
+                      <button
+                        type="button"
+                        onClick={() => handleWorkflowTransition('SUBMITTED')}
+                        disabled={isTransitioning || isSubmitting}
+                        className="px-4 py-2 bg-amber-600 hover:bg-amber-700 active:bg-amber-800 text-white font-medium rounded-lg text-xs tracking-wide transition-all cursor-pointer disabled:opacity-40"
+                      >
+                        Trình duyệt (Submit)
+                      </button>
+                    )}
+                    {(crud.selectedItem as any).workflowStatus === 'SUBMITTED' && (
+                      <button
+                        type="button"
+                        onClick={() => handleWorkflowTransition('FINAL')}
+                        disabled={isTransitioning || isSubmitting}
+                        className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white font-medium rounded-lg text-xs tracking-wide transition-all cursor-pointer disabled:opacity-40"
+                      >
+                        Chốt kết quả (Finalize)
+                      </button>
+                    )}
+                    {(crud.selectedItem as any).workflowStatus === 'FINAL' && (
+                      <button
+                        type="button"
+                        onClick={() => handleWorkflowTransition('APPROVED')}
+                        disabled={isTransitioning || isSubmitting}
+                        className="px-4 py-2 bg-emerald-700 hover:bg-emerald-800 active:bg-emerald-900 text-white font-medium rounded-lg text-xs tracking-wide transition-all cursor-pointer disabled:opacity-40"
+                      >
+                        Phê duyệt QA (Approve)
+                      </button>
+                    )}
+                  </>
+                )}
                 <button
                   type="submit"
-                  disabled={!activeTCCS || isSubmitting}
+                  disabled={!activeTCCS || isSubmitting || isTransitioning}
                   className={`px-5 py-2 text-white font-medium rounded-lg shadow-xs transition-all text-xs tracking-wide flex items-center gap-2 cursor-pointer ${
                     crud.mode === 'EDIT'
                       ? 'bg-blue-600 hover:bg-blue-700 active:bg-blue-800'
                       : 'bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800'
                   } disabled:opacity-40 disabled:cursor-not-allowed`}
                 >
-                  {isSubmitting && <ArrowPathIcon className="w-4 h-4 animate-spin" />}
+                  {(isSubmitting || isTransitioning) && (
+                    <ArrowPathIcon className="w-4 h-4 animate-spin" />
+                  )}
                   {crud.mode === 'EDIT'
                     ? isSubmitting
                       ? 'Đang cập nhật...'

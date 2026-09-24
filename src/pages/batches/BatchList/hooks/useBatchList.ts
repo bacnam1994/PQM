@@ -206,17 +206,6 @@ export function useBatchList() {
           title: 'Đã xóa',
           message: `Đã xóa lô ${crud.selectedItem.batchNo}`,
         });
-        try {
-          logAuditAction({
-            action: 'DELETE',
-            collection: 'BATCHES',
-            documentId: crud.selectedItem.id,
-            details: `Xóa lô ID: ${crud.selectedItem.id}`,
-            performedBy: user?.email || 'unknown',
-          });
-        } catch (logErr) {
-          console.warn('Ghi log thất bại:', logErr);
-        }
       } catch (error) {
         console.error('Failed to delete batch:', error);
       }

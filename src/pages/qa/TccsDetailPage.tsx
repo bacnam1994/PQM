@@ -1,5 +1,6 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
+import { firebaseApprovalTaskRepository } from '../../repositories/firebase/FirebaseApprovalTaskRepository';
 import {
   ArrowLeftIcon,
   DocumentTextIcon,
@@ -169,6 +170,19 @@ const TccsDetailPage = () => {
     setShowImpactModal(true);
   };
 
+  useEffect(() => {
+    if (tccs?.id) {
+      firebaseApprovalTaskRepository
+        .findByEntity('TCCS', tccs.id)
+        .then((tasks) => {
+          if (tasks && tasks.length > 0) {
+            setWorkflowTask(tasks[0]);
+          }
+        })
+        .catch((e) => console.warn('[TccsDetailPage] Lỗi tải approval task:', e));
+    }
+  }, [tccs?.id]);
+
   const handleSignatureSuccess = async (sig: ElectronicSignature) => {
     try {
       const userParam = user
@@ -181,6 +195,11 @@ const TccsDetailPage = () => {
         'Phê duyệt phiên bản tiêu chuẩn cơ sở',
         sig
       );
+      try {
+        await firebaseApprovalTaskRepository.save(updated);
+      } catch (repoErr) {
+        console.warn('[TccsDetailPage] Lỗi lưu phê duyệt vào repository:', repoErr);
+      }
       setWorkflowTask(updated);
       setShowSignModal(false);
       toast.success(`Đã ký duyệt thành công! Trạng thái nhiệm vụ: ${updated.status}`);

@@ -164,6 +164,7 @@ export const useAppTestResults = () => {
     addTestResult: state.addTestResult,
     updateTestResult: state.updateTestResult,
     deleteTestResult: state.deleteTestResult,
+    updateTestResultWorkflowStatus: state.updateTestResultWorkflowStatus,
     loadMoreTestResults: state.loadMoreTestResults,
     mergeTestResults: state.mergeTestResults,
     fetchAllTestResultsForDashboard: state.fetchAllTestResultsForDashboard,

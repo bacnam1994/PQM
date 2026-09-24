@@ -247,7 +247,7 @@ export class BatchAppService {
     }
 
     // 4. Kiểm tra chữ ký điện tử khi được yêu cầu (FDA 21 CFR Part 11 Compliance)
-    if (status === 'RELEASED' && !isActorAdmin) {
+    if (status === 'RELEASED') {
       if (options?.requireSignature && !options?.signature) {
         throw new Error(
           'Quy định 21 CFR Part 11: Yêu cầu chữ ký điện tử hợp lệ của QA/Admin trước khi xuất xưởng Lô.'
@@ -268,7 +268,7 @@ export class BatchAppService {
     }
 
     // 5. Ràng buộc bảo toàn dữ liệu & GMP Release Guard (Business Gate: ReleaseRules / BatchRules) (WF-007, WF-019)
-    if (status === 'RELEASED' && !isActorAdmin) {
+    if (status === 'RELEASED') {
       let freshTestResults: TestResult[] = options?.batchTestResults || [];
       if (this.repo && typeof (this.repo as any).findTestResultsByBatchId === 'function') {
         freshTestResults = await (this.repo as any).findTestResultsByBatchId(batchId);

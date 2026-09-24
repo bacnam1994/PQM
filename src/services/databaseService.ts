@@ -171,15 +171,21 @@ export const deleteTestResultService = async (id: string) => {
 };
 
 /**
- * Xóa toàn bộ dữ liệu (Dùng cho Admin)
+ * @deprecated NGUY HIỂM: Hàm xóa toàn bộ dữ liệu gốc. Đã bị vô hiệu hóa để bảo đảm an toàn dữ liệu sản xuất.
  */
-export const clearDatabaseService = async () => {
+export const clearDatabaseService = async (confirmToken?: string) => {
+  if (confirmToken !== 'CONFIRM_PURGE_PRODUCTION_DATA_DANGEROUS') {
+    throw new Error(
+      'Hành động xóa toàn bộ cơ sở dữ liệu đã bị khóa bởi hệ thống bảo vệ toàn vẹn dữ liệu PQM.'
+    );
+  }
   await set(ref(db), null);
 };
 
 /**
- * Cập nhật hàng loạt (Dùng cho Restore/Demo data)
+ * Cập nhật hàng loạt (Dùng cho Restore/Demo data với Security Guard)
  */
 export const updateRootService = async (updates: Record<string, any>) => {
+  if (!updates || Object.keys(updates).length === 0) return;
   await update(ref(db), updates);
 };

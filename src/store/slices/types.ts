@@ -136,6 +136,11 @@ export interface TestResultSliceActions {
   addTestResult: (r: TestResult) => Promise<void>;
   updateTestResult: (r: TestResult) => Promise<void>;
   deleteTestResult: (id: string) => Promise<void>;
+  updateTestResultWorkflowStatus: (
+    id: string,
+    newStatus: string,
+    options?: { reason?: string; signature?: any; requireSignature?: boolean }
+  ) => Promise<void>;
   loadMoreTestResults: () => void;
   mergeTestResults: (list: TestResult[]) => void;
   fetchAllTestResultsForDashboard: () => Promise<void>;

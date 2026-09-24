@@ -1,13 +1,16 @@
 /**
- * PQM 3.0 - TCCS Application Service
+ * PQM 3.0 & V4 - TCCS Application Service
  * Điều phối các nghiệp vụ quản lý Tiêu chuẩn cơ sở (TCCS): RBAC, Single Active Version, Criteria Alias Sync và Audit Logging
+ * Tuân thủ nghiêm ngặt Repository Pattern, không truy cập trực tiếp Firebase Database.
  */
 
-import { ref, set, update, remove } from 'firebase/database';
-import { db } from '../../firebase';
 import { TCCS, Batch, CriteriaAlias, AILearnedMapping } from '../../types';
 import { ITCCSRepository } from '../../repositories/TCCSRepository';
 import { tccsRepository as defaultTccsRepo } from '../../repositories/firebase/FirebaseTCCSRepository';
+import { ICriteriaAliasRepository } from '../../repositories/CriteriaAliasRepository';
+import { criteriaAliasRepository as defaultCriteriaAliasRepo } from '../../repositories/firebase/FirebaseCriteriaAliasRepository';
+import { IAILearnedMappingRepository } from '../../repositories/AILearnedMappingRepository';
+import { aiLearnedMappingRepository as defaultAiLearnedMappingRepo } from '../../repositories/firebase/FirebaseAILearnedMappingRepository';
 import { can } from '../permissionService';
 import { logAuditAction } from '../auditService';
 import {
@@ -19,7 +22,11 @@ import {
 import { removeUndefined } from '../../utils';
 
 export class TCCSAppService {
-  constructor(private repo: ITCCSRepository = defaultTccsRepo) {}
+  constructor(
+    private repo: ITCCSRepository = defaultTccsRepo,
+    private aliasRepo: ICriteriaAliasRepository = defaultCriteriaAliasRepo,
+    private aiRepo: IAILearnedMappingRepository = defaultAiLearnedMappingRepo
+  ) {}
 
   async createTCCS(tccs: TCCS, existingTCCSList: TCCS[] = [], currentUser: any): Promise<void> {
     if (!can(currentUser, 'tccs:create')) {
@@ -108,7 +115,13 @@ export class TCCSAppService {
         if (existing) {
           const merged = mergeAliases(existing, [change.oldName]);
           if (change.autoConfirm) merged.confirmedByAdmin = true;
-          aliasUpdates[`criteria_aliases/${existing.id}`] = removeUndefined(merged);
+          const cleanMerged = removeUndefined(merged);
+          aliasUpdates[`criteria_aliases/${existing.id}`] = cleanMerged;
+          try {
+            await this.aliasRepo.update(cleanMerged);
+          } catch (e: any) {
+            console.warn('Lỗi cập nhật alias khi cập nhật TCCS:', e);
+          }
         } else {
           const newId = `ca_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
           const newAlias: CriteriaAlias = {
@@ -121,16 +134,14 @@ export class TCCSAppService {
               change.autoConfirm
             ),
           };
-          aliasUpdates[`criteria_aliases/${newId}`] = removeUndefined(newAlias);
+          const cleanNewAlias = removeUndefined(newAlias);
+          aliasUpdates[`criteria_aliases/${newId}`] = cleanNewAlias;
+          try {
+            await this.aliasRepo.save(cleanNewAlias);
+          } catch (e: any) {
+            console.warn('Lỗi lưu alias mới khi cập nhật TCCS:', e);
+          }
         }
-      }
-    }
-
-    if (Object.keys(aliasUpdates).length > 0) {
-      try {
-        await update(ref(db), aliasUpdates);
-      } catch (e: any) {
-        console.warn('Lỗi cập nhật alias khi cập nhật TCCS:', e);
       }
     }
 
@@ -150,7 +161,7 @@ export class TCCSAppService {
   async deleteTCCS(
     id: string,
     batches: Batch[] = [],
-    currentUser: any,
+    currentUser?: any,
     tccsCode?: string,
     existingAliases: CriteriaAlias[] = []
   ): Promise<void> {
@@ -166,17 +177,15 @@ export class TCCSAppService {
 
     await this.repo.delete(id);
 
-    // Tự động dọn dẹp các Criteria Alias gắn liền với TCCS này để tránh orphan records
+    // Xóa liên kết alias mồ côi
     const relatedAliases = existingAliases.filter((a) => a.tccsId === id);
     if (relatedAliases.length > 0) {
-      const aliasUpdates: Record<string, any> = {};
-      relatedAliases.forEach((a) => {
-        aliasUpdates[`criteria_aliases/${a.id}`] = null;
-      });
-      try {
-        await update(ref(db), aliasUpdates);
-      } catch (e: any) {
-        console.warn('Lỗi dọn dẹp alias khi xóa TCCS:', e);
+      for (const a of relatedAliases) {
+        try {
+          await this.aliasRepo.delete(a.id);
+        } catch (e: any) {
+          console.warn('Lỗi dọn dẹp alias khi xóa TCCS:', e);
+        }
       }
     }
 
@@ -202,12 +211,11 @@ export class TCCSAppService {
     const now = new Date().toISOString();
 
     if (existing) {
-      const targetPath = `ai_learned_mappings/${existing.id}`;
-      const updates = {
+      await this.aiRepo.update({
+        ...existing,
         frequency: existing.frequency + 1,
         updatedAt: now,
-      };
-      await update(ref(db, targetPath), updates);
+      });
     } else {
       const newId = `aim_${Date.now()}`;
       const newMapping: AILearnedMapping = {
@@ -218,8 +226,7 @@ export class TCCSAppService {
         createdAt: now,
         updatedAt: now,
       };
-      const targetPath = `ai_learned_mappings/${newId}`;
-      await set(ref(db, targetPath), newMapping);
+      await this.aiRepo.save(newMapping);
     }
 
     logAuditAction({
@@ -238,8 +245,7 @@ export class TCCSAppService {
     }
 
     const cleanAlias = removeUndefined(alias);
-    const targetPath = `criteria_aliases/${alias.id}`;
-    await set(ref(db, targetPath), cleanAlias);
+    await this.aliasRepo.save(cleanAlias);
 
     logAuditAction({
       action: 'CREATE',
@@ -256,8 +262,7 @@ export class TCCSAppService {
     }
 
     const updated = removeUndefined({ ...alias, updatedAt: new Date().toISOString() });
-    const targetPath = `criteria_aliases/${alias.id}`;
-    await update(ref(db, targetPath), updated);
+    await this.aliasRepo.update(updated);
 
     logAuditAction({
       action: 'UPDATE',
@@ -273,8 +278,7 @@ export class TCCSAppService {
       throw new Error('Từ chối quyền: Bạn không có quyền xóa Criteria Alias.');
     }
 
-    const targetPath = `criteria_aliases/${id}`;
-    await remove(ref(db, targetPath));
+    await this.aliasRepo.delete(id);
 
     logAuditAction({
       action: 'DELETE',
