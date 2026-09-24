@@ -155,17 +155,23 @@ describe('Batch Workflow Regression Tests', () => {
       expect(BatchStateMachine.canTransition('RELEASED', 'REJECTED', admin).allowed).toBe(false);
     });
 
-    it('REJECTED sang TESTING hoặc RELEASED bị cấm đối với QA/nhân viên, nhưng ADMIN được trao quyền tối đa phục hồi Lô', () => {
+    it('REJECTED sang TESTING hoặc RELEASED bị cấm đối với mọi vai trò (kể cả ADMIN), bắt buộc mở lại PENDING qua CAPA', () => {
       // QA không thể nhảy cóc từ REJECTED sang TESTING (bắt buộc mở lại PENDING qua CAPA)
       expect(BatchStateMachine.canTransition('REJECTED', 'TESTING', qa).allowed).toBe(false);
-      // REJECTED sang RELEASED khi chưa kiểm nghiệm đạt bị chặn
+      // ADMIN cũng không được phép nhảy cóc từ REJECTED sang TESTING (ADMIN ≠ workflow bypass)
+      expect(BatchStateMachine.canTransition('REJECTED', 'TESTING', admin).allowed).toBe(false);
+      // REJECTED sang RELEASED bị cấm tuyệt đối
       expect(
         BatchStateMachine.canTransition('REJECTED', 'RELEASED', { ...admin, conditionsMet: false })
           .allowed
       ).toBe(false);
-      // ADMIN có thẩm quyền tối cao được phép phục hồi Lô từ REJECTED sang TESTING và PENDING
-      expect(BatchStateMachine.canTransition('REJECTED', 'TESTING', admin).allowed).toBe(true);
-      expect(BatchStateMachine.canTransition('REJECTED', 'PENDING', admin).allowed).toBe(true);
+      // ADMIN được phép mở lại Lô từ REJECTED sang PENDING khi có lý do CAPA
+      expect(
+        BatchStateMachine.canTransition('REJECTED', 'PENDING', {
+          ...admin,
+          reason: 'Kế hoạch tái kiểm tra CAPA-2026',
+        }).allowed
+      ).toBe(true);
     });
   });
 });

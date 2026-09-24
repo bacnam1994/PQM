@@ -17,37 +17,11 @@ import { logAuditAction } from '../auditService';
 import { IChangeControlRepository } from '../../repositories/IChangeControlRepository';
 import { firebaseChangeControlRepository } from '../../repositories/firebase/FirebaseChangeControlRepository';
 
-const STORAGE_KEY = 'PQM_CHANGE_CONTROL_RECORDS';
-
 export class ChangeControlAppService {
   private records: ChangeRequest[] = [];
 
   constructor(private repo: IChangeControlRepository = firebaseChangeControlRepository) {
-    this.loadFromStorage();
-  }
-
-  private loadFromStorage() {
-    try {
-      const raw = typeof localStorage !== 'undefined' ? localStorage.getItem(STORAGE_KEY) : null;
-      if (raw) {
-        this.records = JSON.parse(raw);
-      } else {
-        this.records = this.getInitialSampleData();
-        this.saveToStorage();
-      }
-    } catch {
-      this.records = this.getInitialSampleData();
-    }
-  }
-
-  private saveToStorage() {
-    try {
-      if (typeof localStorage !== 'undefined') {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(this.records));
-      }
-    } catch {
-      // Bỏ qua nếu lỗi quota
-    }
+    this.records = this.getInitialSampleData();
   }
 
   private getInitialSampleData(): ChangeRequest[] {
@@ -109,7 +83,7 @@ export class ChangeControlAppService {
       const items = await this.repo.findAll();
       if (items && items.length > 0) {
         this.records = items;
-        this.saveToStorage();
+
         return [...items].sort((a, b) => (b.proposedAt || '').localeCompare(a.proposedAt || ''));
       }
     } catch (e) {
@@ -172,7 +146,6 @@ export class ChangeControlAppService {
     }
 
     this.records.unshift(newCR);
-    this.saveToStorage();
 
     logAuditAction({
       action: 'CREATE',
@@ -216,8 +189,6 @@ export class ChangeControlAppService {
       console.warn('[ChangeControlAppService] Lỗi update repository:', e);
     }
 
-    this.saveToStorage();
-
     logAuditAction({
       action: 'UPDATE',
       collection: 'DEVIATIONS',
@@ -257,8 +228,6 @@ export class ChangeControlAppService {
     } catch (e) {
       console.warn('[ChangeControlAppService] Lỗi update repository:', e);
     }
-
-    this.saveToStorage();
 
     logAuditAction({
       action: 'UPDATE',
@@ -301,8 +270,6 @@ export class ChangeControlAppService {
     } catch (e) {
       console.warn('[ChangeControlAppService] Lỗi update repository:', e);
     }
-
-    this.saveToStorage();
 
     logAuditAction({
       action: 'UPDATE',
@@ -364,8 +331,6 @@ export class ChangeControlAppService {
     } catch (e) {
       console.warn('[ChangeControlAppService] Lỗi update repository:', e);
     }
-
-    this.saveToStorage();
 
     logAuditAction({
       action: 'UPDATE',

@@ -20,7 +20,6 @@ import {
 } from '@heroicons/react/24/outline';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import { Product, ProductStatus } from '../../types';
-import { logAuditAction } from '../../services/auditService';
 import {
   StatusBadge,
   PageHeader,
@@ -550,19 +549,6 @@ const ProductList: React.FC = () => {
           title: 'Đã xóa',
           message: `Đã xóa sản phẩm ${crud.selectedItem!.name}`,
         });
-
-        // Ghi log an toàn
-        try {
-          logAuditAction({
-            action: 'DELETE',
-            collection: 'PRODUCTS',
-            documentId: crud.selectedItem!.id,
-            details: `Xóa sản phẩm: ${crud.selectedItem!.name}`,
-            performedBy: user?.email || 'unknown',
-          });
-        } catch (logErr) {
-          console.warn('Ghi log thất bại:', logErr);
-        }
       } catch (error) {
         console.error('Failed to delete product:', error);
       }

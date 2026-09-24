@@ -1273,25 +1273,29 @@ export const autoHealAllWithAI = async (storeGetState: () => any) => {
   if (plan.totalActionsCount === 0) {
     return {
       success: true,
+      requiresApproval: false,
       message: `✅ Hệ thống đã được kiểm tra: Đạt ${report.overallScore}/100 điểm (${report.grade}). Không phát hiện liên kết nào cần tự động sửa chữa.`,
       healedCount: 0,
       score: report.overallScore,
     };
   }
 
-  const healedCount = await executeAutoHealPlan(plan, {
-    updateProductFormula: state.updateProductFormula,
-    updateTestResult: state.updateTestResult,
-    updateTCCS: state.updateTCCS,
-    deleteCriteriaAlias: state.deleteCriteriaAlias,
-    testResults: state.testResults || [],
-    tccsList: state.tccsList || [],
-  });
-
+  // BẤT BIẾN GMP/ALCOA+: AI TUYỆT ĐỐI KHÔNG TỰ Ý THỰC THI SỬA ĐỔI HÀNG LOẠT VÀO DATABASE
+  // AI chỉ được PROPOSE, người dùng (QA/Admin) phải REVIEW và APPROVE
   return {
     success: true,
-    message: `🛠️ Đã tự động hàn gắn và chuẩn hóa thành công **${healedCount} liên kết dữ liệu** trên hệ thống!\n- Điểm chất lượng dữ liệu: **${report.overallScore}/100**\n- Các tác vụ hoàn tất: Liên kết nguyên liệu vào công thức, đồng bộ trạng thái phiếu kiểm nghiệm, sửa cờ hiệu lực TCCS và dọn dẹp ánh xạ mồ côi.`,
-    healedCount,
+    requiresApproval: true,
+    proposal: {
+      planId: `healing-plan-${Date.now()}`,
+      issuesCount: report.issues.length,
+      autoHealableCount: report.autoHealableCount,
+      totalActionsCount: plan.totalActionsCount,
+      score: report.overallScore,
+      grade: report.grade,
+      planSummary: plan,
+    },
+    message: `📋 **Đề xuất kế hoạch hàn gắn dữ liệu (Healing Proposal):**\n- Phát hiện: **${report.issues.length} vấn đề** (${plan.totalActionsCount} thao tác tự động đề xuất).\n- Điểm chất lượng dữ liệu: **${report.overallScore}/100** (${report.grade}).\n- *Bảo mật GMP:* AI đã lập kế hoạch hàn gắn an toàn. Vui lòng vào trang **[Kiểm toán Tính nhất quán](/settings)** để xem xét (QA Review) và bấm Phê duyệt thực thi.`,
+    healedCount: 0,
     score: report.overallScore,
   };
 };

@@ -5,15 +5,19 @@ import { useUIStore } from '../../../../store/useUIStore';
 import { useCrud } from '../../../../hooks';
 import { RawMaterial, ProductFormula } from '../../../../types';
 import { generateId } from '../../../../utils';
-import { 
-  analyzeMaterialDuplicates, 
-  createMergeExecutionPlan, 
-  DuplicateGroup, 
+import {
+  analyzeMaterialDuplicates,
+  createMergeExecutionPlan,
+  DuplicateGroup,
   HarmonizationReport,
-  calculateStringSimilarity
+  calculateStringSimilarity,
 } from '../../../../services/ai/materialHarmonizerService';
-import { logAuditAction } from '../../../../services/auditService';
-import { AggregatedFormulaItem, MaterialCategoryFilter, MaterialTab, MaterialUsageFilter } from '../types';
+import {
+  AggregatedFormulaItem,
+  MaterialCategoryFilter,
+  MaterialTab,
+  MaterialUsageFilter,
+} from '../types';
 
 export const CAS_REGEX = /^\d{2,7}-\d{2}-\d{1}$/;
 export const validateCasNumber = (cas: string): boolean => {
@@ -23,23 +27,23 @@ export const validateCasNumber = (cas: string): boolean => {
 
 export const useMaterialListState = () => {
   const { rawMaterials: hydratedMaterials } = useDataGraph();
-  const rawMaterials = useAppStore(state => state.rawMaterials);
-  const products = useAppStore(state => state.products);
-  const productFormulas = useAppStore(state => state.productFormulas);
-  const addRawMaterial = useAppStore(state => state.addRawMaterial);
-  const updateRawMaterial = useAppStore(state => state.updateRawMaterial);
-  const deleteRawMaterial = useAppStore(state => state.deleteRawMaterial);
-  const updateProductFormula = useAppStore(state => state.updateProductFormula);
-  const notify = useAppStore(state => state.notify);
-  const isAdmin = useAppStore(state => state.isAdmin);
-  const user = useAppStore(state => state.user);
+  const rawMaterials = useAppStore((state) => state.rawMaterials);
+  const products = useAppStore((state) => state.products);
+  const productFormulas = useAppStore((state) => state.productFormulas);
+  const addRawMaterial = useAppStore((state) => state.addRawMaterial);
+  const updateRawMaterial = useAppStore((state) => state.updateRawMaterial);
+  const deleteRawMaterial = useAppStore((state) => state.deleteRawMaterial);
+  const updateProductFormula = useAppStore((state) => state.updateProductFormula);
+  const notify = useAppStore((state) => state.notify);
+  const isAdmin = useAppStore((state) => state.isAdmin);
+  const user = useAppStore((state) => state.user);
 
   // Tab State
   const [activeTab, setActiveTab] = useState<MaterialTab>('CATALOG');
 
   // View Mode & Pagination
-  const viewMode = useUIStore(s => s.materialViewMode);
-  const setViewMode = useUIStore(s => s.setMaterialViewMode);
+  const viewMode = useUIStore((s) => s.materialViewMode);
+  const setViewMode = useUIStore((s) => s.setMaterialViewMode);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = viewMode === 'grid' ? 12 : 15;
 
@@ -74,47 +78,61 @@ export const useMaterialListState = () => {
   const [executingMergeGroupId, setExecutingMergeGroupId] = useState<string | null>(null);
 
   // Map tra cứu nhanh
-  const productMap = useMemo(() => new Map(products.map(p => [p.id, p])), [products]);
-  const materialMap = useMemo(() => new Map(rawMaterials.map(m => [m.id, m])), [rawMaterials]);
-  const hydratedMap = useMemo(() => new Map(hydratedMaterials.map(m => [m.id, m])), [hydratedMaterials]);
+  const productMap = useMemo(() => new Map(products.map((p) => [p.id, p])), [products]);
+  const materialMap = useMemo(() => new Map(rawMaterials.map((m) => [m.id, m])), [rawMaterials]);
+  const hydratedMap = useMemo(
+    () => new Map(hydratedMaterials.map((m) => [m.id, m])),
+    [hydratedMaterials]
+  );
 
   // Reset trang khi đổi filter
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, filterCategory, filterStandard, filterUsage, filterProductId, activeTab, viewMode]);
+  }, [
+    searchTerm,
+    filterCategory,
+    filterStandard,
+    filterUsage,
+    filterProductId,
+    activeTab,
+    viewMode,
+  ]);
 
   // TAB 1: Danh sách Master Catalog
   const filteredCatalog = useMemo(() => {
     const searchLower = searchTerm.toLowerCase();
 
-    return (rawMaterials || []).filter(mat => {
-      const matchesSearch = 
-        mat.name.toLowerCase().includes(searchLower) ||
-        (mat.code && mat.code.toLowerCase().includes(searchLower)) ||
-        (mat.standard && mat.standard.toLowerCase().includes(searchLower)) ||
-        (mat.casNumber && mat.casNumber.toLowerCase().includes(searchLower)) ||
-        (mat.aliases && mat.aliases.some(a => a.toLowerCase().includes(searchLower)));
+    return (rawMaterials || [])
+      .filter((mat) => {
+        const matchesSearch =
+          mat.name.toLowerCase().includes(searchLower) ||
+          (mat.code && mat.code.toLowerCase().includes(searchLower)) ||
+          (mat.standard && mat.standard.toLowerCase().includes(searchLower)) ||
+          (mat.casNumber && mat.casNumber.toLowerCase().includes(searchLower)) ||
+          (mat.aliases && mat.aliases.some((a) => a.toLowerCase().includes(searchLower)));
 
-      const matchesCategory = filterCategory === 'ALL' || mat.category === filterCategory;
-      const matchesStandard = filterStandard === 'ALL' || (mat.standard && mat.standard.includes(filterStandard));
+        const matchesCategory = filterCategory === 'ALL' || mat.category === filterCategory;
+        const matchesStandard =
+          filterStandard === 'ALL' || (mat.standard && mat.standard.includes(filterStandard));
 
-      const hydrated = hydratedMap.get(mat.id);
-      const isUsed = (hydrated?.usedInProducts?.length || 0) > 0;
-      const matchesUsage = filterUsage === 'ALL' || (filterUsage === 'USED' ? isUsed : !isUsed);
+        const hydrated = hydratedMap.get(mat.id);
+        const isUsed = (hydrated?.usedInProducts?.length || 0) > 0;
+        const matchesUsage = filterUsage === 'ALL' || (filterUsage === 'USED' ? isUsed : !isUsed);
 
-      return matchesSearch && matchesCategory && matchesStandard && matchesUsage;
-    }).sort((a, b) => a.name.localeCompare(b.name));
+        return matchesSearch && matchesCategory && matchesStandard && matchesUsage;
+      })
+      .sort((a, b) => a.name.localeCompare(b.name));
   }, [rawMaterials, searchTerm, filterCategory, filterStandard, filterUsage, hydratedMap]);
 
   // TAB 2: Danh sách Tổng hợp từ Công thức (Matrix)
   const aggregatedFormulaItems = useMemo(() => {
     const map = new Map<string, AggregatedFormulaItem>();
 
-    productFormulas.forEach(formula => {
+    productFormulas.forEach((formula) => {
       const product = productMap.get(formula.productId);
       if (!product) return;
 
-      (formula.ingredients || []).forEach(ing => {
+      (formula.ingredients || []).forEach((ing) => {
         if (!ing || !ing.name) return;
         const key = `ACTIVE_${ing.name.trim().toLowerCase()}`;
         if (!map.has(key)) {
@@ -124,7 +142,7 @@ export const useMaterialListState = () => {
             type: 'ACTIVE',
             materialId: ing.materialId,
             linkedMaterial: ing.materialId ? materialMap.get(ing.materialId) : undefined,
-            relatedProducts: []
+            relatedProducts: [],
           });
         }
         const item = map.get(key)!;
@@ -132,7 +150,7 @@ export const useMaterialListState = () => {
           item.materialId = ing.materialId;
           item.linkedMaterial = materialMap.get(ing.materialId);
         }
-        if (!item.relatedProducts.some(p => p.id === product.id)) {
+        if (!item.relatedProducts.some((p) => p.id === product.id)) {
           item.relatedProducts.push({
             id: product.id,
             name: product.name,
@@ -143,7 +161,7 @@ export const useMaterialListState = () => {
         }
       });
 
-      (formula.excipients || []).forEach(exc => {
+      (formula.excipients || []).forEach((exc) => {
         if (!exc || !exc.name) return;
         const key = `EXCIPIENT_${exc.name.trim().toLowerCase()}`;
         if (!map.has(key)) {
@@ -153,7 +171,7 @@ export const useMaterialListState = () => {
             type: 'EXCIPIENT',
             materialId: exc.materialId,
             linkedMaterial: exc.materialId ? materialMap.get(exc.materialId) : undefined,
-            relatedProducts: []
+            relatedProducts: [],
           });
         }
         const item = map.get(key)!;
@@ -161,7 +179,7 @@ export const useMaterialListState = () => {
           item.materialId = exc.materialId;
           item.linkedMaterial = materialMap.get(exc.materialId);
         }
-        if (!item.relatedProducts.some(p => p.id === product.id)) {
+        if (!item.relatedProducts.some((p) => p.id === product.id)) {
           item.relatedProducts.push({
             id: product.id,
             name: product.name,
@@ -177,50 +195,67 @@ export const useMaterialListState = () => {
   }, [productFormulas, productMap, materialMap]);
 
   const filteredMatrix = useMemo(() => {
-    return aggregatedFormulaItems.filter(item => {
+    return aggregatedFormulaItems.filter((item) => {
       const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase());
       const matchesType = filterCategory === 'ALL' || item.type === filterCategory;
-      const matchesProduct = filterProductId ? item.relatedProducts.some(p => p.id === filterProductId) : true;
+      const matchesProduct = filterProductId
+        ? item.relatedProducts.some((p) => p.id === filterProductId)
+        : true;
       const isLinked = !!item.materialId && materialMap.has(item.materialId);
       const matchesUsage = filterUsage === 'ALL' || (filterUsage === 'USED' ? isLinked : !isLinked);
       return matchesSearch && matchesType && matchesProduct && matchesUsage;
     });
-  }, [aggregatedFormulaItems, searchTerm, filterCategory, filterProductId, filterUsage, materialMap]);
+  }, [
+    aggregatedFormulaItems,
+    searchTerm,
+    filterCategory,
+    filterProductId,
+    filterUsage,
+    materialMap,
+  ]);
 
   // Metrics Bar Data
   const metrics = useMemo(() => {
     const total = rawMaterials.length;
-    const activeCount = rawMaterials.filter(m => m.category === 'ACTIVE').length;
-    const excipientCount = rawMaterials.filter(m => m.category === 'EXCIPIENT').length;
-    const usedCount = hydratedMaterials.filter(m => (m.usedInProducts?.length || 0) > 0).length;
+    const activeCount = rawMaterials.filter((m) => m.category === 'ACTIVE').length;
+    const excipientCount = rawMaterials.filter((m) => m.category === 'EXCIPIENT').length;
+    const usedCount = hydratedMaterials.filter((m) => (m.usedInProducts?.length || 0) > 0).length;
     const unusedCount = total - usedCount;
 
-    const unlinkedIngredients = aggregatedFormulaItems.filter(i => !i.materialId || !materialMap.has(i.materialId)).length;
+    const unlinkedIngredients = aggregatedFormulaItems.filter(
+      (i) => !i.materialId || !materialMap.has(i.materialId)
+    ).length;
     return { total, activeCount, excipientCount, usedCount, unusedCount, unlinkedIngredients };
   }, [rawMaterials, hydratedMaterials, aggregatedFormulaItems, materialMap]);
 
   // Phân trang
   const currentList = activeTab === 'CATALOG' ? filteredCatalog : filteredMatrix;
   const totalPages = Math.ceil(currentList.length / itemsPerPage);
-  const paginatedItems = currentList.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+  const paginatedItems = currentList.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
 
   // Kiểm tra trùng tên real-time với debounce 400ms
-  const checkDuplicateNames = useCallback((name: string, currentId?: string) => {
-    if (duplicateCheckTimer.current) clearTimeout(duplicateCheckTimer.current);
-    if (!name.trim() || name.trim().length < 3) {
-      setDuplicateWarnings([]);
-      return;
-    }
-    duplicateCheckTimer.current = setTimeout(() => {
-      const warnings = rawMaterials.filter(m => {
-        if (m.id === currentId) return false;
-        const score = calculateStringSimilarity(name, m.name);
-        if (score >= 0.80) return true;
-        return (m.aliases || []).some(a => calculateStringSimilarity(name, a) >= 0.85);
-      });
-      setDuplicateWarnings(warnings);
-    }, 400);
-  }, [rawMaterials]);
+  const checkDuplicateNames = useCallback(
+    (name: string, currentId?: string) => {
+      if (duplicateCheckTimer.current) clearTimeout(duplicateCheckTimer.current);
+      if (!name.trim() || name.trim().length < 3) {
+        setDuplicateWarnings([]);
+        return;
+      }
+      duplicateCheckTimer.current = setTimeout(() => {
+        const warnings = rawMaterials.filter((m) => {
+          if (m.id === currentId) return false;
+          const score = calculateStringSimilarity(name, m.name);
+          if (score >= 0.8) return true;
+          return (m.aliases || []).some((a) => calculateStringSimilarity(name, a) >= 0.85);
+        });
+        setDuplicateWarnings(warnings);
+      }, 400);
+    },
+    [rawMaterials]
+  );
 
   const handleOpenAdd = (presetName?: string, presetCategory?: 'ACTIVE' | 'EXCIPIENT') => {
     setFormCode('');
@@ -252,7 +287,8 @@ export const useMaterialListState = () => {
 
   const handleSaveMaterial = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formName.trim()) return notify({ type: 'WARNING', message: 'Vui lòng nhập Tên nguyên liệu chuẩn!' });
+    if (!formName.trim())
+      return notify({ type: 'WARNING', message: 'Vui lòng nhập Tên nguyên liệu chuẩn!' });
 
     if (formCasNumber.trim() && !validateCasNumber(formCasNumber)) {
       setFormCasError('Định dạng CAS không hợp lệ. Ví dụ đúng: 90045-36-6');
@@ -268,7 +304,7 @@ export const useMaterialListState = () => {
       category: formCategory,
       standard: formStandard.trim() || undefined,
       casNumber: formCasNumber.trim() || undefined,
-      aliases: formAliases.filter(a => a.trim() !== ''),
+      aliases: formAliases.filter((a) => a.trim() !== ''),
       description: formDescription.trim() || undefined,
       createdAt: crud.selectedItem?.createdAt || new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -278,40 +314,45 @@ export const useMaterialListState = () => {
       if (crud.mode === 'EDIT') {
         await updateRawMaterial(materialData);
         notify({ type: 'SUCCESS', message: 'Đã cập nhật thông tin nguyên liệu.' });
-        logAuditAction({
-          action: 'UPDATE',
-          collection: 'SYSTEM',
-          documentId: materialData.id,
-          details: `Cập nhật nguyên liệu: ${materialData.name}${materialData.code ? ` (${materialData.code})` : ''}`,
-          performedBy: user?.email || 'unknown'
-        });
       } else {
         await addRawMaterial(materialData);
         notify({ type: 'SUCCESS', message: 'Đã thêm nguyên liệu mới vào Danh mục chuẩn.' });
-        logAuditAction({
-          action: 'CREATE',
-          collection: 'SYSTEM',
-          documentId: materialData.id,
-          details: `Thêm mới nguyên liệu: ${materialData.name}${materialData.code ? ` (${materialData.code})` : ''}`,
-          performedBy: user?.email || 'unknown'
-        });
 
-        const matchingFormulas = productFormulas.filter(f => 
-          (f.ingredients || []).some(i => !i.materialId && i.name.trim().toLowerCase() === materialData.name.toLowerCase()) ||
-          (f.excipients || []).some(e => !e.materialId && e.name.trim().toLowerCase() === materialData.name.toLowerCase())
+        const matchingFormulas = productFormulas.filter(
+          (f) =>
+            (f.ingredients || []).some(
+              (i) =>
+                !i.materialId && i.name.trim().toLowerCase() === materialData.name.toLowerCase()
+            ) ||
+            (f.excipients || []).some(
+              (e) =>
+                !e.materialId && e.name.trim().toLowerCase() === materialData.name.toLowerCase()
+            )
         );
 
         if (matchingFormulas.length > 0) {
           for (const f of matchingFormulas) {
-            const updatedIngs = (f.ingredients || []).map(i => 
-              (!i.materialId && i.name.trim().toLowerCase() === materialData.name.toLowerCase()) ? { ...i, materialId: materialData.id } : i
+            const updatedIngs = (f.ingredients || []).map((i) =>
+              !i.materialId && i.name.trim().toLowerCase() === materialData.name.toLowerCase()
+                ? { ...i, materialId: materialData.id }
+                : i
             );
-            const updatedExcs = (f.excipients || []).map(e => 
-              (!e.materialId && e.name.trim().toLowerCase() === materialData.name.toLowerCase()) ? { ...e, materialId: materialData.id } : e
+            const updatedExcs = (f.excipients || []).map((e) =>
+              !e.materialId && e.name.trim().toLowerCase() === materialData.name.toLowerCase()
+                ? { ...e, materialId: materialData.id }
+                : e
             );
-            await updateProductFormula({ ...f, ingredients: updatedIngs, excipients: updatedExcs, updatedAt: new Date().toISOString() });
+            await updateProductFormula({
+              ...f,
+              ingredients: updatedIngs,
+              excipients: updatedExcs,
+              updatedAt: new Date().toISOString(),
+            });
           }
-          notify({ type: 'INFO', message: `Đã tự động liên kết với ${matchingFormulas.length} công thức phù hợp.` });
+          notify({
+            type: 'INFO',
+            message: `Đã tự động liên kết với ${matchingFormulas.length} công thức phù hợp.`,
+          });
         }
       }
       setDuplicateWarnings([]);
@@ -362,11 +403,11 @@ export const useMaterialListState = () => {
 
     const newAliases = pasteData
       .split(/[,;\n]+/)
-      .map(item => item.trim())
-      .filter(item => item !== '' && !formAliases.includes(item));
+      .map((item) => item.trim())
+      .filter((item) => item !== '' && !formAliases.includes(item));
 
     if (newAliases.length > 0) {
-      setFormAliases(prev => [...prev, ...newAliases]);
+      setFormAliases((prev) => [...prev, ...newAliases]);
     }
   };
 
@@ -395,20 +436,12 @@ export const useMaterialListState = () => {
         await deleteRawMaterial(delId);
       }
 
-      notify({ 
-        type: 'SUCCESS', 
-        message: `Đã gộp thành công ${group.duplicateMaterials.length} nguyên liệu vào "${plan.updatedPrimaryMaterial.name}" và cập nhật ${plan.updatedFormulas.length} công thức.` 
+      notify({
+        type: 'SUCCESS',
+        message: `Đã gộp thành công ${group.duplicateMaterials.length} nguyên liệu vào "${plan.updatedPrimaryMaterial.name}" và cập nhật ${plan.updatedFormulas.length} công thức.`,
       });
 
-      logAuditAction({
-        action: 'UPDATE',
-        collection: 'SYSTEM',
-        documentId: plan.updatedPrimaryMaterial.id,
-        details: `AI Harmonizer: Gộp ${group.duplicateMaterials.map(d => d.name).join(', ')} vào ${plan.updatedPrimaryMaterial.name}`,
-        performedBy: user?.email || 'unknown'
-      });
-
-      const updatedMaterials = rawMaterials.filter(m => !plan.deletedMaterialIds.includes(m.id));
+      const updatedMaterials = rawMaterials.filter((m) => !plan.deletedMaterialIds.includes(m.id));
       const newReport = analyzeMaterialDuplicates(updatedMaterials, productFormulas, productMap);
       setHarmonizationReport(newReport);
     } catch (error: any) {
@@ -420,8 +453,13 @@ export const useMaterialListState = () => {
   };
 
   // 1-Click Auto Link cho Consistency Tab
-  const handleAutoLinkFormulaItem = async (formulaId: string, ingredientName: string, targetMaterialId: string, isIngredient: boolean) => {
-    const formula = productFormulas.find(f => f.id === formulaId);
+  const handleAutoLinkFormulaItem = async (
+    formulaId: string,
+    ingredientName: string,
+    targetMaterialId: string,
+    isIngredient: boolean
+  ) => {
+    const formula = productFormulas.find((f) => f.id === formulaId);
     if (!formula) return;
 
     try {
@@ -429,12 +467,16 @@ export const useMaterialListState = () => {
       let updatedExcipients = [...(formula.excipients || [])];
 
       if (isIngredient) {
-        updatedIngredients = updatedIngredients.map(i => 
-          i.name.trim().toLowerCase() === ingredientName.trim().toLowerCase() ? { ...i, materialId: targetMaterialId } : i
+        updatedIngredients = updatedIngredients.map((i) =>
+          i.name.trim().toLowerCase() === ingredientName.trim().toLowerCase()
+            ? { ...i, materialId: targetMaterialId }
+            : i
         );
       } else {
-        updatedExcipients = updatedExcipients.map(e => 
-          e.name.trim().toLowerCase() === ingredientName.trim().toLowerCase() ? { ...e, materialId: targetMaterialId } : e
+        updatedExcipients = updatedExcipients.map((e) =>
+          e.name.trim().toLowerCase() === ingredientName.trim().toLowerCase()
+            ? { ...e, materialId: targetMaterialId }
+            : e
         );
       }
 
@@ -515,6 +557,6 @@ export const useMaterialListState = () => {
     handleOpenHarmonizer,
     handleExecuteMerge,
     handleAutoLinkFormulaItem,
-    checkDuplicateNames
+    checkDuplicateNames,
   };
 };

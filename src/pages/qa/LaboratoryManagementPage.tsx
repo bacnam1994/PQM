@@ -357,7 +357,10 @@ export const LaboratoryManagementPage: React.FC = () => {
   };
 
   // Chuẩn hóa hàng loạt các phiếu có gợi ý tin cậy cao (EXACT hoặc ALIAS hoặc SUBSTRING)
-  const handleBatchNormalizeHighConfidence = async () => {
+  const [isBatchConfirmOpen, setIsBatchConfirmOpen] = useState(false);
+  const [batchNormalizeCandidates, setBatchNormalizeCandidates] = useState<any[]>([]);
+
+  const handleBatchNormalizeHighConfidence = () => {
     const candidates = unmappedResults.filter(
       (r) =>
         r.matchedLab &&
@@ -369,13 +372,14 @@ export const LaboratoryManagementPage: React.FC = () => {
       return;
     }
 
-    const confirmed = window.confirm(
-      `Bạn có chắc muốn tự động chuẩn hóa ${candidates.length} phiếu kiểm nghiệm có độ tin cậy cao?`
-    );
-    if (!confirmed) return;
+    setBatchNormalizeCandidates(candidates);
+    setIsBatchConfirmOpen(true);
+  };
 
+  const confirmBatchNormalize = async () => {
+    setIsBatchConfirmOpen(false);
     let successCount = 0;
-    for (const item of candidates) {
+    for (const item of batchNormalizeCandidates) {
       if (!item.matchedLab) continue;
       const targetTestResult = combinedTestResults.find((r) => r.id === item.testResultId);
       if (!targetTestResult) continue;
@@ -1163,6 +1167,18 @@ VD: Quatest 3, KT3, Trung tâm KT 3, Trung tâm Kỹ thuật 3"
         }
         confirmText={isDeleting ? 'Đang xóa...' : 'Xóa vĩnh viễn'}
         confirmButtonColor="bg-rose-600 hover:bg-rose-700 text-white"
+      />
+
+      {/* MODAL: XÁC NHẬN CHUẨN HÓA HÀNG LOẠT */}
+      <ConfirmationModal
+        isOpen={isBatchConfirmOpen}
+        onClose={() => setIsBatchConfirmOpen(false)}
+        onConfirm={confirmBatchNormalize}
+        title="Xác nhận chuẩn hóa hàng loạt"
+        message={`Bạn có chắc muốn tự động chuẩn hóa ${batchNormalizeCandidates.length} phiếu kiểm nghiệm có độ tin cậy cao sang đơn vị kiểm nghiệm chuẩn hóa?`}
+        confirmText="Chuẩn hóa ngay"
+        cancelText="Hủy"
+        confirmButtonColor="bg-blue-600 hover:bg-blue-700 text-white"
       />
     </div>
   );

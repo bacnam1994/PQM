@@ -25,10 +25,11 @@ import {
   DSCard,
   PageHeader,
   Modal,
+  ConfirmationModal,
   VirtualizedTableBody,
 } from '../../components';
 import { useUIStore } from '../../store/useUIStore';
-import { bulkRenameCriteriaInAllTestResults } from '../../services/testResultService';
+import { masterCriterionAppService } from '../../services/app/MasterCriterionAppService';
 import {
   MasterCriterion,
   MasterCriterionCategory,
@@ -349,19 +350,21 @@ const MasterDataTab: React.FC<MasterDataTabProps> = ({ rawMaterials, isAdmin }) 
     });
   };
 
-  const handleDelete = async (item: MasterCriterion) => {
-    if (
-      !window.confirm(
-        `Xác nhận xóa chỉ tiêu "${item.canonicalName}"? Hành động này không thể hoàn tác.`
-      )
-    )
-      return;
-    await deleteMutation.mutateAsync(item.id);
+  const [deletingCriterion, setDeletingCriterion] = useState<MasterCriterion | null>(null);
+
+  const handleDelete = (item: MasterCriterion) => {
+    setDeletingCriterion(item);
+  };
+
+  const confirmDeleteCriterion = async () => {
+    if (!deletingCriterion) return;
+    await deleteMutation.mutateAsync(deletingCriterion.id);
     notify({
       type: 'SUCCESS',
       title: 'Đã xóa',
-      message: `Đã xóa chỉ tiêu "${item.canonicalName}".`,
+      message: `Đã xóa chỉ tiêu "${deletingCriterion.canonicalName}".`,
     });
+    setDeletingCriterion(null);
   };
 
   const materialMap = useMemo(
@@ -525,6 +528,17 @@ const MasterDataTab: React.FC<MasterDataTabProps> = ({ rawMaterials, isAdmin }) 
         onClose={() => setModalOpen(false)}
         editing={editingItem}
         rawMaterials={rawMaterials}
+      />
+
+      <ConfirmationModal
+        isOpen={!!deletingCriterion}
+        onClose={() => setDeletingCriterion(null)}
+        onConfirm={confirmDeleteCriterion}
+        title="Xác nhận xóa chỉ tiêu"
+        message={`Xác nhận xóa chỉ tiêu "${deletingCriterion?.canonicalName}"? Hành động này không thể hoàn tác.`}
+        confirmText="Xóa chỉ tiêu"
+        cancelText="Hủy"
+        confirmButtonColor="bg-rose-600 hover:bg-rose-700 text-white"
       />
     </div>
   );
@@ -706,6 +720,7 @@ const CriteriaList = () => {
     (state) => state.fetchAllTestResultsForDashboard
   );
   const batches = useAppStore((state) => state.batches);
+  const user = useAppStore((state) => state.user);
 
   const [activeTab, setActiveTab] = useState<ActiveTab>('master');
   const [searchTerm, setSearchTerm] = useState('');
@@ -939,9 +954,10 @@ const CriteriaList = () => {
         }
       });
 
-      const { updatedCount } = await bulkRenameCriteriaInAllTestResults(
+      const { updatedCount } = await masterCriterionAppService.bulkRename(
         oldName,
         targetName,
+        user,
         renameScope === 'product' ? targetProductId : undefined
       );
 

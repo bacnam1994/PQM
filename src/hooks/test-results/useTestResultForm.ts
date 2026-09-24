@@ -11,7 +11,6 @@ import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAppStore } from '../../store/useAppStore';
 import { TestResult, TestResultEntry } from '../../types';
-import { logAuditAction } from '../../services/auditService';
 import { useForm } from '../useForm';
 import { useCrud } from '../useCrud';
 import { useFormDraft } from '../useFormDraft';

@@ -79,7 +79,8 @@ export class MasterCriterionAppService {
   async bulkRename(
     oldName: string,
     newName: string,
-    currentUser: any
+    currentUser: any,
+    targetProductId?: string
   ): Promise<{ updatedCount: number; totalScanned: number }> {
     if (!can(currentUser, 'tccs:update')) {
       throw new Error(
@@ -87,7 +88,7 @@ export class MasterCriterionAppService {
       );
     }
 
-    const result = await bulkRenameCriteriaInAllTestResults(oldName, newName);
+    const result = await bulkRenameCriteriaInAllTestResults(oldName, newName, targetProductId);
 
     logAuditAction({
       action: 'UPDATE',

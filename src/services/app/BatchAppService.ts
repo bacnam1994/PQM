@@ -240,7 +240,6 @@ export class BatchAppService {
       actorId: currentUser?.uid,
       reason: effectiveReason,
       conditionsMet: status === 'RELEASED' ? true : undefined,
-      adminOverride: isActorAdmin,
     });
     if (!transitionCheck.allowed) {
       throw new Error(`Quy chuẩn State Machine: ${transitionCheck.reason}`);

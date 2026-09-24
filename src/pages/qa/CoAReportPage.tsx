@@ -8,10 +8,12 @@ import {
   PrinterIcon,
   ArrowPathIcon,
   ExclamationTriangleIcon,
+  ShieldExclamationIcon,
 } from '@heroicons/react/24/outline';
 import { fetchTestResultsByBatchId, fetchTestResultById } from '../../services/testResultService';
-import { calculateOverallStatus, ensureArray } from '../../utils';
+import { ensureArray } from '../../utils';
 import { TestResult, TestResultEntry, TCCS } from '../../types';
+import { verifyEvaluationSnapshotIntegrity } from '../../domain/evaluation/EvaluationSnapshotBuilder';
 import { batchRepository } from '../../repositories/firebase/FirebaseBatchRepository';
 import { productRepository } from '../../repositories/firebase/FirebaseProductRepository';
 import { tccsRepository } from '../../repositories/firebase/FirebaseTCCSRepository';
@@ -27,6 +29,7 @@ const CoAReportPage = () => {
   const [result, setResult] = useState<HydratedTestResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
+  const [failClosedReason, setFailClosedReason] = useState<string | null>(null);
   const [formula, setFormula] = useState<any>(null);
 
   useEffect(() => {
@@ -35,6 +38,7 @@ const CoAReportPage = () => {
     const loadData = async () => {
       setLoading(true);
       setNotFound(false);
+      setFailClosedReason(null);
       try {
         const appState = useAppStore.getState();
         const storeBatches = appState.batches || [];
@@ -61,6 +65,30 @@ const CoAReportPage = () => {
 
           if (!rawResult) {
             setNotFound(true);
+            return;
+          }
+
+          // [FAIL CLOSED ENFORCEMENT - SECTION 15]
+          if (!rawResult.evaluationSnapshot) {
+            if (isMounted) {
+              setFailClosedReason(
+                'Từ chối phát hành CoA: Phiếu kiểm nghiệm chưa có Bản chụp thẩm định niêm phong (EvaluationSnapshot). Theo chuẩn GMP ALCOA+, kết quả phải được phê duyệt và niêm phong trước khi phát hành CoA.'
+              );
+            }
+            return;
+          }
+
+          const isSnapValid = verifyEvaluationSnapshotIntegrity(
+            rawResult.evaluationSnapshot,
+            rawResult.id,
+            rawResult.batchId
+          );
+          if (!isSnapValid) {
+            if (isMounted) {
+              setFailClosedReason(
+                'CẢNH BÁO BẢO MẬT ALCOA+: Chữ ký băm toàn vẹn (SHA-256 Hash) của Evaluation Snapshot không khớp. Dữ liệu đã bị can thiệp trái phép!'
+              );
+            }
             return;
           }
 
@@ -280,37 +308,47 @@ const CoAReportPage = () => {
           const latestResult = resultsForBatch[resultsForBatch.length - 1];
 
           let tccsForEvaluation = batch.tccs || null;
-          const batchSnapshot = batch.evaluationSnapshot;
+          const batchSnapshot = batch.evaluationSnapshot || latestResult?.evaluationSnapshot;
+
+          // [FAIL CLOSED ENFORCEMENT - SECTION 15]
+          // CoA tuyệt đối không tự tính lại business rules nếu thiếu Evaluation Snapshot
+          if (!batchSnapshot) {
+            if (isMounted) {
+              setFailClosedReason(
+                'Từ chối phát hành CoA: Lô sản xuất chưa có Bản chụp thẩm định niêm phong (EvaluationSnapshot). Không thể fallback sang tính toán cục bộ unverified theo chuẩn GMP ALCOA+.'
+              );
+            }
+            return;
+          }
+
+          const isBatchSnapValid = verifyEvaluationSnapshotIntegrity(
+            batchSnapshot,
+            batchSnapshot.testResultId || latestResult?.id || batchId,
+            batchId
+          );
+          if (!isBatchSnapValid) {
+            if (isMounted) {
+              setFailClosedReason(
+                'CẢNH BÁO BẢO MẬT ALCOA+: Chữ ký băm toàn vẹn (SHA-256 Hash) của Evaluation Snapshot trên Lô không khớp. Dữ liệu Lô đã bị can thiệp trái phép!'
+              );
+            }
+            return;
+          }
 
           if (isMounted) {
-            if (batchSnapshot) {
-              setResult({
-                id: `coa-${batchId}`,
-                batchId: batchId,
-                labName: 'Phòng Kiểm Nghiệm',
-                testDate: latestResult?.testDate || new Date().toISOString(),
-                results: finalResults,
-                evaluationSnapshot: batchSnapshot,
-                overallStatus: batchSnapshot.overallStatus === 'PASS' ? 'PASS' : 'FAIL',
-                notes: `CoA chính thức phát hành từ Bản chụp thẩm định niêm phong.`,
-                createdAt: batchSnapshot.timestamp || new Date().toISOString(),
-                batch: { ...batch, tccs: tccsForEvaluation, evaluationSnapshot: batchSnapshot },
-                product: batch.product,
-              } as HydratedTestResult);
-            } else {
-              setResult({
-                id: `consolidated-${batchId}`,
-                batchId: batchId,
-                labName: 'Tổng hợp',
-                testDate: latestResult.testDate,
-                results: finalResults,
-                overallStatus: calculateOverallStatus(finalResults, tccsForEvaluation),
-                notes: `Phiếu tổng hợp từ ${resultsForBatch.length} kết quả.`,
-                createdAt: new Date().toISOString(),
-                batch: { ...batch, tccs: tccsForEvaluation },
-                product: batch.product,
-              } as HydratedTestResult);
-            }
+            setResult({
+              id: `coa-${batchId}`,
+              batchId: batchId,
+              labName: 'Phòng Kiểm Nghiệm',
+              testDate: latestResult?.testDate || new Date().toISOString(),
+              results: finalResults,
+              evaluationSnapshot: batchSnapshot,
+              overallStatus: batchSnapshot.overallStatus === 'PASS' ? 'PASS' : 'FAIL',
+              notes: `CoA chính thức phát hành từ Bản chụp thẩm định niêm phong.`,
+              createdAt: batchSnapshot.timestamp || new Date().toISOString(),
+              batch: { ...batch, tccs: tccsForEvaluation, evaluationSnapshot: batchSnapshot },
+              product: batch.product,
+            } as HydratedTestResult);
           }
 
           // Tải công thức sản phẩm liên quan
@@ -355,6 +393,42 @@ const CoAReportPage = () => {
             className="mt-2 px-5 py-2 bg-emerald-600 text-white rounded-xl font-bold text-sm hover:bg-emerald-700 transition-all shadow-sm"
           >
             Quay lại danh sách
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (failClosedReason) {
+    return (
+      <div className="min-h-[80vh] flex items-center justify-center p-4">
+        <div className="bg-surface max-w-lg p-8 rounded-2xl shadow-lg border-2 border-red-500/30 flex flex-col items-center gap-4 text-center">
+          <div className="w-14 h-14 rounded-full bg-red-500/10 text-red-600 flex items-center justify-center">
+            <ShieldExclamationIcon className="w-8 h-8" />
+          </div>
+          <div>
+            <h3 className="font-black text-ink text-xl">RÀO CHẮN AN TOÀN GMP (FAIL CLOSED)</h3>
+            <p className="text-xs font-semibold text-red-600 dark:text-red-400 mt-1 uppercase tracking-wider">
+              ALCOA+ Evaluation Snapshot Integrity Gate
+            </p>
+          </div>
+          <p className="text-sm text-ink-muted leading-relaxed">{failClosedReason}</p>
+          <div className="p-3 bg-surface-2 rounded-xl text-xs text-ink-soft text-left w-full border border-border">
+            <strong>Bất biến quy chuẩn:</strong> Theo Section 15 Master Workflow, CoA tuyệt đối
+            không tự tính toán lại hoặc fallback khi thiếu Evaluation Snapshot hoặc khi tính toàn
+            vẹn bị vi phạm.
+          </div>
+          <button
+            onClick={() => {
+              if (window.history.state && window.history.state.idx > 0) {
+                navigate(-1);
+              } else {
+                navigate('/test-results');
+              }
+            }}
+            className="mt-2 px-6 py-2.5 bg-slate-800 dark:bg-slate-700 text-white rounded-xl font-bold text-sm hover:bg-slate-900 transition-all shadow-sm"
+          >
+            Quay lại an toàn
           </button>
         </div>
       </div>

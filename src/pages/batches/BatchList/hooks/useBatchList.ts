@@ -13,7 +13,6 @@ import {
   generateId,
   normalizeSearch,
 } from '../../../../utils';
-import { logAuditAction } from '../../../../services/auditService';
 import { fetchTestResultsByBatchId } from '../../../../services/testResultService';
 import { ReleaseRules } from '../../../../domain/rules';
 
@@ -385,15 +384,6 @@ export function useBatchList() {
         } as any);
         processedBatchNos.add(compositeKey);
         count++;
-      }
-
-      if (count > 0) {
-        logAuditAction({
-          action: 'IMPORT',
-          collection: 'BATCHES',
-          details: `Nhập khẩu ${count} lô hàng từ Excel`,
-          performedBy: user?.email || 'unknown',
-        });
       }
 
       notify({

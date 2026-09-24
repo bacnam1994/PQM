@@ -11,7 +11,6 @@ import {
   autoFormatInput,
   parseNumberFromText,
 } from '../../utils';
-import { logAuditAction } from '../../services/auditService';
 import {
   PHARMACOPOEIA_TEMPLATES,
   generateCriteriaFromFormula,
@@ -368,24 +367,10 @@ const TCCSFormPage = () => {
         const oldTCCS = tccsList.find((t) => t.id === id);
         await updateTCCSMutation.mutateAsync({ tccs: tccsData, oldTCCS });
         notify({ type: 'SUCCESS', title: 'Thành công', message: 'Đã cập nhật hồ sơ TCCS.' });
-        logAuditAction({
-          action: 'UPDATE',
-          collection: 'TCCS',
-          documentId: id,
-          details: `Cập nhật TCCS: ${tccsData.code}`,
-          performedBy: currentUser?.email || 'unknown',
-        });
       } else {
         await createTCCSMutation.mutateAsync({ tccs: tccsData });
         clearDraft();
         notify({ type: 'SUCCESS', title: 'Thành công', message: 'Đã tạo hồ sơ TCCS mới.' });
-        logAuditAction({
-          action: 'CREATE',
-          collection: 'TCCS',
-          documentId: tccsData.id,
-          details: `${cloneId ? 'Sao chép' : 'Tạo mới'} TCCS: ${tccsData.code}`,
-          performedBy: currentUser?.email || 'unknown',
-        });
       }
       navigate('/tccs');
     } catch (err: any) {

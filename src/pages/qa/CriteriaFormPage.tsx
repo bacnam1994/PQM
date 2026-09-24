@@ -11,13 +11,12 @@ import {
   ExclamationCircleIcon,
   SparklesIcon,
   ShieldCheckIcon,
-  ArrowRightIcon
+  ArrowRightIcon,
 } from '@heroicons/react/24/outline';
 import { useAppStore } from '../../store/useAppStore';
 import { DSFormInput, SpecialCharToolbar, DSCard, PageHeader } from '../../components';
 import { normalizeName, createAliasRecord } from '../../services/criteriaAliasService';
-import { bulkRenameCriteriaInAllTestResults } from '../../services/testResultService';
-import { logAuditAction } from '../../services/auditService';
+import { masterCriterionAppService } from '../../services/app/MasterCriterionAppService';
 
 interface CriterionUsageInfo {
   name: string;
@@ -32,19 +31,19 @@ const CriteriaFormPage: React.FC = () => {
   const navigate = useNavigate();
 
   // App Store States
-  const { 
-    tccsList, 
-    products, 
-    batches, 
-    testResults, 
-    allTestResults, 
-    fetchAllTestResultsForDashboard, 
-    criteriaAliases, 
-    updateTCCS, 
-    addCriteriaAlias, 
-    notify, 
-    isAdmin, 
-    user 
+  const {
+    tccsList,
+    products,
+    batches,
+    testResults,
+    allTestResults,
+    fetchAllTestResultsForDashboard,
+    criteriaAliases,
+    updateTCCS,
+    addCriteriaAlias,
+    notify,
+    isAdmin,
+    user,
   } = useAppStore();
 
   const [selectedName, setSelectedName] = useState<string>('');
@@ -62,11 +61,15 @@ const CriteriaFormPage: React.FC = () => {
   // 1. Tổng hợp toàn bộ danh mục chỉ tiêu từ TCCS và TestResults (quét toàn bộ kho dữ liệu)
   const criteriaMap = useMemo(() => {
     const map = new Map<string, CriterionUsageInfo>();
-    const productMap = new Map(products.map(p => [p.id, p]));
+    const productMap = new Map(products.map((p) => [p.id, p]));
 
     tccsList.forEach((tccs) => {
       const product = productMap.get(tccs.productId);
-      const productName = product ? product.name : (tccs.productId ? `Sản phẩm đã xóa (${tccs.productId.slice(-6)})` : 'Chưa gán sản phẩm');
+      const productName = product
+        ? product.name
+        : tccs.productId
+          ? `Sản phẩm đã xóa (${tccs.productId.slice(-6)})`
+          : 'Chưa gán sản phẩm';
 
       const processList = (list: any[], type: string) => {
         (list || []).forEach((c) => {
@@ -78,18 +81,18 @@ const CriteriaFormPage: React.FC = () => {
               count: 0,
               relatedTCCS: [],
               types: new Set(),
-              relatedBatchesCount: 0
+              relatedBatchesCount: 0,
             });
           }
           const entry = map.get(trimmed)!;
           entry.count++;
           entry.types.add(type);
-          if (!entry.relatedTCCS.some(r => r.id === tccs.id)) {
+          if (!entry.relatedTCCS.some((r) => r.id === tccs.id)) {
             entry.relatedTCCS.push({
               id: tccs.id,
               code: tccs.code,
               product: productName,
-              productId: tccs.productId
+              productId: tccs.productId,
             });
           }
         });
@@ -100,9 +103,10 @@ const CriteriaFormPage: React.FC = () => {
     });
 
     // Đếm số lô kiểm nghiệm từ toàn bộ danh sách testResults (kết hợp allTestResults nếu có)
-    const effectiveTestResults = allTestResults && allTestResults.length > 0 ? allTestResults : testResults;
+    const effectiveTestResults =
+      allTestResults && allTestResults.length > 0 ? allTestResults : testResults;
     effectiveTestResults.forEach((result) => {
-      (result.results || []).forEach(r => {
+      (result.results || []).forEach((r) => {
         if (!r || !r.criteriaName) return;
         const trimmed = r.criteriaName.trim();
         const entry = map.get(trimmed);
@@ -133,19 +137,21 @@ const CriteriaFormPage: React.FC = () => {
 
   const currentInfo = useMemo(() => {
     if (!selectedName) return null;
-    return criteriaMap.get(selectedName) || {
-      name: selectedName,
-      count: 0,
-      relatedTCCS: [],
-      types: new Set<string>(['Chỉ tiêu mới']),
-      relatedBatchesCount: 0
-    };
+    return (
+      criteriaMap.get(selectedName) || {
+        name: selectedName,
+        count: 0,
+        relatedTCCS: [],
+        types: new Set<string>(['Chỉ tiêu mới']),
+        relatedBatchesCount: 0,
+      }
+    );
   }, [selectedName, criteriaMap]);
 
   const productsUsingCurrentCriteria = useMemo(() => {
     if (!currentInfo) return [];
     const prodMap = new Map<string, string>();
-    currentInfo.relatedTCCS.forEach(r => {
+    currentInfo.relatedTCCS.forEach((r) => {
       if (r.productId) {
         prodMap.set(r.productId, r.product);
       }
@@ -157,7 +163,7 @@ const CriteriaFormPage: React.FC = () => {
   const activeAliases = useMemo(() => {
     if (!selectedName) return [];
     const norm = normalizeName(selectedName);
-    return criteriaAliases.filter(a => normalizeName(a.canonicalName) === norm);
+    return criteriaAliases.filter((a) => normalizeName(a.canonicalName) === norm);
   }, [selectedName, criteriaAliases]);
 
   // Xử lý đổi tên / chuẩn hóa chỉ tiêu
@@ -185,38 +191,47 @@ const CriteriaFormPage: React.FC = () => {
       const tccsUpdates: Promise<void>[] = [];
 
       // 1. Cập nhật các TCCS liên quan
-      tccsList.forEach(tccs => {
+      tccsList.forEach((tccs) => {
         if (renameScope === 'product' && tccs.productId !== targetProductId) return;
 
         let hasChange = false;
-        const updateList = (list: any[]) => (list || []).map(c => {
-          if (c && c.name && c.name.trim() === oldName) {
-            hasChange = true;
-            return { ...c, name: targetName };
-          }
-          return c;
-        });
+        const updateList = (list: any[]) =>
+          (list || []).map((c) => {
+            if (c && c.name && c.name.trim() === oldName) {
+              hasChange = true;
+              return { ...c, name: targetName };
+            }
+            return c;
+          });
 
         const newMain = updateList(tccs.mainQualityCriteria);
         const newSafety = updateList(tccs.safetyCriteria);
 
-        const newRules = (tccs.alternateRules || []).map(r => {
+        const newRules = (tccs.alternateRules || []).map((r) => {
           let ruleChanged = false;
           let main = r.main;
           let alt = r.alt;
-          if (main === oldName) { main = targetName; ruleChanged = true; }
-          if (alt === oldName) { alt = targetName; ruleChanged = true; }
+          if (main === oldName) {
+            main = targetName;
+            ruleChanged = true;
+          }
+          if (alt === oldName) {
+            alt = targetName;
+            ruleChanged = true;
+          }
           if (ruleChanged) hasChange = true;
           return { ...r, main, alt };
         });
 
         if (hasChange) {
-          tccsUpdates.push(updateTCCS({
-            ...tccs,
-            mainQualityCriteria: newMain,
-            safetyCriteria: newSafety,
-            alternateRules: newRules
-          }));
+          tccsUpdates.push(
+            updateTCCS({
+              ...tccs,
+              mainQualityCriteria: newMain,
+              safetyCriteria: newSafety,
+              alternateRules: newRules,
+            })
+          );
 
           // Tự động tạo bản ghi alias để bảo toàn tương thích ngược
           if (autoCreateAlias) {
@@ -224,32 +239,25 @@ const CriteriaFormPage: React.FC = () => {
               id: `ca_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
               ...createAliasRecord(tccs.id, targetName, [oldName], false, true),
             };
-            addCriteriaAlias(aliasRec).catch(err => console.warn('Lỗi tạo alias tự động:', err));
+            addCriteriaAlias(aliasRec).catch((err) => console.warn('Lỗi tạo alias tự động:', err));
           }
         }
       });
 
-      // 2. Cập nhật 100% các phiếu kiểm nghiệm liên quan trên TOÀN BỘ CƠ SỞ DỮ LIỆU
-      const { updatedCount } = await bulkRenameCriteriaInAllTestResults(
-        oldName, 
-        targetName, 
+      // 2. Cập nhật 100% các phiếu kiểm nghiệm liên quan trên TOÀN BỘ CƠ SỞ DỮ LIỆU qua Canonical Service
+      const { updatedCount } = await masterCriterionAppService.bulkRename(
+        oldName,
+        targetName,
+        user,
         renameScope === 'product' ? targetProductId : undefined
       );
 
       await Promise.all(tccsUpdates);
 
-      logAuditAction({
-        action: 'UPDATE',
-        collection: 'CRITERIA_ALIASES',
-        documentId: targetName,
-        details: `Đổi tên chỉ tiêu "${oldName}" thành "${targetName}" (Phạm vi: ${renameScope === 'global' ? 'Toàn hệ thống' : `Sản phẩm ${targetProductId}`}, Đã cập nhật ${updatedCount} phiếu kiểm nghiệm)`,
-        performedBy: user?.email || 'unknown'
-      });
-
       notify({
         type: 'SUCCESS',
         title: 'Đổi tên thành công',
-        message: `Đã cập nhật chỉ tiêu thành "${targetName}" trên ${tccsUpdates.length} hồ sơ TCCS và ${updatedCount} phiếu kiểm nghiệm.`
+        message: `Đã cập nhật chỉ tiêu thành "${targetName}" trên ${tccsUpdates.length} hồ sơ TCCS và ${updatedCount} phiếu kiểm nghiệm.`,
       });
 
       setSelectedName(targetName);
@@ -300,20 +308,22 @@ const CriteriaFormPage: React.FC = () => {
           Chọn chỉ tiêu cần quản lý / chuẩn hóa:
         </label>
         <div className="flex flex-col sm:flex-row gap-3">
-          <select 
-            value={selectedName} 
+          <select
+            value={selectedName}
             onChange={(e) => {
               setSelectedName(e.target.value);
               setNewName(e.target.value);
-            }} 
+            }}
             className="flex-1 px-3 py-2 bg-surface-2 border border-border rounded-lg font-medium text-sm text-ink outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
           >
-            {allCriteriaNames.map(name => (
-              <option key={name} value={name}>{name}</option>
+            {allCriteriaNames.map((name) => (
+              <option key={name} value={name}>
+                {name}
+              </option>
             ))}
           </select>
-          <button 
-            type="button" 
+          <button
+            type="button"
             onClick={() => {
               const customName = prompt('Nhập tên chỉ tiêu mới cần tra cứu:');
               if (customName && customName.trim()) {
@@ -338,7 +348,9 @@ const CriteriaFormPage: React.FC = () => {
                   <ChartBarSquareIcon className="h-5 w-5" />
                 </div>
                 <div className="min-w-0">
-                  <h3 className="font-bold text-ink text-sm leading-tight truncate">{currentInfo.name}</h3>
+                  <h3 className="font-bold text-ink text-sm leading-tight truncate">
+                    {currentInfo.name}
+                  </h3>
                   <p className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">
                     {Array.from(currentInfo.types).join(', ') || 'Chỉ tiêu phân tích'}
                   </p>
@@ -372,7 +384,10 @@ const CriteriaFormPage: React.FC = () => {
                   <p className="text-xs text-ink-muted italic">Chưa gắn vào TCCS nào.</p>
                 ) : (
                   currentInfo.relatedTCCS.map((t, idx) => (
-                    <div key={idx} className="p-2.5 bg-surface-2 rounded-lg border border-border space-y-1">
+                    <div
+                      key={idx}
+                      className="p-2.5 bg-surface-2 rounded-lg border border-border space-y-1"
+                    >
                       <p className="text-xs font-semibold text-ink line-clamp-1">{t.product}</p>
                       <p className="text-[10px] font-mono font-medium text-emerald-600 dark:text-emerald-400 uppercase">
                         TCCS: {t.code}
@@ -391,10 +406,17 @@ const CriteriaFormPage: React.FC = () => {
                   Alias đã ánh xạ ({activeAliases.length})
                 </h4>
                 <div className="space-y-1.5 text-xs">
-                  {activeAliases.map(a => (
-                    <div key={a.id} className="p-2 bg-amber-50 dark:bg-amber-950/30 rounded-lg border border-amber-200 dark:border-amber-800/40">
-                      <p className="font-semibold text-amber-900 dark:text-amber-300">{a.canonicalName}</p>
-                      <p className="text-[10px] text-amber-700 dark:text-amber-400 mt-0.5">Biến thể: {a.aliases?.join(', ') || '---'}</p>
+                  {activeAliases.map((a) => (
+                    <div
+                      key={a.id}
+                      className="p-2 bg-amber-50 dark:bg-amber-950/30 rounded-lg border border-amber-200 dark:border-amber-800/40"
+                    >
+                      <p className="font-semibold text-amber-900 dark:text-amber-300">
+                        {a.canonicalName}
+                      </p>
+                      <p className="text-[10px] text-amber-700 dark:text-amber-400 mt-0.5">
+                        Biến thể: {a.aliases?.join(', ') || '---'}
+                      </p>
                     </div>
                   ))}
                 </div>
@@ -411,7 +433,8 @@ const CriteriaFormPage: React.FC = () => {
                   Chuẩn hóa / Đổi tên Chỉ tiêu
                 </h3>
                 <p className="text-xs text-ink-muted mt-1">
-                  Thay đổi tên chỉ tiêu đồng loạt trên các hồ sơ TCCS và phiếu kiểm nghiệm mà không làm mất dữ liệu lịch sử.
+                  Thay đổi tên chỉ tiêu đồng loạt trên các hồ sơ TCCS và phiếu kiểm nghiệm mà không
+                  làm mất dữ liệu lịch sử.
                 </p>
               </div>
 
@@ -422,10 +445,10 @@ const CriteriaFormPage: React.FC = () => {
                   <label className="text-xs font-semibold text-ink-muted uppercase tracking-wider block mb-1.5">
                     Tên chỉ tiêu mới *
                   </label>
-                  <input 
-                    type="text" 
-                    value={newName} 
-                    onChange={(e) => setNewName(e.target.value)} 
+                  <input
+                    type="text"
+                    value={newName}
+                    onChange={(e) => setNewName(e.target.value)}
                     placeholder="Nhập tên chuẩn hóa (VD: Độ ẩm, Định lượng Paracetamol...)"
                     className="w-full px-3.5 py-2.5 bg-surface-2 border border-border rounded-lg font-medium text-sm text-ink outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 shadow-inner"
                     required
@@ -433,35 +456,46 @@ const CriteriaFormPage: React.FC = () => {
                 </div>
 
                 <div className="space-y-3 bg-surface-2 p-4 rounded-xl border border-border">
-                  <label className="text-xs font-semibold text-ink uppercase tracking-wider block">Phạm vi áp dụng</label>
+                  <label className="text-xs font-semibold text-ink uppercase tracking-wider block">
+                    Phạm vi áp dụng
+                  </label>
                   <div className="space-y-2">
                     <label className="flex items-start sm:items-center gap-3 cursor-pointer">
-                      <input 
-                        type="radio" 
-                        name="scope" 
-                        value="global" 
-                        checked={renameScope === 'global'} 
+                      <input
+                        type="radio"
+                        name="scope"
+                        value="global"
+                        checked={renameScope === 'global'}
                         onChange={() => setRenameScope('global')}
                         className="mt-0.5 sm:mt-0 text-emerald-600 focus:ring-emerald-500 h-4 w-4"
                       />
                       <div>
-                        <span className="text-xs font-semibold text-ink">Toàn hệ thống (Khuyến nghị)</span>
-                        <p className="text-[11px] text-ink-muted">Cập nhật tất cả hồ sơ TCCS ({currentInfo.relatedTCCS.length}) và toàn bộ phiếu kiểm nghiệm có chỉ tiêu này.</p>
+                        <span className="text-xs font-semibold text-ink">
+                          Toàn hệ thống (Khuyến nghị)
+                        </span>
+                        <p className="text-[11px] text-ink-muted">
+                          Cập nhật tất cả hồ sơ TCCS ({currentInfo.relatedTCCS.length}) và toàn bộ
+                          phiếu kiểm nghiệm có chỉ tiêu này.
+                        </p>
                       </div>
                     </label>
 
                     <label className="flex items-start sm:items-center gap-3 cursor-pointer pt-2 border-t border-border">
-                      <input 
-                        type="radio" 
-                        name="scope" 
-                        value="product" 
-                        checked={renameScope === 'product'} 
+                      <input
+                        type="radio"
+                        name="scope"
+                        value="product"
+                        checked={renameScope === 'product'}
                         onChange={() => setRenameScope('product')}
                         className="mt-0.5 sm:mt-0 text-emerald-600 focus:ring-emerald-500 h-4 w-4"
                       />
                       <div>
-                        <span className="text-xs font-semibold text-ink">Chỉ áp dụng cho 1 Sản phẩm cụ thể</span>
-                        <p className="text-[11px] text-ink-muted">Chỉ đổi tên trên hồ sơ TCCS và phiếu kiểm nghiệm thuộc sản phẩm được chọn.</p>
+                        <span className="text-xs font-semibold text-ink">
+                          Chỉ áp dụng cho 1 Sản phẩm cụ thể
+                        </span>
+                        <p className="text-[11px] text-ink-muted">
+                          Chỉ đổi tên trên hồ sơ TCCS và phiếu kiểm nghiệm thuộc sản phẩm được chọn.
+                        </p>
                       </div>
                     </label>
                   </div>
@@ -471,15 +505,17 @@ const CriteriaFormPage: React.FC = () => {
                       <label className="text-[10px] font-semibold text-ink-muted uppercase tracking-wider block mb-1">
                         Chọn sản phẩm:
                       </label>
-                      <select 
-                        value={targetProductId} 
+                      <select
+                        value={targetProductId}
                         onChange={(e) => setTargetProductId(e.target.value)}
                         className="w-full px-3 py-2 bg-surface border border-border rounded-lg text-xs font-medium text-ink outline-none focus:ring-2 focus:ring-emerald-500"
                         required
                       >
                         <option value="">-- Chọn sản phẩm --</option>
-                        {productsUsingCurrentCriteria.map(p => (
-                          <option key={p.id} value={p.id}>{p.name}</option>
+                        {productsUsingCurrentCriteria.map((p) => (
+                          <option key={p.id} value={p.id}>
+                            {p.name}
+                          </option>
                         ))}
                       </select>
                     </div>
@@ -487,31 +523,34 @@ const CriteriaFormPage: React.FC = () => {
                 </div>
 
                 <div className="p-4 bg-emerald-50/70 dark:bg-emerald-950/20 rounded-xl border border-emerald-200 dark:border-emerald-800/40 flex items-start gap-3">
-                  <input 
-                    type="checkbox" 
-                    id="auto-alias-check" 
-                    checked={autoCreateAlias} 
+                  <input
+                    type="checkbox"
+                    id="auto-alias-check"
+                    checked={autoCreateAlias}
                     onChange={(e) => setAutoCreateAlias(e.target.checked)}
                     className="mt-0.5 text-emerald-600 focus:ring-emerald-500 rounded h-4 w-4"
                   />
                   <label htmlFor="auto-alias-check" className="text-xs text-ink cursor-pointer">
-                    <span className="font-semibold text-emerald-900 dark:text-emerald-300">Tự động tạo Alias ánh xạ</span>
+                    <span className="font-semibold text-emerald-900 dark:text-emerald-300">
+                      Tự động tạo Alias ánh xạ
+                    </span>
                     <p className="text-[11px] text-emerald-700 dark:text-emerald-400 mt-0.5">
-                      Lưu tên cũ ("{selectedName}") làm alias của tên mới ("{newName}") để các báo cáo và biểu đồ xu hướng cũ vẫn hiển thị đồng bộ.
+                      Lưu tên cũ ("{selectedName}") làm alias của tên mới ("{newName}") để các báo
+                      cáo và biểu đồ xu hướng cũ vẫn hiển thị đồng bộ.
                     </p>
                   </label>
                 </div>
 
                 <div className="flex justify-end gap-3 pt-4 border-t border-border">
-                  <button 
-                    type="button" 
-                    onClick={() => navigate('/criteria')} 
+                  <button
+                    type="button"
+                    onClick={() => navigate('/criteria')}
                     className="px-4 py-2 text-ink-muted font-semibold text-xs hover:bg-surface-2 rounded-lg border border-border transition-colors"
                   >
                     Hủy
                   </button>
-                  <button 
-                    type="submit" 
+                  <button
+                    type="submit"
                     disabled={isSubmitting || !isAdmin}
                     className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs rounded-lg shadow-sm transition-all flex items-center gap-1.5 disabled:opacity-50"
                   >

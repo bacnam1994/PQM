@@ -107,25 +107,29 @@ export const createBatchAction = async (
     updatedAt: new Date().toISOString(),
   };
 
-  try {
-    await store.addBatch(newBatch as any);
-    return {
-      success: true,
+  // BẤT BIẾN GMP/ALCOA+: AI không được trực tiếp gọi addBatch() vào database.
+  // AI chỉ tạo draft/proposal, người dùng review và xác nhận qua BatchAppService workflow.
+  return {
+    success: true,
+    isProposal: true,
+    requiresUserApproval: true,
+    proposal: {
+      type: 'CREATE_BATCH_PROPOSAL',
       batchId: newBatchId,
       batchNo: newBatch.batchNo,
+      productId: product.id,
       productName: product.name,
       productCode: product.code,
+      tccsId: activeTccs?.id || '',
       tccsCode: activeTccs?.code || 'Chưa gán',
-      message: `✅ Đã tạo thành công lô sản xuất mới!\n- **Số Lô**: \`${newBatch.batchNo}\`\n- **Sản phẩm**: **${product.name}** (${product.code})\n- **NSX**: ${formatDateStandard(mfg)} | **HSD**: ${formatDateStandard(exp)}\n- **TCCS áp dụng**: ${activeTccs?.code || 'Chưa có'}\n- **Trạng thái**: Chờ kiểm nghiệm (PENDING)\n\n👉 [Xem chi tiết Lô ${newBatch.batchNo}](/batches/${newBatchId})`,
-      action: 'REDIRECT',
-      path: `/batches/${newBatchId}`,
-    };
-  } catch (err: any) {
-    return {
-      success: false,
-      error: `Không thể tạo lô: ${err.message || err}`,
-    };
-  }
+      mfgDate: mfg,
+      expDate: exp,
+      theoreticalYield: newBatch.theoreticalYield,
+      yieldUnit: newBatch.yieldUnit,
+    },
+    message: `📋 **Đề xuất đăng ký Lô sản xuất mới (Batch Proposal):**\n- **Số Lô**: \`${newBatch.batchNo}\`\n- **Sản phẩm**: **${product.name}** (${product.code})\n- **NSX**: ${formatDateStandard(mfg)} | **HSD**: ${formatDateStandard(exp)}\n- **TCCS áp dụng**: ${activeTccs?.code || 'Chưa gán'}\n- **Sản lượng lý thuyết**: ${newBatch.theoreticalYield} ${newBatch.yieldUnit}\n- **Trạng thái khởi tạo**: Chờ kiểm nghiệm (PENDING)\n\n*Quy tắc GMP:* AI chỉ đóng vai trò trợ lý đề xuất (Proposal). Vui lòng xác nhận để hoàn tất tạo lô qua quy trình chuẩn.`,
+    action: 'REVIEW_PROPOSAL',
+  };
 };
 
 /**

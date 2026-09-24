@@ -336,29 +336,18 @@ export const useTestResultSave = ({
           cumulativeTotal > 0 ? Math.round((cumulativeCompleted / cumulativeTotal) * 100) : 0;
 
         if (!completionStatus.isComplete && !isCumulativeComplete) {
-          const confirmIncomplete = window.confirm(
-            `CẢNH BÁO: Phiếu kiểm nghiệm mới hoàn thành ${completionStatus.progress}%. \n\nBạn có chắc chắn muốn lưu dạng nháp/chưa hoàn thiện không? (Các chỉ tiêu bị bỏ trống sẽ không hiển thị trên CoA)`
+          console.warn(
+            `[Draft Save] Phiếu kiểm nghiệm hoàn thành ${completionStatus.progress}%, lưu dạng nháp/chưa hoàn thiện.`
           );
-          if (!confirmIncomplete) {
-            setIsSubmitting(false);
-            return;
-          }
         }
 
         const overallStatus = QualityEvaluationEngine.calculateOverallStatus(results, activeTCCS);
 
         const failedCriteria = results.filter((r) => r.isPass === false);
         if (overallStatus === TEST_RESULT_STATUS.FAIL && failedCriteria.length > 0) {
-          const failedNames = failedCriteria
-            .map((r) => `  • ${r.criteriaName} (Nhập: ${r.value})`)
-            .join('\n');
-          const confirmFail = window.confirm(
-            `CẢNH BÁO: Phiếu kiểm nghiệm có kết quả QUALITY = FAIL.\n\nPhát hiện ${failedCriteria.length} chỉ tiêu bị vượt giới hạn / không đạt tiêu chuẩn:\n${failedNames}\n\nViệc lưu Phiếu sẽ không tự động thay đổi Workflow Status của Lô.\nQuyết định RELEASED / REJECTED / BLOCKED được thực hiện theo Workflow và thẩm quyền tương ứng.\n\nBạn có chắc chắn muốn lưu phiếu này không?`
+          console.warn(
+            `[Quality Alert] Phiếu kiểm nghiệm có kết quả QUALITY = FAIL (${failedCriteria.length} chỉ tiêu không đạt). Tiếp tục ghi nhận hồ sơ kiểm nghiệm chính xác.`
           );
-          if (!confirmFail) {
-            setIsSubmitting(false);
-            return;
-          }
         }
 
         const resultData: any = {

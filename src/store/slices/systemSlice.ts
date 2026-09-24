@@ -1,4 +1,4 @@
-import { ref, set as firebaseSet, update as firebaseUpdate } from 'firebase/database';
+import { ref, update as firebaseUpdate } from 'firebase/database';
 import { db } from '../../firebase';
 import { detectQualityAnomalies } from '../../services/reportService';
 import { executeOfflineOptimistic } from '../utils/storeHelpers';
@@ -11,6 +11,8 @@ import {
   LABORATORY_QUERY_KEYS,
 } from '../../constants/queryKeys';
 import { DEFAULT_TESTING_LABORATORIES } from '../../services/laboratoryService';
+import { systemAppService } from '../../services/app/SystemAppService';
+import { laboratoryAppService } from '../../services/app/LaboratoryAppService';
 import { SystemSlice, StoreSlice, ToastMessage } from './types';
 
 export const createSystemSlice: StoreSlice<SystemSlice> = (set, get) => ({
@@ -108,10 +110,24 @@ export const createSystemSlice: StoreSlice<SystemSlice> = (set, get) => ({
         criteria_aliases: {},
         ai_learned_mappings: {},
       };
-      await executeOfflineOptimistic(firebaseSet(ref(db), demoData), get);
+
+      const user = get().user;
+      await systemAppService.resetDemoData(demoData, {
+        actorId: user?.uid || 'admin',
+        actorRole: get().isAdmin ? 'ADMIN' : user?.role || 'GUEST',
+        actorEmail: user?.email,
+        reason: 'Khởi tạo dữ liệu mẫu hệ thống từ bảng điều khiển',
+        confirmationToken: 'CONFIRM_RESET_DEMO',
+      });
+
       get().notify({ type: 'SUCCESS', message: 'Nạp dữ liệu mẫu thành công!' });
-    } catch (e) {
+    } catch (e: any) {
       console.error('Lỗi nạp dữ liệu mẫu:', e);
+      get().notify({
+        type: 'ERROR',
+        title: 'Thất bại',
+        message: e?.message || 'Lỗi nạp dữ liệu mẫu',
+      });
     }
   },
 
@@ -124,10 +140,23 @@ export const createSystemSlice: StoreSlice<SystemSlice> = (set, get) => ({
       });
     }
     try {
-      await executeOfflineOptimistic(firebaseSet(ref(db), null), get);
+      const user = get().user;
+      await systemAppService.wipeDatabase({
+        actorId: user?.uid || 'admin',
+        actorRole: get().isAdmin ? 'ADMIN' : user?.role || 'GUEST',
+        actorEmail: user?.email,
+        reason: 'Xóa sạch dữ liệu hệ thống từ bảng điều khiển Admin',
+        confirmationToken: 'CONFIRM_WIPE',
+      });
+
       get().notify({ type: 'SUCCESS', message: 'Đã xóa sạch dữ liệu!' });
-    } catch (e) {
+    } catch (e: any) {
       console.error('Lỗi xóa sạch dữ liệu:', e);
+      get().notify({
+        type: 'ERROR',
+        title: 'Thất bại',
+        message: e?.message || 'Lỗi xóa sạch dữ liệu',
+      });
     }
   },
 
@@ -159,7 +188,16 @@ export const createSystemSlice: StoreSlice<SystemSlice> = (set, get) => ({
         criteria_aliases: toMap(data.criteriaAliases || (data as any).criteria_aliases),
         testing_laboratories: toMap(data.testingLaboratories || (data as any).testing_laboratories),
       };
-      await executeOfflineOptimistic(firebaseSet(ref(db), restoreData), get);
+
+      const user = get().user;
+      await systemAppService.restoreDatabase(restoreData, {
+        actorId: user?.uid || 'admin',
+        actorRole: get().isAdmin ? 'ADMIN' : user?.role || 'GUEST',
+        actorEmail: user?.email,
+        reason: 'Khôi phục cơ sở dữ liệu từ tệp sao lưu JSON',
+        confirmationToken: 'CONFIRM_RESTORE',
+      });
+
       get().notify({
         type: 'SUCCESS',
         title: 'Thành công',
@@ -196,23 +234,33 @@ export const createSystemSlice: StoreSlice<SystemSlice> = (set, get) => ({
   },
 
   addTestingLaboratory: async (lab) => {
-    await executeOfflineOptimistic(
-      firebaseSet(ref(db, `testing_laboratories/${lab.id}`), lab),
-      get
-    );
+    const user = get().user;
+    await laboratoryAppService.createLaboratory(lab, {
+      actorId: user?.uid || 'system',
+      actorRole: get().isAdmin ? 'ADMIN' : user?.role || 'QA',
+      actorEmail: user?.email,
+    });
     queryClient.invalidateQueries({ queryKey: LABORATORY_QUERY_KEYS.all });
   },
 
   updateTestingLaboratory: async (lab) => {
-    await executeOfflineOptimistic(
-      firebaseUpdate(ref(db, `testing_laboratories/${lab.id}`), lab),
-      get
-    );
+    const user = get().user;
+    await laboratoryAppService.updateLaboratory(lab, {
+      actorId: user?.uid || 'system',
+      actorRole: get().isAdmin ? 'ADMIN' : user?.role || 'QA',
+      actorEmail: user?.email,
+    });
     queryClient.invalidateQueries({ queryKey: LABORATORY_QUERY_KEYS.all });
   },
 
   deleteTestingLaboratory: async (id) => {
-    await executeOfflineOptimistic(firebaseSet(ref(db, `testing_laboratories/${id}`), null), get);
+    const user = get().user;
+    await laboratoryAppService.deleteLaboratory(id, {
+      actorId: user?.uid || 'system',
+      actorRole: get().isAdmin ? 'ADMIN' : user?.role || 'ADMIN',
+      actorEmail: user?.email,
+      reason: 'Xóa đơn vị kiểm nghiệm từ bảng điều khiển quản lý',
+    });
     queryClient.invalidateQueries({ queryKey: LABORATORY_QUERY_KEYS.all });
   },
 });

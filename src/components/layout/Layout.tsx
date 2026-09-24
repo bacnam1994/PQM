@@ -46,6 +46,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { useQualityAlerts } from '../../hooks/useQualityAlerts';
 import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcuts';
 import { GlobalCommandPalette } from './GlobalCommandPalette';
+import { ConfirmationModal } from '../ui/CommonUI';
 
 const LazyAIAssistantChat = React.lazy(() =>
   import('../features/AIAssistantChat').then((m) => ({ default: m.AIAssistantChat }))
@@ -212,11 +213,16 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     }
   };
 
-  const handleLogout = async () => {
-    if (window.confirm('Bạn có chắc chắn muốn đăng xuất?')) {
-      await logout();
-      navigate('/login');
-    }
+  const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
+
+  const handleLogout = () => {
+    setIsLogoutModalOpen(true);
+  };
+
+  const confirmLogout = async () => {
+    setIsLogoutModalOpen(false);
+    await logout();
+    navigate('/login');
   };
 
   const getPageHeaderInfo = (pathname: string) => {
@@ -752,6 +758,16 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
       {role !== 'GUEST' && <AIChatLauncher />}
       <GlobalCommandPalette />
+      <ConfirmationModal
+        isOpen={isLogoutModalOpen}
+        onClose={() => setIsLogoutModalOpen(false)}
+        onConfirm={confirmLogout}
+        title="Xác nhận đăng xuất"
+        message="Bạn có chắc chắn muốn đăng xuất khỏi phiên làm việc hiện tại?"
+        confirmText="Đăng xuất"
+        cancelText="Hủy"
+        confirmButtonColor="bg-rose-600 hover:bg-rose-700 text-white"
+      />
     </div>
   );
 };
