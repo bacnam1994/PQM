@@ -14,10 +14,7 @@ import { fetchTestResultsByBatchId, fetchTestResultById } from '../../services/t
 import { ensureArray } from '../../utils';
 import { TestResult, TestResultEntry, TCCS } from '../../types';
 import { verifyEvaluationSnapshotIntegrity } from '../../domain/evaluation/EvaluationSnapshotBuilder';
-import { batchRepository } from '../../repositories/firebase/FirebaseBatchRepository';
-import { productRepository } from '../../repositories/firebase/FirebaseProductRepository';
-import { tccsRepository } from '../../repositories/firebase/FirebaseTCCSRepository';
-import { formulaRepository } from '../../repositories/firebase/FirebaseFormulaRepository';
+import { coaService } from '../../services/app/CoAService';
 
 const CoAReportPage = () => {
   const { batchId, id } = useParams();
@@ -110,7 +107,7 @@ const CoAReportPage = () => {
                 hydratedBatch = { ...localBatch };
               } else {
                 try {
-                  const b = await batchRepository.findById(rawResult.batchId);
+                  const b = await coaService.fetchBatchFallback(rawResult.batchId);
                   if (b) {
                     hydratedBatch = b as HydratedBatch;
                   }
@@ -128,7 +125,7 @@ const CoAReportPage = () => {
               batchProduct = storeProducts.find((p) => p.id === hydratedBatch!.productId);
               if (!batchProduct) {
                 try {
-                  const p = await productRepository.findById(hydratedBatch.productId);
+                  const p = await coaService.fetchProductFallback(hydratedBatch.productId);
                   if (p) {
                     batchProduct = p;
                   }
@@ -145,7 +142,7 @@ const CoAReportPage = () => {
                 batchTccs = storeTccsList.find((t) => t.id === hydratedBatch!.tccsId);
                 if (!batchTccs) {
                   try {
-                    const t = await tccsRepository.findById(hydratedBatch.tccsId);
+                    const t = await coaService.fetchTccsFallback(hydratedBatch.tccsId);
                     if (t) {
                       batchTccs = t;
                     }
@@ -195,14 +192,7 @@ const CoAReportPage = () => {
           if (prodId) {
             let fetchedFormula = storeFormulas.find((f: any) => f.productId === prodId);
             if (!fetchedFormula) {
-              try {
-                const formulas = await formulaRepository.findByRelation('productId', prodId);
-                if (formulas.length > 0) {
-                  fetchedFormula = formulas[0];
-                }
-              } catch (e) {
-                console.warn('Formula fetch failed:', e);
-              }
+              fetchedFormula = await coaService.fetchFormulaByProductIdFallback(prodId);
             }
             if (isMounted) {
               setFormula(fetchedFormula || null);
@@ -217,7 +207,7 @@ const CoAReportPage = () => {
               batch = { ...localBatch };
             } else {
               try {
-                const b = await batchRepository.findById(batchId);
+                const b = await coaService.fetchBatchFallback(batchId);
                 if (b) {
                   batch = b as HydratedBatch;
                 }
@@ -238,7 +228,7 @@ const CoAReportPage = () => {
             batchProduct = storeProducts.find((p) => p.id === batch!.productId);
             if (!batchProduct) {
               try {
-                const p = await productRepository.findById(batch.productId);
+                const p = await coaService.fetchProductFallback(batch.productId);
                 if (p) {
                   batchProduct = p;
                 }
@@ -255,7 +245,7 @@ const CoAReportPage = () => {
               batchTccs = storeTccsList.find((t) => t.id === batch!.tccsId);
               if (!batchTccs) {
                 try {
-                  const t = await tccsRepository.findById(batch.tccsId);
+                  const t = await coaService.fetchTccsFallback(batch.tccsId);
                   if (t) {
                     batchTccs = t;
                   }
@@ -354,14 +344,7 @@ const CoAReportPage = () => {
           // Tải công thức sản phẩm liên quan
           let fetchedFormula = storeFormulas.find((f: any) => f.productId === batch!.productId);
           if (!fetchedFormula && batch.productId) {
-            try {
-              const formulas = await formulaRepository.findByRelation('productId', batch.productId);
-              if (formulas.length > 0) {
-                fetchedFormula = formulas[0];
-              }
-            } catch (e) {
-              console.warn('Formula fetch failed:', e);
-            }
+            fetchedFormula = await coaService.fetchFormulaByProductIdFallback(batch.productId);
           }
           if (isMounted) {
             setFormula(fetchedFormula || null);

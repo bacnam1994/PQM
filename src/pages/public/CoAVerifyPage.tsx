@@ -7,11 +7,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { testResultRepository } from '../../repositories/firebase/FirebaseTestResultRepository';
-import { batchRepository } from '../../repositories/firebase/FirebaseBatchRepository';
-import { productRepository } from '../../repositories/firebase/FirebaseProductRepository';
-import { tccsRepository } from '../../repositories/firebase/FirebaseTCCSRepository';
-import { signatureService } from '../../services/signatureService';
+import { coaService } from '../../services/app/CoAService';
 import {
   ShieldCheckIcon,
   ExclamationTriangleIcon,
@@ -51,73 +47,22 @@ export const CoAVerifyPage: React.FC = () => {
         setLoading(true);
         setError(null);
 
-        // 1. Thử tìm theo TestResult ID
-        let trData: TestResult | null = await testResultRepository.findById(id);
+        const data = await coaService.getCoAVerificationData(id);
 
-        if (!trData) {
-          // 2. Thử tìm theo Batch ID nếu id truyền vào là batchId
-          const bData = await batchRepository.findById(id);
-          if (bData) {
-            setBatch(bData);
-            const foundTests = await testResultRepository.findByRelation('batchId', bData.id);
-            if (foundTests.length > 0) {
-              trData = foundTests[0];
-            }
-          }
-        }
-
-        if (!trData) {
+        if (!data.testResult) {
           setError('Không tìm thấy dữ liệu kiểm nghiệm tương ứng với mã QR này.');
           setLoading(false);
           return;
         }
 
-        setTestResult(trData);
-
-        // 3. Tải thông tin Lô (nếu chưa có)
-        let currentBatch: Batch | null = null;
-        if (trData.batchId) {
-          currentBatch = await batchRepository.findById(trData.batchId);
-          if (currentBatch) {
-            setBatch(currentBatch);
-
-            // 4. Tải thông tin Sản phẩm
-            if (currentBatch.productId) {
-              const p = await productRepository.findById(currentBatch.productId);
-              if (p) setProduct(p);
-            }
-          }
-        }
-
-        // 5. Tải thông tin TCCS (thông qua Batch hoặc Product)
-        if (currentBatch && currentBatch.tccsId) {
-          const t = await tccsRepository.findById(currentBatch.tccsId);
-          if (t) setTccs(t);
-        }
-
-        // 6. Tải Chữ ký điện tử (FDA 21 CFR Part 11) nếu có
-        try {
-          const docId = trData.id || currentBatch?.id;
-          if (docId) {
-            const sigs = await signatureService.getSignaturesForDocument('COA_ISSUE', docId);
-            if (sigs.length > 0) {
-              setSignature(sigs[0]);
-            } else if (currentBatch) {
-              const batchSigs = await signatureService.getSignaturesForDocument(
-                'BATCH_RELEASE',
-                currentBatch.id
-              );
-              if (batchSigs.length > 0) {
-                setSignature(batchSigs[0]);
-              }
-            }
-          }
-        } catch (sigErr) {
-          console.warn('Lỗi đọc chữ ký điện tử:', sigErr);
-        }
+        setTestResult(data.testResult);
+        setBatch(data.batch);
+        setProduct(data.product);
+        setTccs(data.tccs);
+        setSignature(data.signature);
       } catch (err: any) {
-        console.error('Error verifying CoA:', err);
-        setError('Có lỗi xảy ra trong quá trình truy xuất dữ liệu xác thực.');
+        console.error('Lỗi khi tải thông tin kiểm nghiệm:', err);
+        setError(err.message || 'Lỗi hệ thống khi truy xuất dữ liệu xác thực.');
       } finally {
         setLoading(false);
       }

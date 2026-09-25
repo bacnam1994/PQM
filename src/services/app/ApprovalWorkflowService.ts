@@ -12,8 +12,22 @@ import {
 } from '../../types/approvalWorkflow';
 import { ElectronicSignature, Role, Batch } from '../../types';
 import { ApprovalWorkflowHandlers } from '../../workflow/handlers/approvalWorkflowHandlers';
+import { firebaseApprovalTaskRepository } from '../../repositories/firebase/FirebaseApprovalTaskRepository';
 
 export class ApprovalWorkflowService {
+  /**
+   * Truy vấn approval tasks theo thực thể
+   */
+  static async findByEntity(entityType: string, entityId: string): Promise<ApprovalTask[]> {
+    return firebaseApprovalTaskRepository.findByEntity(entityType, entityId);
+  }
+
+  /**
+   * Lưu trữ hoặc cập nhật approval task
+   */
+  static async saveTask(task: ApprovalTask): Promise<void> {
+    await firebaseApprovalTaskRepository.save(task);
+  }
   /**
    * Khởi tạo đường ống thẩm duyệt đa cấp chuẩn FRS-MOD-13 với cơ chế bảo vệ SoD
    */

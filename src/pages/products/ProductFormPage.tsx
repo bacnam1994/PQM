@@ -14,6 +14,7 @@ import { PRODUCT_STATUS, generateId } from '../../utils';
 import { Product, ProductStatus } from '../../types';
 import { useUIStore } from '../../store/useUIStore';
 import { uploadStorageFile } from '../../services/storageService';
+import { useWorkflowActions } from '../../hooks/useWorkflowActions';
 
 const ProductFormPage = () => {
   const { id } = useParams();
@@ -23,6 +24,12 @@ const ProductFormPage = () => {
   const { products, addProduct, updateProduct, notify, user } = useAppStore();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [productToEdit, setProductToEdit] = useState<Product | null>(null);
+
+  const {
+    canExecute,
+    dispatchAction,
+    isExecuting: isWorkflowExecuting,
+  } = useWorkflowActions('PRODUCT', id);
 
   // Image Upload State
   const [imageUrl, setImageUrl] = useState('');
@@ -211,7 +218,22 @@ const ProductFormPage = () => {
       }
 
       if (id && productToEdit) {
-        await updateProduct({ ...productToEdit, ...data, updatedAt: new Date().toISOString() });
+        const res = await dispatchAction('PRODUCT_UPDATE', {
+          entityId: id,
+          payload: { ...productToEdit, ...data, updatedAt: new Date().toISOString() },
+          reason: `Cập nhật thông tin sản phẩm ${data.code} - ${data.name}`,
+          mutationHandler: async () => {
+            await updateProduct({ ...productToEdit, ...data, updatedAt: new Date().toISOString() });
+          },
+        });
+        if (!res.success) {
+          notify({
+            type: 'ERROR',
+            title: 'Thất bại',
+            message: res.failureReason || 'Lỗi khi cập nhật sản phẩm',
+          });
+          return;
+        }
         notify({
           type: 'SUCCESS',
           title: 'Đã cập nhật',
@@ -219,12 +241,32 @@ const ProductFormPage = () => {
         });
       } else {
         const newId = generateId('prod');
-        await addProduct({
-          id: newId,
-          ...data,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
+        const res = await dispatchAction('PRODUCT_CREATE', {
+          entityId: newId,
+          payload: {
+            id: newId,
+            ...data,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          },
+          reason: `Tạo mới sản phẩm ${data.code} - ${data.name}`,
+          mutationHandler: async () => {
+            await addProduct({
+              id: newId,
+              ...data,
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+            });
+          },
         });
+        if (!res.success) {
+          notify({
+            type: 'ERROR',
+            title: 'Thất bại',
+            message: res.failureReason || 'Lỗi khi tạo sản phẩm',
+          });
+          return;
+        }
         notify({ type: 'SUCCESS', title: 'Thành công', message: 'Đã thêm sản phẩm mới.' });
       }
       navigate('/products');
@@ -425,10 +467,16 @@ const ProductFormPage = () => {
               </button>
               <button
                 type="submit"
-                disabled={isSubmitting}
+                disabled={
+                  isSubmitting ||
+                  isWorkflowExecuting ||
+                  !canExecute(id ? 'PRODUCT_UPDATE' : 'PRODUCT_CREATE')
+                }
                 className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white rounded-lg font-medium text-xs flex items-center gap-2 shadow-xs transition-all disabled:opacity-50 cursor-pointer"
               >
-                {isSubmitting && <ArrowPathIcon className="w-4 h-4 animate-spin" />}
+                {(isSubmitting || isWorkflowExecuting) && (
+                  <ArrowPathIcon className="w-4 h-4 animate-spin" />
+                )}
                 {id ? 'Cập nhật Sản phẩm' : 'Lưu Sản phẩm mới'}
               </button>
             </div>

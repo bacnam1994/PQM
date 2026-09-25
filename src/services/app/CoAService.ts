@@ -7,7 +7,14 @@
  * -docs/contracts/COA_SNAPSHOT_CONTRACT.md
  */
 
-import { Batch, TestResult, TCCS, EvaluationSnapshot, ElectronicSignature } from '../../types';
+import {
+  Batch,
+  TestResult,
+  TCCS,
+  Product,
+  EvaluationSnapshot,
+  ElectronicSignature,
+} from '../../types';
 import { verifyEvaluationSnapshotIntegrity } from '../../domain/evaluation/EvaluationSnapshotBuilder';
 import { AlternateRuleResolver } from '../../domain/evaluation/AlternateRuleResolver';
 import { logAuditAction } from '../auditService';
@@ -15,6 +22,19 @@ import { can } from '../permissionService';
 import { WorkflowFacade } from '../../workflow/WorkflowFacade';
 import { WorkflowActor } from '../../workflow/contracts/actions';
 import { signatureService } from '../signatureService';
+import { testResultRepository } from '../../repositories/firebase/FirebaseTestResultRepository';
+import { batchRepository } from '../../repositories/firebase/FirebaseBatchRepository';
+import { productRepository } from '../../repositories/firebase/FirebaseProductRepository';
+import { tccsRepository } from '../../repositories/firebase/FirebaseTCCSRepository';
+import { formulaRepository } from '../../repositories/firebase/FirebaseFormulaRepository';
+
+export interface CoAVerificationData {
+  testResult: TestResult | null;
+  batch: Batch | null;
+  product: Product | null;
+  tccs: TCCS | null;
+  signature: ElectronicSignature | null;
+}
 
 export interface CoAFootnote {
   symbol: string;
@@ -304,6 +324,104 @@ export class CoAService {
     }
 
     return execution.data!;
+  }
+
+  /**
+   * Truy xuất toàn diện dữ liệu xác thực CoA công khai (BR-COA-004)
+   */
+  public async getCoAVerificationData(id: string): Promise<CoAVerificationData> {
+    let trData: TestResult | null = await testResultRepository.findById(id);
+    let currentBatch: Batch | null = null;
+    let currentProduct: Product | null = null;
+    let currentTccs: TCCS | null = null;
+    let currentSignature: ElectronicSignature | null = null;
+
+    if (!trData) {
+      const bData = await batchRepository.findById(id);
+      if (bData) {
+        currentBatch = bData;
+        const foundTests = await testResultRepository.findByRelation('batchId', bData.id);
+        if (foundTests.length > 0) {
+          trData = foundTests[0];
+        }
+      }
+    }
+
+    if (!trData) {
+      return {
+        testResult: null,
+        batch: currentBatch,
+        product: null,
+        tccs: null,
+        signature: null,
+      };
+    }
+
+    if (trData.batchId && !currentBatch) {
+      currentBatch = await batchRepository.findById(trData.batchId);
+    }
+
+    if (currentBatch?.productId) {
+      currentProduct = await productRepository.findById(currentBatch.productId);
+    }
+
+    if (currentBatch?.tccsId) {
+      currentTccs = await tccsRepository.findById(currentBatch.tccsId);
+    }
+
+    try {
+      const docId = trData.id || currentBatch?.id;
+      if (docId) {
+        const sigs = await signatureService.getSignaturesForDocument('COA_ISSUE', docId);
+        if (sigs.length > 0) {
+          currentSignature = sigs[0];
+        } else if (currentBatch) {
+          const batchSigs = await signatureService.getSignaturesForDocument(
+            'BATCH_RELEASE',
+            currentBatch.id
+          );
+          if (batchSigs.length > 0) {
+            currentSignature = batchSigs[0];
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('Lỗi lấy chữ ký CoA:', e);
+    }
+
+    return {
+      testResult: trData,
+      batch: currentBatch,
+      product: currentProduct,
+      tccs: currentTccs,
+      signature: currentSignature,
+    };
+  }
+
+  public async fetchBatchFallback(batchId: string): Promise<Batch | null> {
+    return batchRepository.findById(batchId);
+  }
+
+  public async fetchProductFallback(productId: string): Promise<Product | null> {
+    return productRepository.findById(productId);
+  }
+
+  public async fetchTccsFallback(tccsId: string): Promise<TCCS | null> {
+    return tccsRepository.findById(tccsId);
+  }
+
+  public async fetchFormulaFallback(formulaId: string): Promise<any | null> {
+    return formulaRepository.findById(formulaId);
+  }
+
+  public async fetchFormulaByProductIdFallback(productId: string): Promise<any | null> {
+    try {
+      const formulas = await formulaRepository.findByRelation('productId', productId);
+      return formulas.length > 0 ? formulas[0] : null;
+    } catch (e) {
+      console.warn('Formula fetch failed:', e);
+      return null;
+    }
   }
 
   private toActor(currentUser: any): WorkflowActor {

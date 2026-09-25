@@ -23,6 +23,7 @@ import { TccsSafetyCriteriaTable } from './tccs-form/TccsSafetyCriteriaTable';
 import { TccsAlternateRulesSection } from './tccs-form/TccsAlternateRulesSection';
 import { tccsFormSchema } from '../../schemas';
 import { OperationalDraftBanner } from '../../components/operational';
+import { useWorkflowActions } from '../../hooks/useWorkflowActions';
 import toast from 'react-hot-toast';
 
 export const COMMON_CRITERIA_UNITS = [
@@ -210,6 +211,7 @@ const TCCSFormPage = () => {
 
   const createTCCSMutation = useCreateTCCSMutation();
   const updateTCCSMutation = useUpdateTCCSMutation();
+  const { canExecute } = useWorkflowActions('TCCS', id);
 
   const [productSearch, setProductSearch] = useState('');
   const [showProductDropdown, setShowProductDropdown] = useState(false);
@@ -518,7 +520,9 @@ const TCCSFormPage = () => {
             </button>
             <button
               type="submit"
-              disabled={isSubmitting}
+              disabled={
+                isSubmitting || !canExecute(id && !cloneId ? 'TCCS_UPDATE_DRAFT' : 'TCCS_CREATE')
+              }
               className="px-6 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-medium text-xs shadow-xs flex items-center gap-2 transition-all active:scale-[0.98] disabled:opacity-50"
             >
               {isSubmitting && <ArrowPathIcon className="w-4 h-4 animate-spin" />}

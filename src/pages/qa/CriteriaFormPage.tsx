@@ -17,6 +17,7 @@ import { useAppStore } from '../../store/useAppStore';
 import { DSFormInput, SpecialCharToolbar, DSCard, PageHeader } from '../../components';
 import { normalizeName, createAliasRecord } from '../../services/criteriaAliasService';
 import { masterCriterionAppService } from '../../services/app/MasterCriterionAppService';
+import { useWorkflowActions } from '../../hooks/useWorkflowActions';
 
 interface CriterionUsageInfo {
   name: string;
@@ -52,6 +53,8 @@ const CriteriaFormPage: React.FC = () => {
   const [targetProductId, setTargetProductId] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [autoCreateAlias, setAutoCreateAlias] = useState(true);
+
+  const { canExecute, isExecuting: isWorkflowExecuting } = useWorkflowActions('MASTER_DATA');
 
   // Tự động nạp toàn bộ danh sách phiếu kiểm nghiệm từ DB để thống kê chính xác
   useEffect(() => {
@@ -551,7 +554,9 @@ const CriteriaFormPage: React.FC = () => {
                   </button>
                   <button
                     type="submit"
-                    disabled={isSubmitting || !isAdmin}
+                    disabled={
+                      isSubmitting || isWorkflowExecuting || !canExecute('CRITERIA_MASTER_UPDATE')
+                    }
                     className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs rounded-lg shadow-sm transition-all flex items-center gap-1.5 disabled:opacity-50"
                   >
                     {isSubmitting ? (

@@ -17,6 +17,7 @@
     "export:source": "node scripts/exportAllSource.cjs",
     "workflow:inventory": "node scripts/workflow/inventory.cjs",
     "workflow:generate": "node scripts/workflow/generate_matrices.cjs",
+    "workflow:guard": "node scripts/workflow/check_boundaries.cjs",
     "prepare": "husky"
   },
   "dependencies": {

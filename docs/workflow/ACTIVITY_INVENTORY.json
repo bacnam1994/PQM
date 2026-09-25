@@ -1,6 +1,6 @@
 {
   "version": "1.0.0-BASELINE",
-  "generatedAt": "2026-09-25T03:00:04.071Z",
+  "generatedAt": "2026-09-25T06:54:16.825Z",
   "totalActivities": 122,
   "gateMetrics": {
     "unmappedCount": 0,
@@ -233,7 +233,7 @@
     {
       "id": "ACT-014",
       "trigger": "APP_SERVICE_MUTATION",
-      "location": "src/services/app/CoAService.ts:178",
+      "location": "src/services/app/CoAService.ts:191",
       "category": "DOCUMENT",
       "entity": "COA",
       "mutation": true,
@@ -246,7 +246,7 @@
     {
       "id": "ACT-015",
       "trigger": "APP_SERVICE_MUTATION",
-      "location": "src/services/app/CoAService.ts:209",
+      "location": "src/services/app/CoAService.ts:222",
       "category": "APPROVAL",
       "entity": "COA",
       "mutation": true,
@@ -259,7 +259,7 @@
     {
       "id": "ACT-016",
       "trigger": "APP_SERVICE_MUTATION",
-      "location": "src/services/app/CoAService.ts:260",
+      "location": "src/services/app/CoAService.ts:273",
       "category": "GOVERNANCE",
       "entity": "COA",
       "mutation": true,
@@ -506,7 +506,7 @@
     {
       "id": "ACT-035",
       "trigger": "APP_SERVICE_MUTATION",
-      "location": "src/services/app/MaterialAppService.ts:84",
+      "location": "src/services/app/MaterialAppService.ts:86",
       "category": "LIFECYCLE",
       "entity": "MATERIAL",
       "mutation": true,
@@ -636,7 +636,7 @@
     {
       "id": "ACT-045",
       "trigger": "APP_SERVICE_MUTATION",
-      "location": "src/services/app/ProductAppService.ts:96",
+      "location": "src/services/app/ProductAppService.ts:107",
       "category": "LIFECYCLE",
       "entity": "PRODUCT",
       "mutation": true,
@@ -649,7 +649,7 @@
     {
       "id": "ACT-046",
       "trigger": "APP_SERVICE_MUTATION",
-      "location": "src/services/app/ProductAppService.ts:120",
+      "location": "src/services/app/ProductAppService.ts:136",
       "category": "LIFECYCLE",
       "entity": "PRODUCT",
       "mutation": true,
@@ -779,7 +779,7 @@
     {
       "id": "ACT-056",
       "trigger": "APP_SERVICE_MUTATION",
-      "location": "src/services/app/TCCSAppService.ts:191",
+      "location": "src/services/app/TCCSAppService.ts:195",
       "category": "LIFECYCLE",
       "entity": "TCCS",
       "mutation": true,
@@ -792,7 +792,7 @@
     {
       "id": "ACT-057",
       "trigger": "APP_SERVICE_MUTATION",
-      "location": "src/services/app/TCCSAppService.ts:241",
+      "location": "src/services/app/TCCSAppService.ts:245",
       "category": "LIFECYCLE",
       "entity": "TCCS",
       "mutation": true,
@@ -805,7 +805,7 @@
     {
       "id": "ACT-058",
       "trigger": "APP_SERVICE_MUTATION",
-      "location": "src/services/app/TCCSAppService.ts:288",
+      "location": "src/services/app/TCCSAppService.ts:295",
       "category": "LIFECYCLE",
       "entity": "TCCS",
       "mutation": true,
@@ -818,7 +818,7 @@
     {
       "id": "ACT-059",
       "trigger": "APP_SERVICE_MUTATION",
-      "location": "src/services/app/TCCSAppService.ts:314",
+      "location": "src/services/app/TCCSAppService.ts:321",
       "category": "LIFECYCLE",
       "entity": "TCCS",
       "mutation": true,
@@ -831,7 +831,7 @@
     {
       "id": "ACT-060",
       "trigger": "APP_SERVICE_MUTATION",
-      "location": "src/services/app/TCCSAppService.ts:340",
+      "location": "src/services/app/TCCSAppService.ts:347",
       "category": "LIFECYCLE",
       "entity": "TCCS",
       "mutation": true,
@@ -844,7 +844,7 @@
     {
       "id": "ACT-061",
       "trigger": "APP_SERVICE_MUTATION",
-      "location": "src/services/app/TCCSAppService.ts:363",
+      "location": "src/services/app/TCCSAppService.ts:370",
       "category": "LIFECYCLE",
       "entity": "TCCS",
       "mutation": true,
@@ -857,7 +857,7 @@
     {
       "id": "ACT-062",
       "trigger": "APP_SERVICE_MUTATION",
-      "location": "src/services/app/TCCSAppService.ts:376",
+      "location": "src/services/app/TCCSAppService.ts:383",
       "category": "LIFECYCLE",
       "entity": "TCCS",
       "mutation": true,
@@ -1507,7 +1507,7 @@
     {
       "id": "ACT-112",
       "trigger": "UI_FORM_SUBMIT",
-      "location": "src/pages/batches/BatchFormPage.tsx:50",
+      "location": "src/pages/batches/BatchFormPage.tsx:53",
       "category": "LIFECYCLE",
       "entity": "BATCH",
       "mutation": true,
@@ -1533,7 +1533,7 @@
     {
       "id": "ACT-114",
       "trigger": "UI_FORM_SUBMIT",
-      "location": "src/pages/products/ProductFormPage.tsx:174",
+      "location": "src/pages/products/ProductFormPage.tsx:177",
       "category": "LIFECYCLE",
       "entity": "PRODUCT",
       "mutation": true,
@@ -1546,7 +1546,7 @@
     {
       "id": "ACT-115",
       "trigger": "UI_FORM_SUBMIT",
-      "location": "src/pages/qa/CriteriaFormPage.tsx:170",
+      "location": "src/pages/qa/CriteriaFormPage.tsx:173",
       "category": "LIFECYCLE",
       "entity": "SYSTEM",
       "mutation": true,
@@ -1572,7 +1572,7 @@
     {
       "id": "ACT-117",
       "trigger": "UI_FORM_SUBMIT",
-      "location": "src/pages/qa/TCCSFormPage.tsx:331",
+      "location": "src/pages/qa/TCCSFormPage.tsx:333",
       "category": "LIFECYCLE",
       "entity": "TCCS",
       "mutation": true,

@@ -42,6 +42,7 @@ import { Modal } from '../../components/ui/CommonUI';
 import { DeviationMetricsBar } from '../quality/deviations/DeviationMetricsBar';
 import { CAPATrackerView } from '../quality/deviations/CAPATrackerView';
 import { DeviationWorkflowModal } from '../quality/deviations/DeviationWorkflowModal';
+import { useWorkflowActions } from '../../hooks/useWorkflowActions';
 
 // Trạng thái workflow hiển thị
 const STATUS_CONFIG: Record<
@@ -132,6 +133,8 @@ const DeviationListPage: React.FC = () => {
   const [severityFilter, setSeverityFilter] = useState<string>('ALL');
   const [selectedDeviation, setSelectedDeviation] = useState<QualityDeviation | null>(null);
   const [activeViewTab, setActiveViewTab] = useState<'DEVIATIONS' | 'CAPA_TRACKER'>('DEVIATIONS');
+
+  const { canExecute } = useWorkflowActions('DEVIATION', selectedDeviation?.id);
 
   // Modal states
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -395,7 +398,8 @@ const DeviationListPage: React.FC = () => {
 
           <button
             onClick={() => setShowCreateModal(true)}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-rose-600 hover:bg-rose-700 active:scale-[0.98] text-white font-medium text-xs shadow-2xs transition-all"
+            disabled={!canExecute('DEVIATION_CREATE')}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-rose-600 hover:bg-rose-700 active:scale-[0.98] text-white font-medium text-xs shadow-2xs transition-all disabled:opacity-50"
           >
             <PlusIcon className="w-4 h-4" />
             <span>Khởi tạo sai lệch</span>

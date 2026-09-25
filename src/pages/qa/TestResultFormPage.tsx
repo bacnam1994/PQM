@@ -6,6 +6,7 @@ import toast from 'react-hot-toast';
 import { useTestResultForm } from '../../hooks/test-results/useTestResultForm';
 import { useAppStore } from '../../store/useAppStore';
 import { useDataGraph } from '../../hooks/useDataGraph';
+import { useWorkflowActions } from '../../hooks/useWorkflowActions';
 import { fetchTestResultById } from '../../services/testResultService';
 import { normalizeSearch, BATCH_STATUS } from '../../utils';
 import { consumeAIDraft, peekAIDraft } from '../../services/ai/aiDraftManager';
@@ -111,11 +112,29 @@ const TestResultFormPage: React.FC = () => {
   const [isApplyingAIDraft, setIsApplyingAIDraft] = useState(false);
   const [isTransitioning, setIsTransitioning] = useState(false);
 
+  const {
+    canExecute,
+    dispatchAction,
+    isExecuting: isWorkflowExecuting,
+  } = useWorkflowActions('TEST_RESULT', id);
+
   const handleWorkflowTransition = async (targetStatus: string) => {
     if (!crud.selectedItem) return;
     try {
       setIsTransitioning(true);
-      await updateTestResultWorkflowStatus(crud.selectedItem.id, targetStatus);
+      let actionId: any = 'TEST_RESULT_SUBMIT';
+      if (targetStatus === 'FINAL' || targetStatus === 'APPROVED') actionId = 'TEST_RESULT_APPROVE';
+
+      const res = await dispatchAction(actionId, {
+        entityId: crud.selectedItem.id,
+        currentState: (crud.selectedItem as any).workflowStatus || 'DRAFT',
+        reason: `Chuyển trạng thái quy trình sang ${targetStatus}`,
+      });
+
+      if (!res.success) {
+        throw new Error(res.failureReason || 'Lỗi khi chuyển trạng thái quy trình');
+      }
+
       toast.success(`Đã chuyển trạng thái quy trình: ${targetStatus}`);
       navigate('/test-results');
     } catch (err: any) {
@@ -505,36 +524,39 @@ const TestResultFormPage: React.FC = () => {
               <div className="flex items-center gap-3">
                 {crud.mode === 'EDIT' && crud.selectedItem && (
                   <>
-                    {((crud.selectedItem as any).workflowStatus || 'DRAFT') === 'DRAFT' && (
-                      <button
-                        type="button"
-                        onClick={() => handleWorkflowTransition('SUBMITTED')}
-                        disabled={isTransitioning || isSubmitting}
-                        className="px-4 py-2 bg-amber-600 hover:bg-amber-700 active:bg-amber-800 text-white font-medium rounded-lg text-xs tracking-wide transition-all cursor-pointer disabled:opacity-40"
-                      >
-                        Trình duyệt (Submit)
-                      </button>
-                    )}
-                    {(crud.selectedItem as any).workflowStatus === 'SUBMITTED' && (
-                      <button
-                        type="button"
-                        onClick={() => handleWorkflowTransition('FINAL')}
-                        disabled={isTransitioning || isSubmitting}
-                        className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white font-medium rounded-lg text-xs tracking-wide transition-all cursor-pointer disabled:opacity-40"
-                      >
-                        Chốt kết quả (Finalize)
-                      </button>
-                    )}
-                    {(crud.selectedItem as any).workflowStatus === 'FINAL' && (
-                      <button
-                        type="button"
-                        onClick={() => handleWorkflowTransition('APPROVED')}
-                        disabled={isTransitioning || isSubmitting}
-                        className="px-4 py-2 bg-emerald-700 hover:bg-emerald-800 active:bg-emerald-900 text-white font-medium rounded-lg text-xs tracking-wide transition-all cursor-pointer disabled:opacity-40"
-                      >
-                        Phê duyệt QA (Approve)
-                      </button>
-                    )}
+                    {((crud.selectedItem as any).workflowStatus || 'DRAFT') === 'DRAFT' &&
+                      canExecute('TEST_RESULT_SUBMIT') && (
+                        <button
+                          type="button"
+                          onClick={() => handleWorkflowTransition('SUBMITTED')}
+                          disabled={isTransitioning || isSubmitting || isWorkflowExecuting}
+                          className="px-4 py-2 bg-amber-600 hover:bg-amber-700 active:bg-amber-800 text-white font-medium rounded-lg text-xs tracking-wide transition-all cursor-pointer disabled:opacity-40"
+                        >
+                          Trình duyệt (Submit)
+                        </button>
+                      )}
+                    {(crud.selectedItem as any).workflowStatus === 'SUBMITTED' &&
+                      canExecute('TEST_RESULT_APPROVE') && (
+                        <button
+                          type="button"
+                          onClick={() => handleWorkflowTransition('FINAL')}
+                          disabled={isTransitioning || isSubmitting || isWorkflowExecuting}
+                          className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white font-medium rounded-lg text-xs tracking-wide transition-all cursor-pointer disabled:opacity-40"
+                        >
+                          Chốt kết quả (Finalize)
+                        </button>
+                      )}
+                    {(crud.selectedItem as any).workflowStatus === 'FINAL' &&
+                      canExecute('TEST_RESULT_APPROVE') && (
+                        <button
+                          type="button"
+                          onClick={() => handleWorkflowTransition('APPROVED')}
+                          disabled={isTransitioning || isSubmitting || isWorkflowExecuting}
+                          className="px-4 py-2 bg-emerald-700 hover:bg-emerald-800 active:bg-emerald-900 text-white font-medium rounded-lg text-xs tracking-wide transition-all cursor-pointer disabled:opacity-40"
+                        >
+                          Phê duyệt QA (Approve)
+                        </button>
+                      )}
                   </>
                 )}
                 <button

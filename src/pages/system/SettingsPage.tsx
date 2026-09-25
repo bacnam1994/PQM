@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAppStore } from '../../store/useAppStore';
-import { testResultRepository } from '../../repositories/firebase/FirebaseTestResultRepository';
+import { testResultAppService } from '../../services/app/TestResultAppService';
 import {
   CircleStackIcon,
   ArrowDownTrayIcon,
@@ -398,8 +398,8 @@ const SettingsPage: React.FC = () => {
 
   const handleExportData = async () => {
     try {
-      // Lấy toàn bộ dữ liệu TestResults từ Repository để đảm bảo backup đầy đủ
-      const allTestResults = await testResultRepository.findAll();
+      // Lấy toàn bộ dữ liệu TestResults từ Service để đảm bảo backup đầy đủ
+      const allTestResults = await testResultAppService.getAllTestResults();
 
       // Giả lập lại fullData để tương thích với cấu trúc Export cũ
       const fullData: any = { testResults: allTestResults };

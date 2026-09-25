@@ -90,6 +90,13 @@ export class TestResultAppService {
     }
     await this.workflowHandlers.handleDelete(id, currentUser, oldTestResult);
   }
+
+  /**
+   * Truy xuất toàn bộ phiếu kiểm nghiệm phục vụ sao lưu / export dữ liệu
+   */
+  async getAllTestResults(): Promise<TestResult[]> {
+    return this.repo.findAll();
+  }
 }
 
 export const testResultAppService = new TestResultAppService();

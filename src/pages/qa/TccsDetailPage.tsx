@@ -1,6 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { firebaseApprovalTaskRepository } from '../../repositories/firebase/FirebaseApprovalTaskRepository';
 import {
   ArrowLeftIcon,
   DocumentTextIcon,
@@ -172,8 +171,7 @@ const TccsDetailPage = () => {
 
   useEffect(() => {
     if (tccs?.id) {
-      firebaseApprovalTaskRepository
-        .findByEntity('TCCS', tccs.id)
+      ApprovalWorkflowService.findByEntity('TCCS', tccs.id)
         .then((tasks) => {
           if (tasks && tasks.length > 0) {
             setWorkflowTask(tasks[0]);
@@ -196,7 +194,7 @@ const TccsDetailPage = () => {
         sig
       );
       try {
-        await firebaseApprovalTaskRepository.save(updated);
+        await ApprovalWorkflowService.saveTask(updated);
       } catch (repoErr) {
         console.warn('[TccsDetailPage] Lỗi lưu phê duyệt vào repository:', repoErr);
       }
