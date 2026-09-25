@@ -147,7 +147,7 @@ describe('Batch Domain - Vertical Slice 5 (Core GMP)', () => {
           testResults: [],
           currentUser: adminUser,
         })
-      ).rejects.toThrow('Từ chối xuất xưởng: Lô không đủ điều kiện');
+      ).rejects.toThrow('Từ chối xuất xưởng: Còn rào cản chưa thỏa mãn');
     });
   });
 

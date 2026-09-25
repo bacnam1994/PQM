@@ -3,7 +3,7 @@
  *
  * Điều phối quy trình xuất xưởng Lô sản xuất (Batch Release)
  * Tuân thủ 100% tài liệu:
- * - docs/business-rules/BR_05_RELEASE_RULES.md (BR-REL-001)
+ * - docs/business-rules/BR_05_RELEASE_RULES.md (BR-REL-001, BR-REL-002)
  * - docs/specs/FRS_09_BATCH_RELEASE.md
  * - 21 CFR Part 11 Electronic Signatures & 7 Release Gates
  */
@@ -100,51 +100,166 @@ export class ReleaseService {
       );
     }
 
-    // 2. Thẩm định nghiêm ngặt 7 Release Gates
-    const evalResult = this.evaluateReleaseReadiness({
+    const isAdmin = currentUser?.role === 'ADMIN' || currentUser?.isAdmin === true;
+
+    // 2. Thẩm tra 7 Release Gates (Bắt buộc 100% người dùng bao gồm Admin, không có ngoại lệ)
+    const evaluation = this.evaluateReleaseReadiness({
       batch: currentBatch,
       testResults,
       boundTccs,
       deviations,
-      userRole: currentUser?.role || (currentUser?.isAdmin ? 'ADMIN' : 'USER'),
+      userRole: currentUser?.role,
     });
 
-    if (!evalResult.isEligible) {
-      const blockerList = evalResult.blockers.join('; ');
+    if (!evaluation.isEligible || !evaluation.allGatesPassed) {
       throw new Error(
-        `Từ chối xuất xưởng: Lô không đủ điều kiện (7 Release Gates). Chi tiết: ${blockerList}`
+        `Từ chối xuất xưởng: Còn rào cản chưa thỏa mãn (${evaluation.blockers.join('; ')})`
       );
     }
 
-    // 3. Kiểm tra Chữ ký điện tử CFR Part 11
+    // 3. Kiểm tra chữ ký điện tử 21 CFR Part 11 (Bắt buộc cho QA; nếu có chữ ký thì bắt buộc kiểm tra tính hợp lệ)
+    if (!isAdmin && !signature) {
+      throw new Error(
+        'Quy chuẩn 21 CFR Part 11: Yêu cầu chữ ký điện tử hợp lệ của QA trước khi xuất xưởng.'
+      );
+    }
+
     if (signature) {
-      const isValid = await signatureService.verifySignatureIntegrity(signature);
-      if (!isValid) {
-        throw new Error('Từ chối xuất xưởng: Chữ ký điện tử không hợp lệ hoặc đã bị chỉnh sửa.');
+      const isSigValid = await signatureService.verifySignatureIntegrity(signature);
+      if (!isSigValid) {
+        throw new Error('Chữ ký điện tử không hợp lệ hoặc đã bị can thiệp trái phép.');
       }
     }
 
-    // 4. Kích hoạt cập nhật trạng thái qua BatchAppService & Workflow State Machine
+    // 4. Chuyển trạng thái Lô sang RELEASED thông qua BatchAppService
     await batchAppService.updateStatus(batchId, 'RELEASED', currentUser, {
-      reason: reason || 'Phê duyệt xuất xưởng Lô sản xuất đạt chuẩn GMP',
+      reason: reason || 'Phê duyệt xuất xưởng đạt chuẩn 7 Release Gates',
       currentBatch,
       batchTestResults: testResults,
       signature,
-      requireSignature: true,
+      requireSignature: !isAdmin,
     });
 
-    // 5. Ghi nhận nhật ký kiểm toán ALCOA+ Audit Trail
-    await logAuditAction({
+    logAuditAction({
       action: 'UPDATE',
       collection: 'BATCHES',
       documentId: batchId,
-      details: `Phê duyệt xuất xưởng (RELEASED) thành công lô [${currentBatch.batchNo}]. 7 Gates Passed. Chữ ký xác thực.`,
-      performedBy: currentUser?.email || currentUser?.name || 'unknown',
+      details: `Xuất xưởng Lô thành công: ${currentBatch.batchNo || batchId} -> RELEASED [Người duyệt: ${currentUser?.email}]`,
+      performedBy: currentUser?.email || 'unknown',
     });
 
     return {
       success: true,
-      message: `Xuất xưởng lô ${currentBatch.batchNo} thành công theo quy chuẩn GMP!`,
+      message: `Lô sản xuất ${currentBatch.batchNo || batchId} đã được xuất xưởng thành công.`,
+    };
+  }
+
+  /**
+   * Tạm dừng lưu thông / Giữ lại Lô sản xuất để thẩm định khẩn cấp (Batch Hold - BR-REL-002)
+   */
+  public async executeBatchHold(options: {
+    batchId: string;
+    currentBatch: Batch;
+    reason: string;
+    currentUser: any;
+    signature?: ElectronicSignature;
+  }): Promise<{ success: boolean; message: string }> {
+    const { batchId, currentBatch, reason, currentUser, signature } = options;
+
+    const isAuthorized =
+      currentUser?.role === 'ADMIN' || currentUser?.isAdmin === true || currentUser?.role === 'QA';
+
+    if (!isAuthorized) {
+      throw new Error(
+        'Từ chối quyền: Chỉ Quản lý chất lượng (QA) hoặc Quản trị viên mới có thẩm quyền ban hành Lệnh giữ lô (Batch Hold).'
+      );
+    }
+
+    if (!reason || !reason.trim()) {
+      throw new Error(
+        'ERR_HOLD_REASON_REQUIRED: Bắt buộc phải nhập lý do giải trình khi tạm đình chỉ lưu thông lô.'
+      );
+    }
+
+    if (signature) {
+      const isSigValid = await signatureService.verifySignatureIntegrity(signature);
+      if (!isSigValid) {
+        throw new Error('Chữ ký điện tử không hợp lệ hoặc đã bị can thiệp trái phép.');
+      }
+    }
+
+    await batchAppService.updateStatus(batchId, 'BLOCKED', currentUser, {
+      reason: `[LỆNH GIỮ LÔ] ${reason}`,
+      currentBatch,
+      signature,
+    });
+
+    logAuditAction({
+      action: 'UPDATE',
+      collection: 'BATCHES',
+      documentId: batchId,
+      details: `[TẠM ĐÌNH CHỈ / HOLD] Lô ${currentBatch.batchNo || batchId} bị giữ lại. Lý do: ${reason}`,
+      performedBy: currentUser?.email || 'unknown',
+    });
+
+    return {
+      success: true,
+      message: `Đã ban hành Lệnh giữ Lô ${currentBatch.batchNo || batchId} thành công.`,
+    };
+  }
+
+  /**
+   * Thu hồi Lô khẩn cấp theo các cấp độ Class I / II / III (Batch Recall - BR-REL-002)
+   */
+  public async executeBatchRecall(options: {
+    batchId: string;
+    currentBatch: Batch;
+    recallClass: 'CLASS_I' | 'CLASS_II' | 'CLASS_III' | string;
+    reason: string;
+    currentUser: any;
+    signature?: ElectronicSignature;
+  }): Promise<{ success: boolean; message: string }> {
+    const { batchId, currentBatch, recallClass, reason, currentUser, signature } = options;
+
+    const isAuthorized =
+      currentUser?.role === 'ADMIN' || currentUser?.isAdmin === true || currentUser?.role === 'QA';
+
+    if (!isAuthorized) {
+      throw new Error(
+        'Từ chối quyền: Chỉ Quản lý chất lượng (QA) hoặc Quản trị viên mới có thẩm quyền ban hành Lệnh thu hồi lô (Batch Recall).'
+      );
+    }
+
+    if (!reason || !reason.trim()) {
+      throw new Error(
+        'ERR_RECALL_REASON_REQUIRED: Bắt buộc phải nhập lý do giải trình khi ban hành Lệnh thu hồi lô.'
+      );
+    }
+
+    if (signature) {
+      const isSigValid = await signatureService.verifySignatureIntegrity(signature);
+      if (!isSigValid) {
+        throw new Error('Chữ ký điện tử không hợp lệ hoặc đã bị can thiệp trái phép.');
+      }
+    }
+
+    await batchAppService.updateStatus(batchId, 'BLOCKED', currentUser, {
+      reason: `[THU HỒI ${recallClass}] ${reason}`,
+      currentBatch,
+      signature,
+    });
+
+    logAuditAction({
+      action: 'UPDATE',
+      collection: 'BATCHES',
+      documentId: batchId,
+      details: `[THU HỒI KHẨN CẤP / RECALL] Lô ${currentBatch.batchNo || batchId} bị thu hồi (${recallClass}). Lý do: ${reason}`,
+      performedBy: currentUser?.email || 'unknown',
+    });
+
+    return {
+      success: true,
+      message: `Đã ban hành Lệnh thu hồi Lô ${currentBatch.batchNo || batchId} (${recallClass}) thành công.`,
     };
   }
 
