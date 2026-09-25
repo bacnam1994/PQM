@@ -6,5 +6,6 @@ import { AILearnedMapping } from '../../types';
 import { IRepository } from '../types';
 
 export interface IAILearnedMappingRepository extends IRepository<AILearnedMapping> {
-  findByRawName(rawName: string): Promise<AILearnedMapping | null>;
+  findByOriginalName(name: string): Promise<AILearnedMapping | null>;
+  findByRawName?(rawName: string): Promise<AILearnedMapping | null>;
 }

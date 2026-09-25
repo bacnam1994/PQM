@@ -1,10 +1,5 @@
 /**
- * PQM 3.0 - AI Learned Mapping Repository Interface
+ * PQM REBUILD - AI LEARNED MAPPING REPOSITORY INTERFACE ADAPTER
  */
 
-import { AILearnedMapping } from '../types';
-import { IRepository } from './types';
-
-export interface IAILearnedMappingRepository extends IRepository<AILearnedMapping> {
-  findByOriginalName(name: string): Promise<AILearnedMapping | null>;
-}
+export * from './interfaces/IAILearnedMappingRepository';

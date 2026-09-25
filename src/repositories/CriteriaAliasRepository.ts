@@ -1,10 +1,5 @@
 /**
- * PQM 3.0 - Criteria Alias Repository Interface
+ * PQM REBUILD - CRITERIA ALIAS REPOSITORY INTERFACE ADAPTER
  */
 
-import { CriteriaAlias } from '../types';
-import { IRepository } from './types';
-
-export interface ICriteriaAliasRepository extends IRepository<CriteriaAlias> {
-  findByTccsId(tccsId: string): Promise<CriteriaAlias[]>;
-}
+export * from './interfaces/ICriteriaAliasRepository';
