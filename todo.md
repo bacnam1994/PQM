@@ -1,7 +1,7 @@
 # PQM — KẾ HOẠCH REBUILD TOÀN DIỆN THEO WORKFLOW
 
 Repository: `bacnam1994/PQM`  
-Trạng thái hiện tại: **PHASE 4 (PRODUCT DOMAIN REBUILD) — COMPLETED | NEXT: PHASE 5 (MATERIAL DOMAIN REBUILD)**
+Trạng thái hiện tại: **PHASE 5 (MATERIAL DOMAIN REBUILD) — COMPLETED | NEXT: PHASE 6 (TCCS DOMAIN REBUILD)**
 
 ---
 
@@ -16,7 +16,7 @@ Trạng thái hiện tại: **PHASE 4 (PRODUCT DOMAIN REBUILD) — COMPLETED | N
 | **P-05** | **Rebuild Repository Boundary**     | Tách Interface (`src/repositories/interfaces/`) khỏi Firebase (`src/infrastructure/repositories/`) |   ✅ **HOÀN THÀNH**   | `src/repositories/interfaces/`, `infrastructure/`   |
 | **P-06** | **Rebuild Domain Slices (1-16)**    | Di chuyển 16 lát dọc độc lập theo template DDD (Domain / App / Workflow / Infra / Tests)           | 🟡 **ĐANG THỰC HIỆN** | Tuần tự theo 16 Vertical Slices (VS-01 ĐÃ XONG)     |
 | **P-07** | **Product Domain Rebuild**          | Audit → Move → Rewire → Test → Verify cho toàn bộ Product CRUD, FSM, Approval, Bulk, AI            |   ✅ **HOÀN THÀNH**   | `src/domains/product/`                              |
-| **P-08** | **Material Domain Rebuild**         | Audit → Move → Rewire → Test → Verify cho Material CRUD, Status, Approval, Import, Bulk            |   📋 Chờ kích hoạt    | `src/domains/material/`                             |
+| **P-08** | **Material Domain Rebuild**         | Audit → Move → Rewire → Test → Verify cho Material CRUD, Status, Approval, Import, Bulk            |   ✅ **HOÀN THÀNH**   | `src/domains/material/`                             |
 | **P-09** | **TCCS Domain Rebuild**             | Rebuild TCCS CREATE, UPDATE, SUBMIT, APPROVE, REJECT, REVISE. Zero bypass approval                 |   📋 Chờ kích hoạt    | `src/domains/tccs/`                                 |
 | **P-10** | **Formula Domain Rebuild**          | Chuẩn hóa Formula Entity, Validation, Version authority, FSM, Repo, Workflow                       |   📋 Chờ kích hoạt    | `src/domains/formula/`                              |
 | **P-11** | **Batch Domain Rebuild**            | Rebuild Batch FSM (Hold, Start, Release, Cancel, Close, Reopen), 7 Release Gates, AI Quick Batch   |   📋 Chờ kích hoạt    | `src/domains/batch/`                                |
@@ -44,8 +44,8 @@ Trạng thái hiện tại: **PHASE 4 (PRODUCT DOMAIN REBUILD) — COMPLETED | N
 |  Thứ tự   | Domain Slice       | Mã nguồn hiện tại (`src/`)                                                                                                     | Thư mục mục tiêu (`src/domains/`)       |    Trạng thái     |    Mức rủi ro     |
 | :-------: | :----------------- | :----------------------------------------------------------------------------------------------------------------------------- | :-------------------------------------- | :---------------: | :---------------: |
 | **VS-01** | **Product**        | `services/app/ProductAppService.ts`, `repositories/ProductRepository.ts`, `pages/products/`                                    | `src/domains/product/`                  | ✅ **HOÀN THÀNH** |   🟡 Trung bình   |
-| **VS-02** | **Material**       | `services/app/MaterialAppService.ts`, `repositories/MaterialRepository.ts`, `pages/products/materials/`                        | `src/domains/material/`                 | 🟡 **TIẾP THEO**  |   🟡 Trung bình   |
-| **VS-03** | **TCCS**           | `services/app/TCCSAppService.ts`, `repositories/TCCSRepository.ts`, `pages/qa/TCCS*`                                           | `src/domains/tccs/`                     | 📋 Chờ kích hoạt  |   🔴 Cao (GMP)    |
+| **VS-02** | **Material**       | `services/app/MaterialAppService.ts`, `repositories/MaterialRepository.ts`, `pages/products/materials/`                        | `src/domains/material/`                 | ✅ **HOÀN THÀNH** |   🟡 Trung bình   |
+| **VS-03** | **TCCS**           | `services/app/TCCSAppService.ts`, `repositories/TCCSRepository.ts`, `pages/qa/TCCS*`                                           | `src/domains/tccs/`                     | 🟡 **TIẾP THEO**  |   🔴 Cao (GMP)    |
 | **VS-04** | **Formula**        | `services/app/FormulaAppService.ts`, `repositories/FormulaRepository.ts`, `pages/products/formula/`                            | `src/domains/formula/`                  | 📋 Chờ kích hoạt  |   🟡 Trung bình   |
 | **VS-05** | **Batch**          | `services/app/BatchAppService.ts`, `services/app/ReleaseService.ts`, `repositories/BatchRepository.ts`                         | `src/domains/batch/`                    | 📋 Chờ kích hoạt  | 🔴 Rất cao (GMP)  |
 | **VS-06** | **Test Result**    | `services/app/TestResultAppService.ts`, `repositories/TestResultRepository.ts`, `pages/qa/TestResult*`                         | `src/domains/test-result/`              | 📋 Chờ kích hoạt  | 🔴 Rất cao (GMP)  |
