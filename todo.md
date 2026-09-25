@@ -1,7 +1,7 @@
 # PQM — KẾ HOẠCH REBUILD TOÀN DIỆN THEO WORKFLOW
 
 Repository: `bacnam1994/PQM`  
-Trạng thái hiện tại: **PHASE 7 (FORMULA DOMAIN REBUILD) — COMPLETED | NEXT: PHASE 8 (BATCH DOMAIN REBUILD)**
+Trạng thái hiện tại: **PHASE 8 (BATCH DOMAIN REBUILD) — COMPLETED | NEXT: PHASE 9 (TEST RESULT DOMAIN REBUILD)**
 
 ---
 
@@ -19,7 +19,7 @@ Trạng thái hiện tại: **PHASE 7 (FORMULA DOMAIN REBUILD) — COMPLETED | N
 | **P-08** | **Material Domain Rebuild**         | Audit → Move → Rewire → Test → Verify cho Material CRUD, Status, Approval, Import, Bulk            |   ✅ **HOÀN THÀNH**   | `src/domains/material/`                                  |
 | **P-09** | **TCCS Domain Rebuild**             | Rebuild TCCS CREATE, UPDATE, SUBMIT, APPROVE, REJECT, REVISE. Zero bypass approval                 |   ✅ **HOÀN THÀNH**   | `src/domains/tccs/`                                      |
 | **P-10** | **Formula Domain Rebuild**          | Chuẩn hóa Formula Entity, Validation, Version authority, FSM, Repo, Workflow                       |   ✅ **HOÀN THÀNH**   | `src/domains/formula/`                                   |
-| **P-11** | **Batch Domain Rebuild**            | Rebuild Batch FSM (Hold, Start, Release, Cancel, Close, Reopen), 7 Release Gates, AI Quick Batch   |   📋 Chờ kích hoạt    | `src/domains/batch/`                                     |
+| **P-11** | **Batch Domain Rebuild**            | Rebuild Batch FSM (Hold, Start, Release, Cancel, Close, Reopen), 7 Release Gates, AI Quick Batch   |   ✅ **HOÀN THÀNH**   | `src/domains/batch/`                                     |
 | **P-12** | **Test Result Domain Rebuild**      | Rebuild Test Result Draft, Submit, Finalize, Approve, Reject, Supersede, Quality Evaluation        |   📋 Chờ kích hoạt    | `src/domains/test-result/`                               |
 | **P-13** | **Deviation / OOS / CAPA**          | Tách bạch Deviation, OOS, CAPA thành 3 domain riêng biệt có FSM, rules, services độc lập           |   📋 Chờ kích hoạt    | `src/domains/deviation/`, `oos/`, `capa/`                |
 | **P-14** | **Change Request Rebuild**          | Chuẩn hóa Change Request & Change Action FSM, đồng nhất State Authority                            |   📋 Chờ kích hoạt    | `src/domains/change-request/`                            |
@@ -47,8 +47,8 @@ Trạng thái hiện tại: **PHASE 7 (FORMULA DOMAIN REBUILD) — COMPLETED | N
 | **VS-02** | **Material**       | `services/app/MaterialAppService.ts`, `repositories/MaterialRepository.ts`, `pages/products/materials/`                        | `src/domains/material/`                 | ✅ **HOÀN THÀNH** |   🟡 Trung bình   |
 | **VS-03** | **TCCS**           | `services/app/TCCSAppService.ts`, `repositories/TCCSRepository.ts`, `pages/qa/TCCS*`                                           | `src/domains/tccs/`                     | ✅ **HOÀN THÀNH** |   🔴 Cao (GMP)    |
 | **VS-04** | **Formula**        | `services/app/FormulaAppService.ts`, `repositories/FormulaRepository.ts`, `pages/products/formula/`                            | `src/domains/formula/`                  | ✅ **HOÀN THÀNH** |   🟡 Trung bình   |
-| **VS-05** | **Batch**          | `services/app/BatchAppService.ts`, `services/app/ReleaseService.ts`, `repositories/BatchRepository.ts`                         | `src/domains/batch/`                    | 🟡 **TIẾP THEO**  | 🔴 Rất cao (GMP)  |
-| **VS-06** | **Test Result**    | `services/app/TestResultAppService.ts`, `repositories/TestResultRepository.ts`, `pages/qa/TestResult*`                         | `src/domains/test-result/`              | 📋 Chờ kích hoạt  | 🔴 Rất cao (GMP)  |
+| **VS-05** | **Batch**          | `services/app/BatchAppService.ts`, `services/app/ReleaseService.ts`, `repositories/BatchRepository.ts`                         | `src/domains/batch/`                    | ✅ **HOÀN THÀNH** | 🔴 Rất cao (GMP)  |
+| **VS-06** | **Test Result**    | `services/app/TestResultAppService.ts`, `repositories/TestResultRepository.ts`, `pages/qa/TestResult*`                         | `src/domains/test-result/`              | 🟡 **TIẾP THEO**  | 🔴 Rất cao (GMP)  |
 | **VS-07** | **Deviation**      | `services/app/DeviationAppService.ts`, `repositories/IDeviationRepository.ts`, `pages/qa/Deviation*`                           | `src/domains/deviation/`                | 📋 Chờ kích hoạt  |   🔴 Cao (GMP)    |
 | **VS-08** | **OOS**            | `services/app/OOSService.ts`, `components/features/OOSInvestigationModal.tsx`                                                  | `src/domains/oos/`                      | 📋 Chờ kích hoạt  |   🔴 Cao (GMP)    |
 | **VS-09** | **CAPA**           | `services/app/CAPAService.ts`, `domain/capa/`                                                                                  | `src/domains/capa/`                     | 📋 Chờ kích hoạt  |   🔴 Cao (GMP)    |
