@@ -6,6 +6,6 @@ import { ProductFormula } from '../../types';
 import { IRepository } from '../types';
 
 export interface IFormulaRepository extends IRepository<ProductFormula> {
-  findByProductId(productId: string): Promise<ProductFormula[]>;
-  findActiveByProductId(productId: string): Promise<ProductFormula | null>;
+  findByProductId(productId: string): Promise<ProductFormula | null>;
+  findActiveByProductId?(productId: string): Promise<ProductFormula | null>;
 }
