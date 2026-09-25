@@ -1,0 +1,102 @@
+# 🛡️ MA TRẬN THẨM QUYỀN HÀNH ĐỘNG (RBAC CAPABILITY MATRIX)
+
+> **Tài liệu sinh tự động từ Single Source of Truth:** `src/workflow/definitions/index.ts`  
+> **Số vai trò chuẩn hóa:** **8** (`ADMIN`, `QA`, `QC`, `LAB`, `PRODUCTION`, `USER`, `VIEWER`, `GUEST`)  
+> **Cập nhật lần cuối:** 2026-09-25
+
+---
+
+| Action ID                        | Entity           | ADMIN | QA  | QC  | LAB | PROD | USER | VIEWER | GUEST |
+| :------------------------------- | :--------------- | :---: | :-: | :-: | :-: | :--: | :--: | :----: | :---: |
+| `BATCH_CREATE`                   | `BATCH`          |  ✅   | ✅  |  —  |  —  |  ✅  |  —   |   —    |   —   |
+| `BATCH_UPDATE_METADATA`          | `BATCH`          |  ✅   | ✅  |  —  |  —  |  ✅  |  —   |   —    |   —   |
+| `BATCH_DISPATCH_TESTING`         | `BATCH`          |  ✅   | ✅  |  —  |  —  |  ✅  |  —   |   —    |   —   |
+| `BATCH_EVALUATE_RELEASE`         | `BATCH`          |  ✅   | ✅  | ✅  |  —  |  —   |  —   |   —    |   —   |
+| `BATCH_RELEASE_APPROVE`          | `BATCH`          |  ✅   | ✅  |  —  |  —  |  —   |  —   |   —    |   —   |
+| `BATCH_REJECT`                   | `BATCH`          |  ✅   | ✅  |  —  |  —  |  —   |  —   |   —    |   —   |
+| `BATCH_HOLD`                     | `BATCH`          |  ✅   | ✅  |  —  |  —  |  —   |  —   |   —    |   —   |
+| `BATCH_RECALL`                   | `BATCH`          |  ✅   | ✅  |  —  |  —  |  —   |  —   |   —    |   —   |
+| `BATCH_DELETE`                   | `BATCH`          |  ✅   |  —  |  —  |  —  |  —   |  —   |   —    |   —   |
+| `TEST_RESULT_CREATE`             | `TEST_RESULT`    |  ✅   | ✅  | ✅  | ✅  |  —   |  —   |   —    |   —   |
+| `TEST_RESULT_ENTRY_INPUT`        | `TEST_RESULT`    |  ✅   | ✅  | ✅  | ✅  |  —   |  —   |   —    |   —   |
+| `TEST_RESULT_CALCULATION_RUN`    | `TEST_RESULT`    |  ✅   | ✅  | ✅  | ✅  |  —   |  —   |   —    |   —   |
+| `TEST_RESULT_SUBMIT`             | `TEST_RESULT`    |  ✅   | ✅  | ✅  | ✅  |  —   |  —   |   —    |   —   |
+| `TEST_RESULT_APPROVE`            | `TEST_RESULT`    |  ✅   | ✅  |  —  |  —  |  —   |  —   |   —    |   —   |
+| `TEST_RESULT_REJECT`             | `TEST_RESULT`    |  ✅   | ✅  |  —  |  —  |  —   |  —   |   —    |   —   |
+| `TEST_RESULT_CANCEL`             | `TEST_RESULT`    |  ✅   | ✅  |  —  | ✅  |  —   |  —   |   —    |   —   |
+| `TEST_RESULT_REVOKE`             | `TEST_RESULT`    |  ✅   | ✅  |  —  |  —  |  —   |  —   |   —    |   —   |
+| `TEST_RESULT_REEVALUATE`         | `TEST_RESULT`    |  ✅   | ✅  |  —  |  —  |  —   |  —   |   —    |   —   |
+| `TEST_RESULT_DELETE`             | `TEST_RESULT`    |  ✅   |  —  |  —  |  —  |  —   |  —   |   —    |   —   |
+| `DEVIATION_CREATE`               | `DEVIATION`      |  ✅   | ✅  | ✅  | ✅  |  ✅  |  —   |   —    |   —   |
+| `DEVIATION_INVESTIGATE`          | `DEVIATION`      |  ✅   | ✅  | ✅  |  —  |  —   |  —   |   —    |   —   |
+| `DEVIATION_APPROVE`              | `DEVIATION`      |  ✅   | ✅  |  —  |  —  |  —   |  —   |   —    |   —   |
+| `DEVIATION_CLOSE`                | `DEVIATION`      |  ✅   | ✅  |  —  |  —  |  —   |  —   |   —    |   —   |
+| `DEVIATION_DELETE`               | `DEVIATION`      |  ✅   |  —  |  —  |  —  |  —   |  —   |   —    |   —   |
+| `OOS_CREATE`                     | `OOS`            |  ✅   | ✅  | ✅  | ✅  |  —   |  —   |   —    |   —   |
+| `OOS_PHASE1_LAB_INVESTIGATE`     | `OOS`            |  ✅   | ✅  | ✅  | ✅  |  —   |  —   |   —    |   —   |
+| `OOS_PHASE2_MFG_INVESTIGATE`     | `OOS`            |  ✅   | ✅  |  —  |  —  |  ✅  |  —   |   —    |   —   |
+| `OOS_CONCLUDE`                   | `OOS`            |  ✅   | ✅  |  —  |  —  |  —   |  —   |   —    |   —   |
+| `CAPA_CREATE`                    | `CAPA`           |  ✅   | ✅  | ✅  |  —  |  —   |  —   |   —    |   —   |
+| `CAPA_ASSIGN`                    | `CAPA`           |  ✅   | ✅  |  —  |  —  |  —   |  —   |   —    |   —   |
+| `CAPA_EXECUTE`                   | `CAPA`           |  ✅   | ✅  | ✅  | ✅  |  ✅  |  —   |   —    |   —   |
+| `CAPA_VERIFY`                    | `CAPA`           |  ✅   | ✅  |  —  |  —  |  —   |  —   |   —    |   —   |
+| `CAPA_CLOSE`                     | `CAPA`           |  ✅   | ✅  |  —  |  —  |  —   |  —   |   —    |   —   |
+| `CHANGE_REQUEST_CREATE`          | `CHANGE_REQUEST` |  ✅   | ✅  | ✅  |  —  |  ✅  |  ✅  |   —    |   —   |
+| `CHANGE_REQUEST_FMEA_ASSESS`     | `CHANGE_REQUEST` |  ✅   | ✅  | ✅  |  —  |  —   |  —   |   —    |   —   |
+| `CHANGE_REQUEST_ADD_ACTION`      | `CHANGE_REQUEST` |  ✅   | ✅  |  —  |  —  |  ✅  |  —   |   —    |   —   |
+| `CHANGE_REQUEST_COMPLETE_ACTION` | `CHANGE_REQUEST` |  ✅   | ✅  |  —  | ✅  |  ✅  |  ✅  |   —    |   —   |
+| `CHANGE_REQUEST_REVIEW`          | `CHANGE_REQUEST` |  ✅   | ✅  |  —  |  —  |  —   |  —   |   —    |   —   |
+| `CHANGE_REQUEST_APPROVE`         | `CHANGE_REQUEST` |  ✅   | ✅  |  —  |  —  |  —   |  —   |   —    |   —   |
+| `CHANGE_REQUEST_REJECT`          | `CHANGE_REQUEST` |  ✅   | ✅  |  —  |  —  |  —   |  —   |   —    |   —   |
+| `CHANGE_REQUEST_IMPLEMENT`       | `CHANGE_REQUEST` |  ✅   | ✅  |  —  |  —  |  —   |  —   |   —    |   —   |
+| `CHANGE_REQUEST_CLOSE`           | `CHANGE_REQUEST` |  ✅   | ✅  |  —  |  —  |  —   |  —   |   —    |   —   |
+| `APPROVAL_TASK_CREATE`           | `APPROVAL_TASK`  |  ✅   | ✅  | ✅  | ✅  |  ✅  |  —   |   —    |   —   |
+| `APPROVAL_TASK_DECIDE`           | `APPROVAL_TASK`  |  ✅   | ✅  | ✅  |  —  |  ✅  |  —   |   —    |   —   |
+| `APPROVAL_TASK_CANCEL`           | `APPROVAL_TASK`  |  ✅   | ✅  |  —  |  —  |  —   |  —   |   —    |   —   |
+| `COA_GENERATE`                   | `COA`            |  ✅   | ✅  | ✅  | ✅  |  —   |  ✅  |   —    |   —   |
+| `COA_SIGN`                       | `COA`            |  ✅   | ✅  |  —  |  —  |  —   |  —   |   —    |   —   |
+| `COA_REVOKE`                     | `COA`            |  ✅   | ✅  |  —  |  —  |  —   |  —   |   —    |   —   |
+| `COA_VERIFY_PUBLIC`              | `COA`            |  ✅   | ✅  | ✅  | ✅  |  ✅  |  ✅  |   ✅   |  ✅   |
+| `PRODUCT_CREATE`                 | `PRODUCT`        |  ✅   | ✅  |  —  |  —  |  —   |  —   |   —    |   —   |
+| `PRODUCT_UPDATE`                 | `PRODUCT`        |  ✅   | ✅  |  —  |  —  |  —   |  —   |   —    |   —   |
+| `PRODUCT_ARCHIVE`                | `PRODUCT`        |  ✅   |  —  |  —  |  —  |  —   |  —   |   —    |   —   |
+| `MATERIAL_CREATE`                | `MATERIAL`       |  ✅   | ✅  |  —  |  —  |  —   |  —   |   —    |   —   |
+| `MATERIAL_UPDATE`                | `MATERIAL`       |  ✅   | ✅  |  —  |  —  |  —   |  —   |   —    |   —   |
+| `MATERIAL_DELETE`                | `MATERIAL`       |  ✅   |  —  |  —  |  —  |  —   |  —   |   —    |   —   |
+| `TCCS_CREATE`                    | `TCCS`           |  ✅   | ✅  |  —  |  —  |  —   |  —   |   —    |   —   |
+| `TCCS_UPDATE_DRAFT`              | `TCCS`           |  ✅   | ✅  |  —  |  —  |  —   |  —   |   —    |   —   |
+| `TCCS_SUBMIT`                    | `TCCS`           |  ✅   | ✅  |  —  |  —  |  —   |  —   |   —    |   —   |
+| `TCCS_APPROVE`                   | `TCCS`           |  ✅   | ✅  |  —  |  —  |  —   |  —   |   —    |   —   |
+| `TCCS_REVISE`                    | `TCCS`           |  ✅   | ✅  |  —  |  —  |  —   |  —   |   —    |   —   |
+| `TCCS_OBSOLETE`                  | `TCCS`           |  ✅   | ✅  |  —  |  —  |  —   |  —   |   —    |   —   |
+| `FORMULA_CREATE`                 | `FORMULA`        |  ✅   | ✅  |  —  |  —  |  —   |  —   |   —    |   —   |
+| `FORMULA_UPDATE`                 | `FORMULA`        |  ✅   | ✅  |  —  |  —  |  —   |  —   |   —    |   —   |
+| `FORMULA_ARCHIVE`                | `FORMULA`        |  ✅   |  —  |  —  |  —  |  —   |  —   |   —    |   —   |
+| `CRITERIA_MASTER_CREATE`         | `MASTER_DATA`    |  ✅   | ✅  |  —  |  —  |  —   |  —   |   —    |   —   |
+| `CRITERIA_MASTER_UPDATE`         | `MASTER_DATA`    |  ✅   | ✅  |  —  |  —  |  —   |  —   |   —    |   —   |
+| `CRITERIA_ALIAS_MAP`             | `MASTER_DATA`    |  ✅   | ✅  |  —  |  —  |  —   |  —   |   —    |   —   |
+| `LAB_MASTER_CREATE`              | `MASTER_DATA`    |  ✅   | ✅  |  —  |  —  |  —   |  —   |   —    |   —   |
+| `LAB_MASTER_UPDATE`              | `MASTER_DATA`    |  ✅   | ✅  |  —  |  —  |  —   |  —   |   —    |   —   |
+| `PHARMACOPOEIA_CREATE`           | `MASTER_DATA`    |  ✅   | ✅  |  —  |  —  |  —   |  —   |   —    |   —   |
+| `PHARMACOPOEIA_UPDATE`           | `MASTER_DATA`    |  ✅   | ✅  |  —  |  —  |  —   |  —   |   —    |   —   |
+| `PHARMACOPOEIA_DELETE`           | `MASTER_DATA`    |  ✅   |  —  |  —  |  —  |  —   |  —   |   —    |   —   |
+| `SYSTEM_BACKUP_EXECUTE`          | `SYSTEM`         |  ✅   |  —  |  —  |  —  |  —   |  —   |   —    |   —   |
+| `SYSTEM_RESTORE_EXECUTE`         | `SYSTEM`         |  ✅   |  —  |  —  |  —  |  —   |  —   |   —    |   —   |
+| `SYSTEM_WIPE_DEMO_EXECUTE`       | `SYSTEM`         |  ✅   |  —  |  —  |  —  |  —   |  —   |   —    |   —   |
+| `SYSTEM_AUTO_HEAL_PROPOSE`       | `SYSTEM`         |  ✅   |  —  |  —  |  —  |  —   |  —   |   —    |   —   |
+| `SYSTEM_AUTO_HEAL_APPROVE`       | `SYSTEM`         |  ✅   | ✅  |  —  |  —  |  —   |  —   |   —    |   —   |
+| `SYSTEM_AUTO_HEAL_EXECUTE`       | `SYSTEM`         |  ✅   |  —  |  —  |  —  |  —   |  —   |   —    |   —   |
+| `SYSTEM_CONFIG_UPDATE`           | `SYSTEM`         |  ✅   |  —  |  —  |  —  |  —   |  —   |   —    |   —   |
+| `SYSTEM_USER_ROLE_ASSIGN`        | `SYSTEM`         |  ✅   |  —  |  —  |  —  |  —   |  —   |   —    |   —   |
+| `FILE_STORAGE_UPLOAD`            | `SYSTEM`         |  ✅   | ✅  | ✅  | ✅  |  ✅  |  ✅  |   —    |   —   |
+| `FILE_STORAGE_DELETE`            | `SYSTEM`         |  ✅   | ✅  |  —  |  —  |  —   |  —   |   —    |   —   |
+| `EXCEL_DATA_EXPORT`              | `SYSTEM`         |  ✅   | ✅  | ✅  | ✅  |  ✅  |  ✅  |   ✅   |   —   |
+| `CLOUD_FUNCTION_INVOKE`          | `SYSTEM`         |  ✅   | ✅  | ✅  |  —  |  —   |  —   |   —    |   —   |
+| `AI_OCR_EXTRACT`                 | `TEST_RESULT`    |  ✅   | ✅  |  —  | ✅  |  —   |  —   |   —    |   —   |
+| `AI_MAPPING_PROPOSE`             | `MASTER_DATA`    |  ✅   | ✅  |  —  | ✅  |  —   |  —   |   —    |   —   |
+| `AI_STABILITY_PREDICT`           | `BATCH`          |  ✅   | ✅  | ✅  |  —  |  —   |  —   |   —    |   —   |
+| `AI_BATCH_CLEARANCE_PROPOSE`     | `BATCH`          |  ✅   | ✅  |  —  |  —  |  —   |  —   |   —    |   —   |
+| `AI_NATURAL_QUERY`               | `SYSTEM`         |  ✅   | ✅  | ✅  | ✅  |  ✅  |  ✅  |   ✅   |   —   |
+| `AI_VOICE_PARSE`                 | `TEST_RESULT`    |  ✅   | ✅  |  —  | ✅  |  —   |  —   |   —    |   —   |
+| `AI_LAB_COMPARE`                 | `TEST_RESULT`    |  ✅   | ✅  | ✅  |  —  |  —   |  —   |   —    |   —   |
+| `AI_DATA_INTEGRITY_SCAN`         | `SYSTEM`         |  ✅   | ✅  | ✅  |  —  |  —   |  —   |   —    |   —   |

@@ -321,5 +321,34 @@ describe('TASK-005: Security Rules Verification Suite', () => {
       });
       expect(result.allowed).toBe(true);
     });
+
+    it('GAP-07: chặn QA hoặc ADMIN chuyển trạng thái lô sang RELEASED nếu qualityStatus là FAIL', () => {
+      // 1. QA cố chuyển sang RELEASED khi qualityStatus = FAIL
+      const qaResult = SecurityRulesValidator.evaluate(qaUser, 'UPDATE', 'batches/b_fail', {
+        status: 'RELEASED',
+        qualityStatus: 'FAIL',
+      });
+      expect(qaResult.allowed).toBe(false);
+      expect(qaResult.reason).toContain('GAP-07');
+
+      // 2. ADMIN cố chuyển sang RELEASED khi qualityStatus = FAIL -> Vẫn bị chặn (ADMIN ≠ bypass)
+      const adminUserContext = {
+        uid: 'u_admin',
+        email: 'admin@v-biotech.vn',
+        role: 'ADMIN' as const,
+        isAdmin: true,
+      };
+      const adminResult = SecurityRulesValidator.evaluate(
+        adminUserContext,
+        'UPDATE',
+        'batches/b_fail',
+        {
+          status: 'RELEASED',
+          qualityStatus: 'FAIL',
+        }
+      );
+      expect(adminResult.allowed).toBe(false);
+      expect(adminResult.reason).toContain('GAP-07');
+    });
   });
 });

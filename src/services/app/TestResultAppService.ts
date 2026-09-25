@@ -12,24 +12,17 @@ import {
   deviationAppService as defaultDeviationAppService,
 } from './DeviationAppService';
 import { can } from '../permissionService';
-import { logAuditAction } from '../auditService';
-import { validateOptimisticLock, nextVersion } from '../../utils/concurrency';
-import { signatureService } from '../signatureService';
-import { buildEvaluationSnapshot } from '../../domain/evaluation';
-import {
-  resolveTestResultStatus,
-  calculateOverallStatusForTestResult,
-} from '../../domain/test-result/testResultStatusResolver';
-import {
-  TestResultWorkflowStateMachine,
-  QualityWorkflowMatrixGuard,
-} from '../../domain/workflow/stateMachine';
+import { TestResultWorkflowHandlers } from '../../workflow/handlers/testResultWorkflowHandlers';
 
 export class TestResultAppService {
+  private workflowHandlers: TestResultWorkflowHandlers;
+
   constructor(
     private repo: ITestResultRepository = defaultTestResultRepo,
     private deviationService: DeviationAppService = defaultDeviationAppService
-  ) {}
+  ) {
+    this.workflowHandlers = new TestResultWorkflowHandlers(this.repo, this.deviationService);
+  }
 
   /**
    * Tạo mới Phiếu kiểm nghiệm
@@ -42,73 +35,7 @@ export class TestResultAppService {
     if (!can(currentUser, 'test_result:create')) {
       throw new Error('Từ chối quyền: Bạn không có quyền lập phiếu kiểm nghiệm mới.');
     }
-
-    // MODEL 3: Enforce Authoritative Technical Entity Identity
-    let effectiveBatchId = testResult.batchId?.trim();
-    let effectiveTccsId = testResult.tccsId?.trim();
-
-    if (options?.batch) {
-      if (effectiveBatchId === options.batch.batchNo) {
-        // Tự động chuẩn hóa nếu người dùng vô tình truyền batchNo thay cho Technical ID
-        effectiveBatchId = options.batch.id;
-      }
-      if (!effectiveTccsId && options.batch.tccsId) {
-        effectiveTccsId = options.batch.tccsId;
-      }
-    }
-
-    if (!effectiveBatchId) {
-      throw new Error('Phiếu kiểm nghiệm phải gắn liền với một Lô sản xuất cụ thể.');
-    }
-    if (!testResult.labName?.trim()) {
-      throw new Error('Tên phòng kiểm nghiệm (Lab) không được để trống.');
-    }
-    if (!testResult.testDate?.trim()) {
-      throw new Error('Ngày kiểm nghiệm không được để trống.');
-    }
-
-    // Tự động kiểm tra tính toán tổng hợp PASS / FAIL / PENDING / UNKNOWN dựa trên các chỉ tiêu chi tiết
-    let evaluatedStatus: 'PASS' | 'FAIL' | 'PENDING' | 'UNKNOWN' =
-      resolveTestResultStatus(testResult);
-    if (testResult.results && testResult.results.length > 0) {
-      const calc = calculateOverallStatusForTestResult(testResult);
-      if (calc) evaluatedStatus = calc;
-    }
-
-    const evaluationSnapshot =
-      testResult.evaluationSnapshot ||
-      buildEvaluationSnapshot({ ...testResult, overallStatus: evaluatedStatus }, currentUser, {
-        batch: options?.batch,
-      });
-
-    const cleanResult: TestResult = {
-      ...testResult,
-      batchId: effectiveBatchId,
-      tccsId: effectiveTccsId,
-      overallStatus: evaluatedStatus,
-      evaluationSnapshot,
-      version: testResult.version && testResult.version > 0 ? testResult.version : 1,
-      createdAt: testResult.createdAt || new Date().toISOString(),
-    };
-
-    await this.repo.save(cleanResult);
-
-    // Chuẩn GMP: Tự động ghi nhận Hồ sơ Sai lệch (Deviation/OOS) khi kết quả kiểm nghiệm không đạt (FAIL)
-    if (resolveTestResultStatus(cleanResult) === 'FAIL') {
-      try {
-        await this.deviationService.autoLogFromOOS(cleanResult, options?.batch, currentUser);
-      } catch (err) {
-        console.error('[TestResultAppService] Tự động tạo hồ sơ sai lệch OOS thất bại:', err);
-      }
-    }
-
-    logAuditAction({
-      action: 'CREATE',
-      collection: 'TEST_RESULTS',
-      documentId: cleanResult.id,
-      details: `Thêm phiếu KN: Lô ${options?.batch?.batchNo || cleanResult.batchId}, Lab: ${cleanResult.labName}, Kết quả: ${cleanResult.overallStatus} (v${cleanResult.version})`,
-      performedBy: currentUser?.email || 'unknown',
-    });
+    await this.workflowHandlers.handleCreate(testResult, currentUser, options);
   }
 
   /**
@@ -125,85 +52,7 @@ export class TestResultAppService {
         'Từ chối quyền: Không thể chỉnh sửa phiếu kiểm nghiệm đã duyệt hoặc bị khóa.'
       );
     }
-
-    // Kiểm tra xung đột khóa lạc quan (OCC)
-    validateOptimisticLock(
-      oldTestResult?.version,
-      testResult.version,
-      `Phiếu kiểm nghiệm ${testResult.id}`
-    );
-
-    // MODEL 3: Enforce Authoritative Technical Entity Identity
-    let effectiveBatchId = testResult.batchId?.trim();
-    let effectiveTccsId = testResult.tccsId?.trim();
-
-    if (options?.batch) {
-      if (effectiveBatchId === options.batch.batchNo) {
-        effectiveBatchId = options.batch.id;
-      }
-      if (!effectiveTccsId && options.batch.tccsId) {
-        effectiveTccsId = options.batch.tccsId;
-      }
-    }
-
-    if (!effectiveBatchId) {
-      throw new Error('Phiếu kiểm nghiệm phải gắn liền với một Lô sản xuất cụ thể.');
-    }
-    if (!testResult.labName?.trim()) {
-      throw new Error('Tên phòng kiểm nghiệm (Lab) không được để trống.');
-    }
-    if (!testResult.testDate?.trim()) {
-      throw new Error('Ngày kiểm nghiệm không được để trống.');
-    }
-
-    let evaluatedStatus: 'PASS' | 'FAIL' | 'PENDING' | 'UNKNOWN' =
-      resolveTestResultStatus(testResult);
-    if (testResult.results && testResult.results.length > 0) {
-      const calc = calculateOverallStatusForTestResult(testResult);
-      if (calc) evaluatedStatus = calc;
-    }
-
-    const newVersion = nextVersion(oldTestResult?.version ?? testResult.version);
-
-    // ALCOA+: Tái tạo snapshot nếu chưa có snapshot hoặc snapshot cũ có overallStatus lệch với evaluatedStatus
-    const shouldRebuildSnapshot =
-      !testResult.evaluationSnapshot ||
-      testResult.evaluationSnapshot.overallStatus !== evaluatedStatus;
-
-    const evaluationSnapshot = shouldRebuildSnapshot
-      ? buildEvaluationSnapshot({ ...testResult, overallStatus: evaluatedStatus }, currentUser, {
-          batch: options?.batch,
-        })
-      : testResult.evaluationSnapshot;
-
-    const cleanResult: TestResult = {
-      ...testResult,
-      batchId: effectiveBatchId,
-      tccsId: effectiveTccsId,
-      overallStatus: evaluatedStatus,
-      evaluationSnapshot,
-      version: newVersion,
-      updatedAt: new Date().toISOString(),
-    };
-
-    await this.repo.update(cleanResult);
-
-    // Chuẩn GMP: Tự động ghi nhận Hồ sơ Sai lệch (Deviation/OOS) khi kết quả kiểm nghiệm cập nhật thành FAIL
-    if (resolveTestResultStatus(cleanResult) === 'FAIL') {
-      try {
-        await this.deviationService.autoLogFromOOS(cleanResult, options?.batch, currentUser);
-      } catch (err) {
-        console.error('[TestResultAppService] Tự động tạo hồ sơ sai lệch OOS thất bại:', err);
-      }
-    }
-
-    logAuditAction({
-      action: 'UPDATE',
-      collection: 'TEST_RESULTS',
-      documentId: cleanResult.id,
-      details: `Cập nhật phiếu KN: ${cleanResult.id}, Kết quả: ${cleanResult.overallStatus} (v${cleanResult.version})`,
-      performedBy: currentUser?.email || 'unknown',
-    });
+    await this.workflowHandlers.handleUpdate(testResult, currentUser, oldTestResult, options);
   }
 
   /**
@@ -223,84 +72,12 @@ export class TestResultAppService {
       requireSignature?: boolean;
     }
   ): Promise<void> {
-    // WF-018: Luôn đọc bản ghi mới nhất từ DB để làm authoritative source
-    let current = await this.repo.findById(id);
-    if (!current && options?.oldTestResult) {
-      current = options.oldTestResult;
-    }
-    if (!current) {
-      throw new Error(`Không tìm thấy Phiếu kiểm nghiệm với mã: ${id}`);
-    }
-
-    const currentWorkflowStatus: TestResultWorkflowStatus = current.workflowStatus || 'DRAFT';
-
-    // 1. Thẩm tra bước chuyển trạng thái quy trình (FSM)
-    const transitionCheck = TestResultWorkflowStateMachine.canTransition(
-      currentWorkflowStatus,
+    await this.workflowHandlers.handleWorkflowStatusTransition(
+      id,
       newWorkflowStatus,
-      {
-        actorRole: currentUser?.role,
-        actorId: currentUser?.uid,
-        reason: options?.reason,
-      }
+      currentUser,
+      options
     );
-    if (!transitionCheck.allowed) {
-      throw new Error(`Quy chuẩn State Machine Phiếu KN: ${transitionCheck.reason}`);
-    }
-
-    // 2. Thẩm tra Ma trận Chất lượng × Quy trình (Quality × Workflow Matrix)
-    const qualityStatus = resolveTestResultStatus(current);
-    const matrixCheck = QualityWorkflowMatrixGuard.validate(newWorkflowStatus, qualityStatus);
-    if (!matrixCheck.allowed) {
-      throw new Error(`Ma trận Chất lượng × Quy trình: ${matrixCheck.reason}`);
-    }
-
-    // 3. Yêu cầu lý do đối với SUPERSEDED
-    if (newWorkflowStatus === 'SUPERSEDED' && (!options?.reason || !options.reason.trim())) {
-      throw new Error(
-        'Đánh dấu thay thế phiếu kiểm nghiệm (SUPERSEDED) bắt buộc phải có lý do giải trình.'
-      );
-    }
-
-    // 4. Ràng buộc Chữ ký số khi Phê duyệt (21 CFR Part 11 Compliance) (WF-012)
-    if (newWorkflowStatus === 'APPROVED') {
-      if (options?.requireSignature || options?.signature) {
-        if (!options?.signature) {
-          throw new Error(
-            'Quy định 21 CFR Part 11: Yêu cầu chữ ký điện tử hợp lệ của QA/Admin trước khi phê duyệt phiếu kiểm nghiệm.'
-          );
-        }
-        if (
-          (options.signature.documentType !== 'TEST_RESULT_APPROVAL' &&
-            (options.signature.documentType as string) !== 'TEST_RESULT') ||
-          options.signature.documentId !== id
-        ) {
-          throw new Error('Chữ ký điện tử không khớp với Phiếu kiểm nghiệm đang phê duyệt.');
-        }
-        const isValid = await signatureService.verifySignatureIntegrity(options.signature);
-        if (!isValid) {
-          throw new Error('Chữ ký điện tử không hợp lệ hoặc đã bị can thiệp trái phép.');
-        }
-      }
-    }
-
-    const newVersion = nextVersion(current.version ?? 1);
-    const cleanResult: TestResult = {
-      ...current,
-      workflowStatus: newWorkflowStatus,
-      version: newVersion,
-      updatedAt: new Date().toISOString(),
-    };
-
-    await this.repo.update(cleanResult);
-
-    logAuditAction({
-      action: 'UPDATE',
-      collection: 'TEST_RESULTS',
-      documentId: id,
-      details: `Chuyển trạng thái quy trình phiếu KN: ${currentWorkflowStatus} -> ${newWorkflowStatus}${options?.reason ? ` (Lý do: ${options.reason})` : ''}`,
-      performedBy: currentUser?.email || 'unknown',
-    });
   }
 
   /**
@@ -308,26 +85,10 @@ export class TestResultAppService {
    */
   async deleteTestResult(id: string, currentUser: any, oldTestResult?: TestResult): Promise<void> {
     const current = oldTestResult || (await this.repo.findById(id));
-
-    if (current?.workflowStatus === 'APPROVED' || current?.workflowStatus === 'RELEASED') {
-      throw new Error(
-        'Từ chối thao tác: Không thể xóa Phiếu kiểm nghiệm đã được phê duyệt (APPROVED) hoặc xuất xưởng (RELEASED). Theo quy chuẩn ALCOA+ và Part 11, phiếu chỉ có thể được thay thế (SUPERSEDED) kèm biên bản CAPA/Deviation.'
-      );
-    }
-
     if (!can(currentUser, 'test_result:delete', current)) {
       throw new Error('Từ chối quyền: Bạn không có quyền xóa phiếu kiểm nghiệm này.');
     }
-
-    await this.repo.delete(id);
-
-    logAuditAction({
-      action: 'DELETE',
-      collection: 'TEST_RESULTS',
-      documentId: id,
-      details: `Xóa phiếu KN: ${id}`,
-      performedBy: currentUser?.email || 'unknown',
-    });
+    await this.workflowHandlers.handleDelete(id, currentUser, oldTestResult);
   }
 }
 

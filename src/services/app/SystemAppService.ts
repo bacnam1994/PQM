@@ -4,7 +4,7 @@
  * Application Service phụ trách toàn bộ các tác vụ hệ thống cấp cao (System Destructive & High-Impact Operations).
  *
  * Tuân thủ nghiêm ngặt Canonical Architecture:
- * UI -> Canonical Action -> SystemAppService -> Authorization -> Confirmation Token -> Repository -> Audit
+ * UI -> Canonical Action -> SystemAppService -> WorkflowFacade -> Confirmation Token -> Repository -> ALCOA+ Audit
  *
  * Cấm mọi thao tác direct DB bypass từ Zustand slice hay UI helpers.
  */
@@ -12,6 +12,8 @@
 import { ISystemRepository } from '../../repositories/ISystemRepository';
 import { firebaseSystemRepository } from '../../repositories/firebase/FirebaseSystemRepository';
 import { logAuditAction } from '../auditService';
+import { WorkflowFacade } from '../../workflow/WorkflowFacade';
+import { WorkflowActor } from '../../workflow/contracts/actions';
 
 export interface SystemActionContext {
   actorId: string;
@@ -48,8 +50,13 @@ export class SystemAppService {
     }
   }
 
-  private generateExecutionId(action: string): string {
-    return `sys-exec-${action.toLowerCase()}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+  private toActor(context: SystemActionContext): WorkflowActor {
+    return {
+      id: context.actorId,
+      name: context.actorEmail || context.actorId,
+      role: context.actorRole.toUpperCase(),
+      email: context.actorEmail,
+    };
   }
 
   /**
@@ -57,35 +64,30 @@ export class SystemAppService {
    */
   async backupDatabase(context: SystemActionContext): Promise<SystemActionResult> {
     this.validateAdminAuthorization(context, 'DATABASE_BACKUP');
-    const executionId = this.generateExecutionId('BACKUP');
 
-    try {
-      const data = await this.repo.backupDatabase();
-      await logAuditAction({
-        action: 'RESTORE',
-        collection: 'SYSTEM',
-        documentId: executionId,
-        details: `Sao lưu cơ sở dữ liệu thành công (ExecutionId: ${executionId})`,
-        performedBy: context.actorEmail || context.actorId,
-      });
+    const execution = await WorkflowFacade.dispatch<Record<string, any>>(
+      {
+        actionId: 'SYSTEM_BACKUP_EXECUTE',
+        entityType: 'SYSTEM',
+        entityId: 'DATABASE',
+        actor: this.toActor(context),
+      },
+      async () => {
+        return await this.repo.backupDatabase();
+      }
+    );
 
-      return {
-        executionId,
-        success: true,
-        action: 'DATABASE_BACKUP',
-        timestamp: new Date().toISOString(),
-        data,
-      };
-    } catch (error: any) {
-      await logAuditAction({
-        action: 'RESTORE',
-        collection: 'SYSTEM',
-        documentId: executionId,
-        details: `Sao lưu cơ sở dữ liệu thất bại: ${error?.message || error}`,
-        performedBy: context.actorEmail || context.actorId,
-      });
-      throw error;
+    if (!execution.success) {
+      throw new Error(execution.failureReason || 'Sao lưu cơ sở dữ liệu thất bại.');
     }
+
+    return {
+      executionId: execution.executionId,
+      success: true,
+      action: 'DATABASE_BACKUP',
+      timestamp: execution.timestamp,
+      data: execution.data,
+    };
   }
 
   /**
@@ -109,35 +111,31 @@ export class SystemAppService {
       throw new Error('Dữ liệu khôi phục không hợp lệ hoặc rỗng.');
     }
 
-    const executionId = this.generateExecutionId('RESTORE');
+    const execution = await WorkflowFacade.dispatch<void>(
+      {
+        actionId: 'SYSTEM_RESTORE_EXECUTE',
+        entityType: 'SYSTEM',
+        entityId: 'DATABASE',
+        actor: this.toActor(context),
+        reason: context.reason,
+        confirmationToken: context.confirmationToken,
+      },
+      async () => {
+        await this.repo.restoreDatabase(data);
+      }
+    );
 
-    try {
-      await this.repo.restoreDatabase(data);
-      await logAuditAction({
-        action: 'RESTORE',
-        collection: 'SYSTEM',
-        documentId: executionId,
-        details: `Khôi phục cơ sở dữ liệu thành công (ExecutionId: ${executionId}). Lý do: ${context.reason}`,
-        performedBy: context.actorEmail || context.actorId,
-      });
-
-      return {
-        executionId,
-        success: true,
-        action: 'DATABASE_RESTORE',
-        timestamp: new Date().toISOString(),
-        message: 'Khôi phục cơ sở dữ liệu hoàn tất.',
-      };
-    } catch (error: any) {
-      await logAuditAction({
-        action: 'RESTORE',
-        collection: 'SYSTEM',
-        documentId: executionId,
-        details: `Khôi phục cơ sở dữ liệu thất bại: ${error?.message || error}`,
-        performedBy: context.actorEmail || context.actorId,
-      });
-      throw error;
+    if (!execution.success) {
+      throw new Error(execution.failureReason || 'Khôi phục cơ sở dữ liệu thất bại.');
     }
+
+    return {
+      executionId: execution.executionId,
+      success: true,
+      action: 'DATABASE_RESTORE',
+      timestamp: execution.timestamp,
+      message: 'Khôi phục cơ sở dữ liệu hoàn tất.',
+    };
   }
 
   /**
@@ -154,35 +152,31 @@ export class SystemAppService {
       throw new Error('Mã xác nhận xóa dữ liệu không hợp lệ. Yêu cầu nhập đúng CONFIRM_WIPE.');
     }
 
-    const executionId = this.generateExecutionId('WIPE');
+    const execution = await WorkflowFacade.dispatch<void>(
+      {
+        actionId: 'SYSTEM_WIPE_DEMO_EXECUTE',
+        entityType: 'SYSTEM',
+        entityId: 'DATABASE',
+        actor: this.toActor(context),
+        reason: context.reason,
+        confirmationToken: context.confirmationToken,
+      },
+      async () => {
+        await this.repo.wipeDatabase();
+      }
+    );
 
-    try {
-      await this.repo.wipeDatabase();
-      await logAuditAction({
-        action: 'DELETE',
-        collection: 'SYSTEM',
-        documentId: executionId,
-        details: `XÓA SẠCH DỮ LIỆU HỆ THỐNG (ExecutionId: ${executionId}). Lý do: ${context.reason}`,
-        performedBy: context.actorEmail || context.actorId,
-      });
-
-      return {
-        executionId,
-        success: true,
-        action: 'DATABASE_WIPE',
-        timestamp: new Date().toISOString(),
-        message: 'Đã xóa sạch toàn bộ cơ sở dữ liệu.',
-      };
-    } catch (error: any) {
-      await logAuditAction({
-        action: 'DELETE',
-        collection: 'SYSTEM',
-        documentId: executionId,
-        details: `Xóa dữ liệu thất bại: ${error?.message || error}`,
-        performedBy: context.actorEmail || context.actorId,
-      });
-      throw error;
+    if (!execution.success) {
+      throw new Error(execution.failureReason || 'Xóa dữ liệu thất bại.');
     }
+
+    return {
+      executionId: execution.executionId,
+      success: true,
+      action: 'DATABASE_WIPE',
+      timestamp: execution.timestamp,
+      message: 'Đã xóa sạch toàn bộ cơ sở dữ liệu.',
+    };
   }
 
   /**
@@ -204,35 +198,31 @@ export class SystemAppService {
       );
     }
 
-    const executionId = this.generateExecutionId('RESET_DEMO');
+    const execution = await WorkflowFacade.dispatch<void>(
+      {
+        actionId: 'SYSTEM_WIPE_DEMO_EXECUTE',
+        entityType: 'SYSTEM',
+        entityId: 'DATABASE',
+        actor: this.toActor(context),
+        reason: context.reason,
+        confirmationToken: context.confirmationToken,
+      },
+      async () => {
+        await this.repo.resetDemoData(demoData);
+      }
+    );
 
-    try {
-      await this.repo.resetDemoData(demoData);
-      await logAuditAction({
-        action: 'UPDATE',
-        collection: 'SYSTEM',
-        documentId: executionId,
-        details: `Khởi tạo dữ liệu mẫu thành công (ExecutionId: ${executionId}). Lý do: ${context.reason}`,
-        performedBy: context.actorEmail || context.actorId,
-      });
-
-      return {
-        executionId,
-        success: true,
-        action: 'DATABASE_RESET_DEMO',
-        timestamp: new Date().toISOString(),
-        message: 'Khởi tạo dữ liệu mẫu hoàn tất.',
-      };
-    } catch (error: any) {
-      await logAuditAction({
-        action: 'UPDATE',
-        collection: 'SYSTEM',
-        documentId: executionId,
-        details: `Khởi tạo dữ liệu mẫu thất bại: ${error?.message || error}`,
-        performedBy: context.actorEmail || context.actorId,
-      });
-      throw error;
+    if (!execution.success) {
+      throw new Error(execution.failureReason || 'Khởi tạo dữ liệu mẫu thất bại.');
     }
+
+    return {
+      executionId: execution.executionId,
+      success: true,
+      action: 'DATABASE_RESET_DEMO',
+      timestamp: execution.timestamp,
+      message: 'Khởi tạo dữ liệu mẫu hoàn tất.',
+    };
   }
 }
 

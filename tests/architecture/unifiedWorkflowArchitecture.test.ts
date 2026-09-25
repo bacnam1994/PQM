@@ -19,6 +19,10 @@ import {
 import { WORKFLOW_ACTION_CATALOG } from '../../src/domain/workflow/workflowActionCatalog';
 import { MasterCriterionAppService } from '../../src/services/app/MasterCriterionAppService';
 
+vi.mock('../../src/services/auditService', () => ({
+  logAuditAction: vi.fn().mockResolvedValue({ success: true }),
+}));
+
 describe('Unified Workflow Architecture & Security Gates', () => {
   describe('Gate 1: Release Security - Zero Admin Bypass', () => {
     it('BatchAppService không được chứa bypass !isActorAdmin trong kiểm tra Release', () => {

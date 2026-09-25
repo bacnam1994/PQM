@@ -38,12 +38,25 @@ export class SecurityRulesValidator {
 
     // 2. ADMIN có toàn quyền
     if (user.isAdmin || user.role === 'ADMIN') {
-      // Ngoại lệ duy nhất của ADMIN: Không được UPDATE hoặc DELETE Audit Trail (Quy định ALCOA+ bất biến)
+      // Ngoại lệ 1 của ADMIN: Không được UPDATE hoặc DELETE Audit Trail (Quy định ALCOA+ bất biến)
       if (resourcePath.startsWith('audit_logs') && (action === 'UPDATE' || action === 'DELETE')) {
         return {
           allowed: false,
           reason: 'ALCOA+ Violation: Nhật ký kiểm toán là bất biến, không thể sửa đổi hoặc xóa.',
         };
+      }
+      // Ngoại lệ 2 (GAP-07): ADMIN không thể chuyển status = RELEASED nếu qualityStatus !== PASS
+      if (resourcePath.startsWith('batches') && (action === 'UPDATE' || action === 'CREATE')) {
+        if (payload?.status === 'RELEASED') {
+          const qStatus = payload?.qualityStatus ?? currentData?.qualityStatus;
+          if (qStatus && qStatus !== 'PASS') {
+            return {
+              allowed: false,
+              reason:
+                'Database Guard Violation (GAP-07): Lô không thể chuyển sang RELEASED khi kết quả kiểm nghiệm chưa ĐẠT (PASS).',
+            };
+          }
+        }
       }
       return { allowed: true };
     }
@@ -149,6 +162,16 @@ export class SecurityRulesValidator {
               reason:
                 'Chỉ QA mới có thẩm quyền Phê duyệt xuất xưởng (RELEASED) hoặc Từ chối (REJECTED) lô sản xuất.',
             };
+          }
+          if (payload?.status === 'RELEASED') {
+            const qStatus = payload?.qualityStatus ?? currentData?.qualityStatus;
+            if (qStatus && qStatus !== 'PASS') {
+              return {
+                allowed: false,
+                reason:
+                  'Database Guard Violation (GAP-07): Lô không thể chuyển sang RELEASED khi kết quả kiểm nghiệm chưa ĐẠT (PASS).',
+              };
+            }
           }
         }
 

@@ -1,9 +1,38 @@
 import { db } from '../firebase';
-import { ref, push, serverTimestamp, query, orderByChild, limitToLast, onValue, get, endBefore } from 'firebase/database';
+import {
+  ref,
+  push,
+  serverTimestamp,
+  query,
+  orderByChild,
+  limitToLast,
+  onValue,
+  get,
+  endBefore,
+} from 'firebase/database';
 
 export interface AuditLogEntry {
-  action: 'CREATE' | 'UPDATE' | 'DELETE' | 'IMPORT' | 'RESTORE' | 'LOGIN' | 'SYNC_CONFLICT' | 'SYNC_MERGE';
-  collection: 'PRODUCTS' | 'BATCHES' | 'TCCS' | 'FORMULAS' | 'TEST_RESULTS' | 'SYSTEM' | 'CRITERIA_ALIASES' | 'MATERIALS' | 'DEVIATIONS' | 'AI_GATEWAY' | 'ELECTRONIC_SIGNATURES';
+  action:
+    | 'CREATE'
+    | 'UPDATE'
+    | 'DELETE'
+    | 'IMPORT'
+    | 'RESTORE'
+    | 'LOGIN'
+    | 'SYNC_CONFLICT'
+    | 'SYNC_MERGE';
+  collection:
+    | 'PRODUCTS'
+    | 'BATCHES'
+    | 'TCCS'
+    | 'FORMULAS'
+    | 'TEST_RESULTS'
+    | 'SYSTEM'
+    | 'CRITERIA_ALIASES'
+    | 'MATERIALS'
+    | 'DEVIATIONS'
+    | 'AI_GATEWAY'
+    | 'ELECTRONIC_SIGNATURES';
   documentId?: string;
   details: string;
   performedBy: string; // Email người thực hiện
@@ -15,19 +44,28 @@ export interface AuditLogRecord extends Omit<AuditLogEntry, 'timestamp'> {
   timestamp: number;
 }
 
+export interface LogAuditOptions {
+  throwOnError?: boolean;
+}
+
 /**
  * Ghi lại nhật ký hoạt động của người dùng
  */
-export const logAuditAction = async (entry: Omit<AuditLogEntry, 'timestamp'>) => {
+export const logAuditAction = async (
+  entry: Omit<AuditLogEntry, 'timestamp'>,
+  options?: LogAuditOptions
+): Promise<void> => {
   try {
     const logsRef = ref(db, 'audit_logs');
     await push(logsRef, {
       ...entry,
-      timestamp: serverTimestamp()
+      timestamp: serverTimestamp(),
     });
   } catch (error) {
-    console.error("Failed to log audit action:", error);
-    // Không throw error để tránh làm gián đoạn luồng chính
+    console.error('Failed to log audit action:', error);
+    if (options?.throwOnError) {
+      throw error;
+    }
   }
 };
 
@@ -36,21 +74,25 @@ export const logAuditAction = async (entry: Omit<AuditLogEntry, 'timestamp'>) =>
  */
 export const fetchAuditLogs = async (limitCount: number = 100): Promise<AuditLogRecord[]> => {
   try {
-    const logsQuery = query(ref(db, 'audit_logs'), orderByChild('timestamp'), limitToLast(limitCount));
+    const logsQuery = query(
+      ref(db, 'audit_logs'),
+      orderByChild('timestamp'),
+      limitToLast(limitCount)
+    );
     const snapshot = await get(logsQuery);
     if (!snapshot.exists()) return [];
 
     const data = snapshot.val();
-    const records: AuditLogRecord[] = Object.keys(data).map(key => ({
+    const records: AuditLogRecord[] = Object.keys(data).map((key) => ({
       id: key,
       ...data[key],
-      timestamp: typeof data[key].timestamp === 'number' ? data[key].timestamp : Date.now()
+      timestamp: typeof data[key].timestamp === 'number' ? data[key].timestamp : Date.now(),
     }));
 
     // Sắp xếp mới nhất lên đầu
     return records.sort((a, b) => b.timestamp - a.timestamp);
   } catch (error) {
-    console.error("Failed to fetch audit logs:", error);
+    console.error('Failed to fetch audit logs:', error);
     return [];
   }
 };
@@ -75,11 +117,7 @@ export const fetchAuditLogsPaged = async (
         limitToLast(fetchLimit)
       );
     } else {
-      logsQuery = query(
-        logsRef,
-        orderByChild('timestamp'),
-        limitToLast(fetchLimit)
-      );
+      logsQuery = query(logsRef, orderByChild('timestamp'), limitToLast(fetchLimit));
     }
 
     const snapshot = await get(logsQuery);
@@ -88,10 +126,10 @@ export const fetchAuditLogsPaged = async (
     }
 
     const data = snapshot.val();
-    let records: AuditLogRecord[] = Object.keys(data).map(key => ({
+    let records: AuditLogRecord[] = Object.keys(data).map((key) => ({
       id: key,
       ...data[key],
-      timestamp: typeof data[key].timestamp === 'number' ? data[key].timestamp : Date.now()
+      timestamp: typeof data[key].timestamp === 'number' ? data[key].timestamp : Date.now(),
     }));
 
     records.sort((a, b) => b.timestamp - a.timestamp);
@@ -105,7 +143,7 @@ export const fetchAuditLogsPaged = async (
 
     return { records, hasMore, nextTimestamp };
   } catch (error) {
-    console.error("Failed to fetch paged audit logs:", error);
+    console.error('Failed to fetch paged audit logs:', error);
     return { records: [], hasMore: false };
   }
 };
@@ -117,21 +155,29 @@ export const subscribeAuditLogs = (
   callback: (logs: AuditLogRecord[]) => void,
   limitCount: number = 100
 ) => {
-  const logsQuery = query(ref(db, 'audit_logs'), orderByChild('timestamp'), limitToLast(limitCount));
-  return onValue(logsQuery, (snapshot) => {
-    if (!snapshot.exists()) {
+  const logsQuery = query(
+    ref(db, 'audit_logs'),
+    orderByChild('timestamp'),
+    limitToLast(limitCount)
+  );
+  return onValue(
+    logsQuery,
+    (snapshot) => {
+      if (!snapshot.exists()) {
+        callback([]);
+        return;
+      }
+      const data = snapshot.val();
+      const records: AuditLogRecord[] = Object.keys(data).map((key) => ({
+        id: key,
+        ...data[key],
+        timestamp: typeof data[key].timestamp === 'number' ? data[key].timestamp : Date.now(),
+      }));
+      callback(records.sort((a, b) => b.timestamp - a.timestamp));
+    },
+    (error) => {
+      console.error('Error subscribing to audit logs:', error);
       callback([]);
-      return;
     }
-    const data = snapshot.val();
-    const records: AuditLogRecord[] = Object.keys(data).map(key => ({
-      id: key,
-      ...data[key],
-      timestamp: typeof data[key].timestamp === 'number' ? data[key].timestamp : Date.now()
-    }));
-    callback(records.sort((a, b) => b.timestamp - a.timestamp));
-  }, (error) => {
-    console.error("Error subscribing to audit logs:", error);
-    callback([]);
-  });
+  );
 };

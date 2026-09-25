@@ -1,6 +1,7 @@
 /**
  * PQM V4 Platform - Change Control Application Service
  * Quản lý vòng đời Yêu cầu Thay đổi (Change Control) chuẩn GMP-WHO và ICH Q10
+ * Ủy quyền 100% các đột biến dữ liệu qua ChangeControlWorkflowHandlers & WorkflowFacade.
  * Lưu trữ bền vững thông qua IChangeControlRepository (Firebase RTDB).
  */
 
@@ -11,16 +12,16 @@ import {
   FMEARiskAssessment,
   ChangeActionItem,
 } from '../../types/changeControl';
-import { generateId } from '../../utils';
-import { nextVersion } from '../../utils/concurrency';
-import { logAuditAction } from '../auditService';
 import { IChangeControlRepository } from '../../repositories/IChangeControlRepository';
 import { firebaseChangeControlRepository } from '../../repositories/firebase/FirebaseChangeControlRepository';
+import { ChangeControlWorkflowHandlers } from '../../workflow/handlers/changeControlWorkflowHandlers';
 
 export class ChangeControlAppService {
   private records: ChangeRequest[] = [];
+  private handlers: ChangeControlWorkflowHandlers;
 
   constructor(private repo: IChangeControlRepository = firebaseChangeControlRepository) {
+    this.handlers = new ChangeControlWorkflowHandlers(this.repo);
     this.records = this.getInitialSampleData();
   }
 
@@ -83,7 +84,6 @@ export class ChangeControlAppService {
       const items = await this.repo.findAll();
       if (items && items.length > 0) {
         this.records = items;
-
         return [...items].sort((a, b) => (b.proposedAt || '').localeCompare(a.proposedAt || ''));
       }
     } catch (e) {
@@ -106,102 +106,36 @@ export class ChangeControlAppService {
   }
 
   /**
-   * Khởi tạo Change Request mới
+   * Khởi tạo Change Request mới qua Workflow
    */
   async createChangeRequest(
     input: CreateChangeRequestInput,
     currentUser: { email?: string }
   ): Promise<ChangeRequest> {
-    const id = generateId('cr');
-    const now = new Date();
-    const year = now.getFullYear();
-    const count = this.records.length + 1;
-    const crNo = `CR-${year}-${count.toString().padStart(4, '0')}`;
-
-    const newCR: ChangeRequest = {
-      id,
-      crNo,
-      title: input.title,
-      category: input.category,
-      changeType: input.changeType,
-      status: 'DRAFT',
-      productId: input.productId,
-      productName: input.productName,
-      tccsId: input.tccsId,
-      tccsCode: input.tccsCode,
-      justification: input.justification,
-      description: input.description,
-      targetImplementationDate: input.targetImplementationDate,
-      proposedBy: currentUser?.email || 'SYSTEM',
-      proposedAt: now.toISOString(),
-      actionItems: [],
-      version: 1,
-      updatedAt: now.toISOString(),
-    };
-
-    try {
-      await this.repo.save(newCR);
-    } catch (e) {
-      console.warn('[ChangeControlAppService] Lưu repository cảnh báo, lưu bộ nhớ dự phòng:', e);
-    }
-
+    const newCR = await this.handlers.handleCreate(input, currentUser, this.records.length);
     this.records.unshift(newCR);
-
-    logAuditAction({
-      action: 'CREATE',
-      collection: 'DEVIATIONS',
-      documentId: id,
-      details: `Khởi tạo Yêu cầu Thay đổi GMP: ${crNo} (${input.changeType}) - Nhóm: ${input.category}`,
-      performedBy: currentUser?.email || 'SYSTEM',
-    });
-
     return newCR;
   }
 
   /**
-   * Cập nhật đánh giá rủi ro FMEA
+   * Cập nhật đánh giá rủi ro FMEA qua Workflow
    */
   async assessFMEARisk(
     id: string,
     fmea: Omit<FMEARiskAssessment, 'rpn' | 'riskLevel'>,
     currentUser: { email?: string }
   ): Promise<ChangeRequest> {
-    const cr = await this.getById(id);
-    if (!cr) throw new Error(`Không tìm thấy Change Request: ${id}`);
-
-    const rpn = fmea.severity * fmea.probability * fmea.detectability;
-    const riskLevel: 'LOW' | 'MEDIUM' | 'HIGH' = rpn >= 60 ? 'HIGH' : rpn >= 25 ? 'MEDIUM' : 'LOW';
-
-    const updatedAssessment: FMEARiskAssessment = {
-      ...fmea,
-      rpn,
-      riskLevel,
-    };
-
-    cr.riskAssessment = updatedAssessment;
-    cr.status = cr.status === 'DRAFT' ? 'IMPACT_ASSESSMENT' : cr.status;
-    cr.version = nextVersion(cr.version);
-    cr.updatedAt = new Date().toISOString();
-
-    try {
-      await this.repo.update(cr);
-    } catch (e) {
-      console.warn('[ChangeControlAppService] Lỗi update repository:', e);
+    const cachedCR = this.records.find((r) => r.id === id);
+    const updatedCR = await this.handlers.handleAssessFMEARisk(id, fmea, currentUser, cachedCR);
+    const index = this.records.findIndex((r) => r.id === id);
+    if (index >= 0) {
+      this.records[index] = updatedCR;
     }
-
-    logAuditAction({
-      action: 'UPDATE',
-      collection: 'DEVIATIONS',
-      documentId: id,
-      details: `Cập nhật FMEA Risk Assessment cho ${cr.crNo}: RPN=${rpn} (${riskLevel})`,
-      performedBy: currentUser?.email || 'SYSTEM',
-    });
-
-    return cr;
+    return updatedCR;
   }
 
   /**
-   * Thêm hành động triển khai vào kế hoạch thay đổi
+   * Thêm hành động triển khai vào kế hoạch thay đổi qua Workflow
    */
   async addActionItem(
     id: string,
@@ -210,80 +144,39 @@ export class ChangeControlAppService {
     },
     currentUser: { email?: string }
   ): Promise<ChangeRequest> {
-    const cr = await this.getById(id);
-    if (!cr) throw new Error(`Không tìm thấy Change Request: ${id}`);
-
-    const newItem: ChangeActionItem = {
-      ...item,
-      id: generateId('cr_act'),
-      status: item.status || 'PENDING',
-    };
-
-    cr.actionItems = [...(cr.actionItems || []), newItem];
-    cr.version = nextVersion(cr.version);
-    cr.updatedAt = new Date().toISOString();
-
-    try {
-      await this.repo.update(cr);
-    } catch (e) {
-      console.warn('[ChangeControlAppService] Lỗi update repository:', e);
+    const cachedCR = this.records.find((r) => r.id === id);
+    const updatedCR = await this.handlers.handleAddActionItem(id, item, currentUser, cachedCR);
+    const index = this.records.findIndex((r) => r.id === id);
+    if (index >= 0) {
+      this.records[index] = updatedCR;
     }
-
-    logAuditAction({
-      action: 'UPDATE',
-      collection: 'DEVIATIONS',
-      documentId: id,
-      details: `Thêm hành động thay đổi vào ${cr.crNo}: ${newItem.title} (Phụ trách: ${newItem.responsible})`,
-      performedBy: currentUser?.email || 'SYSTEM',
-    });
-
-    return cr;
+    return updatedCR;
   }
 
   /**
-   * Hoàn thành một hành động thay đổi
+   * Hoàn thành một hành động thay đổi qua Workflow
    */
   async completeActionItem(
     id: string,
     actionId: string,
     currentUser: { email?: string }
   ): Promise<ChangeRequest> {
-    const cr = await this.getById(id);
-    if (!cr) throw new Error(`Không tìm thấy Change Request: ${id}`);
-
-    cr.actionItems = (cr.actionItems || []).map((act) => {
-      if (act.id === actionId) {
-        return {
-          ...act,
-          status: 'COMPLETED' as const,
-          completedAt: new Date().toISOString(),
-        };
-      }
-      return act;
-    });
-
-    cr.version = nextVersion(cr.version);
-    cr.updatedAt = new Date().toISOString();
-
-    try {
-      await this.repo.update(cr);
-    } catch (e) {
-      console.warn('[ChangeControlAppService] Lỗi update repository:', e);
+    const cachedCR = this.records.find((r) => r.id === id);
+    const updatedCR = await this.handlers.handleCompleteActionItem(
+      id,
+      actionId,
+      currentUser,
+      cachedCR
+    );
+    const index = this.records.findIndex((r) => r.id === id);
+    if (index >= 0) {
+      this.records[index] = updatedCR;
     }
-
-    logAuditAction({
-      action: 'UPDATE',
-      collection: 'DEVIATIONS',
-      documentId: id,
-      details: `Hoàn tất hành động ${actionId} trong ${cr.crNo}`,
-      performedBy: currentUser?.email || 'SYSTEM',
-    });
-
-    return cr;
+    return updatedCR;
   }
 
   /**
-   * Chuyển trạng thái quy trình thay đổi chuẩn GMP
+   * Chuyển trạng thái quy trình thay đổi chuẩn GMP qua Workflow
    */
   async updateStatus(
     id: string,
@@ -291,56 +184,19 @@ export class ChangeControlAppService {
     currentUser: { email?: string; role?: string | null; isAdmin?: boolean },
     notes?: string
   ): Promise<ChangeRequest> {
-    const cr = await this.getById(id);
-    if (!cr) throw new Error(`Không tìm thấy Change Request: ${id}`);
-
-    // Kiểm tra quy định khi đóng thay đổi
-    if (newStatus === 'CLOSED') {
-      const isAuthorized =
-        currentUser?.isAdmin || currentUser?.role === 'QA' || currentUser?.role === 'ADMIN';
-      if (!isAuthorized) {
-        throw new Error(
-          'Từ chối quyền: Chỉ Quản lý QA hoặc Quản trị viên mới có thẩm quyền Đóng (Close) Change Request.'
-        );
-      }
-
-      // Kiểm tra tất cả hành động đã hoàn tất chưa
-      const hasUnfinished = (cr.actionItems || []).some((a) => a.status !== 'COMPLETED');
-      if (hasUnfinished) {
-        throw new Error(
-          'Không thể đóng thay đổi: Vẫn còn các hành động trong kế hoạch chưa hoàn thành.'
-        );
-      }
-
-      cr.closedBy = currentUser?.email || 'QA_ADMIN';
-      cr.closedAt = new Date().toISOString();
-      cr.closureNotes = notes || 'Đã thẩm tra tính hiệu quả và đóng thay đổi theo chuẩn GMP.';
+    const cachedCR = this.records.find((r) => r.id === id);
+    const updatedCR = await this.handlers.handleUpdateStatus(
+      id,
+      newStatus,
+      currentUser,
+      notes,
+      cachedCR
+    );
+    const index = this.records.findIndex((r) => r.id === id);
+    if (index >= 0) {
+      this.records[index] = updatedCR;
     }
-
-    if (newStatus === 'APPROVED') {
-      cr.approvedBy = currentUser?.email || 'QA_MANAGER';
-      cr.approvedAt = new Date().toISOString();
-    }
-
-    cr.status = newStatus;
-    cr.version = nextVersion(cr.version);
-    cr.updatedAt = new Date().toISOString();
-
-    try {
-      await this.repo.update(cr);
-    } catch (e) {
-      console.warn('[ChangeControlAppService] Lỗi update repository:', e);
-    }
-
-    logAuditAction({
-      action: 'UPDATE',
-      collection: 'DEVIATIONS',
-      documentId: id,
-      details: `Chuyển trạng thái Change Request ${cr.crNo}: -> ${newStatus}${notes ? ` (${notes})` : ''}`,
-      performedBy: currentUser?.email || 'SYSTEM',
-    });
-
-    return cr;
+    return updatedCR;
   }
 }
 

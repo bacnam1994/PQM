@@ -48,6 +48,8 @@ export interface WorkflowExecutionResult<TData = any> {
   data?: TData;
   failureCode?: string;
   failureReason?: string;
+  auditStatus?: 'COMMITTED' | 'AUDIT_FAILED' | 'SKIPPED';
+  auditError?: string;
   timestamp: string;
   durationMs: number;
 }
@@ -243,15 +245,35 @@ export class UnifiedWorkflowExecutor {
           SYSTEM: 'SYSTEM',
         };
 
-        await logAuditAction({
-          action: auditAction,
-          collection: collectionMap[entityType] || 'SYSTEM',
-          documentId: entityId,
-          performedBy: actor.email || actor.name || actor.id,
-          details: `[UnifiedWorkflow] ${actionId} trên ${entityType} #${entityId}: ${reason || (currentState ? `${currentState} -> ${calculatedNextState || currentState}` : 'Thực thi thành công')}`,
-        });
+        await logAuditAction(
+          {
+            action: auditAction,
+            collection: collectionMap[entityType] || 'SYSTEM',
+            documentId: entityId,
+            performedBy: actor.email || actor.name || actor.id,
+            details: `[UnifiedWorkflow] ${actionId} trên ${entityType} #${entityId}: ${reason || (currentState ? `${currentState} -> ${calculatedNextState || currentState}` : 'Thực thi thành công')}`,
+          },
+          { throwOnError: true }
+        );
       } catch (auditErr) {
-        console.warn(`[UnifiedWorkflowExecutor] Ghi nhận audit cảnh báo:`, auditErr);
+        console.error(`[UnifiedWorkflowExecutor] Ghi nhận audit thất bại:`, auditErr);
+        // ALCOA+ & 21 CFR Part 11: Fail-closed khi không thể ghi nhận Audit Trail
+        return {
+          success: false,
+          executionId,
+          actionId,
+          entityType,
+          entityId,
+          fromState: currentState,
+          toState: calculatedNextState,
+          data: resultData,
+          failureCode: 'AUDIT_LOG_FAILED',
+          failureReason: `Ghi nhận Audit Trail thất bại: ${(auditErr as any)?.message || 'Lỗi lưu trữ nhật ký kiểm toán'}. Theo nguyên tắc ALCOA+ và FDA 21 CFR Part 11, hành động nghiệp vụ không được xác nhận hoàn tất khi thiếu hồ sơ kiểm toán.`,
+          auditStatus: 'AUDIT_FAILED',
+          auditError: (auditErr as any)?.message || String(auditErr),
+          timestamp,
+          durationMs: Date.now() - startTime,
+        };
       }
     }
 
@@ -264,6 +286,7 @@ export class UnifiedWorkflowExecutor {
       fromState: currentState,
       toState: calculatedNextState,
       data: resultData,
+      auditStatus: actionMeta.requiresAudit ? 'COMMITTED' : 'SKIPPED',
       timestamp,
       durationMs: Date.now() - startTime,
     };

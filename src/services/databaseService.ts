@@ -13,10 +13,13 @@ export const saveItem = async (path: string, id: string, data: any) => {
 };
 
 /**
- * Xóa một bản ghi
+ * @deprecated @forbidden CẤM GỌI TRỰC TIẾP deleteItemService
+ * Mọi thao tác xóa dữ liệu phải qua Application Service và Repository chuyên trách.
  */
 export const deleteItemService = async (path: string, id: string) => {
-  await remove(ref(db, `${path}/${id}`));
+  throw new Error(
+    `[FORBIDDEN DIRECT DELETE] Cấm gọi trực tiếp deleteItemService('${path}', '${id}'). Mọi thao tác xóa phải qua Application Service để đảm bảo thẩm tra quyền hạn, ràng buộc cascade và Audit Trail ALCOA+.`
+  );
 };
 
 /**
@@ -171,21 +174,22 @@ export const deleteTestResultService = async (id: string) => {
 };
 
 /**
- * @deprecated NGUY HIỂM: Hàm xóa toàn bộ dữ liệu gốc. Đã bị vô hiệu hóa để bảo đảm an toàn dữ liệu sản xuất.
+ * @deprecated @forbidden VÔ HIỆU HÓA HOÀN TOÀN: Cấm gọi clearDatabaseService
+ * Thao tác dọn sạch dữ liệu hệ thống bắt buộc phải thông qua SystemAppService.wipeDatabase
+ * có token xác nhận, thẩm tra quyền ADMIN và ghi vết Audit Trail đầy đủ.
  */
-export const clearDatabaseService = async (confirmToken?: string) => {
-  if (confirmToken !== 'CONFIRM_PURGE_PRODUCTION_DATA_DANGEROUS') {
-    throw new Error(
-      'Hành động xóa toàn bộ cơ sở dữ liệu đã bị khóa bởi hệ thống bảo vệ toàn vẹn dữ liệu PQM.'
-    );
-  }
-  await set(ref(db), null);
+export const clearDatabaseService = async (_confirmToken?: string) => {
+  throw new Error(
+    `[FORBIDDEN ROOT OPERATION] clearDatabaseService đã bị khóa vĩnh viễn. Vui lòng sử dụng systemAppService.wipeDatabase() với xác thực token và Audit Trail.`
+  );
 };
 
 /**
- * Cập nhật hàng loạt (Dùng cho Restore/Demo data với Security Guard)
+ * @deprecated @forbidden VÔ HIỆU HÓA HOÀN TOÀN: Cấm gọi updateRootService
+ * Thao tác ghi đè root bắt buộc phải thông qua SystemAppService.restoreBackup / resetDemoData.
  */
-export const updateRootService = async (updates: Record<string, any>) => {
-  if (!updates || Object.keys(updates).length === 0) return;
-  await update(ref(db), updates);
+export const updateRootService = async (_updates: Record<string, any>) => {
+  throw new Error(
+    `[FORBIDDEN ROOT OPERATION] updateRootService đã bị khóa vĩnh viễn. Vui lòng sử dụng SystemAppService để đảm bảo kiểm soát quyền ADMIN và Audit Trail.`
+  );
 };

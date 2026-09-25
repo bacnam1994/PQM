@@ -90,6 +90,15 @@ export const WORKFLOW_ACTION_CATALOG: Record<string, WorkflowActionMetadata> = {
     requiresAudit: true,
     requiresReason: true,
   },
+  MATERIAL_DELETE: {
+    actionId: 'MATERIAL_DELETE',
+    entityType: 'MATERIAL',
+    category: 'LIFECYCLE',
+    description: 'Xóa nguyên phụ liệu không còn sử dụng',
+    allowedRoles: ['admin'],
+    requiresAudit: true,
+    requiresReason: true,
+  },
 
   // TCCS & Formula
   TCCS_CREATE: {
@@ -151,6 +160,24 @@ export const WORKFLOW_ACTION_CATALOG: Record<string, WorkflowActionMetadata> = {
     requiresAudit: true,
     requiresReason: false,
   },
+  FORMULA_UPDATE: {
+    actionId: 'FORMULA_UPDATE',
+    entityType: 'FORMULA',
+    category: 'LIFECYCLE',
+    description: 'Cập nhật định lượng công thức sản xuất',
+    allowedRoles: ['admin', 'manager', 'lead'],
+    requiresAudit: true,
+    requiresReason: true,
+  },
+  FORMULA_DELETE: {
+    actionId: 'FORMULA_DELETE',
+    entityType: 'FORMULA',
+    category: 'LIFECYCLE',
+    description: 'Xóa công thức sản xuất',
+    allowedRoles: ['admin'],
+    requiresAudit: true,
+    requiresReason: true,
+  },
   FORMULA_APPROVE: {
     actionId: 'FORMULA_APPROVE',
     entityType: 'FORMULA',
@@ -170,6 +197,26 @@ export const WORKFLOW_ACTION_CATALOG: Record<string, WorkflowActionMetadata> = {
     allowedRoles: ['admin', 'manager', 'lead', 'operator'],
     requiresAudit: true,
     requiresReason: false,
+    targetFsm: 'BatchStateMachine',
+  },
+  BATCH_UPDATE: {
+    actionId: 'BATCH_UPDATE',
+    entityType: 'BATCH',
+    category: 'LIFECYCLE',
+    description: 'Cập nhật thông tin chi tiết lô sản xuất',
+    allowedRoles: ['admin', 'manager', 'lead', 'operator'],
+    requiresAudit: true,
+    requiresReason: false,
+    targetFsm: 'BatchStateMachine',
+  },
+  BATCH_DELETE: {
+    actionId: 'BATCH_DELETE',
+    entityType: 'BATCH',
+    category: 'LIFECYCLE',
+    description: 'Xóa lô sản xuất chưa xuất xưởng',
+    allowedRoles: ['admin'],
+    requiresAudit: true,
+    requiresReason: true,
     targetFsm: 'BatchStateMachine',
   },
   BATCH_START_TESTING: {
@@ -294,6 +341,16 @@ export const WORKFLOW_ACTION_CATALOG: Record<string, WorkflowActionMetadata> = {
     requiresReason: true,
     targetFsm: 'TestResultStateMachine',
   },
+  TEST_RESULT_DELETE: {
+    actionId: 'TEST_RESULT_DELETE',
+    entityType: 'TEST_RESULT',
+    category: 'LIFECYCLE',
+    description: 'Xóa phiếu kiểm nghiệm nháp/chưa duyệt',
+    allowedRoles: ['admin', 'manager', 'lead'],
+    requiresAudit: true,
+    requiresReason: true,
+    targetFsm: 'TestResultStateMachine',
+  },
 
   // Quality & Deviation & CAPA
   QUALITY_SNAPSHOT_FREEZE: {
@@ -359,6 +416,16 @@ export const WORKFLOW_ACTION_CATALOG: Record<string, WorkflowActionMetadata> = {
     category: 'TRANSITION',
     description: 'Đóng hồ sơ sai lệch',
     allowedRoles: ['admin', 'manager', 'qa_manager'],
+    requiresAudit: true,
+    requiresReason: true,
+    targetFsm: 'DeviationStateMachine',
+  },
+  DEVIATION_DELETE: {
+    actionId: 'DEVIATION_DELETE',
+    entityType: 'DEVIATION',
+    category: 'LIFECYCLE',
+    description: 'Xóa hồ sơ sai lệch khỏi hệ thống',
+    allowedRoles: ['admin'],
     requiresAudit: true,
     requiresReason: true,
     targetFsm: 'DeviationStateMachine',
@@ -459,6 +526,33 @@ export const WORKFLOW_ACTION_CATALOG: Record<string, WorkflowActionMetadata> = {
   },
 
   // System & Master Data
+  MASTER_CRITERIA_CREATE: {
+    actionId: 'MASTER_CRITERIA_CREATE',
+    entityType: 'MASTER_DATA',
+    category: 'LIFECYCLE',
+    description: 'Tạo mới chỉ tiêu kiểm nghiệm mẫu',
+    allowedRoles: ['admin', 'manager', 'qa_manager', 'lead', 'specialist'],
+    requiresAudit: true,
+    requiresReason: false,
+  },
+  MASTER_CRITERIA_UPDATE: {
+    actionId: 'MASTER_CRITERIA_UPDATE',
+    entityType: 'MASTER_DATA',
+    category: 'LIFECYCLE',
+    description: 'Cập nhật thông tin chỉ tiêu mẫu',
+    allowedRoles: ['admin', 'manager', 'qa_manager', 'lead', 'specialist'],
+    requiresAudit: true,
+    requiresReason: false,
+  },
+  MASTER_CRITERIA_DELETE: {
+    actionId: 'MASTER_CRITERIA_DELETE',
+    entityType: 'MASTER_DATA',
+    category: 'LIFECYCLE',
+    description: 'Xóa chỉ tiêu mẫu khỏi danh mục',
+    allowedRoles: ['admin'],
+    requiresAudit: true,
+    requiresReason: true,
+  },
   MASTER_DATA_IMPORT: {
     actionId: 'MASTER_DATA_IMPORT',
     entityType: 'MASTER_DATA',

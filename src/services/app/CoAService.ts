@@ -7,11 +7,14 @@
  * -docs/contracts/COA_SNAPSHOT_CONTRACT.md
  */
 
-import { Batch, TestResult, TCCS, EvaluationSnapshot } from '../../types';
+import { Batch, TestResult, TCCS, EvaluationSnapshot, ElectronicSignature } from '../../types';
 import { verifyEvaluationSnapshotIntegrity } from '../../domain/evaluation/EvaluationSnapshotBuilder';
 import { AlternateRuleResolver } from '../../domain/evaluation/AlternateRuleResolver';
 import { logAuditAction } from '../auditService';
 import { can } from '../permissionService';
+import { WorkflowFacade } from '../../workflow/WorkflowFacade';
+import { WorkflowActor } from '../../workflow/contracts/actions';
+import { signatureService } from '../signatureService';
 
 export interface CoAFootnote {
   symbol: string;
@@ -152,15 +155,166 @@ export class CoAService {
       publishedBy: currentUser?.email || 'system',
     };
 
-    logAuditAction({
-      action: 'CREATE',
-      collection: 'COA_DOCUMENTS' as any,
-      documentId: payload.coaNumber,
-      details: `Sinh chứng nhận phân tích CoA: ${payload.coaNumber} cho Lô: ${payload.batchNumber} (Kết luận: ${payload.overallConclusion})`,
-      performedBy: currentUser?.email || 'unknown',
-    });
+    // Dispatch outbox event for ALCOA+ compliance
+    const actor = this.toActor(currentUser);
+    WorkflowFacade.dispatch(
+      {
+        actionId: 'COA_GENERATE',
+        entityType: 'COA',
+        entityId: payload.coaNumber,
+        actor,
+        payload,
+        reason: `Sinh chứng nhận phân tích CoA: ${payload.coaNumber} cho Lô: ${payload.batchNumber} (Kết luận: ${payload.overallConclusion})`,
+      },
+      async () => payload
+    ).catch(() => {});
 
     return payload;
+  }
+
+  /**
+   * Tạo payload tài liệu CoA bất đồng bộ qua Workflow Engine Kernel
+   */
+  public async generateCoAPayloadAsync(options: {
+    batch: Batch;
+    testResult: TestResult;
+    tccs?: TCCS | null;
+    currentUser: any;
+  }): Promise<CoADocumentPayload> {
+    const payload = this.generateCoAPayload(options);
+    const actor = this.toActor(options.currentUser);
+
+    const execution = await WorkflowFacade.dispatch(
+      {
+        actionId: 'COA_GENERATE',
+        entityType: 'COA',
+        entityId: payload.coaNumber,
+        actor,
+        payload,
+        reason: `Sinh chứng nhận phân tích CoA: ${payload.coaNumber} cho Lô: ${payload.batchNumber} (Kết luận: ${payload.overallConclusion})`,
+      },
+      async () => payload
+    );
+
+    if (!execution.success) {
+      throw new Error(execution.failureReason || 'Lỗi điều phối COA_GENERATE qua Workflow.');
+    }
+
+    return execution.data!;
+  }
+
+  /**
+   * QA Ký số ban hành chứng chỉ CoA điện tử qua Workflow Kernel (COA_SIGN)
+   */
+  public async signCoA(options: {
+    coaNumber: string;
+    batchNumber: string;
+    signature: ElectronicSignature;
+    currentUser: any;
+  }): Promise<{ coaNumber: string; signedAt: string; signature: ElectronicSignature }> {
+    const { coaNumber, batchNumber, signature, currentUser } = options;
+    const actor = this.toActor(currentUser);
+
+    const execution = await WorkflowFacade.dispatch(
+      {
+        actionId: 'COA_SIGN',
+        entityType: 'COA',
+        entityId: coaNumber,
+        actor,
+        payload: { coaNumber, batchNumber },
+        signature,
+        reason: `Ký số thẩm duyệt chứng nhận CoA: ${coaNumber} cho Lô: ${batchNumber}`,
+      },
+      async () => {
+        const isValid = await signatureService.verifySignatureIntegrity(signature);
+        if (!isValid) {
+          throw new Error('Chữ ký điện tử thẩm duyệt CoA không hợp lệ hoặc đã bị can thiệp.');
+        }
+
+        logAuditAction({
+          action: 'UPDATE',
+          collection: 'COA_DOCUMENTS' as any,
+          documentId: coaNumber,
+          details: `Ký số ban hành chứng nhận phân tích CoA: ${coaNumber} (Người ký: ${currentUser?.email})`,
+          performedBy: currentUser?.email || 'unknown',
+        });
+
+        return {
+          coaNumber,
+          signedAt: new Date().toISOString(),
+          signature,
+        };
+      }
+    );
+
+    if (!execution.success) {
+      throw new Error(execution.failureReason || 'Lỗi điều phối COA_SIGN qua Workflow.');
+    }
+
+    return execution.data!;
+  }
+
+  /**
+   * Thu hồi hiệu lực chứng nhận CoA đã ban hành (COA_REVOKE)
+   */
+  public async revokeCoA(options: {
+    coaNumber: string;
+    reason: string;
+    currentUser: any;
+    signature?: ElectronicSignature;
+  }): Promise<{ coaNumber: string; revokedAt: string; reason: string }> {
+    const { coaNumber, reason, currentUser, signature } = options;
+    const actor = this.toActor(currentUser);
+
+    const execution = await WorkflowFacade.dispatch(
+      {
+        actionId: 'COA_REVOKE',
+        entityType: 'COA',
+        entityId: coaNumber,
+        actor,
+        payload: { coaNumber, reason },
+        reason,
+        signature,
+      },
+      async () => {
+        if (!reason || reason.trim().length < 20) {
+          throw new Error(
+            'ERR_REVOCATION_REASON_TOO_SHORT: Lý do thu hồi CoA phải tối thiểu 20 ký tự giải trình.'
+          );
+        }
+
+        logAuditAction({
+          action: 'UPDATE',
+          collection: 'COA_DOCUMENTS' as any,
+          documentId: coaNumber,
+          details: `Thu hồi hiệu lực chứng nhận CoA: ${coaNumber}. Lý do: ${reason}`,
+          performedBy: currentUser?.email || 'unknown',
+        });
+
+        return {
+          coaNumber,
+          revokedAt: new Date().toISOString(),
+          reason,
+        };
+      }
+    );
+
+    if (!execution.success) {
+      throw new Error(execution.failureReason || 'Lỗi điều phối COA_REVOKE qua Workflow.');
+    }
+
+    return execution.data!;
+  }
+
+  private toActor(currentUser: any): WorkflowActor {
+    const rawRole = (currentUser?.role || (currentUser?.isAdmin ? 'ADMIN' : 'QA')).toUpperCase();
+    return {
+      id: currentUser?.id || currentUser?.uid || currentUser?.email || 'usr_unknown',
+      name: currentUser?.displayName || currentUser?.name || currentUser?.email || 'User',
+      role: rawRole,
+      email: currentUser?.email || 'unknown@v-biotech.com',
+      isAdmin: currentUser?.isAdmin || rawRole === 'ADMIN',
+    } as any;
   }
 }
 

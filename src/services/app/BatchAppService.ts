@@ -1,28 +1,26 @@
 /**
  * PQM 3.0 - Batch Application Service
- * Điều phối các nghiệp vụ quản lý Lô sản xuất: RBAC Authorization, Validation,
- * State Machine, Schema Snapshotting (TCCS & Formula) & Optimistic Concurrency Control (OCC)
+ * Điều phối các nghiệp vụ quản lý Lô sản xuất qua BatchWorkflowHandlers & WorkflowFacade:
+ * RBAC Authorization, Validation, State Machine, Schema Snapshotting (TCCS & Formula) & OCC
  */
 
 import { Batch, TestResult, TCCS, ProductFormula, ElectronicSignature } from '../../types';
 import { IBatchRepository } from '../../repositories/BatchRepository';
 import { batchRepository as defaultBatchRepo } from '../../repositories/firebase/FirebaseBatchRepository';
 import { can } from '../permissionService';
-import { logAuditAction } from '../auditService';
-import { validateOptimisticLock, nextVersion } from '../../utils/concurrency';
-import { signatureService } from '../signatureService';
-import { BatchRules } from '../../domain/rules';
-import { BatchStateMachine } from '../../domain/workflow/stateMachine';
+import {
+  BatchWorkflowHandlers,
+  BatchCreationContext,
+} from '../../workflow/handlers/batchWorkflowHandlers';
 
-export interface BatchCreationContext {
-  activeTCCS?: TCCS;
-  tccsList?: TCCS[];
-  productFormula?: ProductFormula;
-  productFormulas?: ProductFormula[];
-}
+export type { BatchCreationContext };
 
 export class BatchAppService {
-  constructor(private repo: IBatchRepository = defaultBatchRepo) {}
+  private workflowHandlers: BatchWorkflowHandlers;
+
+  constructor(private repo: IBatchRepository = defaultBatchRepo) {
+    this.workflowHandlers = new BatchWorkflowHandlers(this.repo);
+  }
 
   /**
    * Tạo mới Lô sản xuất có chụp phiên bản Schema Snapshotting (TCCS & Formula)
@@ -36,74 +34,18 @@ export class BatchAppService {
     if (!can(currentUser, 'batch:create')) {
       throw new Error('Từ chối quyền: Bạn không có quyền tạo lô sản xuất mới.');
     }
-
-    if (!batch.batchNo?.trim()) {
-      throw new Error('Số lô sản xuất không được để trống.');
-    }
-    if (!batch.productId?.trim()) {
-      throw new Error('Vui lòng chọn sản phẩm liên kết cho lô sản xuất.');
-    }
-
-    if (existingBatches && existingBatches.length > 0) {
-      const cleanNo = batch.batchNo.trim().toLowerCase();
-      const duplicate = existingBatches.find(
-        (b) => b.id !== batch.id && b.batchNo?.trim().toLowerCase() === cleanNo
-      );
-      if (duplicate) {
-        throw new Error(`Số lô "${batch.batchNo}" đã tồn tại trên hệ thống.`);
-      }
-    }
-
-    if (batch.mfgDate && batch.expDate && batch.expDate < batch.mfgDate) {
-      throw new Error('Hạn dùng không được trước ngày sản xuất.');
-    }
-
-    if (batch.theoreticalYield != null && batch.theoreticalYield < 0) {
-      throw new Error('Sản lượng lý thuyết không thể là số âm.');
-    }
-    if (batch.actualYield != null && batch.actualYield < 0) {
-      throw new Error('Sản lượng thực tế không thể là số âm.');
-    }
-
-    // --- SCHEMA SNAPSHOTTING (Đóng băng tiêu chuẩn & công thức tại thời điểm tạo lô) ---
-    let tccsSnapshot = batch.tccsSnapshot;
-    if (!tccsSnapshot && context) {
-      tccsSnapshot = context.activeTCCS || context.tccsList?.find((t) => t.id === batch.tccsId);
-    }
-
-    let formulaSnapshot = batch.formulaSnapshot;
-    if (!formulaSnapshot && context) {
-      formulaSnapshot =
-        context.productFormula ||
-        context.productFormulas?.find((f) => f.productId === batch.productId);
-    }
-
-    const cleanBatch: Batch = {
-      ...batch,
-      status: 'PENDING', // Bắt buộc khởi tạo là PENDING theo PQM_SYSTEM_WORKFLOW_MASTER
-      version: batch.version && batch.version > 0 ? batch.version : 1,
-      tccsSnapshot,
-      formulaSnapshot,
-      createdAt: batch.createdAt || new Date().toISOString(),
-    };
-
-    await this.repo.save(cleanBatch);
-
-    logAuditAction({
-      action: 'CREATE',
-      collection: 'BATCHES',
-      documentId: cleanBatch.id,
-      details: `Tạo lô hàng: ${cleanBatch.batchNo} (${cleanBatch.status}) v${cleanBatch.version}${tccsSnapshot ? ` [Frozen TCCS: ${tccsSnapshot.code}]` : ''}`,
-      performedBy: currentUser?.email || 'unknown',
-    });
+    await this.workflowHandlers.handleCreate(batch, currentUser, existingBatches, context);
   }
 
   /**
    * Cập nhật thông tin Lô sản xuất có bảo vệ Optimistic Concurrency Control (OCC)
-   * Tuyệt đối cấm thay đổi Workflow Status thông qua updateBatch() (WF-005)
    */
   async updateBatch(batch: Batch, currentUser: any, oldBatch?: Batch): Promise<void> {
     const old = oldBatch || (await this.repo.findById(batch.id));
+
+    if (!can(currentUser, 'batch:update', old)) {
+      throw new Error('Từ chối quyền: Bạn không có quyền cập nhật thông tin lô sản xuất này.');
+    }
 
     if (old && batch.status && batch.status !== old.status) {
       throw new Error(
@@ -111,62 +53,11 @@ export class BatchAppService {
       );
     }
 
-    if (!can(currentUser, 'batch:update', old || batch)) {
-      throw new Error(
-        'Từ chối quyền: Không thể cập nhật lô sản xuất (có thể do quyền hạn hoặc lô đã đóng/xuất xưởng).'
-      );
-    }
-
-    // Kiểm tra xung đột khóa lạc quan (OCC)
-    validateOptimisticLock(old?.version, batch.version, `Lô sản xuất ${batch.batchNo || batch.id}`);
-
-    if (!batch.batchNo?.trim()) {
-      throw new Error('Số lô sản xuất không được để trống.');
-    }
-    if (!batch.productId?.trim()) {
-      throw new Error('Vui lòng chọn sản phẩm liên kết cho lô sản xuất.');
-    }
-
-    if (batch.mfgDate && batch.expDate && batch.expDate < batch.mfgDate) {
-      throw new Error('Hạn dùng không được trước ngày sản xuất.');
-    }
-
-    if (batch.theoreticalYield != null && batch.theoreticalYield < 0) {
-      throw new Error('Sản lượng lý thuyết không thể là số âm.');
-    }
-    if (batch.actualYield != null && batch.actualYield < 0) {
-      throw new Error('Sản lượng thực tế không thể là số âm.');
-    }
-
-    const newVersion = nextVersion(old?.version ?? batch.version);
-
-    const cleanBatch: Batch = {
-      ...batch,
-      // Bảo toàn các trường trạng thái quy trình và audit metadata
-      status: old?.status || batch.status || 'PENDING',
-      releasedAt: old?.releasedAt,
-      releasedBy: old?.releasedBy,
-      rejectReason: old?.rejectReason,
-      // Bảo toàn các bản chụp đã có
-      tccsSnapshot: batch.tccsSnapshot || old?.tccsSnapshot,
-      formulaSnapshot: batch.formulaSnapshot || old?.formulaSnapshot,
-      version: newVersion,
-      updatedAt: new Date().toISOString(),
-    };
-
-    await this.repo.update(cleanBatch);
-
-    logAuditAction({
-      action: 'UPDATE',
-      collection: 'BATCHES',
-      documentId: cleanBatch.id,
-      details: `Cập nhật lô hàng: ${cleanBatch.batchNo} -> trạng thái: ${cleanBatch.status} (v${cleanBatch.version})`,
-      performedBy: currentUser?.email || 'unknown',
-    });
+    await this.workflowHandlers.handleUpdate(batch, currentUser, oldBatch);
   }
 
   /**
-   * Chuyển trạng thái Lô sản xuất (State Machine & Release Guard)
+   * Cập nhật trạng thái Lô sản xuất qua Workflow State Machine & Release Guard
    * Luôn thực hiện Fresh DB Read (WF-018), không phụ thuộc vào cache client
    */
   async updateStatus(
@@ -181,7 +72,6 @@ export class BatchAppService {
       requireSignature?: boolean;
     }
   ): Promise<void> {
-    // WF-018: Luôn đọc bản ghi Lô mới nhất từ cơ sở dữ liệu để làm authoritative source
     let currentBatch = await this.repo.findById(batchId);
     if (!currentBatch && options?.currentBatch) {
       currentBatch = options.currentBatch;
@@ -207,93 +97,9 @@ export class BatchAppService {
       }
     }
 
-    // 2. Rào chắn lý do theo quy định FSM (Quản trị viên ADMIN được cấp quyền tối đa can thiệp phục hồi)
-    const isActorAdmin = currentUser?.role === 'ADMIN' || currentUser?.isAdmin === true;
-    let effectiveReason = options?.reason;
-    if (isActorAdmin && (!effectiveReason || !effectiveReason.trim())) {
-      effectiveReason = `Quản trị viên (ADMIN) điều chỉnh trạng thái Lô sang ${status}.`;
-    }
-
-    if (status === 'REJECTED') {
-      if (!effectiveReason || !effectiveReason.trim()) {
-        throw new Error('Từ chối (Reject) lô sản xuất bắt buộc phải có lý do giải trình rõ ràng.');
-      }
-    } else if (status === 'BLOCKED') {
-      if (!effectiveReason || !effectiveReason.trim()) {
-        throw new Error(
-          currentBatch.status === 'RELEASED'
-            ? 'Thu hồi lô đã xuất xưởng bắt buộc phải có lý do thu hồi rõ ràng.'
-            : 'Khóa (Block) lô sản xuất bắt buộc phải có lý do giải trình.'
-        );
-      }
-    } else if (currentBatch.status === 'REJECTED' && status === 'PENDING') {
-      if (!effectiveReason || !effectiveReason.trim()) {
-        throw new Error(
-          'Mở lại Lô đã bị từ chối bắt buộc phải có biên bản giải trình và lý do xét duyệt CAPA.'
-        );
-      }
-    }
-
-    // 3. Thẩm tra quy tắc chuyển trạng thái FSM (BatchStateMachine)
-    const transitionCheck = BatchStateMachine.canTransition(currentBatch.status, status, {
-      actorRole: currentUser?.role,
-      actorId: currentUser?.uid,
-      reason: effectiveReason,
-      conditionsMet: status === 'RELEASED' ? true : undefined,
-    });
-    if (!transitionCheck.allowed) {
-      throw new Error(`Quy chuẩn State Machine: ${transitionCheck.reason}`);
-    }
-
-    // 4. Kiểm tra chữ ký điện tử khi được yêu cầu (FDA 21 CFR Part 11 Compliance)
-    if (status === 'RELEASED') {
-      if (options?.requireSignature && !options?.signature) {
-        throw new Error(
-          'Quy định 21 CFR Part 11: Yêu cầu chữ ký điện tử hợp lệ của QA/Admin trước khi xuất xưởng Lô.'
-        );
-      }
-      if (options?.signature) {
-        if (
-          options.signature.documentType !== 'BATCH_RELEASE' ||
-          options.signature.documentId !== batchId
-        ) {
-          throw new Error('Chữ ký điện tử không khớp với Lô sản xuất đang phê duyệt.');
-        }
-        const isValid = await signatureService.verifySignatureIntegrity(options.signature);
-        if (!isValid) {
-          throw new Error('Chữ ký điện tử không hợp lệ hoặc đã bị can thiệp trái phép.');
-        }
-      }
-    }
-
-    // 5. Ràng buộc bảo toàn dữ liệu & GMP Release Guard (Business Gate: ReleaseRules / BatchRules) (WF-007, WF-019)
-    if (status === 'RELEASED') {
-      let freshTestResults: TestResult[] = options?.batchTestResults || [];
-      if (this.repo && typeof (this.repo as any).findTestResultsByBatchId === 'function') {
-        freshTestResults = await (this.repo as any).findTestResultsByBatchId(batchId);
-      }
-
-      const releaseDecision = BatchRules.canRelease(
-        currentBatch,
-        freshTestResults,
-        currentUser?.role,
-        currentBatch.tccsSnapshot || (currentBatch as any)?.tccs
-      );
-      if (!releaseDecision.allowed) {
-        throw new Error(
-          `Quy chuẩn GMP & Release Guard: ${releaseDecision.reason || 'Lô không đủ điều kiện xuất xưởng.'}`
-        );
-      }
-    }
-
-    await this.repo.updateStatus(batchId, status, effectiveReason);
-
-    logAuditAction({
-      action: 'UPDATE',
-      collection: 'BATCHES',
-      documentId: batchId,
-      details: `Chuyển trạng thái lô: ${currentBatch.batchNo || batchId} -> ${status}${effectiveReason ? ` (Lý do: ${effectiveReason})` : ''}${options?.signature ? ` [Đã ký điện tử: ${options.signature.signerEmail}]` : ''}`,
-      performedBy: currentUser?.email || 'unknown',
+    await this.workflowHandlers.handleStatusTransition(batchId, status, currentUser, {
+      ...options,
+      currentBatch,
     });
   }
 
@@ -322,15 +128,7 @@ export class BatchAppService {
       );
     }
 
-    await this.repo.delete(id);
-
-    logAuditAction({
-      action: 'DELETE',
-      collection: 'BATCHES',
-      documentId: id,
-      details: `Xóa lô hàng: ${batchNo || id}`,
-      performedBy: currentUser?.email || 'unknown',
-    });
+    await this.workflowHandlers.handleDelete(id, currentUser, batchNo);
   }
 }
 
