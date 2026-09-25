@@ -1,7 +1,7 @@
 # PQM — KẾ HOẠCH REBUILD TOÀN DIỆN THEO WORKFLOW
 
 Repository: `bacnam1994/PQM`  
-Trạng thái hiện tại: **PHASE 2 (REBUILD WORKFLOW KERNEL) — COMPLETED | NEXT: PHASE 3 (REPOSITORY BOUNDARY)**
+Trạng thái hiện tại: **PHASE 3 (REPOSITORY BOUNDARY) — COMPLETED | NEXT: PHASE 4 (PRODUCT DOMAIN REBUILD)**
 
 ---
 
@@ -13,7 +13,7 @@ Trạng thái hiện tại: **PHASE 2 (REBUILD WORKFLOW KERNEL) — COMPLETED | 
 | **P-02** | **Source Classification**           | Phân loại toàn bộ file source sang UI, APP, WORKFLOW, DOMAIN, REPO, INFRA, UTIL, TYPE              | ✅ **HOÀN THÀNH** | `docs/audit/PQM_REBUILD_SOURCE_MIGRATION_MAP_V1.md` |
 | **P-03** | **Dependency Graph**                | Lập đồ thị phụ thuộc đơn hướng: UI → App → Workflow → Domain → Repo → Infra                        | ✅ **HOÀN THÀNH** | `docs/audit/PQM_REBUILD_SOURCE_MIGRATION_MAP_V1.md` |
 | **P-04** | **Rebuild Workflow Kernel**         | Chuẩn hóa contracts, registry, kernel, guards, handlers, events trong `src/workflow/`              | ✅ **HOÀN THÀNH** | `src/workflow/kernel/`, `guards/`, `registry/`      |
-| **P-05** | **Rebuild Repository Boundary**     | Tách Interface (`src/repositories/interfaces/`) khỏi Firebase (`src/infrastructure/repositories/`) | 📋 Chờ kích hoạt  | `src/repositories/interfaces/`                      |
+| **P-05** | **Rebuild Repository Boundary**     | Tách Interface (`src/repositories/interfaces/`) khỏi Firebase (`src/infrastructure/repositories/`) | ✅ **HOÀN THÀNH** | `src/repositories/interfaces/`, `infrastructure/`   |
 | **P-06** | **Rebuild Domain Slices (1-16)**    | Di chuyển 16 lát dọc độc lập theo template DDD (Domain / App / Workflow / Infra / Tests)           | 📋 Chờ kích hoạt  | Tuần tự theo 16 Vertical Slices                     |
 | **P-07** | **Product Domain Rebuild**          | Audit → Move → Rewire → Test → Verify cho toàn bộ Product CRUD, FSM, Approval, Bulk, AI            | 📋 Chờ kích hoạt  | `src/domains/product/`                              |
 | **P-08** | **Material Domain Rebuild**         | Audit → Move → Rewire → Test → Verify cho Material CRUD, Status, Approval, Import, Bulk            | 📋 Chờ kích hoạt  | `src/domains/material/`                             |
