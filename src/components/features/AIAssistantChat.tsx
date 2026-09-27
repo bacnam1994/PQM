@@ -38,6 +38,7 @@ import {
   loadCachedInsights,
   saveCachedInsights,
 } from '../../services/ai/autoLearningService';
+import { useAIChatHostStore } from '../../store/useAIChatHostStore';
 
 type MessageSender = 'user' | 'ai' | 'system';
 type MessageAction = 'CREATE_BATCH' | 'REDIRECT' | null;
@@ -143,14 +144,24 @@ export const AIAssistantChat: React.FC<AIAssistantChatProps> = ({
 
   const abortControllerRef = useRef<AbortController | null>(null);
 
-  // Hủy request AI cũ khi chuyển trang hoặc unmount (Phase 11)
+  // Phase 2: Tiêu thụ pendingPrompt từ AIChatHostStore khi mở chat
+  useEffect(() => {
+    if (isOpen) {
+      const pending = useAIChatHostStore.getState().consumePendingPrompt();
+      if (pending) {
+        setChatInputText(pending);
+      }
+    }
+  }, [isOpen]);
+
+  // Hủy request AI chỉ khi component thực sự unmount (bảo toàn session qua navigation)
   useEffect(() => {
     return () => {
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
       }
     };
-  }, [location.pathname]);
+  }, []);
 
   // Xác định thực thể đang xem theo URL hiện tại để nhúng ngữ cảnh AI
   const currentContext = useMemo(() => {
@@ -887,6 +898,9 @@ export const AIAssistantChat: React.FC<AIAssistantChatProps> = ({
 
       const preferredModel = localStorage.getItem('GEMINI_MODEL') || 'gemini-2.5-flash';
       const sessionMemoryPrompt = user?.uid ? buildSessionMemoryPrompt(user.uid) : '';
+      const sessionAtStart = useAIChatHostStore.getState().activeSessionId;
+      useAIChatHostStore.getState().setIsProcessing(true);
+
       const aiResponse = await geminiService.chatWithAppContext(
         userText,
         appContextData,
@@ -896,7 +910,13 @@ export const AIAssistantChat: React.FC<AIAssistantChatProps> = ({
         { signal: controller.signal }
       );
 
-      if (controller.signal.aborted) return;
+      // Stale request guard: Bỏ qua nếu session đã thay đổi hoặc request đã bị abort
+      if (
+        controller.signal.aborted ||
+        useAIChatHostStore.getState().activeSessionId !== sessionAtStart
+      ) {
+        return;
+      }
 
       addMessage({
         sender: 'ai',
@@ -913,6 +933,7 @@ export const AIAssistantChat: React.FC<AIAssistantChatProps> = ({
         text: `Xin lỗi, tôi gặp sự cố:\n\n${formatGeminiError(error)}`,
       });
     } finally {
+      useAIChatHostStore.getState().setIsProcessing(false);
       if (abortControllerRef.current === controller) {
         setIsLoading(false);
       }
@@ -983,6 +1004,7 @@ export const AIAssistantChat: React.FC<AIAssistantChatProps> = ({
               onClick={() => {
                 sessionStorage.removeItem('pqm_ai_chat_history');
                 setMessages([WELCOME_MESSAGE]);
+                useAIChatHostStore.getState().resetSession();
                 toast.success('Đã xóa lịch sử trò chuyện');
               }}
               className="p-1.5 rounded-lg text-white/70 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"

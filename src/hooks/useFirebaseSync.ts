@@ -21,13 +21,17 @@ import {
   TEST_RESULT_QUERY_KEYS,
   LABORATORY_QUERY_KEYS,
 } from '../constants/queryKeys';
+import { perfTelemetry } from '../utils/perfTelemetry';
 import { DEFAULT_TESTING_LABORATORIES } from '../services/laboratoryService';
 
-interface CollectionConfig {
+export type CollectionSyncScope = 'BOUNDED_SYNC' | 'FULL_SYNC';
+
+export interface CollectionConfig {
   key: string;
   storeName: string;
   firebasePath: string;
   queryKey: readonly any[];
+  syncScope: CollectionSyncScope;
   sortFn?: (a: any, b: any) => number;
   getScopedInvalidations?: (item: any, id: string) => void;
   getInitialQuery?: (reference: any) => any;
@@ -39,6 +43,7 @@ const COLLECTION_CONFIGS: Record<string, CollectionConfig> = {
     storeName: 'products',
     firebasePath: 'products',
     queryKey: PRODUCT_QUERY_KEYS.all,
+    syncScope: 'FULL_SYNC',
     getScopedInvalidations: (item, id) => {
       queryClient.invalidateQueries({ queryKey: PRODUCT_QUERY_KEYS.detail(id) });
       queryClient.invalidateQueries({ queryKey: BATCH_QUERY_KEYS.byProduct(id) });
@@ -50,6 +55,7 @@ const COLLECTION_CONFIGS: Record<string, CollectionConfig> = {
     storeName: 'batches',
     firebasePath: 'batches',
     queryKey: BATCH_QUERY_KEYS.all,
+    syncScope: 'BOUNDED_SYNC',
     getInitialQuery: (reference) => query(reference, limitToLast(100)),
     sortFn: (a, b) =>
       new Date(b.mfgDate || b.createdAt || 0).getTime() -
@@ -67,6 +73,7 @@ const COLLECTION_CONFIGS: Record<string, CollectionConfig> = {
     storeName: 'tccs',
     firebasePath: 'tccs',
     queryKey: TCCS_QUERY_KEYS.all,
+    syncScope: 'FULL_SYNC',
     getScopedInvalidations: (item, id) => {
       queryClient.invalidateQueries({ queryKey: TCCS_QUERY_KEYS.detail(id) });
       if (item?.productId) {
@@ -79,6 +86,7 @@ const COLLECTION_CONFIGS: Record<string, CollectionConfig> = {
     storeName: 'productFormulas',
     firebasePath: 'product_formulas',
     queryKey: PRODUCT_QUERY_KEYS.formulas,
+    syncScope: 'FULL_SYNC',
     getScopedInvalidations: (item, id) => {
       if (item?.productId) {
         queryClient.invalidateQueries({
@@ -92,6 +100,7 @@ const COLLECTION_CONFIGS: Record<string, CollectionConfig> = {
     storeName: 'rawMaterials',
     firebasePath: 'raw_materials',
     queryKey: PRODUCT_QUERY_KEYS.materials,
+    syncScope: 'FULL_SYNC',
     getScopedInvalidations: (item, id) => {
       queryClient.invalidateQueries({ queryKey: PRODUCT_QUERY_KEYS.materialDetail(id) });
     },
@@ -101,6 +110,7 @@ const COLLECTION_CONFIGS: Record<string, CollectionConfig> = {
     storeName: 'testResults',
     firebasePath: 'testResults',
     queryKey: TEST_RESULT_QUERY_KEYS.all,
+    syncScope: 'BOUNDED_SYNC',
     getInitialQuery: (reference) => query(reference, limitToLast(500)),
     sortFn: (a, b) =>
       new Date(b.testDate || b.createdAt || 0).getTime() -
@@ -117,18 +127,21 @@ const COLLECTION_CONFIGS: Record<string, CollectionConfig> = {
     storeName: 'aiLearnedMappings',
     firebasePath: 'ai_learned_mappings',
     queryKey: TCCS_QUERY_KEYS.aiMappings,
+    syncScope: 'FULL_SYNC',
   },
   criteriaAliases: {
     key: 'criteriaAliases',
     storeName: 'criteriaAliases',
     firebasePath: 'criteria_aliases',
     queryKey: TCCS_QUERY_KEYS.aliases,
+    syncScope: 'FULL_SYNC',
   },
   testingLaboratories: {
     key: 'testingLaboratories',
     storeName: 'testingLaboratories',
     firebasePath: 'testing_laboratories',
     queryKey: LABORATORY_QUERY_KEYS.all,
+    syncScope: 'FULL_SYNC',
   },
 };
 
@@ -266,6 +279,11 @@ export const useFirebaseSync = () => {
 
           // Cập nhật sync metadata
           updateCollectionSyncMeta(config.key, list.length);
+          perfTelemetry.record('COLLECTION_SYNC', {
+            collection: config.key,
+            count: list.length,
+            details: { syncScope: config.syncScope },
+          });
         }
       } catch (e) {
         console.warn(`[SyncEngine] Lỗi nạp snapshot ban đầu cho [${config.key}]:`, e);
@@ -274,7 +292,8 @@ export const useFirebaseSync = () => {
       if (!isMounted) return null;
 
       // 2. Lắng nghe Vi mô: onChildChanged (Granular Update in-place)
-      const unsubChanged = onChildChanged(reference, (snapshot) => {
+      // BẮT BUỘC: Lắng nghe trên queryTarget (chính xác phạm vi BOUNDED_SYNC hoặc FULL_SYNC)
+      const unsubChanged = onChildChanged(queryTarget, (snapshot) => {
         if (!isMounted) return;
         const updatedEntity = snapshot.val();
         const id = snapshot.key || updatedEntity?.id;
@@ -312,8 +331,9 @@ export const useFirebaseSync = () => {
       collectionCleanups.push(unsubChanged);
 
       // 3. Lắng nghe thêm mới Vi mô: onChildAdded
+      // BẮT BUỘC: Lắng nghe trên queryTarget (chính xác phạm vi BOUNDED_SYNC hoặc FULL_SYNC)
       // CHỈ xử lý các bản ghi THỰC SỰ MỚI (chưa có trong knownIds từ snapshot ban đầu)
-      const unsubAdded = onChildAdded(reference, (snapshot) => {
+      const unsubAdded = onChildAdded(queryTarget, (snapshot) => {
         if (!isMounted) return;
         const newEntity = snapshot.val();
         const id = snapshot.key || newEntity?.id;
@@ -340,8 +360,9 @@ export const useFirebaseSync = () => {
       });
       collectionCleanups.push(unsubAdded);
 
-      // 4. Lắng nghe xóa Vi mô: onChildRemoved
-      const unsubRemoved = onChildRemoved(reference, (snapshot) => {
+      // 4. Lắng nghe xóa Vi mô: onChildRemoved (Xóa hoặc Eviction khi rơi khỏi Bounded Window)
+      // BẮT BUỘC: Lắng nghe trên queryTarget (chính xác phạm vi BOUNDED_SYNC hoặc FULL_SYNC)
+      const unsubRemoved = onChildRemoved(queryTarget, (snapshot) => {
         if (!isMounted) return;
         const id = snapshot.key;
         if (!id) return;
@@ -508,6 +529,7 @@ export const useFirebaseSync = () => {
       (snap) => {
         if (!isMounted) return;
         if (snap.val() === true) {
+          perfTelemetry.record('FIREBASE_CONNECT');
           const currentStatus = useAppStore.getState().syncStatus;
           if (currentStatus === 'ERROR' || currentStatus === 'OFFLINE')
             useAppStore.getState().setSyncStatus('IDLE');

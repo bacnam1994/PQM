@@ -10,11 +10,28 @@
  */
 
 import { AIGatewayRequest } from './AIGateway';
+import { perfTelemetry } from '../../utils/perfTelemetry';
+
+export interface SemanticCacheQuery<TInput = any> {
+  promptId: string;
+  promptVersion?: string;
+  model?: string;
+  entityId?: string;
+  dataVersionHash?: string;
+  input: TInput;
+  options?: {
+    bypassCache?: boolean;
+    ttlMinutes?: number;
+  };
+}
 
 export interface CachedAIItem<T = any> {
   id: string;
   promptId: string;
   promptVersion?: string;
+  model?: string;
+  entityId?: string;
+  dataVersionHash?: string;
   normalizedText: string;
   tokens: string[];
   data: T;
@@ -177,9 +194,10 @@ export class SemanticCacheService {
 
   /**
    * Tìm kiếm kết quả cache cho một yêu cầu AI
+   * Ràng buộc danh tính: model + promptVersion + entityId + dataVersionHash + normalized question
    */
   get<T = any>(
-    request: AIGatewayRequest
+    request: SemanticCacheQuery | AIGatewayRequest
   ): { data: T; confidenceScore: number; isExactMatch: boolean; similarity: number } | null {
     if (request.options?.bypassCache) {
       this.statsRecord.misses++;
@@ -203,11 +221,43 @@ export class SemanticCacheService {
         continue;
       }
 
+      // Khớp chặt chẽ Model
+      const reqModel = (request as SemanticCacheQuery).model;
+      if (reqModel && item.model && item.model !== reqModel) {
+        continue;
+      }
+
+      // Khớp chặt chẽ Prompt Version
+      if (
+        request.promptVersion &&
+        item.promptVersion &&
+        item.promptVersion !== request.promptVersion
+      ) {
+        continue;
+      }
+
+      // Khớp chặt chẽ Entity Identity (lô / sản phẩm mục tiêu)
+      const reqEntityId = (request as SemanticCacheQuery).entityId;
+      if (reqEntityId && item.entityId && item.entityId !== reqEntityId) {
+        continue;
+      }
+
+      // Khớp chặt chẽ Data Version Hash (dữ liệu nghiệp vụ thay đổi -> cache invalid)
+      const reqDataHash = (request as SemanticCacheQuery).dataVersionHash;
+      if (reqDataHash && item.dataVersionHash && item.dataVersionHash !== reqDataHash) {
+        continue;
+      }
+
       // 1. Kiểm tra Exact Match trên chuỗi chuẩn hóa
       if (item.normalizedText === normalizedText) {
         item.hitCount++;
         this.statsRecord.hits++;
         this.statsRecord.totalSavedLatencyMs += 2500; // Ước tính trung bình 2.5s mỗi cuộc gọi Gemini
+        perfTelemetry.record('AI_CACHE_HIT', {
+          promptId: request.promptId,
+          model: item.model,
+          details: { entityId: item.entityId, match: 'exact' },
+        });
         return {
           data: item.data as T,
           confidenceScore: item.confidenceScore,
@@ -228,6 +278,11 @@ export class SemanticCacheService {
       bestMatch.hitCount++;
       this.statsRecord.hits++;
       this.statsRecord.totalSavedLatencyMs += 2500;
+      perfTelemetry.record('AI_CACHE_HIT', {
+        promptId: request.promptId,
+        model: bestMatch.model,
+        details: { entityId: bestMatch.entityId, match: 'semantic', similarity: highestSimilarity },
+      });
       return {
         data: bestMatch.data,
         confidenceScore: bestMatch.confidenceScore,
@@ -237,6 +292,11 @@ export class SemanticCacheService {
     }
 
     this.statsRecord.misses++;
+    perfTelemetry.record('AI_CACHE_MISS', {
+      promptId: request.promptId,
+      model: (request as SemanticCacheQuery).model,
+      details: { entityId: (request as SemanticCacheQuery).entityId },
+    });
     return null;
   }
 
@@ -244,7 +304,7 @@ export class SemanticCacheService {
    * Lưu kết quả vào Semantic Cache
    */
   set<T = any>(
-    request: AIGatewayRequest,
+    request: SemanticCacheQuery | AIGatewayRequest,
     data: T,
     confidenceScore = 0.95,
     ttlMs: number = DEFAULT_TTL_MS
@@ -253,12 +313,25 @@ export class SemanticCacheService {
 
     const { normalizedText, tokens } = normalizeAIInput(request.input);
     const now = Date.now();
-    const id = `${request.promptId}_${Math.abs(this.hashCode(normalizedText))}`;
+    const req = request as SemanticCacheQuery;
+    const id = [
+      req.promptId,
+      req.model || '',
+      req.promptVersion || '',
+      req.entityId || '',
+      req.dataVersionHash || '',
+      Math.abs(this.hashCode(normalizedText)),
+    ]
+      .filter(Boolean)
+      .join('_');
 
     const cacheItem: CachedAIItem<T> = {
       id,
-      promptId: request.promptId,
-      promptVersion: request.promptVersion,
+      promptId: req.promptId,
+      promptVersion: req.promptVersion,
+      model: req.model,
+      entityId: req.entityId,
+      dataVersionHash: req.dataVersionHash,
       normalizedText,
       tokens,
       data,

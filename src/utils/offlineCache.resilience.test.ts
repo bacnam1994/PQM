@@ -17,6 +17,7 @@ import {
   saveToCache,
   getFromCache,
   clearEntireCache,
+  resetDBConnectionForTest,
 } from './offlineCache';
 
 // Xây dựng Mock In-Memory IndexedDB Engine để kiểm định chi tiết các điều kiện biên
@@ -118,7 +119,8 @@ class MockIndexedDBEngine {
 describe('P7 — IndexedDB Offline Cache Resilience & Concurrency', () => {
   let mockEngine: MockIndexedDBEngine;
 
-  beforeEach(() => {
+  beforeEach(async () => {
+    await resetDBConnectionForTest();
     mockEngine = new MockIndexedDBEngine();
     (globalThis as any).indexedDB = mockEngine.createIDBMock();
   });

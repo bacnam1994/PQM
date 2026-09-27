@@ -8,6 +8,11 @@
  * 3. Chỉ đính kèm dữ liệu tối giản cần thiết vào ngữ cảnh, giảm 90%+ kích thước prompt và token.
  */
 
+import {
+  resolveFinalTestResultForBatch,
+  normalizeTestResultStatus,
+} from '../../domain/test-result/testResultStatusResolver';
+
 export interface LeanResolvedContext {
   _contextType: 'SPECIFIC_BATCH' | 'SPECIFIC_PRODUCT' | 'GENERAL_OVERVIEW';
   _summary: string;
@@ -42,8 +47,13 @@ export interface LeanResolvedContext {
     reportNo?: string;
     testDate?: string;
     overallStatus?: string;
+    canonicalStatus?: string;
+    confidence?: string;
+    isConsolidated?: boolean;
+    candidateCount?: number;
     passedItemsCount?: number;
     totalItemsCount?: number;
+    sampleResults?: Array<{ criteriaName?: string; status?: string; value?: any }>;
   };
   recentBatches?: Array<{ batchNo: string; status: string; mfgDate?: string }>;
   formula?: {
@@ -106,14 +116,11 @@ export function resolveLeanContext(
       tccsList.find((t) => t.productId === matchedBatch.productId && t.isActive) ||
       tccsList.find((t) => t.productId === matchedBatch.productId);
 
-    // Lấy test result mới nhất / chính thống của lô này
-    const batchTestResults = testResults.filter((tr) => tr.batchId === matchedBatch.id);
-    const latestTest =
-      batchTestResults.sort(
-        (a, b) =>
-          new Date(b.testDate || b.createdAt || 0).getTime() -
-          new Date(a.testDate || a.createdAt || 0).getTime()
-      )[0] || null;
+    // Phân giải kết quả kiểm nghiệm thẩm quyền theo Canonical Domain Resolver (Phase 4 Hardening)
+    // Tuyệt đối không tự chọn testResult chỉ bằng latest testDate hoặc tự đoán PASS/FAIL
+    const resolution = resolveFinalTestResultForBatch(matchedBatch, testResults, activeTccs);
+    const authoritativeTest = resolution.finalTestResult || null;
+    const canonicalStatus = resolution.status;
 
     const alerts = qualityAlerts.filter(
       (a) =>
@@ -124,7 +131,7 @@ export function resolveLeanContext(
 
     return {
       _contextType: 'SPECIFIC_BATCH',
-      _summary: `Ngữ cảnh mục tiêu: Lô ${matchedBatch.batchNo} của sản phẩm ${product?.name || 'N/A'}.`,
+      _summary: `Ngữ cảnh mục tiêu: Lô ${matchedBatch.batchNo} của sản phẩm ${product?.name || 'N/A'}. Trạng thái kiểm nghiệm thẩm quyền: ${canonicalStatus}.`,
       batch: {
         id: matchedBatch.id,
         batchNo: matchedBatch.batchNo,
@@ -154,19 +161,44 @@ export function resolveLeanContext(
             safetyCriteriaCount: activeTccs.safetyCriteria?.length || 0,
           }
         : undefined,
-      testResult: latestTest
+      testResult: authoritativeTest
         ? {
-            id: latestTest.id,
-            labName: latestTest.labName,
-            reportNo: latestTest.reportNo,
-            testDate: latestTest.testDate,
-            overallStatus: latestTest.overallStatus,
-            passedItemsCount: Array.isArray(latestTest.testResults)
-              ? latestTest.testResults.filter((r: any) => r.status === 'PASSED').length
+            id: authoritativeTest.id,
+            labName: authoritativeTest.labName,
+            reportNo: (authoritativeTest as any).reportNo || authoritativeTest.id,
+            testDate: authoritativeTest.testDate,
+            overallStatus: authoritativeTest.overallStatus || canonicalStatus,
+            canonicalStatus,
+            confidence: resolution.confidence,
+            isConsolidated: resolution.isConsolidated,
+            candidateCount: resolution.candidateCount,
+            passedItemsCount: Array.isArray(
+              (authoritativeTest as any).results || (authoritativeTest as any).testResults
+            )
+              ? (
+                  (authoritativeTest as any).results || (authoritativeTest as any).testResults
+                ).filter(
+                  (r: any) =>
+                    normalizeTestResultStatus(r.status || r.resultStatus || r.isPassed) === 'PASS'
+                ).length
               : undefined,
-            totalItemsCount: Array.isArray(latestTest.testResults)
-              ? latestTest.testResults.length
+            totalItemsCount: Array.isArray(
+              (authoritativeTest as any).results || (authoritativeTest as any).testResults
+            )
+              ? ((authoritativeTest as any).results || (authoritativeTest as any).testResults)
+                  .length
               : undefined,
+            sampleResults: (
+              ((authoritativeTest as any).results ||
+                (authoritativeTest as any).testResults ||
+                []) as any[]
+            )
+              .slice(0, 8)
+              .map((r: any) => ({
+                criteriaName: r.criteriaName || r.name,
+                status: normalizeTestResultStatus(r.status || r.resultStatus || r.isPassed),
+                value: r.value,
+              })),
           }
         : undefined,
       relevantAlerts: alerts.map((a) => ({

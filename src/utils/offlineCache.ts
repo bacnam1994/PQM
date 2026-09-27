@@ -1,11 +1,16 @@
 const DB_NAME = 'QA_Manager_DB';
 const DB_VERSION = 4; // v4: thêm store offlineMutations phục vụ hàng đợi ghi ngoại tuyến
 
+let dbPromise: Promise<IDBDatabase> | null = null;
+
 /**
  * Khởi tạo IndexedDB và tạo các bảng lưu trữ (Object Stores)
+ * Tái sử dụng shared DB connection singleton (Phase 5) để giảm overhead kết nối
  */
 export const initDB = (): Promise<IDBDatabase> => {
-  return new Promise((resolve, reject) => {
+  if (dbPromise) return dbPromise;
+
+  dbPromise = new Promise((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, DB_VERSION);
 
     request.onupgradeneeded = (e: any) => {
@@ -32,9 +37,40 @@ export const initDB = (): Promise<IDBDatabase> => {
       });
     };
 
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
+    request.onsuccess = () => {
+      const db = request.result;
+      db.onclose = () => {
+        dbPromise = null;
+      };
+      db.onversionchange = () => {
+        db.close();
+        dbPromise = null;
+      };
+      resolve(db);
+    };
+
+    request.onerror = () => {
+      dbPromise = null;
+      reject(request.error);
+    };
   });
+
+  return dbPromise;
+};
+
+/**
+ * Đóng và giải phóng kết nối IndexedDB (phục vụ teardown trong unit test)
+ */
+export const resetDBConnectionForTest = async () => {
+  if (dbPromise) {
+    try {
+      const db = await dbPromise;
+      db.close();
+    } catch {
+      /* ignore */
+    }
+    dbPromise = null;
+  }
 };
 
 export const saveToCache = async (

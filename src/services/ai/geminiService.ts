@@ -10,6 +10,7 @@ import {
   DEFAULT_GEMINI_MODEL,
   type GeminiModelOption,
 } from '../../constants/aiModels';
+import { perfTelemetry } from '../../utils/perfTelemetry';
 
 export { AVAILABLE_GEMINI_MODELS, DEFAULT_GEMINI_MODEL, type GeminiModelOption };
 
@@ -624,11 +625,56 @@ export const geminiService = {
     const activeModel = modelName || getGeminiModel();
     const isThinkingEnabled = getIsThinkingEnabled();
 
-    // ─── TẦNG CACHE AI (Phase 15): Kiểm tra Semantic Cache cho câu hỏi tra cứu ───
+    // ─── TỐI ƯU HÓA NGỮ CẢNH: Context Resolver Siêu nhẹ ─────────────────
+    const leanContext = resolveLeanContext(message, appContextData);
+
+    // Tính toán Entity Identity & Data Version Hash cho Semantic Cache (Phase 3)
+    let entityId = 'general';
+    let dataVersionHash = '';
+
+    if (leanContext._contextType === 'SPECIFIC_BATCH' && leanContext.batch) {
+      entityId = `batch:${leanContext.batch.id || leanContext.batch.batchNo}`;
+      dataVersionHash = [
+        leanContext.batch.status,
+        leanContext.batch.actualYield,
+        leanContext.testResult?.id,
+        leanContext.testResult?.overallStatus,
+        leanContext.testResult?.reportNo,
+        leanContext.tccs?.code,
+        (leanContext.relevantAlerts || []).length,
+      ]
+        .filter(Boolean)
+        .join('|');
+    } else if (leanContext._contextType === 'SPECIFIC_PRODUCT' && leanContext.product) {
+      entityId = `product:${leanContext.product.id || leanContext.product.code}`;
+      dataVersionHash = [
+        leanContext.product.status,
+        (leanContext.recentBatches || []).map((b) => `${b.batchNo}:${b.status}`).join(','),
+      ]
+        .filter(Boolean)
+        .join('|');
+    } else {
+      entityId = 'overview';
+      dataVersionHash = [
+        leanContext.systemOverview?.totalProducts,
+        leanContext.systemOverview?.totalBatches,
+        (leanContext.recentBatches || []).map((b) => `${b.batchNo}:${b.status}`).join(','),
+      ]
+        .filter(Boolean)
+        .join('|');
+    }
+
+    const promptVersion = 'prompt-v22';
+
+    // ─── TẦNG CACHE AI (Phase 3 Hardening): Kiểm tra Semantic Cache kết hợp Domain Binding ───
     if (!options?.bypassCache && (!history || history.length === 0)) {
       const cached = semanticCache.get<{ text: string; thinking?: string }>({
-        promptId: 'TCCS_ASSISTANT',
-        input: `[${activeModel}] ${message}`,
+        promptId: 'AI_ASSISTANT',
+        promptVersion,
+        model: activeModel,
+        entityId,
+        dataVersionHash,
+        input: message,
       });
       if (cached && cached.data?.text) {
         return {
@@ -645,9 +691,6 @@ export const geminiService = {
       model: activeModel,
       tools: [{ functionDeclarations: GEMINI_TOOL_DECLARATIONS as any }],
     });
-
-    // ─── TỐI ƯU HÓA NGỮ CẢNH (Phase 8): Context Resolver Siêu nhẹ ─────────────────
-    const leanContext = resolveLeanContext(message, appContextData);
 
     const systemPrompt = `Bạn là Trợ lý AI chuyên môn của phần mềm V-BIOTECH Quality Management (Quản lý Chất lượng Dược phẩm).
 Nhiệm vụ: Trả lời câu hỏi dựa trên DỮ LIỆU THỰC của ứng dụng và GỌI CÁC TOOL khi cần phân tích sâu hơn.
@@ -704,9 +747,18 @@ ${isThinkingEnabled ? `20. [BẬT THEO CẤU HÌNH] Bạn hãy bắt đầu ph�
 
         let accumulatedThinking = '';
 
+        const reqStartTime = performance.now();
+        perfTelemetry.record('AI_REQUEST_START', { model: activeModel, promptId: 'AI_ASSISTANT' });
+
         // Gửi tin nhắn đầu tiên
         let result = await chat.sendMessage(message);
         let response = result.response;
+        const firstRespDuration = performance.now() - reqStartTime;
+        perfTelemetry.record('AI_FIRST_RESPONSE', {
+          model: activeModel,
+          durationMs: firstRespDuration,
+          promptId: 'AI_ASSISTANT',
+        });
 
         if (options?.signal?.aborted) {
           throw new DOMException('Chat request was aborted after initial response', 'AbortError');
@@ -740,6 +792,10 @@ ${isThinkingEnabled ? `20. [BẬT THEO CẤU HÌNH] Bạn hãy bắt đầu ph�
 
           iterationCount++;
           hasCalledAnyTool = true;
+          perfTelemetry.record('AI_TOOL', {
+            model: activeModel,
+            details: { iteration: iterationCount },
+          });
           const toolCallParts = response.candidates[0].content.parts;
           const functionResponseParts: any[] = [];
 
@@ -794,10 +850,24 @@ ${isThinkingEnabled ? `20. [BẬT THEO CẤU HÌNH] Bạn hãy bắt đầu ph�
           finalResponseText = finalParsed.cleanText;
         }
 
+        const totalDuration = performance.now() - reqStartTime;
+        perfTelemetry.record('AI_FINAL_RESPONSE', {
+          model: activeModel,
+          durationMs: totalDuration,
+          promptId: 'AI_ASSISTANT',
+        });
+
         // ─── Lưu vào Semantic Cache nếu là câu trả lời tra cứu thông thường ───
         if (!hasCalledAnyTool && (!history || history.length === 0)) {
           semanticCache.set(
-            { promptId: 'TCCS_ASSISTANT', input: `[${activeModel}] ${message}` },
+            {
+              promptId: 'AI_ASSISTANT',
+              promptVersion,
+              model: activeModel,
+              entityId,
+              dataVersionHash,
+              input: message,
+            },
             { text: finalResponseText, thinking: accumulatedThinking || undefined }
           );
         }

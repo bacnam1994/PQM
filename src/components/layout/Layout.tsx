@@ -48,13 +48,17 @@ import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcuts';
 import { GlobalCommandPalette } from './GlobalCommandPalette';
 import { ConfirmationModal } from '../ui/CommonUI';
 
+import { useAIChatHostStore } from '../../store/useAIChatHostStore';
+
 const LazyAIAssistantChat = React.lazy(() =>
   import('../features/AIAssistantChat').then((m) => ({ default: m.AIAssistantChat }))
 );
 
-const AIChatLauncher: React.FC = () => {
-  const [isOpen, setIsOpen] = useState(false);
-  const [hasLoaded, setHasLoaded] = useState(false);
+const AIChatSessionHost: React.FC = () => {
+  const isOpen = useAIChatHostStore((state) => state.isOpen);
+  const hasLoaded = useAIChatHostStore((state) => state.hasLoaded);
+  const openChat = useAIChatHostStore((state) => state.openChat);
+  const closeChat = useAIChatHostStore((state) => state.closeChat);
 
   useEffect(() => {
     // Preload AI chunk khi trình duyệt rảnh rỗi (Phase 16)
@@ -71,11 +75,6 @@ const AIChatLauncher: React.FC = () => {
     }
   }, []);
 
-  const handleOpen = () => {
-    setHasLoaded(true);
-    setIsOpen(true);
-  };
-
   const handlePreload = () => {
     // Preload AI chunk on hover/focus to guarantee zero latency when clicked
     import('../features/AIAssistantChat');
@@ -85,7 +84,7 @@ const AIChatLauncher: React.FC = () => {
     <>
       {!isOpen && (
         <button
-          onClick={handleOpen}
+          onClick={() => openChat()}
           onMouseEnter={handlePreload}
           onFocus={handlePreload}
           className="fixed bottom-6 right-6 w-14 h-14 bg-gradient-to-r from-emerald-600 to-teal-600 rounded-full flex items-center justify-center text-white shadow-lg shadow-emerald-500/25 hover:scale-105 hover:from-emerald-700 hover:to-teal-700 transition-all z-50 group cursor-pointer"
@@ -98,7 +97,7 @@ const AIChatLauncher: React.FC = () => {
 
       {hasLoaded && (
         <React.Suspense fallback={null}>
-          <LazyAIAssistantChat isOpen={isOpen} onClose={() => setIsOpen(false)} />
+          <LazyAIAssistantChat isOpen={isOpen} onClose={closeChat} />
         </React.Suspense>
       )}
     </>
@@ -392,11 +391,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
           type="button"
           onClick={() => {
             onItemClick && onItemClick();
-            window.dispatchEvent(
-              new CustomEvent('trigger-ai-chat', {
-                detail: { prompt: 'Tổng quan tình trạng tất cả lô hàng hiện tại' },
-              })
-            );
+            useAIChatHostStore.getState().openChat('Tổng quan tình trạng tất cả lô hàng hiện tại');
           }}
           className="w-full group flex items-center gap-x-3 rounded-lg px-3 py-2 text-xs font-medium text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/10 transition-colors text-left"
           title="Trợ lý AI Copilot"
@@ -771,7 +766,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         </main>
       </div>
 
-      {role !== 'GUEST' && <AIChatLauncher />}
+      {role !== 'GUEST' && <AIChatSessionHost />}
       <GlobalCommandPalette />
       <ConfirmationModal
         isOpen={isLogoutModalOpen}
