@@ -1,41 +1,41 @@
 # PQM — KẾ HOẠCH REBUILD TOÀN DIỆN THEO WORKFLOW
 
 Repository: `bacnam1994/PQM`  
-Trạng thái hiện tại: **PHASE 16 (MASTER DATA DOMAIN REBUILD - VS-13) — COMPLETED | NEXT: PHASE 17 (SYSTEM DOMAIN REBUILD - VS-14)**
+Trạng thái hiện tại: **PHASE 16 (MASTER DATA & SYSTEM - VS-13 & VS-14) — COMPLETED | NEXT: PHASE 17 (AI BOUNDARY REBUILD - VS-15)**
 
 ---
 
 ## 📊 BẢNG THEO DÕI TIẾN ĐỘ 27 PHASES REBUILD
 
-|  Phase   | Phân kỳ                             | Nhiệm vụ cốt lõi                                                                                   |      Trạng thái       | Artifact bàn giao                                        |
-| :------: | :---------------------------------- | :------------------------------------------------------------------------------------------------- | :-------------------: | :------------------------------------------------------- |
-| **P-01** | **Freeze Contract**                 | Freeze Action IDs, Payloads, FSM, Permissions, RBAC, Signature, Reason, Idempotency, OCC           |   ✅ **HOÀN THÀNH**   | `ADR-REBUILD-WORKFLOW-CONTRACT-FREEZE.md`                |
-| **P-02** | **Source Classification**           | Phân loại toàn bộ file source sang UI, APP, WORKFLOW, DOMAIN, REPO, INFRA, UTIL, TYPE              |   ✅ **HOÀN THÀNH**   | `docs/audit/PQM_REBUILD_SOURCE_MIGRATION_MAP_V1.md`      |
-| **P-03** | **Dependency Graph**                | Lập đồ thị phụ thuộc đơn hướng: UI → App → Workflow → Domain → Repo → Infra                        |   ✅ **HOÀN THÀNH**   | `docs/audit/PQM_REBUILD_SOURCE_MIGRATION_MAP_V1.md`      |
-| **P-04** | **Rebuild Workflow Kernel**         | Chuẩn hóa contracts, registry, kernel, guards, handlers, events trong `src/workflow/`              |   ✅ **HOÀN THÀNH**   | `src/workflow/kernel/`, `guards/`, `registry/`           |
-| **P-05** | **Rebuild Repository Boundary**     | Tách Interface (`src/repositories/interfaces/`) khỏi Firebase (`src/infrastructure/repositories/`) |   ✅ **HOÀN THÀNH**   | `src/repositories/interfaces/`, `infrastructure/`        |
-| **P-06** | **Rebuild Domain Slices (1-16)**    | Di chuyển 16 lát dọc độc lập theo template DDD (Domain / App / Workflow / Infra / Tests)           | 🟡 **ĐANG THỰC HIỆN** | Tuần tự theo 16 Vertical Slices (VS-01 -> VS-11 ĐÃ XONG) |
-| **P-07** | **Product Domain Rebuild**          | Audit → Move → Rewire → Test → Verify cho toàn bộ Product CRUD, FSM, Approval, Bulk, AI            |   ✅ **HOÀN THÀNH**   | `src/domains/product/`                                   |
-| **P-08** | **Material Domain Rebuild**         | Audit → Move → Rewire → Test → Verify cho Material CRUD, Status, Approval, Import, Bulk            |   ✅ **HOÀN THÀNH**   | `src/domains/material/`                                  |
-| **P-09** | **TCCS Domain Rebuild**             | Rebuild TCCS CREATE, UPDATE, SUBMIT, APPROVE, REJECT, REVISE. Zero bypass approval                 |   ✅ **HOÀN THÀNH**   | `src/domains/tccs/`                                      |
-| **P-10** | **Formula Domain Rebuild**          | Chuẩn hóa Formula Entity, Validation, Version authority, FSM, Repo, Workflow                       |   ✅ **HOÀN THÀNH**   | `src/domains/formula/`                                   |
-| **P-11** | **Batch Domain Rebuild**            | Rebuild Batch FSM (Hold, Start, Release, Cancel, Close, Reopen), 7 Release Gates, AI Quick Batch   |   ✅ **HOÀN THÀNH**   | `src/domains/batch/`                                     |
-| **P-12** | **Test Result Domain Rebuild**      | Rebuild Test Result Draft, Submit, Finalize, Approve, Reject, Supersede, Quality Evaluation        |   ✅ **HOÀN THÀNH**   | `src/domains/test-result/`                               |
-| **P-13** | **Deviation / OOS / CAPA**          | Tách bạch Deviation, OOS, CAPA thành 3 domain riêng biệt có FSM, rules, services độc lập           |   ✅ **HOÀN THÀNH**   | `src/domains/deviation/`, `oos/`, `capa/`                |
-| **P-14** | **Change Request Rebuild**          | Chuẩn hóa Change Request & Change Action FSM, đồng nhất State Authority                            |   ✅ **HOÀN THÀNH**   | `src/domains/change-request/`                            |
-| **P-15** | **CoA & Approval Rebuild**          | Tách Document Generation, Approval, Release, Signature, ALCOA+ Audit Trail                         |   ✅ **HOÀN THÀNH**   | `src/domains/coa/` (Xong), `approval/` (Xong)            |
-| **P-16** | **Master Data & System**            | Rebuild Users, Roles, Criteria, Labs, Pharmacopoeia, Settings, Destructive Tokens                  | 🟡 **ĐANG THỰC HIỆN** | `src/domains/master-data/` (Xong), `system/` (Tiếp theo) |
-| **P-17** | **AI Boundary Rebuild**             | Cách ly AI Proposal tools, Human-in-the-loop confirmation, Zero direct repository mutation         |   📋 Chờ kích hoạt    | `src/interfaces/ai/`                                     |
-| **P-18** | **UI / Pages / Hooks Rebuild**      | Page → Feature Hook → Workflow/Application API. Zero direct Firebase/Repo mutation                 |   📋 Chờ kích hoạt    | `src/ui/`                                                |
-| **P-19** | **Xóa Legacy (Cleanup)**            | Xóa an toàn mã cũ đã di chuyển thành công (MIGRATED, REMOVED, EXPLICITLY RETAINED)                 |   📋 Chờ kích hoạt    | `docs/audit/PQM_LEGACY_REMOVAL_REGISTER_V1.md`           |
-| **P-20** | **Import / Export / Bulk Rebuild**  | Đảm bảo CSV/Excel Import, Bulk Create/Release/Delete tuân thủ 100% canonical workflow              |   📋 Chờ kích hoạt    | Bulk workflow isolation                                  |
-| **P-21** | **Automated Architecture Gates**    | Bổ sung tests tự động chặn direct repo mutation, bypass, orphan mutation trên CI                   |   📋 Chờ kích hoạt    | `tests/architecture/` suite                              |
-| **P-22** | **Domain-by-Domain Regression**     | Chạy toàn bộ test suites sau mỗi domain slice migration                                            |   📋 Chờ kích hoạt    | Regression check                                         |
-| **P-23** | **Full Application Regression**     | Chạy Full E2E & Business Journeys (S-001 -> S-006, Lifecycle Journey, Security Rules)              |   📋 Chờ kích hoạt    | Full test pass                                           |
-| **P-24** | **Final Source Audit**              | Lập báo cáo đối soát 100% mã nguồn cũ sang mã nguồn mới, 0 file chưa phân loại                     |   📋 Chờ kích hoạt    | `docs/audit/PQM_REBUILD_FINAL_SOURCE_AUDIT_V1.md`        |
-| **P-25** | **Final Workflow Audit**            | Chứng minh 2 chiều: Activity ➔ Workflow ➔ Repo và Repo mutation ➔ Workflow ➔ Action                |   📋 Chờ kích hoạt    | `docs/audit/PQM_REBUILD_FINAL_WORKFLOW_AUDIT_V1.md`      |
-| **P-26** | **Final Metrics & Certification**   | Đo lường toàn bộ chỉ số Zero Orphan, Zero Bypass, Zero Direct Mutation, 100% Coverage              |   📋 Chờ kích hoạt    | `docs/audit/PQM_REBUILD_FINAL_CERTIFICATION_V1.md`       |
-| **P-27** | **Rebuild Certification & Tagging** | Ký duyệt nghiệm thu hoàn tất Rebuild, commit hoàn tất và gắn tag phiên bản kiến trúc               |   📋 Chờ kích hoạt    | Hoàn tất                                                 |
+|  Phase   | Phân kỳ                             | Nhiệm vụ cốt lõi                                                                                   |      Trạng thái       | Artifact bàn giao                                               |
+| :------: | :---------------------------------- | :------------------------------------------------------------------------------------------------- | :-------------------: | :-------------------------------------------------------------- |
+| **P-01** | **Freeze Contract**                 | Freeze Action IDs, Payloads, FSM, Permissions, RBAC, Signature, Reason, Idempotency, OCC           |   ✅ **HOÀN THÀNH**   | `ADR-REBUILD-WORKFLOW-CONTRACT-FREEZE.md`                       |
+| **P-02** | **Source Classification**           | Phân loại toàn bộ file source sang UI, APP, WORKFLOW, DOMAIN, REPO, INFRA, UTIL, TYPE              |   ✅ **HOÀN THÀNH**   | `docs/audit/PQM_REBUILD_SOURCE_MIGRATION_MAP_V1.md`             |
+| **P-03** | **Dependency Graph**                | Lập đồ thị phụ thuộc đơn hướng: UI → App → Workflow → Domain → Repo → Infra                        |   ✅ **HOÀN THÀNH**   | `docs/audit/PQM_REBUILD_SOURCE_MIGRATION_MAP_V1.md`             |
+| **P-04** | **Rebuild Workflow Kernel**         | Chuẩn hóa contracts, registry, kernel, guards, handlers, events trong `src/workflow/`              |   ✅ **HOÀN THÀNH**   | `src/workflow/kernel/`, `guards/`, `registry/`                  |
+| **P-05** | **Rebuild Repository Boundary**     | Tách Interface (`src/repositories/interfaces/`) khỏi Firebase (`src/infrastructure/repositories/`) |   ✅ **HOÀN THÀNH**   | `src/repositories/interfaces/`, `infrastructure/`               |
+| **P-06** | **Rebuild Domain Slices (1-16)**    | Di chuyển 16 lát dọc độc lập theo template DDD (Domain / App / Workflow / Infra / Tests)           | 🟡 **ĐANG THỰC HIỆN** | Tuần tự theo 16 Vertical Slices (VS-01 -> VS-14 ĐÃ XONG)        |
+| **P-07** | **Product Domain Rebuild**          | Audit → Move → Rewire → Test → Verify cho toàn bộ Product CRUD, FSM, Approval, Bulk, AI            |   ✅ **HOÀN THÀNH**   | `src/domains/product/`                                          |
+| **P-08** | **Material Domain Rebuild**         | Audit → Move → Rewire → Test → Verify cho Material CRUD, Status, Approval, Import, Bulk            |   ✅ **HOÀN THÀNH**   | `src/domains/material/`                                         |
+| **P-09** | **TCCS Domain Rebuild**             | Rebuild TCCS CREATE, UPDATE, SUBMIT, APPROVE, REJECT, REVISE. Zero bypass approval                 |   ✅ **HOÀN THÀNH**   | `src/domains/tccs/`                                             |
+| **P-10** | **Formula Domain Rebuild**          | Chuẩn hóa Formula Entity, Validation, Version authority, FSM, Repo, Workflow                       |   ✅ **HOÀN THÀNH**   | `src/domains/formula/`                                          |
+| **P-11** | **Batch Domain Rebuild**            | Rebuild Batch FSM (Hold, Start, Release, Cancel, Close, Reopen), 7 Release Gates, AI Quick Batch   |   ✅ **HOÀN THÀNH**   | `src/domains/batch/`                                            |
+| **P-12** | **Test Result Domain Rebuild**      | Rebuild Test Result Draft, Submit, Finalize, Approve, Reject, Supersede, Quality Evaluation        |   ✅ **HOÀN THÀNH**   | `src/domains/test-result/`                                      |
+| **P-13** | **Deviation / OOS / CAPA**          | Tách bạch Deviation, OOS, CAPA thành 3 domain riêng biệt có FSM, rules, services độc lập           |   ✅ **HOÀN THÀNH**   | `src/domains/deviation/`, `oos/`, `capa/`                       |
+| **P-14** | **Change Request Rebuild**          | Chuẩn hóa Change Request & Change Action FSM, đồng nhất State Authority                            |   ✅ **HOÀN THÀNH**   | `src/domains/change-request/`                                   |
+| **P-15** | **CoA & Approval Rebuild**          | Tách Document Generation, Approval, Release, Signature, ALCOA+ Audit Trail                         |   ✅ **HOÀN THÀNH**   | `src/domains/coa/` (Xong), `approval/` (Xong)                   |
+| **P-16** | **Master Data & System**            | Rebuild Users, Roles, Criteria, Labs, Pharmacopoeia, Settings, Destructive Tokens                  |   ✅ **HOÀN THÀNH**   | `src/domains/master-data/` (Xong), `src/domains/system/` (Xong) |
+| **P-17** | **AI Boundary Rebuild**             | Cách ly AI Proposal tools, Human-in-the-loop confirmation, Zero direct repository mutation         |   🟡 **TIẾP THEO**    | `src/interfaces/ai/`                                            |
+| **P-18** | **UI / Pages / Hooks Rebuild**      | Page → Feature Hook → Workflow/Application API. Zero direct Firebase/Repo mutation                 |   📋 Chờ kích hoạt    | `src/ui/`                                                       |
+| **P-19** | **Xóa Legacy (Cleanup)**            | Xóa an toàn mã cũ đã di chuyển thành công (MIGRATED, REMOVED, EXPLICITLY RETAINED)                 |   📋 Chờ kích hoạt    | `docs/audit/PQM_LEGACY_REMOVAL_REGISTER_V1.md`                  |
+| **P-20** | **Import / Export / Bulk Rebuild**  | Đảm bảo CSV/Excel Import, Bulk Create/Release/Delete tuân thủ 100% canonical workflow              |   📋 Chờ kích hoạt    | Bulk workflow isolation                                         |
+| **P-21** | **Automated Architecture Gates**    | Bổ sung tests tự động chặn direct repo mutation, bypass, orphan mutation trên CI                   |   📋 Chờ kích hoạt    | `tests/architecture/` suite                                     |
+| **P-22** | **Domain-by-Domain Regression**     | Chạy toàn bộ test suites sau mỗi domain slice migration                                            |   📋 Chờ kích hoạt    | Regression check                                                |
+| **P-23** | **Full Application Regression**     | Chạy Full E2E & Business Journeys (S-001 -> S-006, Lifecycle Journey, Security Rules)              |   📋 Chờ kích hoạt    | Full test pass                                                  |
+| **P-24** | **Final Source Audit**              | Lập báo cáo đối soát 100% mã nguồn cũ sang mã nguồn mới, 0 file chưa phân loại                     |   📋 Chờ kích hoạt    | `docs/audit/PQM_REBUILD_FINAL_SOURCE_AUDIT_V1.md`               |
+| **P-25** | **Final Workflow Audit**            | Chứng minh 2 chiều: Activity ➔ Workflow ➔ Repo và Repo mutation ➔ Workflow ➔ Action                |   📋 Chờ kích hoạt    | `docs/audit/PQM_REBUILD_FINAL_WORKFLOW_AUDIT_V1.md`             |
+| **P-26** | **Final Metrics & Certification**   | Đo lường toàn bộ chỉ số Zero Orphan, Zero Bypass, Zero Direct Mutation, 100% Coverage              |   📋 Chờ kích hoạt    | `docs/audit/PQM_REBUILD_FINAL_CERTIFICATION_V1.md`              |
+| **P-27** | **Rebuild Certification & Tagging** | Ký duyệt nghiệm thu hoàn tất Rebuild, commit hoàn tất và gắn tag phiên bản kiến trúc               |   📋 Chờ kích hoạt    | Hoàn tất                                                        |
 
 ---
 
@@ -822,7 +822,7 @@ Reopen
 
 ---
 
-# XX. PHASE 16 — MASTER DATA / SYSTEM (VS-13 MASTER DATA: ✅ ĐÃ HOÀN THÀNH | VS-14 SYSTEM: 🟡 TIẾP THEO)
+# XX. PHASE 16 — MASTER DATA / SYSTEM (VS-13 MASTER DATA: ✅ ĐÃ HOÀN THÀNH | VS-14 SYSTEM: ✅ ĐÃ HOÀN THÀNH)
 
 ### 1. Master Data Domain (`src/domains/master-data/`) - ✅ ĐÃ HOÀN THÀNH (VS-13)
 
@@ -839,14 +839,24 @@ Reopen
 - `src/domains/master-data/tests/masterDataDomain.test.ts`: 100% pass 12 unit tests.
 - Các adapter `MasterCriterionAppService.ts`, `PharmacopoeiaAppService.ts`, `LaboratoryAppService.ts`: Thin adapters bảo toàn 100% backward compatibility.
 
-### 2. System Domain (`src/domains/system/`) - 🟡 TIẾP THEO (VS-14)
+### 2. System Domain (`src/domains/system/`) - ✅ ĐÃ HOÀN THÀNH (VS-14)
 
-- Rebuild Users, Roles, Permissions, System Settings, Audit Trail Watchdog, Destructive Action Tokens.
-- Phân biệt rõ ranh giới SYSTEM INFRASTRUCTURE và BUSINESS MUTATION.
+Đã hoàn thành chuẩn hóa toàn bộ phân hệ Quản trị hệ thống, Phân quyền RBAC và Tác vụ cấp cao:
+
+- `src/domains/system/domain/types.ts`: Định nghĩa `UserData`, `UserRole`, `UserAuditLogEntry`, `SystemActionContext`, `SystemActionResult`, `ConfirmationToken`, `SystemHealthStatus`.
+- `src/domains/system/domain/rules.ts`: `SystemRules` kiểm soát thẩm quyền ADMIN tối cao, xác thực 2 yếu tố Confirmation Token (`CONFIRM_RESTORE`, `CONFIRM_WIPE`, `CONFIRM_RESET_DEMO`), bắt buộc lý do giải trình ghi vết ALCOA+ Audit Trail, rào chắn gán vai trò người dùng.
+- `src/domains/system/application/systemAppService.ts`: `SystemAppService` điều phối sao lưu snapshot (`DATABASE_BACKUP`), khôi phục snapshot (`DATABASE_RESTORE`), dọn sạch dữ liệu (`DATABASE_WIPE`), và nạp dữ liệu demo (`DATABASE_RESET_DEMO`) qua `WorkflowFacade.dispatch()`.
+- `src/domains/system/application/userService.ts`: `UserService` quản lý người dùng thời gian thực, cập nhật vai trò kèm audit trail, xóa tài khoản và upload avatar.
+- `src/domains/system/application/permissionService.ts`: `PermissionService` tập trung hóa kiểm tra năng lực ngữ cảnh (`can`, `canAny`, `canAll`, `hasRole`, `isAdmin`, `normalizeUser`, `canReleaseBatch`, `canApproveTestResult`, `canIssueCoA`).
+- `src/domains/system/application/queries.ts`: `SystemQueries` cung cấp điểm truy vấn quyền hạn và thông tin người dùng đồng nhất.
+- `src/domains/system/infrastructure/repository.ts`: Binding `ISystemRepository` và `firebaseSystemRepository`.
+- `src/domains/system/workflow/definitions.ts`: Khóa chặt action IDs (`SYSTEM_BACKUP_EXECUTE`, `SYSTEM_RESTORE_EXECUTE`, `SYSTEM_WIPE_DEMO_EXECUTE`, `SYSTEM_CONFIG_UPDATE`, `SYSTEM_USER_ROLE_ASSIGN`).
+- `src/domains/system/tests/systemDomain.test.ts`: 100% pass unit tests (Authorization Gate, Token Verification, Reason Enforcement, RBAC Resource Context).
+- Các adapter `SystemAppService.ts`, `userService.ts`, `permissionService.ts`: Thin adapters duy trì 100% backward compatibility.
 
 ---
 
-# XXI. PHASE 17 — AI
+# XXI. PHASE 17 — AI (VS-15 AI BOUNDARY: 🟡 TIẾP THEO)
 
 AI phải được đưa về đúng boundary:
 
