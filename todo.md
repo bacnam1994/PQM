@@ -1,7 +1,7 @@
 # PQM — KẾ HOẠCH REBUILD TOÀN DIỆN THEO WORKFLOW
 
 Repository: `bacnam1994/PQM`  
-Trạng thái hiện tại: **PHASE 18 (UI / PAGES / HOOKS REBUILD) — COMPLETED | NEXT: PHASE 19 (LEGACY CLEANUP)**
+Trạng thái hiện tại: **PHASE 19 (LEGACY CLEANUP) — COMPLETED | NEXT: PHASE 20 (IMPORT / EXPORT / BULK ACTIONS)**
 
 ---
 
@@ -27,8 +27,8 @@ Trạng thái hiện tại: **PHASE 18 (UI / PAGES / HOOKS REBUILD) — COMPLETE
 | **P-16** | **Master Data & System**            | Rebuild Users, Roles, Criteria, Labs, Pharmacopoeia, Settings, Destructive Tokens                  | ✅ **HOÀN THÀNH** | `src/domains/master-data/` (Xong), `src/domains/system/` (Xong) |
 | **P-17** | **AI Boundary Rebuild**             | Cách ly AI Proposal tools, Human-in-the-loop confirmation, Zero direct repository mutation         | ✅ **HOÀN THÀNH** | `src/domains/ai/` (Xong)                                        |
 | **P-18** | **UI / Pages / Hooks Rebuild**      | Page → Feature Hook → Workflow/Application API. Zero direct Firebase/Repo mutation                 | ✅ **HOÀN THÀNH** | `src/hooks/queries/`, `src/hooks/` rewired to domains           |
-| **P-19** | **Xóa Legacy (Cleanup)**            | Xóa an toàn mã cũ đã di chuyển thành công (MIGRATED, REMOVED, EXPLICITLY RETAINED)                 | 🟡 **TIẾP THEO**  | `docs/audit/PQM_LEGACY_REMOVAL_REGISTER_V1.md`                  |
-| **P-20** | **Import / Export / Bulk Rebuild**  | Đảm bảo CSV/Excel Import, Bulk Create/Release/Delete tuân thủ 100% canonical workflow              | 📋 Chờ kích hoạt  | Bulk workflow isolation                                         |
+| **P-19** | **Xóa Legacy (Cleanup)**            | Xóa an toàn mã cũ đã di chuyển thành công (MIGRATED, REMOVED, EXPLICITLY RETAINED)                 | ✅ **HOÀN THÀNH** | `docs/audit/PQM_LEGACY_REMOVAL_REGISTER_V1.md`                  |
+| **P-20** | **Import / Export / Bulk Rebuild**  | Đảm bảo CSV/Excel Import, Bulk Create/Release/Delete tuân thủ 100% canonical workflow              | 🟡 **TIẾP THEO**  | Bulk workflow isolation                                         |
 | **P-21** | **Automated Architecture Gates**    | Bổ sung tests tự động chặn direct repo mutation, bypass, orphan mutation trên CI                   | 📋 Chờ kích hoạt  | `tests/architecture/` suite                                     |
 | **P-22** | **Domain-by-Domain Regression**     | Chạy toàn bộ test suites sau mỗi domain slice migration                                            | 📋 Chờ kích hoạt  | Regression check                                                |
 | **P-23** | **Full Application Regression**     | Chạy Full E2E & Business Journeys (S-001 -> S-006, Lifecycle Journey, Security Rules)              | 📋 Chờ kích hoạt  | Full test pass                                                  |
@@ -913,36 +913,18 @@ Workflow/Application API
 
 ---
 
-# XXIII. PHASE 19 — XÓA LEGACY
+# XXIII. PHASE 19 — XÓA LEGACY (✅ ĐÃ HOÀN THÀNH)
 
-Chỉ xóa sau khi:
+Đã hoàn thành kiểm toán, phân loại và lập Sổ Đăng ký Xử lý Mã nguồn cũ:
 
-```text
-new path PASS
-tests PASS
-runtime PASS
-traceability PASS
-```
-
-Mỗi legacy module phải có một trong ba trạng thái:
-
-```text
-MIGRATED
-REMOVED
-EXPLICITLY RETAINED
-```
-
-Không được còn:
-
-```text
-UNKNOWN
-```
-
-Tạo:
-
-```text
-docs/audit/PQM_LEGACY_REMOVAL_REGISTER_V1.md
-```
+- Đạt 100% tiêu chí an toàn: `new path PASS`, `tests PASS`, `runtime PASS`, `traceability PASS`.
+- Đã phân loại 100% 46 modules/files:
+  - **MIGRATED**: 8 files (100% UI query hooks & print logic).
+  - **EXPLICITLY RETAINED**: 37 files (toàn bộ thin adapters trong `src/services/app/`, `src/services/`, `src/repositories/` duy trì 100% backward compatibility, không phá vỡ UI hay tests).
+  - **REMOVED**: 1 file (loại bỏ vĩnh viễn `clearDatabaseService.ts` bypass an ninh).
+  - **UNKNOWN**: **0 (Zero)** tuyệt đối.
+- Ban hành tài liệu kiểm toán chính thức:
+  - [`docs/audit/PQM_LEGACY_REMOVAL_REGISTER_V1.md`](file:///d:/26%20Kiem%20nghiem/PQM/docs/audit/PQM_LEGACY_REMOVAL_REGISTER_V1.md)
 
 ---
 
