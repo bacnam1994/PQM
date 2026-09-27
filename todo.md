@@ -1,7 +1,7 @@
 # PQM — KẾ HOẠCH REBUILD TOÀN DIỆN THEO WORKFLOW
 
 Repository: `bacnam1994/PQM`  
-Trạng thái hiện tại: **PHASE 15 (APPROVAL DOMAIN REBUILD - VS-12) — COMPLETED | NEXT: PHASE 16 (MASTER DATA DOMAIN REBUILD - VS-13)**
+Trạng thái hiện tại: **PHASE 16 (MASTER DATA DOMAIN REBUILD - VS-13) — COMPLETED | NEXT: PHASE 17 (SYSTEM DOMAIN REBUILD - VS-14)**
 
 ---
 
@@ -24,7 +24,7 @@ Trạng thái hiện tại: **PHASE 15 (APPROVAL DOMAIN REBUILD - VS-12) — COM
 | **P-13** | **Deviation / OOS / CAPA**          | Tách bạch Deviation, OOS, CAPA thành 3 domain riêng biệt có FSM, rules, services độc lập           |   ✅ **HOÀN THÀNH**   | `src/domains/deviation/`, `oos/`, `capa/`                |
 | **P-14** | **Change Request Rebuild**          | Chuẩn hóa Change Request & Change Action FSM, đồng nhất State Authority                            |   ✅ **HOÀN THÀNH**   | `src/domains/change-request/`                            |
 | **P-15** | **CoA & Approval Rebuild**          | Tách Document Generation, Approval, Release, Signature, ALCOA+ Audit Trail                         |   ✅ **HOÀN THÀNH**   | `src/domains/coa/` (Xong), `approval/` (Xong)            |
-| **P-16** | **Master Data & System**            | Rebuild Users, Roles, Criteria, Labs, Pharmacopoeia, Settings, Destructive Tokens                  |   📋 Chờ kích hoạt    | `src/domains/master-data/`, `system/`                    |
+| **P-16** | **Master Data & System**            | Rebuild Users, Roles, Criteria, Labs, Pharmacopoeia, Settings, Destructive Tokens                  | 🟡 **ĐANG THỰC HIỆN** | `src/domains/master-data/` (Xong), `system/` (Tiếp theo) |
 | **P-17** | **AI Boundary Rebuild**             | Cách ly AI Proposal tools, Human-in-the-loop confirmation, Zero direct repository mutation         |   📋 Chờ kích hoạt    | `src/interfaces/ai/`                                     |
 | **P-18** | **UI / Pages / Hooks Rebuild**      | Page → Feature Hook → Workflow/Application API. Zero direct Firebase/Repo mutation                 |   📋 Chờ kích hoạt    | `src/ui/`                                                |
 | **P-19** | **Xóa Legacy (Cleanup)**            | Xóa an toàn mã cũ đã di chuyển thành công (MIGRATED, REMOVED, EXPLICITLY RETAINED)                 |   📋 Chờ kích hoạt    | `docs/audit/PQM_LEGACY_REMOVAL_REGISTER_V1.md`           |
@@ -55,8 +55,8 @@ Trạng thái hiện tại: **PHASE 15 (APPROVAL DOMAIN REBUILD - VS-12) — COM
 | **VS-10** | **Change Request** | `services/app/ChangeControlAppService.ts`, `repositories/IChangeControlRepository.ts`                                          | `src/domains/change-request/`           | ✅ **HOÀN THÀNH** |   🔴 Cao (GMP)    |
 | **VS-11** | **CoA**            | `services/app/CoAService.ts`, `pages/qa/CoAReportPage.tsx`, `pages/public/CoAVerifyPage.tsx`                                   | `src/domains/coa/`                      | ✅ **HOÀN THÀNH** |   🔴 Cao (GMP)    |
 | **VS-12** | **Approval**       | `services/app/ApprovalWorkflowService.ts`, `repositories/IApprovalTaskRepository.ts`                                           | `src/domains/approval/`                 | ✅ **HOÀN THÀNH** |   🔴 Cao (GMP)    |
-| **VS-13** | **Master Data**    | `services/app/MasterCriterionAppService.ts`, `services/app/PharmacopoeiaAppService.ts`, `services/app/LaboratoryAppService.ts` | `src/domains/master-data/`              | 🟡 **TIẾP THEO**  |   🟡 Trung bình   |
-| **VS-14** | **System**         | `services/app/SystemAppService.ts`, `services/userService.ts`, `services/permissionService.ts`                                 | `src/domains/system/`                   | 📋 Chờ kích hoạt  |   🟡 Trung bình   |
+| **VS-13** | **Master Data**    | `services/app/MasterCriterionAppService.ts`, `services/app/PharmacopoeiaAppService.ts`, `services/app/LaboratoryAppService.ts` | `src/domains/master-data/`              | ✅ **HOÀN THÀNH** |   🟡 Trung bình   |
+| **VS-14** | **System**         | `services/app/SystemAppService.ts`, `services/userService.ts`, `services/permissionService.ts`                                 | `src/domains/system/`                   | 🟡 **TIẾP THEO**  |   🟡 Trung bình   |
 | **VS-15** | **AI Boundary**    | `services/ai/`, `architecture/aiGovernance*`                                                                                   | `src/domains/ai/` hoặc `interfaces/ai/` | 📋 Chờ kích hoạt  |  🔴 Cao (Safety)  |
 | **VS-16** | **Auth**           | `services/authService.ts`, `providers/AuthProvider.tsx`, `pages/auth/`                                                         | `src/domains/auth/`                     | 📋 Chờ kích hoạt  | 🔴 Cao (Security) |
 
@@ -822,32 +822,27 @@ Reopen
 
 ---
 
-# XX. PHASE 16 — MASTER DATA / SYSTEM
+# XX. PHASE 16 — MASTER DATA / SYSTEM (VS-13 MASTER DATA: ✅ ĐÃ HOÀN THÀNH | VS-14 SYSTEM: 🟡 TIẾP THEO)
 
-Rebuild:
+### 1. Master Data Domain (`src/domains/master-data/`) - ✅ ĐÃ HOÀN THÀNH (VS-13)
 
-```text
-Users
-Roles
-Permissions
-Settings
-Master data
-System configuration
-```
+Đã hoàn thành chuẩn hóa toàn bộ dữ liệu chủ (Master Criteria, Pharmacopoeia Standards, Testing Laboratories) theo chuẩn DDD:
 
-Phân biệt:
+- `src/domains/master-data/domain/types.ts`: Định nghĩa `MasterCriterion`, `PharmacopoeiaStandard`, `TestingLaboratory`, `PharmacopoeiaActionContext`, `LabActionContext`.
+- `src/domains/master-data/domain/rules.ts`: `MasterCriterionRules`, `PharmacopoeiaRules`, `LaboratoryRules` (Kiểm soát thẩm quyền RBAC QA/ADMIN, bắt buộc lý do giải trình khi xóa, kiểm tra tính toàn vẹn các trường định danh bắt buộc).
+- `src/domains/master-data/application/masterCriterionService.ts`: `MasterCriterionAppService` điều phối tạo, sửa, xóa và bulkRename toàn hệ thống qua `WorkflowFacade.dispatch()`.
+- `src/domains/master-data/application/pharmacopoeiaService.ts`: `PharmacopoeiaAppService` quản lý 31+ chuyên luận Dược điển, kiểm soát seed và audit trail.
+- `src/domains/master-data/application/laboratoryService.ts`: `LaboratoryAppService` quản lý phòng kiểm nghiệm nội/ngoại kiểm và bí danh (aliases) phục vụ OCR/fuzzy matching.
+- `src/domains/master-data/application/queries.ts`: `MasterDataQueries` cung cấp điểm truy vấn đồng nhất.
+- `src/domains/master-data/infrastructure/repository.ts`: Binding các repository Firebase tương ứng.
+- `src/domains/master-data/workflow/definitions.ts`: Khóa chặt action IDs (`CRITERIA_MASTER_CREATE`, `CRITERIA_MASTER_UPDATE`, `CRITERIA_ALIAS_MAP`, `PHARMACOPOEIA_CREATE`, `PHARMACOPOEIA_UPDATE`, `PHARMACOPOEIA_DELETE`, `LAB_MASTER_CREATE`, `LAB_MASTER_UPDATE`).
+- `src/domains/master-data/tests/masterDataDomain.test.ts`: 100% pass 12 unit tests.
+- Các adapter `MasterCriterionAppService.ts`, `PharmacopoeiaAppService.ts`, `LaboratoryAppService.ts`: Thin adapters bảo toàn 100% backward compatibility.
 
-```text
-SYSTEM INFRASTRUCTURE
-```
+### 2. System Domain (`src/domains/system/`) - 🟡 TIẾP THEO (VS-14)
 
-và:
-
-```text
-BUSINESS MUTATION
-```
-
-Không đưa mọi thao tác kỹ thuật vào business workflow chỉ để đạt con số workflow coverage.
+- Rebuild Users, Roles, Permissions, System Settings, Audit Trail Watchdog, Destructive Action Tokens.
+- Phân biệt rõ ranh giới SYSTEM INFRASTRUCTURE và BUSINESS MUTATION.
 
 ---
 
