@@ -1,5 +1,12 @@
 # VIBECODE WORKFLOW FRAMEWORK — PQM
 
+> **🚨 QUY TẮC BẮT BUỘC TIÊN QUYẾT**:
+> Toàn bộ các phiên làm việc của AI/Vibecode **BẮT BUỘC** phải tuân thủ tuyệt đối:
+>
+> 1. [`.vibecode/PQM_MASTER_RULES.md`](file:///d:/26%20Kiem%20nghiem/PQM/.vibecode/PQM_MASTER_RULES.md) (15 Golden Invariants tối thượng)
+> 2. [`docs/governance/PQM_VIBECODE_RULES.md`](file:///d:/26%20Kiem%20nghiem/PQM/docs/governance/PQM_VIBECODE_RULES.md) (15 câu hỏi Inspect checklist)
+> 3. [`docs/governance/PQM_ENGINEERING_GOVERNANCE.md`](file:///d:/26%20Kiem%20nghiem/PQM/docs/governance/PQM_ENGINEERING_GOVERNANCE.md) (Hiến pháp kỹ thuật)
+
 Tài liệu này định nghĩa quy trình làm việc chuẩn mực bắt buộc cho toàn bộ dự án PQM và mọi phiên làm việc của AI/kỹ sư phát triển.
 
 ---
