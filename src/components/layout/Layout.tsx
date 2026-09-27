@@ -1,4 +1,4 @@
-import React, { useState, Fragment } from 'react';
+import React, { useState, useEffect, Fragment } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   Dialog,
@@ -55,6 +55,21 @@ const LazyAIAssistantChat = React.lazy(() =>
 const AIChatLauncher: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [hasLoaded, setHasLoaded] = useState(false);
+
+  useEffect(() => {
+    // Preload AI chunk khi trình duyệt rảnh rỗi (Phase 16)
+    if ('requestIdleCallback' in window) {
+      const handle = (window as any).requestIdleCallback(() => {
+        import('../features/AIAssistantChat');
+      });
+      return () => (window as any).cancelIdleCallback?.(handle);
+    } else {
+      const timer = setTimeout(() => {
+        import('../features/AIAssistantChat');
+      }, 2000);
+      return () => clearTimeout(timer);
+    }
+  }, []);
 
   const handleOpen = () => {
     setHasLoaded(true);

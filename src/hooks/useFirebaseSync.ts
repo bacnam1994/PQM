@@ -144,14 +144,74 @@ const COLLECTION_CONFIGS: Record<string, CollectionConfig> = {
  *    - onChildRemoved: Xóa đúng record mục tiêu.
  * 3. Loại bỏ hoàn toàn reload/replace toàn bộ bảng khi 1 record thay đổi.
  */
+/**
+ * PQM Sync Metadata: Lightweight performance & freshness tracking (Phase 4)
+ * KHÔNG dùng metadata này làm business authority.
+ */
+export interface PqmSyncMetadata {
+  version: number;
+  lastSuccessfulSyncAt: string;
+  collections: Record<string, { lastSyncedAt: string; count: number }>;
+}
+
+const SYNC_META_KEY = 'PQM_SYNC_META';
+
+export const getSyncMetadata = (): PqmSyncMetadata => {
+  try {
+    const raw = localStorage.getItem(SYNC_META_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch {
+    /* fallback an toàn */
+  }
+  return { version: 1, lastSuccessfulSyncAt: '', collections: {} };
+};
+
+export const updateCollectionSyncMeta = (collectionKey: string, count: number) => {
+  try {
+    const meta = getSyncMetadata();
+    const now = new Date().toISOString();
+    meta.lastSuccessfulSyncAt = now;
+    meta.collections[collectionKey] = { lastSyncedAt: now, count };
+    localStorage.setItem(SYNC_META_KEY, JSON.stringify(meta));
+  } catch {
+    /* silent fallback */
+  }
+};
+
+const CRITICAL_COLLECTION_KEYS = [
+  'products',
+  'batches',
+  'tccsList',
+  'testingLaboratories',
+] as const;
+const SECONDARY_COLLECTION_KEYS = [
+  'productFormulas',
+  'rawMaterials',
+  'testResults',
+  'criteriaAliases',
+  'aiLearnedMappings',
+] as const;
+
+/**
+ * useFirebaseSync — Canonical Parallel Sync Engine (Phases 1 - 6)
+ *
+ * Tối ưu hóa hiệu năng đồng bộ dữ liệu:
+ * 1. Khởi tạo: Nạp nhanh từ IndexedDB Offline Cache (Tier 1 & Tier 2) -> App Shell render tức thì
+ * 2. Parallel Tiered Sync: Thay thế for..of tuần tự bằng Promise.all theo tầng (Critical trước, Secondary sau)
+ * 3. Chống Duplicate Bootstrap Replay: Thu thập Set các ID đã có từ snapshot ban đầu để listener onChildAdded
+ *    không thực hiện duplicate update, duplicate cache write và duplicate query invalidations
+ * 4. Vòng đời Listener Ổn định (Phase 5): Phụ thuộc vào user?.uid thay vì toàn bộ object user
+ * 5. Scoped Invalidation (Phase 6): Chỉ làm mới đúng query mục tiêu khi có delta thay đổi thực sự
+ */
 export const useFirebaseSync = () => {
-  const user = useAppStore((state) => state.user);
+  const userId = useAppStore((state) => state.user?.uid);
 
   useEffect(() => {
-    if (!user) return; // Guard: Chỉ đồng bộ khi người dùng đã đăng nhập
+    if (!userId) return; // Guard: Chỉ đồng bộ khi người dùng đã đăng nhập (ổn định theo uid)
 
     let isMounted = true;
     const unsubscribes: (() => void)[] = [];
+    const bootStartTime = performance.now();
 
     const handleOnline = () => {
       goOnline(db);
@@ -160,10 +220,151 @@ export const useFirebaseSync = () => {
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
 
-    const initializeData = async () => {
-      // BƯỚC 1: Tải nhanh dữ liệu từ IndexedDB Offline Cache (Tiered Hydration)
+    // Tập hợp ID đã được tải từ snapshot ban đầu cho từng collection
+    // Nhằm ngăn chặn Firebase RTDB onChildAdded phát lại sự kiện cho các bản ghi đã nạp
+    const knownItemIdsByCollection: Record<string, Set<string>> = {};
+
+    const setupCollectionSync = async (config: CollectionConfig): Promise<(() => void) | null> => {
+      if (!isMounted) return null;
+      const collectionCleanups: (() => void)[] = [];
+      const knownIds = new Set<string>();
+      knownItemIdsByCollection[config.key] = knownIds;
+
+      const reference = ref(db, config.firebasePath);
+      const queryTarget = config.getInitialQuery ? config.getInitialQuery(reference) : reference;
+
+      // 1. Snapshot ban đầu
       try {
-        // Tầng 1: Dữ liệu CRITICAL cần ngay để render App Shell, Dashboard & danh mục chính
+        const snapshot = await get(queryTarget);
+        if (snapshot.exists() && isMounted) {
+          const data = snapshot.val();
+          let list = data ? Object.values(data) : [];
+          if (config.sortFn) {
+            list = list.sort(config.sortFn);
+          }
+
+          // Ghi nhận ID đã có để onChildAdded bỏ qua
+          list.forEach((item: any) => {
+            if (item?.id) knownIds.add(String(item.id));
+          });
+
+          // Cập nhật TanStack Query Cache một lần duy nhất
+          queryClient.setQueryData(config.queryKey, list);
+          useAppStore.getState().setAppState({
+            lastSync: new Date().toISOString(),
+          });
+
+          // Ghi vào IndexedDB ngầm (không block UI)
+          if (list.length > 0) {
+            const saveTask = () => saveToCache(config.storeName, list, { clear: true });
+            if ('requestIdleCallback' in window) {
+              window.requestIdleCallback(saveTask);
+            } else {
+              setTimeout(saveTask, 300);
+            }
+          }
+
+          // Cập nhật sync metadata
+          updateCollectionSyncMeta(config.key, list.length);
+        }
+      } catch (e) {
+        console.warn(`[SyncEngine] Lỗi nạp snapshot ban đầu cho [${config.key}]:`, e);
+      }
+
+      if (!isMounted) return null;
+
+      // 2. Lắng nghe Vi mô: onChildChanged (Granular Update in-place)
+      const unsubChanged = onChildChanged(reference, (snapshot) => {
+        if (!isMounted) return;
+        const updatedEntity = snapshot.val();
+        const id = snapshot.key || updatedEntity?.id;
+        if (!updatedEntity || !id) return;
+
+        knownIds.add(String(id));
+
+        queryClient.setQueryData<any[]>(config.queryKey, (old = []) => {
+          const index = old.findIndex((item) => item.id === id);
+          if (index === -1) {
+            const next = [updatedEntity, ...old];
+            if (config.sortFn) next.sort(config.sortFn);
+            return next;
+          }
+          const next = [...old];
+          next[index] = updatedEntity;
+
+          if (config.sortFn && next.length > 1) {
+            const prevBroken = index > 0 && config.sortFn(next[index - 1], next[index]) > 0;
+            const nextBroken =
+              index < next.length - 1 && config.sortFn(next[index], next[index + 1]) > 0;
+            if (prevBroken || nextBroken) {
+              next.sort(config.sortFn);
+            }
+          }
+          return next;
+        });
+
+        // Lưu vi mô vào IndexedDB (KHÔNG xóa bảng)
+        saveItemToCache(config.storeName, updatedEntity);
+
+        // Invalidate scoped queries liên quan
+        config.getScopedInvalidations?.(updatedEntity, id);
+      });
+      collectionCleanups.push(unsubChanged);
+
+      // 3. Lắng nghe thêm mới Vi mô: onChildAdded
+      // CHỈ xử lý các bản ghi THỰC SỰ MỚI (chưa có trong knownIds từ snapshot ban đầu)
+      const unsubAdded = onChildAdded(reference, (snapshot) => {
+        if (!isMounted) return;
+        const newEntity = snapshot.val();
+        const id = snapshot.key || newEntity?.id;
+        if (!newEntity || !id) return;
+
+        // Bỏ qua nếu bản ghi đã có từ snapshot ban đầu -> LOẠI BỎ HOÀN TOÀN DUPLICATE BOOTSTRAP REPLAY
+        if (knownIds.has(String(id))) return;
+        knownIds.add(String(id));
+
+        queryClient.setQueryData<any[]>(config.queryKey, (old = []) => {
+          if (old.some((item) => item.id === id)) return old;
+          if (config.sortFn && old.length > 0 && config.sortFn(newEntity, old[0]) <= 0) {
+            return [newEntity, ...old];
+          }
+          const next = [...old, newEntity];
+          if (config.sortFn) {
+            next.sort(config.sortFn);
+          }
+          return next;
+        });
+
+        saveItemToCache(config.storeName, newEntity);
+        config.getScopedInvalidations?.(newEntity, id);
+      });
+      collectionCleanups.push(unsubAdded);
+
+      // 4. Lắng nghe xóa Vi mô: onChildRemoved
+      const unsubRemoved = onChildRemoved(reference, (snapshot) => {
+        if (!isMounted) return;
+        const id = snapshot.key;
+        if (!id) return;
+
+        knownIds.delete(String(id));
+
+        queryClient.setQueryData<any[]>(config.queryKey, (old = []) =>
+          old.filter((item) => item.id !== id)
+        );
+
+        deleteItemFromCache(config.storeName, id);
+        config.getScopedInvalidations?.(null, id);
+      });
+      collectionCleanups.push(unsubRemoved);
+
+      return () => {
+        collectionCleanups.forEach((fn) => fn());
+      };
+    };
+
+    const initializeData = async () => {
+      // BƯỚC 1: Tải nhanh dữ liệu từ IndexedDB Offline Cache (Local-First Render)
+      try {
         const [
           cachedProducts,
           cachedBatches,
@@ -242,133 +443,38 @@ export const useFirebaseSync = () => {
 
       if (!isMounted) return;
 
-      // BƯỚC 2: Thiết lập Granular Delta Listeners cho từng danh mục
-      const isInitialSnapshotLoaded: Record<string, boolean> = {};
+      // BƯỚC 2: REMOTE SYNC SONG SONG (Phase 2 - Parallel Initial Sync)
+      // 2.1. Critical Collections chạy song song bằng Promise.all (Không block tuần tự)
+      const criticalCleanups = await Promise.all(
+        CRITICAL_COLLECTION_KEYS.map((key) => {
+          const config = COLLECTION_CONFIGS[key];
+          return config ? setupCollectionSync(config) : Promise.resolve(null);
+        })
+      );
+      if (!isMounted) return;
+      criticalCleanups.forEach((cleanup) => {
+        if (cleanup) unsubscribes.push(cleanup);
+      });
 
-      for (const config of Object.values(COLLECTION_CONFIGS)) {
-        const reference = ref(db, config.firebasePath);
-
-        // 2.1. Nạp snapshot ban đầu 1 lần (Initial Snapshot Fetch có giới hạn nếu có getInitialQuery)
-        try {
-          const queryTarget = config.getInitialQuery
-            ? config.getInitialQuery(reference)
-            : reference;
-          const snapshot = await get(queryTarget);
-          if (snapshot.exists() && isMounted) {
-            const data = snapshot.val();
-            let list = data ? Object.values(data) : [];
-            if (config.sortFn) {
-              list = list.sort(config.sortFn);
-            }
-
-            // Đồng bộ toàn bộ danh sách ban đầu vào TanStack Query Cache (Single Source of Truth)
-            queryClient.setQueryData(config.queryKey, list);
-            useAppStore.getState().setAppState({
-              lastSync: new Date().toISOString(),
-            });
-
-            // Ghi đầy đủ vào IndexedDB (Initial load cho phép clear để xóa rác cũ nếu có)
-            if (list.length > 0) {
-              const saveTask = () => saveToCache(config.storeName, list, { clear: true });
-              if ('requestIdleCallback' in window) {
-                window.requestIdleCallback(saveTask);
-              } else {
-                setTimeout(saveTask, 500);
-              }
-            }
-          }
-        } catch (e) {
-          console.warn(`[SyncEngine] Lỗi nạp snapshot ban đầu cho [${config.key}]:`, e);
-        }
-
-        isInitialSnapshotLoaded[config.key] = true;
+      // 2.2. Secondary Collections nạp nền song song (Không block App Shell / Dashboard)
+      const syncSecondaryCollections = async () => {
         if (!isMounted) return;
-
-        // 2.2. Lắng nghe thay đổi Vi mô: onChildChanged (Granular Update không clone/sort vô tội vạ)
-        const unsubChanged = onChildChanged(reference, (snapshot) => {
-          if (!isMounted) return;
-          const updatedEntity = snapshot.val();
-          const id = snapshot.key || updatedEntity?.id;
-          if (!updatedEntity || !id) return;
-
-          // Cập nhật in-place vào TanStack Query Cache
-          queryClient.setQueryData<any[]>(config.queryKey, (old = []) => {
-            const index = old.findIndex((item) => item.id === id);
-            if (index === -1) {
-              const next = [updatedEntity, ...old];
-              if (config.sortFn) next.sort(config.sortFn);
-              return next;
-            }
-            const next = [...old];
-            next[index] = updatedEntity;
-
-            // Kiểm tra O(1) thứ tự: chỉ re-sort khi vị trí với phần tử lân cận bị vi phạm
-            if (config.sortFn && next.length > 1) {
-              const prevBroken = index > 0 && config.sortFn(next[index - 1], next[index]) > 0;
-              const nextBroken =
-                index < next.length - 1 && config.sortFn(next[index], next[index + 1]) > 0;
-              if (prevBroken || nextBroken) {
-                next.sort(config.sortFn);
-              }
-            }
-            return next;
-          });
-
-          // Lưu vi mô vào IndexedDB (KHÔNG xóa bảng)
-          saveItemToCache(config.storeName, updatedEntity);
-
-          // Invalidate scoped queries liên quan
-          config.getScopedInvalidations?.(updatedEntity, id);
+        const secondaryCleanups = await Promise.all(
+          SECONDARY_COLLECTION_KEYS.map((key) => {
+            const config = COLLECTION_CONFIGS[key];
+            return config ? setupCollectionSync(config) : Promise.resolve(null);
+          })
+        );
+        if (!isMounted) return;
+        secondaryCleanups.forEach((cleanup) => {
+          if (cleanup) unsubscribes.push(cleanup);
         });
-        unsubscribes.push(unsubChanged);
+      };
 
-        // 2.3. Lắng nghe thêm mới Vi mô: onChildAdded (O(1) prepend nếu mới nhất)
-        const unsubAdded = onChildAdded(reference, (snapshot) => {
-          if (!isMounted || !isInitialSnapshotLoaded[config.key]) return;
-          const newEntity = snapshot.val();
-          const id = snapshot.key || newEntity?.id;
-          if (!newEntity || !id) return;
-
-          // Thêm in-place vào TanStack Query Cache nếu chưa có
-          queryClient.setQueryData<any[]>(config.queryKey, (old = []) => {
-            if (old.some((item) => item.id === id)) return old;
-            // Nếu phần tử mới nhất thỏa mãn thứ tự đứng đầu, chỉ việc chèn đầu O(1)
-            if (config.sortFn && old.length > 0 && config.sortFn(newEntity, old[0]) <= 0) {
-              return [newEntity, ...old];
-            }
-            const next = [...old, newEntity];
-            if (config.sortFn) {
-              next.sort(config.sortFn);
-            }
-            return next;
-          });
-
-          // Lưu vi mô vào IndexedDB
-          saveItemToCache(config.storeName, newEntity);
-
-          // Invalidate scoped queries liên quan
-          config.getScopedInvalidations?.(newEntity, id);
-        });
-        unsubscribes.push(unsubAdded);
-
-        // 2.4. Lắng nghe xóa Vi mô: onChildRemoved
-        const unsubRemoved = onChildRemoved(reference, (snapshot) => {
-          if (!isMounted) return;
-          const id = snapshot.key;
-          if (!id) return;
-
-          // Xóa in-place khỏi TanStack Query Cache
-          queryClient.setQueryData<any[]>(config.queryKey, (old = []) =>
-            old.filter((item) => item.id !== id)
-          );
-
-          // Xóa vi mô khỏi IndexedDB
-          deleteItemFromCache(config.storeName, id);
-
-          // Invalidate scoped queries liên quan
-          config.getScopedInvalidations?.(null, id);
-        });
-        unsubscribes.push(unsubRemoved);
+      if ('requestIdleCallback' in window) {
+        (window as any).requestIdleCallback(() => syncSecondaryCollections());
+      } else {
+        setTimeout(syncSecondaryCollections, 50);
       }
 
       // BƯỚC 3: Đồng bộ Quality Alerts theo cấu trúc mới
@@ -421,5 +527,5 @@ export const useFirebaseSync = () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };
-  }, [user]);
+  }, [userId]);
 };

@@ -17,3 +17,12 @@ export async function createGoogleGenerativeAI(apiKey: string) {
   const { GoogleGenerativeAI } = await getGenerativeAISDK();
   return new GoogleGenerativeAI(apiKey);
 }
+
+export const SchemaType = {
+  STRING: 'string',
+  NUMBER: 'number',
+  INTEGER: 'integer',
+  BOOLEAN: 'boolean',
+  ARRAY: 'array',
+  OBJECT: 'object',
+} as const;

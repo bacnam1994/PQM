@@ -138,8 +138,19 @@ export const AIAssistantChat: React.FC<AIAssistantChatProps> = ({
     () => localStorage.getItem('GEMINI_MODEL') || DEFAULT_GEMINI_MODEL
   );
   const [thinkingEnabled, setThinkingEnabled] = useState(
-    () => localStorage.getItem('GEMINI_THINKING_ENABLED') !== 'false'
+    () => localStorage.getItem('GEMINI_THINKING_ENABLED') === 'true'
   );
+
+  const abortControllerRef = useRef<AbortController | null>(null);
+
+  // Hủy request AI cũ khi chuyển trang hoặc unmount (Phase 11)
+  useEffect(() => {
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
+  }, [location.pathname]);
 
   // Xác định thực thể đang xem theo URL hiện tại để nhúng ngữ cảnh AI
   const currentContext = useMemo(() => {
@@ -298,27 +309,39 @@ export const AIAssistantChat: React.FC<AIAssistantChatProps> = ({
     saveChatHistory(messages);
   }, [messages]);
 
-  // SESSION MEMORY: Tom tat va luu khi dong chat
-  const handleCloseChat = useCallback(async () => {
+  // SESSION MEMORY (Phase 10): Đóng chat tức thì, chạy tóm tắt ngầm qua requestIdleCallback
+  const handleCloseChat = useCallback(() => {
+    // 1. Đóng UI ngay lập tức
     setIsOpen(false);
+
+    // 2. Chạy session summary ngầm không block UI, chỉ khi có >= 4 messages có nội dung
     const realMessages = messages.filter(
       (m) => m.id !== 'msg_welcome' && (m.sender === 'user' || m.sender === 'ai')
     );
-    if (realMessages.length >= 2 && user?.uid) {
-      try {
+    if (realMessages.length >= 4 && user?.uid) {
+      const runIdleSummary = () => {
         const msgForSummary = realMessages.map((m) => ({
           sender: m.sender as string,
           text: m.text,
         }));
-        const summary = await summarizeSessionWithAI(msgForSummary, (p: string, s?: string) =>
+        summarizeSessionWithAI(msgForSummary, (p: string, s?: string) =>
           geminiService.generateText(p, s)
-        );
-        if (summary) saveSessionMemory(user.uid, summary, currentModel);
-      } catch {
-        /* silent fail */
+        )
+          .then((summary) => {
+            if (summary && user?.uid) saveSessionMemory(user.uid, summary, currentModel);
+          })
+          .catch(() => {
+            /* silent fail */
+          });
+      };
+
+      if ('requestIdleCallback' in window) {
+        (window as any).requestIdleCallback(runIdleSummary);
+      } else {
+        setTimeout(runIdleSummary, 1500);
       }
     }
-  }, [messages, user, currentModel]);
+  }, [messages, user?.uid, currentModel, setIsOpen]);
 
   // MORNING BRIEFING: Hien thi AI Insights khi mo chat lan dau trong ngay
   const briefingShownKey = `pqm_briefing_shown_${new Date().toDateString()}`;
@@ -831,6 +854,13 @@ export const AIAssistantChat: React.FC<AIAssistantChatProps> = ({
 
     setIsLoading(true);
 
+    // Phase 11: Khởi tạo AbortController cho request mới, hủy request cũ nếu còn chạy
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     try {
       const appContextData = {
         products,
@@ -862,8 +892,11 @@ export const AIAssistantChat: React.FC<AIAssistantChatProps> = ({
         appContextData,
         history as any,
         preferredModel,
-        sessionMemoryPrompt
+        sessionMemoryPrompt,
+        { signal: controller.signal }
       );
+
+      if (controller.signal.aborted) return;
 
       addMessage({
         sender: 'ai',
@@ -871,17 +904,26 @@ export const AIAssistantChat: React.FC<AIAssistantChatProps> = ({
         thinking: aiResponse.thinking,
       });
     } catch (error: any) {
+      if (error?.name === 'AbortError' || controller.signal.aborted) {
+        return; // Bỏ qua request đã bị hủy do người dùng navigate hoặc gửi câu hỏi mới
+      }
       console.error('Chat Error:', error);
       addMessage({
         sender: 'ai',
         text: `Xin lỗi, tôi gặp sự cố:\n\n${formatGeminiError(error)}`,
       });
     } finally {
-      setIsLoading(false);
+      if (abortControllerRef.current === controller) {
+        setIsLoading(false);
+      }
     }
   };
 
   if (!isOpen) {
+    // Nếu được điều khiển từ bên ngoài (Layout.tsx), không tự render thêm button nổi để tránh duplicate 2 launcher
+    if (controlledIsOpen !== undefined) {
+      return null;
+    }
     return (
       <button
         onClick={() => setIsOpen(true)}

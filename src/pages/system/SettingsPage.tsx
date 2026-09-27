@@ -55,7 +55,7 @@ import { ProductFormula, FormulaIngredient } from '../../types';
 import { useUIStore } from '../../store/useUIStore';
 import { resetConsent } from '../../hooks/useCookieConsent';
 import { useShallow } from 'zustand/react/shallow';
-import { AVAILABLE_GEMINI_MODELS, DEFAULT_GEMINI_MODEL } from '../../services/ai/geminiService';
+import { AVAILABLE_GEMINI_MODELS, DEFAULT_GEMINI_MODEL } from '../../constants/aiModels';
 
 /** Panel hiển thị trạng thái bộ lọc đã lưu và cho phép reset từng trang */
 const FilterStatusPanel: React.FC = () => {

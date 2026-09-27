@@ -1,7 +1,17 @@
-import { GoogleGenerativeAI, SchemaType, Content } from '@google/generative-ai';
+import type { GoogleGenerativeAI, Content } from '@google/generative-ai';
+import { createGoogleGenerativeAI, SchemaType } from './geminiClientLoader';
 import { GEMINI_TOOL_DECLARATIONS, executeTool } from './aiTools';
 import type { RenderedPdfPage } from '../../utils/pdfProcessor';
 import type { TesseractFallbackResult } from './tesseractFallback';
+import { resolveLeanContext } from './contextResolver';
+import { semanticCache } from './semanticCacheService';
+import {
+  AVAILABLE_GEMINI_MODELS,
+  DEFAULT_GEMINI_MODEL,
+  type GeminiModelOption,
+} from '../../constants/aiModels';
+
+export { AVAILABLE_GEMINI_MODELS, DEFAULT_GEMINI_MODEL, type GeminiModelOption };
 
 export const getApiKey = (): string => {
   const localKey =
@@ -31,14 +41,14 @@ export const formatGeminiError = (error: any): string => {
   return `Đã xảy ra sự cố khi giao tiếp với AI: ${msg}`;
 };
 
-const getGenAI = () => {
+const getGenAI = async (): Promise<GoogleGenerativeAI> => {
   const key = getApiKey();
   if (!key) {
     throw new Error(
       'Chưa cấu hình Gemini API Key. Vui lòng nhập API Key trong phần Cài đặt hệ thống hoặc file .env của dự án.'
     );
   }
-  return new GoogleGenerativeAI(key);
+  return await createGoogleGenerativeAI(key);
 };
 
 // [BẢO MẬT] Danh sách MIME types hợp lệ cho OCR upload
@@ -69,50 +79,13 @@ export const validateOCRFile = (file: File): { valid: boolean; error?: string } 
   return { valid: true };
 };
 
-export interface GeminiModelOption {
-  id: string;
-  name: string;
-  badge: string;
-  group: 'Gemini 2.5' | 'Gemini 2.0';
-  description: string;
-}
-
-export const AVAILABLE_GEMINI_MODELS: GeminiModelOption[] = [
-  // --- THẾ HỆ GEMINI 2.5 ---
-  {
-    id: 'gemini-2.5-flash',
-    name: 'Gemini 2.5 Flash',
-    badge: '⚡ 2.5 Flash (Tiêu chuẩn)',
-    group: 'Gemini 2.5',
-    description:
-      'Mô hình chuẩn cân bằng tốt giữa tốc độ phản hồi và khả năng hiểu ngôn ngữ dược điển.',
-  },
-  {
-    id: 'gemini-2.5-pro',
-    name: 'Gemini 2.5 Pro',
-    badge: '🔬 2.5 Pro (Suy luận)',
-    group: 'Gemini 2.5',
-    description: 'Xử lý ngữ cảnh lớn, phân tích dữ liệu chuyên sâu và tính toán thống kê SPC.',
-  },
-  // --- THẾ HỆ GEMINI 2.0 ---
-  {
-    id: 'gemini-2.0-flash',
-    name: 'Gemini 2.0 Flash',
-    badge: '⚡ 2.0 Flash',
-    group: 'Gemini 2.0',
-    description: 'Phiên bản tương thích ổn định cho các tác vụ kiểm nghiệm thường quy.',
-  },
-];
-
-export const DEFAULT_GEMINI_MODEL = 'gemini-2.5-flash';
-
 export const getGeminiModel = (): string => {
   return localStorage.getItem('GEMINI_MODEL') || DEFAULT_GEMINI_MODEL;
 };
 
 export const getIsThinkingEnabled = (): boolean => {
   const saved = localStorage.getItem('GEMINI_THINKING_ENABLED');
-  return saved !== 'false'; // Mặc định là true nếu chưa set
+  return saved === 'true'; // Mặc định là false theo Phase 14 để tối ưu độ trễ
 };
 
 export const extractThinking = (text: string): { thinking?: string; cleanText: string } => {
@@ -337,7 +310,7 @@ export const geminiService = {
     if (!validation.valid) {
       throw new Error(validation.error);
     }
-    const genAI = getGenAI();
+    const genAI = await getGenAI();
 
     // ─── Outer try: bắt mọi lỗi mạng để kích hoạt Tesseract.js fallback ────────
     try {
@@ -552,7 +525,7 @@ export const geminiService = {
     systemPrompt?: string,
     modelName?: string
   ): Promise<string> => {
-    const genAI = getGenAI();
+    const genAI = await getGenAI();
     const activeModel = modelName || getGeminiModel();
     const model = genAI.getGenerativeModel({
       model: activeModel,
@@ -581,7 +554,7 @@ export const geminiService = {
     modelName?: string,
     temperature: number = 0.2
   ): Promise<T> => {
-    const genAI = getGenAI();
+    const genAI = await getGenAI();
     const activeModel = modelName || getGeminiModel();
 
     const model = genAI.getGenerativeModel({
@@ -594,26 +567,25 @@ export const geminiService = {
       ...(systemPrompt ? { systemInstruction: systemPrompt } : {}),
     });
 
-    const maxRetries = 3;
+    const maxRetries = 2;
     let attempt = 0;
 
     while (attempt < maxRetries) {
       try {
         const result = await model.generateContent(prompt);
         const text = result.response.text();
-        // JSON.parse ở đây là safety net — Structured Output đảm bảo text luôn là JSON hợp lệ
         return JSON.parse(text) as T;
       } catch (error: any) {
         attempt++;
         const errorMessage = error?.message || '';
-        const backoffMs = Math.pow(2, attempt) * 1000;
+        const backoffMs = Math.pow(2, attempt) * 1000 + Math.random() * 300;
 
         if (
           (errorMessage.includes('503') || errorMessage.includes('429')) &&
           attempt < maxRetries
         ) {
           console.warn(
-            `Gemini generateStructuredJson overloaded. Retrying attempt ${attempt} in ${backoffMs}ms...`
+            `Gemini generateStructuredJson overloaded. Retrying attempt ${attempt} in ${Math.round(backoffMs)}ms...`
           );
           await new Promise((res) => setTimeout(res, backoffMs));
           continue;
@@ -628,143 +600,60 @@ export const geminiService = {
   },
 
   /**
-   * Tính năng Chat bằng Text với dữ liệu ngữ cảnh của toàn bộ ứng dụng hỗ trợ Multi-turn + Function Calling
+   * Tính năng Chat bằng Text với dữ liệu ngữ cảnh tinh gọn (Phases 8, 11, 12, 13, 14, 15)
+   * Hỗ trợ Multi-turn + Parallel Tool Execution + Semantic Caching + AbortSignal
    * @param message Tin nhắn câu hỏi của người dùng
-   * @param appContextData Object chứa toàn bộ dữ liệu ứng dụng
+   * @param appContextData Object chứa dữ liệu ứng dụng
    * @param history Lịch sử đoạn chat trước đó để hỗ trợ Multi-turn
+   * @param modelName Tên model AI tùy chọn
+   * @param sessionMemoryPrompt Ký ức hội thoại từ session trước
+   * @param options Tùy chọn AbortSignal và bypassCache
    */
   chatWithAppContext: async (
     message: string,
     appContextData: any,
     history: Content[] = [],
     modelName?: string,
-    sessionMemoryPrompt?: string
+    sessionMemoryPrompt?: string,
+    options?: { signal?: AbortSignal; bypassCache?: boolean }
   ) => {
-    const genAI = getGenAI();
+    if (options?.signal?.aborted) {
+      throw new DOMException('Chat request was aborted before start', 'AbortError');
+    }
+
     const activeModel = modelName || getGeminiModel();
     const isThinkingEnabled = getIsThinkingEnabled();
+
+    // ─── TẦNG CACHE AI (Phase 15): Kiểm tra Semantic Cache cho câu hỏi tra cứu ───
+    if (!options?.bypassCache && (!history || history.length === 0)) {
+      const cached = semanticCache.get<{ text: string; thinking?: string }>({
+        promptId: 'TCCS_ASSISTANT',
+        input: `[${activeModel}] ${message}`,
+      });
+      if (cached && cached.data?.text) {
+        return {
+          text: cached.data.text,
+          thinking: cached.data.thinking,
+          fromCache: true,
+        };
+      }
+    }
+
+    const genAI = await getGenAI();
 
     const model = genAI.getGenerativeModel({
       model: activeModel,
       tools: [{ functionDeclarations: GEMINI_TOOL_DECLARATIONS as any }],
     });
 
-    // [SMART CONTEXT BUILDER] Phân tích câu hỏi để xác định data liên quan
-    // Thay vì cắt cứng 50 records, ưu tiên data có liên quan đến từ khóa trong message
-    const buildSmartContext = (msg: string, data: any) => {
-      const msgLower = msg.toLowerCase();
-
-      const products = data.products || [];
-      const batches = data.batches || [];
-      const tccsList = data.tccsList || [];
-      const testResults = data.testResults || [];
-
-      // Bước 1: Tìm sản phẩm/lô được đề cập trong câu hỏi
-      const mentionedProducts = products.filter(
-        (p: any) =>
-          (p.name && msgLower.includes(p.name.toLowerCase())) ||
-          (p.code && msgLower.includes(p.code.toLowerCase()))
-      );
-      const mentionedBatches = batches.filter(
-        (b: any) => b.batchNo && msgLower.includes(b.batchNo.toLowerCase())
-      );
-
-      const mentionedProductIds = new Set([
-        ...mentionedProducts.map((p: any) => p.id),
-        ...mentionedBatches.map((b: any) => b.productId),
-      ]);
-
-      // Bước 2: Nếu có sản phẩm cụ thể được đề cập → trả về đầy đủ data của sản phẩm đó
-      if (mentionedProductIds.size > 0) {
-        const relevantBatches = batches.filter((b: any) => mentionedProductIds.has(b.productId));
-        const relevantBatchIds = new Set(relevantBatches.map((b: any) => b.id));
-        const relevantTestResults = testResults.filter((tr: any) =>
-          relevantBatchIds.has(tr.batchId)
-        );
-        const relevantTccs = tccsList.filter((t: any) => mentionedProductIds.has(t.productId));
-
-        return {
-          _note: `Context ưu tiên: ${mentionedProductIds.size} sản phẩm được đề cập trong câu hỏi`,
-          products: mentionedProducts.map((p: any) => ({
-            id: p.id,
-            code: p.code,
-            name: p.name,
-            status: p.status,
-          })),
-          allProducts_summary: `Tổng ${products.length} sản phẩm. Đang hiển thị ${mentionedProducts.length} sản phẩm liên quan.`,
-          batches: relevantBatches.map((b: any) => ({
-            id: b.id,
-            batchNo: b.batchNo,
-            productId: b.productId,
-            status: b.status,
-            mfg: b.mfgDate,
-            exp: b.expDate,
-          })),
-          tccs: relevantTccs.map((t: any) => ({
-            id: t.id,
-            code: t.code,
-            isActive: t.isActive,
-            issueDate: t.issueDate,
-            productId: t.productId,
-          })),
-          testResults: relevantTestResults.map((tr: any) => ({
-            id: tr.id,
-            lab: tr.labName,
-            date: tr.testDate,
-            status: tr.overallStatus,
-            batchId: tr.batchId,
-          })),
-        };
-      }
-
-      // Bước 3: Nếu không tìm thấy sản phẩm cụ thể → context tổng hợp thông minh
-      // Ưu tiên 20 records mới nhất của mỗi loại + tóm tắt tổng số
-      const MAX_GENERAL = 20;
-      return {
-        _note: 'Context tổng hợp: không có sản phẩm cụ thể được đề cập',
-        products: products
-          .slice(0, MAX_GENERAL)
-          .map((p: any) => ({ id: p.id, code: p.code, name: p.name, status: p.status })),
-        products_total: products.length,
-        batches: batches
-          .slice(0, MAX_GENERAL)
-          .map((b: any) => ({
-            id: b.id,
-            batchNo: b.batchNo,
-            productId: b.productId,
-            status: b.status,
-            mfg: b.mfgDate,
-            exp: b.expDate,
-          })),
-        batches_total: batches.length,
-        tccs: tccsList
-          .slice(0, MAX_GENERAL)
-          .map((t: any) => ({
-            code: t.code,
-            isActive: t.isActive,
-            issueDate: t.issueDate,
-            productId: t.productId,
-          })),
-        testResults: testResults
-          .slice(0, MAX_GENERAL)
-          .map((tr: any) => ({
-            id: tr.id,
-            lab: tr.labName,
-            date: tr.testDate,
-            status: tr.overallStatus,
-            batchId: tr.batchId,
-          })),
-        testResults_total: testResults.length,
-      };
-    };
-
-    const smartContext = buildSmartContext(message, appContextData);
+    // ─── TỐI ƯU HÓA NGỮ CẢNH (Phase 8): Context Resolver Siêu nhẹ ─────────────────
+    const leanContext = resolveLeanContext(message, appContextData);
 
     const systemPrompt = `Bạn là Trợ lý AI chuyên môn của phần mềm V-BIOTECH Quality Management (Quản lý Chất lượng Dược phẩm).
 Nhiệm vụ: Trả lời câu hỏi dựa trên DỮ LIỆU THỰC của ứng dụng và GỌI CÁC TOOL khi cần phân tích sâu hơn.
 
-DỮ LIỆU ỨNG DỤNG HIỆN TẠI (JSON):
-${JSON.stringify(smartContext, null, 2)}
+DỮ LIỆU NGỮ CẢNH TRỌNG TÂM (JSON):
+${JSON.stringify(leanContext, null, 2)}
 
 QUY TẮC:
 1. LUÔN dựa vào dữ liệu JSON để trả lời. Không bịa đặt thông tin.
@@ -787,12 +676,16 @@ QUY TẮC:
 18. [ACTION] Nếu người dùng yêu cầu cập nhật trạng thái lô ("duyệt xuất xưởng lô X", "từ chối lô X", "chuyển lô X về kiểm nghiệm") → GỌI updateBatchStatusAction với batchNo, newStatus ('RELEASED' | 'REJECTED' | 'TESTING') và reason.
 19. [PREDICTIVE] Nếu người dùng hỏi về rủi ro trước khi kiểm nghiệm lô ("lô X có nguy cơ gì không?", "dự báo rủi ro lô X") → GỌI predictBatchRiskAction với batchNo.
 ${sessionMemoryPrompt ? sessionMemoryPrompt : ''}
-${isThinkingEnabled ? `20. [QUAN TRỌNG - BẮT BUỘC] Bạn phải luôn bắt đầu phản hồi của mình bằng việc lập luận chi tiết quy trình suy nghĩ và phân tích dữ liệu bên trong cặp thẻ <thinking>...</thinking> (ví dụ: giải thích tại sao bạn chọn hành động hay quyết định gọi tool nào, đối chiếu số liệu thế nào). Chỉ đưa ra câu trả lời chính thức hoặc định dạng markdown cho người dùng bên ngoài cặp thẻ <thinking>...</thinking>. Không được hiển thị thẻ <thinking> trong markdown code blocks.` : ''}`;
+${isThinkingEnabled ? `20. [BẬT THEO CẤU HÌNH] Bạn hãy bắt đầu phản hồi bằng việc phân tích ngắn gọn lý do chọn công cụ hoặc đối chiếu số liệu bên trong cặp thẻ <thinking>...</thinking>. Không tạo chain-of-thought quá dài gây chậm phản hồi.` : ''}`;
 
-    const maxRetries = 3;
+    const maxRetries = 2; // Giảm xuống 2 để tránh treo UI lâu (Phase 12)
     let attempt = 0;
 
     while (attempt < maxRetries) {
+      if (options?.signal?.aborted) {
+        throw new DOMException('Chat request was aborted during retry loop', 'AbortError');
+      }
+
       try {
         const chat = model.startChat({
           history: [
@@ -815,6 +708,10 @@ ${isThinkingEnabled ? `20. [QUAN TRỌNG - BẮT BUỘC] Bạn phải luôn bắ
         let result = await chat.sendMessage(message);
         let response = result.response;
 
+        if (options?.signal?.aborted) {
+          throw new DOMException('Chat request was aborted after initial response', 'AbortError');
+        }
+
         // Trích xuất suy nghĩ bước 1 nếu có
         try {
           const firstText = response.text();
@@ -824,40 +721,51 @@ ${isThinkingEnabled ? `20. [QUAN TRỌNG - BẮT BUỘC] Bạn phải luôn bắ
               accumulatedThinking += (accumulatedThinking ? '\n\n' : '') + parsed.thinking;
             }
           }
-        } catch (e) {
+        } catch {
           // Bỏ qua nếu response chỉ chứa functionCall
         }
 
-        // ✅ Vòng lặp xử lý Function Calling
-        // Gemini có thể gọi nhiều tool liên tiếp trước khi trả về văn bản cuối cùng
+        // ✅ Vòng lặp xử lý Function Calling (Giới hạn tối đa 4 iterations - Phase 13)
         let iterationCount = 0;
-        const MAX_TOOL_ITERATIONS = 5; // Giới hạn để tránh vòng lặp vô tận
+        const MAX_TOOL_ITERATIONS = 4;
+        let hasCalledAnyTool = false;
 
         while (
           response.candidates?.[0]?.content?.parts?.some((p: any) => p.functionCall) &&
           iterationCount < MAX_TOOL_ITERATIONS
         ) {
+          if (options?.signal?.aborted) {
+            throw new DOMException('Chat request was aborted during tool execution', 'AbortError');
+          }
+
           iterationCount++;
+          hasCalledAnyTool = true;
           const toolCallParts = response.candidates[0].content.parts;
           const functionResponseParts: any[] = [];
 
-          // Thực thi tất cả tool calls trong response hiện tại
-          for (const part of toolCallParts) {
-            if (part.functionCall) {
+          // Thực thi song song các tool độc lập trong cùng 1 turn (Phase 13)
+          const toolExecutions = toolCallParts
+            .filter((p: any) => p.functionCall)
+            .map(async (part: any) => {
               const toolResult = await executeTool(
                 part.functionCall.name,
                 part.functionCall.args as Record<string, any>,
-                appContextData, // Truyền dữ liệu thật, không phải leanContext
+                appContextData,
                 geminiService.generateText
               );
-
-              functionResponseParts.push({
+              return {
                 functionResponse: {
                   name: part.functionCall.name,
                   response: { result: toolResult },
                 },
-              });
-            }
+              };
+            });
+
+          const executedParts = await Promise.all(toolExecutions);
+          functionResponseParts.push(...executedParts);
+
+          if (options?.signal?.aborted) {
+            throw new DOMException('Chat request was aborted after tool execution', 'AbortError');
           }
 
           // Gửi kết quả tool về cho model
@@ -873,7 +781,7 @@ ${isThinkingEnabled ? `20. [QUAN TRỌNG - BẮT BUỘC] Bạn phải luôn bắ
                 accumulatedThinking += (accumulatedThinking ? '\n\n' : '') + parsed.thinking;
               }
             }
-          } catch (e) {
+          } catch {
             // Có thể chỉ chứa tool call tiếp theo
           }
         }
@@ -886,21 +794,41 @@ ${isThinkingEnabled ? `20. [QUAN TRỌNG - BẮT BUỘC] Bạn phải luôn bắ
           finalResponseText = finalParsed.cleanText;
         }
 
+        // ─── Lưu vào Semantic Cache nếu là câu trả lời tra cứu thông thường ───
+        if (!hasCalledAnyTool && (!history || history.length === 0)) {
+          semanticCache.set(
+            { promptId: 'TCCS_ASSISTANT', input: `[${activeModel}] ${message}` },
+            { text: finalResponseText, thinking: accumulatedThinking || undefined }
+          );
+        }
+
         return {
           text: finalResponseText,
           thinking: accumulatedThinking || undefined,
         };
       } catch (error: any) {
+        if (error?.name === 'AbortError' || options?.signal?.aborted) {
+          throw error;
+        }
+
         attempt++;
         const errorMessage = error?.message || '';
 
-        // Chỉ retry với lỗi quá tải (503) hoặc rate limit (429)
-        if (
-          (errorMessage.includes('503') || errorMessage.includes('429')) &&
-          attempt < maxRetries
-        ) {
-          console.warn(`Gemini API overloaded. Retrying attempt ${attempt}...`);
-          await new Promise((res) => setTimeout(res, 2000 * attempt));
+        // Phân loại retry (Phase 12):
+        // KHÔNG retry lỗi 4xx, authentication, safety, hoặc AbortError
+        const isQuotaOrOverload =
+          errorMessage.includes('503') ||
+          errorMessage.includes('429') ||
+          errorMessage.includes('RESOURCE_EXHAUSTED') ||
+          errorMessage.includes('overloaded');
+
+        if (isQuotaOrOverload && attempt < maxRetries) {
+          const jitter = Math.random() * 500;
+          const backoff = (errorMessage.includes('429') ? 1500 : 1000) * attempt + jitter;
+          console.warn(
+            `Gemini API overloaded/429. Retrying attempt ${attempt} in ${Math.round(backoff)}ms...`
+          );
+          await new Promise((res) => setTimeout(res, backoff));
           continue;
         }
 
@@ -908,7 +836,6 @@ ${isThinkingEnabled ? `20. [QUAN TRỌNG - BẮT BUỘC] Bạn phải luôn bắ
         throw error;
       }
     }
-    // Sau vòng while, ném lỗi rõ ràng thay vì trả về undefined im lặng
     throw new Error('Gemini Chat: Đã vượt quá số lần thử lại tối đa mà không thành công.');
   },
 };
