@@ -1,7 +1,7 @@
 # PQM — KẾ HOẠCH REBUILD TOÀN DIỆN THEO WORKFLOW
 
 Repository: `bacnam1994/PQM`  
-Trạng thái hiện tại: **PHASE 14 (COA DOMAIN REBUILD - VS-11) — COMPLETED | NEXT: PHASE 15 (APPROVAL DOMAIN REBUILD - VS-12)**
+Trạng thái hiện tại: **PHASE 15 (APPROVAL DOMAIN REBUILD - VS-12) — COMPLETED | NEXT: PHASE 16 (MASTER DATA DOMAIN REBUILD - VS-13)**
 
 ---
 
@@ -23,7 +23,7 @@ Trạng thái hiện tại: **PHASE 14 (COA DOMAIN REBUILD - VS-11) — COMPLETE
 | **P-12** | **Test Result Domain Rebuild**      | Rebuild Test Result Draft, Submit, Finalize, Approve, Reject, Supersede, Quality Evaluation        |   ✅ **HOÀN THÀNH**   | `src/domains/test-result/`                               |
 | **P-13** | **Deviation / OOS / CAPA**          | Tách bạch Deviation, OOS, CAPA thành 3 domain riêng biệt có FSM, rules, services độc lập           |   ✅ **HOÀN THÀNH**   | `src/domains/deviation/`, `oos/`, `capa/`                |
 | **P-14** | **Change Request Rebuild**          | Chuẩn hóa Change Request & Change Action FSM, đồng nhất State Authority                            |   ✅ **HOÀN THÀNH**   | `src/domains/change-request/`                            |
-| **P-15** | **CoA & Approval Rebuild**          | Tách Document Generation, Approval, Release, Signature, ALCOA+ Audit Trail                         | 🟡 **ĐANG THỰC HIỆN** | `src/domains/coa/` (Xong), `approval/` (Tiếp theo)       |
+| **P-15** | **CoA & Approval Rebuild**          | Tách Document Generation, Approval, Release, Signature, ALCOA+ Audit Trail                         |   ✅ **HOÀN THÀNH**   | `src/domains/coa/` (Xong), `approval/` (Xong)            |
 | **P-16** | **Master Data & System**            | Rebuild Users, Roles, Criteria, Labs, Pharmacopoeia, Settings, Destructive Tokens                  |   📋 Chờ kích hoạt    | `src/domains/master-data/`, `system/`                    |
 | **P-17** | **AI Boundary Rebuild**             | Cách ly AI Proposal tools, Human-in-the-loop confirmation, Zero direct repository mutation         |   📋 Chờ kích hoạt    | `src/interfaces/ai/`                                     |
 | **P-18** | **UI / Pages / Hooks Rebuild**      | Page → Feature Hook → Workflow/Application API. Zero direct Firebase/Repo mutation                 |   📋 Chờ kích hoạt    | `src/ui/`                                                |
@@ -54,8 +54,8 @@ Trạng thái hiện tại: **PHASE 14 (COA DOMAIN REBUILD - VS-11) — COMPLETE
 | **VS-09** | **CAPA**           | `services/app/CAPAService.ts`, `domain/capa/`                                                                                  | `src/domains/capa/`                     | ✅ **HOÀN THÀNH** |   🔴 Cao (GMP)    |
 | **VS-10** | **Change Request** | `services/app/ChangeControlAppService.ts`, `repositories/IChangeControlRepository.ts`                                          | `src/domains/change-request/`           | ✅ **HOÀN THÀNH** |   🔴 Cao (GMP)    |
 | **VS-11** | **CoA**            | `services/app/CoAService.ts`, `pages/qa/CoAReportPage.tsx`, `pages/public/CoAVerifyPage.tsx`                                   | `src/domains/coa/`                      | ✅ **HOÀN THÀNH** |   🔴 Cao (GMP)    |
-| **VS-12** | **Approval**       | `services/app/ApprovalWorkflowService.ts`, `repositories/IApprovalTaskRepository.ts`                                           | `src/domains/approval/`                 | 🟡 **TIẾP THEO**  |   🔴 Cao (GMP)    |
-| **VS-13** | **Master Data**    | `services/app/MasterCriterionAppService.ts`, `services/app/PharmacopoeiaAppService.ts`, `services/app/LaboratoryAppService.ts` | `src/domains/master-data/`              | 📋 Chờ kích hoạt  |   🟡 Trung bình   |
+| **VS-12** | **Approval**       | `services/app/ApprovalWorkflowService.ts`, `repositories/IApprovalTaskRepository.ts`                                           | `src/domains/approval/`                 | ✅ **HOÀN THÀNH** |   🔴 Cao (GMP)    |
+| **VS-13** | **Master Data**    | `services/app/MasterCriterionAppService.ts`, `services/app/PharmacopoeiaAppService.ts`, `services/app/LaboratoryAppService.ts` | `src/domains/master-data/`              | 🟡 **TIẾP THEO**  |   🟡 Trung bình   |
 | **VS-14** | **System**         | `services/app/SystemAppService.ts`, `services/userService.ts`, `services/permissionService.ts`                                 | `src/domains/system/`                   | 📋 Chờ kích hoạt  |   🟡 Trung bình   |
 | **VS-15** | **AI Boundary**    | `services/ai/`, `architecture/aiGovernance*`                                                                                   | `src/domains/ai/` hoặc `interfaces/ai/` | 📋 Chờ kích hoạt  |  🔴 Cao (Safety)  |
 | **VS-16** | **Auth**           | `services/authService.ts`, `providers/AuthProvider.tsx`, `pages/auth/`                                                         | `src/domains/auth/`                     | 📋 Chờ kích hoạt  | 🔴 Cao (Security) |
@@ -807,11 +807,18 @@ Reopen
 - `src/domains/coa/tests/coaDomain.test.ts`: 100% pass unit tests (ALCOA+ tamper detection, footnotes, e-signature, verification).
 - `src/services/app/CoAService.ts`: Thin adapter duy trì 100% backward compatibility.
 
-### 2. Approval Domain (`src/domains/approval/`) - 🟡 TIẾP THEO (VS-12)
+### 2. Approval Domain (`src/domains/approval/`) - ✅ ĐÃ HOÀN THÀNH (VS-12)
 
-- Tách bạch quy trình phê duyệt (Approval Tasks) chuẩn GMP:
-  - Document generation không được tự động bypass approval.
-  - Chuẩn hóa: Task Creation ➔ Review ➔ Multi-step Approval / Rejection ➔ Delegation ➔ Audit Trail.
+Đã hoàn thành tách bạch và chuẩn hóa quy trình phê duyệt đa cấp (Approval Tasks) chuẩn GMP:
+
+- `src/domains/approval/domain/types.ts`: Định nghĩa `ApprovalTask`, `ApprovalStep`, `ApprovalLogEntry`, `ApprovalEntityType`, `ApprovalOverallStatus`, `StepDecision`.
+- `src/domains/approval/domain/rules.ts`: Rào chắn SoD (`verifySoDCompliance`), cấu hình bước chuẩn (`getDefaultStepsForEntity`), tiền điều kiện quyết định (`validateStepDecisionPreconditions`: quyền vai trò, e-Signature CFR Part 11, lý do từ chối >= 10 ký tự), tiền điều kiện thu hồi (`validateRevocationPreconditions`: QA/Admin, chặn Lô RELEASED, lý do >= 30 ký tự per BR-APP-002), và State Machine (`ApprovalTaskStateMachine`).
+- `src/domains/approval/application/service.ts`: `ApprovalWorkflowService` điều phối qua `ApprovalWorkflowHandlers` và `WorkflowFacade.dispatch()`.
+- `src/domains/approval/application/queries.ts`: `ApprovalQueries` (findByEntity, findByAssignee, findById, findAll, findPendingTasks).
+- `src/domains/approval/infrastructure/repository.ts`: Binding `IApprovalTaskRepository` với `firebaseApprovalTaskRepository`.
+- `src/domains/approval/workflow/definitions.ts`: Định danh canonical workflow action IDs (`APPROVAL_TASK_CREATE`, `APPROVAL_TASK_DECIDE`, `APPROVAL_TASK_CANCEL`) & nhãn trạng thái.
+- `src/domains/approval/tests/approvalDomain.test.ts`: 100% pass 15 unit tests.
+- `src/services/app/ApprovalWorkflowService.ts`: Thin adapter duy trì 100% backward compatibility.
 
 ---
 

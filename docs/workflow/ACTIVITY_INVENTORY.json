@@ -1,7 +1,7 @@
 {
   "version": "1.0.0-BASELINE",
-  "generatedAt": "2026-09-25T06:54:16.825Z",
-  "totalActivities": 122,
+  "generatedAt": "2026-09-27T01:47:04.813Z",
+  "totalActivities": 74,
   "gateMetrics": {
     "unmappedCount": 0,
     "orphanCount": 0,
@@ -10,48 +10,41 @@
   },
   "breakdown": {
     "byEntity": {
-      "BATCH": 16,
-      "CAPA": 3,
-      "CHANGE_REQUEST": 6,
-      "COA": 3,
-      "DEVIATION": 9,
-      "FORMULA": 4,
-      "MASTER_DATA": 21,
-      "MATERIAL": 4,
-      "OOS": 3,
-      "PRODUCT": 7,
+      "MASTER_DATA": 24,
       "SYSTEM": 28,
-      "TCCS": 11,
-      "TEST_RESULT": 6,
-      "APPROVAL_TASK": 1
+      "APPROVAL_TASK": 1,
+      "BATCH": 8,
+      "CHANGE_REQUEST": 1,
+      "DEVIATION": 3,
+      "FORMULA": 1,
+      "MATERIAL": 1,
+      "PRODUCT": 3,
+      "TCCS": 2,
+      "TEST_RESULT": 2
     },
     "byRisk": {
-      "HIGH": 42,
-      "MEDIUM": 54,
-      "LOW": 26
+      "LOW": 26,
+      "MEDIUM": 28,
+      "HIGH": 20
     },
     "byOwner": {
-      "PRODUCTION": 5,
-      "ADMIN": 11,
-      "QA": 79,
-      "QC": 1,
-      "LAB": 3,
+      "QA": 44,
+      "ADMIN": 6,
       "AI_ADVISORY": 17,
+      "PRODUCTION": 1,
       "USER": 5,
       "SYSTEM": 1
     },
     "byCategory": {
-      "LIFECYCLE": 85,
-      "TRANSITION": 2,
-      "APPROVAL": 4,
-      "QUALITY": 7,
-      "DOCUMENT": 3,
-      "GOVERNANCE": 14,
-      "ADMIN": 7
+      "LIFECYCLE": 49,
+      "ADMIN": 6,
+      "GOVERNANCE": 13,
+      "QUALITY": 4,
+      "DOCUMENT": 2
     },
     "byTrigger": {
-      "APP_SERVICE_MUTATION": 66,
-      "REPOSITORY_WRITE": 28,
+      "APP_SERVICE_MUTATION": 15,
+      "REPOSITORY_WRITE": 31,
       "AI_TOOL_EXECUTE": 17,
       "UI_FORM_SUBMIT": 7,
       "FILE_EXPORT": 1,
@@ -64,331 +57,6 @@
     {
       "id": "ACT-001",
       "trigger": "APP_SERVICE_MUTATION",
-      "location": "src/services/app/BatchAppService.ts:28",
-      "category": "LIFECYCLE",
-      "entity": "BATCH",
-      "mutation": true,
-      "currentPath": "BatchAppService.createBatch",
-      "desiredAction": "BATCH_CREATE",
-      "owner": "PRODUCTION",
-      "risk": "HIGH",
-      "coverageState": "LEGACY_DIRECT"
-    },
-    {
-      "id": "ACT-002",
-      "trigger": "APP_SERVICE_MUTATION",
-      "location": "src/services/app/BatchAppService.ts:43",
-      "category": "LIFECYCLE",
-      "entity": "BATCH",
-      "mutation": true,
-      "currentPath": "BatchAppService.updateBatch",
-      "desiredAction": "BATCH_UPDATE_METADATA",
-      "owner": "PRODUCTION",
-      "risk": "MEDIUM",
-      "coverageState": "LEGACY_DIRECT"
-    },
-    {
-      "id": "ACT-003",
-      "trigger": "APP_SERVICE_MUTATION",
-      "location": "src/services/app/BatchAppService.ts:63",
-      "category": "LIFECYCLE",
-      "entity": "BATCH",
-      "mutation": true,
-      "currentPath": "BatchAppService.updateStatus",
-      "desiredAction": "BATCH_UPDATE_METADATA",
-      "owner": "PRODUCTION",
-      "risk": "MEDIUM",
-      "coverageState": "LEGACY_DIRECT"
-    },
-    {
-      "id": "ACT-004",
-      "trigger": "APP_SERVICE_MUTATION",
-      "location": "src/services/app/BatchAppService.ts:109",
-      "category": "LIFECYCLE",
-      "entity": "BATCH",
-      "mutation": true,
-      "currentPath": "BatchAppService.updateProgress",
-      "desiredAction": "BATCH_UPDATE_METADATA",
-      "owner": "PRODUCTION",
-      "risk": "MEDIUM",
-      "coverageState": "LEGACY_DIRECT"
-    },
-    {
-      "id": "ACT-005",
-      "trigger": "APP_SERVICE_MUTATION",
-      "location": "src/services/app/BatchAppService.ts:119",
-      "category": "LIFECYCLE",
-      "entity": "BATCH",
-      "mutation": true,
-      "currentPath": "BatchAppService.deleteBatch",
-      "desiredAction": "BATCH_DELETE",
-      "owner": "ADMIN",
-      "risk": "HIGH",
-      "coverageState": "LEGACY_DIRECT"
-    },
-    {
-      "id": "ACT-006",
-      "trigger": "APP_SERVICE_MUTATION",
-      "location": "src/services/app/CAPAService.ts:27",
-      "category": "LIFECYCLE",
-      "entity": "CAPA",
-      "mutation": true,
-      "currentPath": "CAPAService.addCapaAction",
-      "desiredAction": "SYSTEM_CONFIG_UPDATE",
-      "owner": "QA",
-      "risk": "MEDIUM",
-      "coverageState": "LEGACY_DIRECT"
-    },
-    {
-      "id": "ACT-007",
-      "trigger": "APP_SERVICE_MUTATION",
-      "location": "src/services/app/CAPAService.ts:71",
-      "category": "TRANSITION",
-      "entity": "CAPA",
-      "mutation": true,
-      "currentPath": "CAPAService.completeCapaAction",
-      "desiredAction": "CAPA_EXECUTE",
-      "owner": "QA",
-      "risk": "HIGH",
-      "coverageState": "LEGACY_DIRECT"
-    },
-    {
-      "id": "ACT-008",
-      "trigger": "APP_SERVICE_MUTATION",
-      "location": "src/services/app/CAPAService.ts:95",
-      "category": "APPROVAL",
-      "entity": "CAPA",
-      "mutation": true,
-      "currentPath": "CAPAService.verifyAndCloseCAPA",
-      "desiredAction": "CAPA_VERIFY",
-      "owner": "QA",
-      "risk": "HIGH",
-      "coverageState": "LEGACY_DIRECT"
-    },
-    {
-      "id": "ACT-009",
-      "trigger": "APP_SERVICE_MUTATION",
-      "location": "src/services/app/ChangeControlAppService.ts:111",
-      "category": "LIFECYCLE",
-      "entity": "CHANGE_REQUEST",
-      "mutation": true,
-      "currentPath": "ChangeControlAppService.createChangeRequest",
-      "desiredAction": "CHANGE_REQUEST_CREATE",
-      "owner": "QA",
-      "risk": "HIGH",
-      "coverageState": "LEGACY_DIRECT"
-    },
-    {
-      "id": "ACT-010",
-      "trigger": "APP_SERVICE_MUTATION",
-      "location": "src/services/app/ChangeControlAppService.ts:123",
-      "category": "QUALITY",
-      "entity": "CHANGE_REQUEST",
-      "mutation": true,
-      "currentPath": "ChangeControlAppService.assessFMEARisk",
-      "desiredAction": "CHANGE_REQUEST_FMEA_ASSESS",
-      "owner": "QA",
-      "risk": "HIGH",
-      "coverageState": "LEGACY_DIRECT"
-    },
-    {
-      "id": "ACT-011",
-      "trigger": "APP_SERVICE_MUTATION",
-      "location": "src/services/app/ChangeControlAppService.ts:140",
-      "category": "LIFECYCLE",
-      "entity": "CHANGE_REQUEST",
-      "mutation": true,
-      "currentPath": "ChangeControlAppService.addActionItem",
-      "desiredAction": "CHANGE_REQUEST_ADD_ACTION",
-      "owner": "QA",
-      "risk": "MEDIUM",
-      "coverageState": "LEGACY_DIRECT"
-    },
-    {
-      "id": "ACT-012",
-      "trigger": "APP_SERVICE_MUTATION",
-      "location": "src/services/app/ChangeControlAppService.ts:159",
-      "category": "TRANSITION",
-      "entity": "CHANGE_REQUEST",
-      "mutation": true,
-      "currentPath": "ChangeControlAppService.completeActionItem",
-      "desiredAction": "CHANGE_REQUEST_COMPLETE_ACTION",
-      "owner": "QA",
-      "risk": "MEDIUM",
-      "coverageState": "LEGACY_DIRECT"
-    },
-    {
-      "id": "ACT-013",
-      "trigger": "APP_SERVICE_MUTATION",
-      "location": "src/services/app/ChangeControlAppService.ts:181",
-      "category": "LIFECYCLE",
-      "entity": "CHANGE_REQUEST",
-      "mutation": true,
-      "currentPath": "ChangeControlAppService.updateStatus",
-      "desiredAction": "SYSTEM_CONFIG_UPDATE",
-      "owner": "QA",
-      "risk": "MEDIUM",
-      "coverageState": "LEGACY_DIRECT"
-    },
-    {
-      "id": "ACT-014",
-      "trigger": "APP_SERVICE_MUTATION",
-      "location": "src/services/app/CoAService.ts:191",
-      "category": "DOCUMENT",
-      "entity": "COA",
-      "mutation": true,
-      "currentPath": "CoAService.generateCoAPayloadAsync",
-      "desiredAction": "COA_GENERATE",
-      "owner": "QA",
-      "risk": "HIGH",
-      "coverageState": "LEGACY_DIRECT"
-    },
-    {
-      "id": "ACT-015",
-      "trigger": "APP_SERVICE_MUTATION",
-      "location": "src/services/app/CoAService.ts:222",
-      "category": "APPROVAL",
-      "entity": "COA",
-      "mutation": true,
-      "currentPath": "CoAService.signCoA",
-      "desiredAction": "COA_SIGN",
-      "owner": "QA",
-      "risk": "HIGH",
-      "coverageState": "LEGACY_DIRECT"
-    },
-    {
-      "id": "ACT-016",
-      "trigger": "APP_SERVICE_MUTATION",
-      "location": "src/services/app/CoAService.ts:273",
-      "category": "GOVERNANCE",
-      "entity": "COA",
-      "mutation": true,
-      "currentPath": "CoAService.revokeCoA",
-      "desiredAction": "COA_REVOKE",
-      "owner": "QA",
-      "risk": "HIGH",
-      "coverageState": "LEGACY_DIRECT"
-    },
-    {
-      "id": "ACT-017",
-      "trigger": "APP_SERVICE_MUTATION",
-      "location": "src/services/app/DeviationAppService.ts:44",
-      "category": "LIFECYCLE",
-      "entity": "DEVIATION",
-      "mutation": true,
-      "currentPath": "DeviationAppService.createDeviation",
-      "desiredAction": "DEVIATION_CREATE",
-      "owner": "QC",
-      "risk": "HIGH",
-      "coverageState": "LEGACY_DIRECT"
-    },
-    {
-      "id": "ACT-018",
-      "trigger": "APP_SERVICE_MUTATION",
-      "location": "src/services/app/DeviationAppService.ts:51",
-      "category": "LIFECYCLE",
-      "entity": "DEVIATION",
-      "mutation": true,
-      "currentPath": "DeviationAppService.autoLogFromOOS",
-      "desiredAction": "SYSTEM_CONFIG_UPDATE",
-      "owner": "QA",
-      "risk": "MEDIUM",
-      "coverageState": "LEGACY_DIRECT"
-    },
-    {
-      "id": "ACT-019",
-      "trigger": "APP_SERVICE_MUTATION",
-      "location": "src/services/app/DeviationAppService.ts:62",
-      "category": "LIFECYCLE",
-      "entity": "DEVIATION",
-      "mutation": true,
-      "currentPath": "DeviationAppService.updateStatus",
-      "desiredAction": "SYSTEM_CONFIG_UPDATE",
-      "owner": "QA",
-      "risk": "MEDIUM",
-      "coverageState": "LEGACY_DIRECT"
-    },
-    {
-      "id": "ACT-020",
-      "trigger": "APP_SERVICE_MUTATION",
-      "location": "src/services/app/DeviationAppService.ts:74",
-      "category": "LIFECYCLE",
-      "entity": "DEVIATION",
-      "mutation": true,
-      "currentPath": "DeviationAppService.addCAPAItem",
-      "desiredAction": "SYSTEM_CONFIG_UPDATE",
-      "owner": "QA",
-      "risk": "MEDIUM",
-      "coverageState": "LEGACY_DIRECT"
-    },
-    {
-      "id": "ACT-021",
-      "trigger": "APP_SERVICE_MUTATION",
-      "location": "src/services/app/DeviationAppService.ts:85",
-      "category": "LIFECYCLE",
-      "entity": "DEVIATION",
-      "mutation": true,
-      "currentPath": "DeviationAppService.completeCAPAItem",
-      "desiredAction": "SYSTEM_CONFIG_UPDATE",
-      "owner": "QA",
-      "risk": "MEDIUM",
-      "coverageState": "LEGACY_DIRECT"
-    },
-    {
-      "id": "ACT-022",
-      "trigger": "APP_SERVICE_MUTATION",
-      "location": "src/services/app/DeviationAppService.ts:92",
-      "category": "ADMIN",
-      "entity": "DEVIATION",
-      "mutation": true,
-      "currentPath": "DeviationAppService.deleteDeviation",
-      "desiredAction": "DEVIATION_DELETE",
-      "owner": "ADMIN",
-      "risk": "HIGH",
-      "coverageState": "LEGACY_DIRECT"
-    },
-    {
-      "id": "ACT-023",
-      "trigger": "APP_SERVICE_MUTATION",
-      "location": "src/services/app/FormulaAppService.ts:80",
-      "category": "LIFECYCLE",
-      "entity": "FORMULA",
-      "mutation": true,
-      "currentPath": "FormulaAppService.createFormula",
-      "desiredAction": "FORMULA_CREATE",
-      "owner": "QA",
-      "risk": "HIGH",
-      "coverageState": "LEGACY_DIRECT"
-    },
-    {
-      "id": "ACT-024",
-      "trigger": "APP_SERVICE_MUTATION",
-      "location": "src/services/app/FormulaAppService.ts:110",
-      "category": "LIFECYCLE",
-      "entity": "FORMULA",
-      "mutation": true,
-      "currentPath": "FormulaAppService.updateFormula",
-      "desiredAction": "FORMULA_UPDATE",
-      "owner": "QA",
-      "risk": "HIGH",
-      "coverageState": "LEGACY_DIRECT"
-    },
-    {
-      "id": "ACT-025",
-      "trigger": "APP_SERVICE_MUTATION",
-      "location": "src/services/app/FormulaAppService.ts:137",
-      "category": "LIFECYCLE",
-      "entity": "FORMULA",
-      "mutation": true,
-      "currentPath": "FormulaAppService.deleteFormula",
-      "desiredAction": "FORMULA_ARCHIVE",
-      "owner": "ADMIN",
-      "risk": "HIGH",
-      "coverageState": "LEGACY_DIRECT"
-    },
-    {
-      "id": "ACT-026",
-      "trigger": "APP_SERVICE_MUTATION",
       "location": "src/services/app/LaboratoryAppService.ts:45",
       "category": "LIFECYCLE",
       "entity": "MASTER_DATA",
@@ -400,7 +68,7 @@
       "coverageState": "LEGACY_DIRECT"
     },
     {
-      "id": "ACT-027",
+      "id": "ACT-002",
       "trigger": "APP_SERVICE_MUTATION",
       "location": "src/services/app/LaboratoryAppService.ts:81",
       "category": "LIFECYCLE",
@@ -413,7 +81,7 @@
       "coverageState": "LEGACY_DIRECT"
     },
     {
-      "id": "ACT-028",
+      "id": "ACT-003",
       "trigger": "APP_SERVICE_MUTATION",
       "location": "src/services/app/LaboratoryAppService.ts:104",
       "category": "LIFECYCLE",
@@ -426,7 +94,7 @@
       "coverageState": "LEGACY_DIRECT"
     },
     {
-      "id": "ACT-029",
+      "id": "ACT-004",
       "trigger": "APP_SERVICE_MUTATION",
       "location": "src/services/app/MasterCriterionAppService.ts:35",
       "category": "LIFECYCLE",
@@ -439,7 +107,7 @@
       "coverageState": "LEGACY_DIRECT"
     },
     {
-      "id": "ACT-030",
+      "id": "ACT-005",
       "trigger": "APP_SERVICE_MUTATION",
       "location": "src/services/app/MasterCriterionAppService.ts:63",
       "category": "LIFECYCLE",
@@ -452,7 +120,7 @@
       "coverageState": "LEGACY_DIRECT"
     },
     {
-      "id": "ACT-031",
+      "id": "ACT-006",
       "trigger": "APP_SERVICE_MUTATION",
       "location": "src/services/app/MasterCriterionAppService.ts:88",
       "category": "LIFECYCLE",
@@ -465,7 +133,7 @@
       "coverageState": "LEGACY_DIRECT"
     },
     {
-      "id": "ACT-032",
+      "id": "ACT-007",
       "trigger": "APP_SERVICE_MUTATION",
       "location": "src/services/app/MasterCriterionAppService.ts:115",
       "category": "LIFECYCLE",
@@ -478,85 +146,7 @@
       "coverageState": "LEGACY_DIRECT"
     },
     {
-      "id": "ACT-033",
-      "trigger": "APP_SERVICE_MUTATION",
-      "location": "src/services/app/MaterialAppService.ts:27",
-      "category": "LIFECYCLE",
-      "entity": "MATERIAL",
-      "mutation": true,
-      "currentPath": "MaterialAppService.createMaterial",
-      "desiredAction": "MATERIAL_CREATE",
-      "owner": "QA",
-      "risk": "MEDIUM",
-      "coverageState": "LEGACY_DIRECT"
-    },
-    {
-      "id": "ACT-034",
-      "trigger": "APP_SERVICE_MUTATION",
-      "location": "src/services/app/MaterialAppService.ts:55",
-      "category": "LIFECYCLE",
-      "entity": "MATERIAL",
-      "mutation": true,
-      "currentPath": "MaterialAppService.updateMaterial",
-      "desiredAction": "MATERIAL_UPDATE",
-      "owner": "QA",
-      "risk": "MEDIUM",
-      "coverageState": "LEGACY_DIRECT"
-    },
-    {
-      "id": "ACT-035",
-      "trigger": "APP_SERVICE_MUTATION",
-      "location": "src/services/app/MaterialAppService.ts:86",
-      "category": "LIFECYCLE",
-      "entity": "MATERIAL",
-      "mutation": true,
-      "currentPath": "MaterialAppService.deleteMaterial",
-      "desiredAction": "MATERIAL_DELETE",
-      "owner": "ADMIN",
-      "risk": "HIGH",
-      "coverageState": "LEGACY_DIRECT"
-    },
-    {
-      "id": "ACT-036",
-      "trigger": "APP_SERVICE_MUTATION",
-      "location": "src/services/app/OOSService.ts:39",
-      "category": "LIFECYCLE",
-      "entity": "OOS",
-      "mutation": true,
-      "currentPath": "OOSService.triggerOOSInvestigation",
-      "desiredAction": "SYSTEM_CONFIG_UPDATE",
-      "owner": "QA",
-      "risk": "MEDIUM",
-      "coverageState": "LEGACY_DIRECT"
-    },
-    {
-      "id": "ACT-037",
-      "trigger": "APP_SERVICE_MUTATION",
-      "location": "src/services/app/OOSService.ts:66",
-      "category": "LIFECYCLE",
-      "entity": "OOS",
-      "mutation": true,
-      "currentPath": "OOSService.submitPhase1Investigation",
-      "desiredAction": "SYSTEM_CONFIG_UPDATE",
-      "owner": "QA",
-      "risk": "MEDIUM",
-      "coverageState": "LEGACY_DIRECT"
-    },
-    {
-      "id": "ACT-038",
-      "trigger": "APP_SERVICE_MUTATION",
-      "location": "src/services/app/OOSService.ts:103",
-      "category": "APPROVAL",
-      "entity": "OOS",
-      "mutation": true,
-      "currentPath": "OOSService.concludeOOSInvestigation",
-      "desiredAction": "OOS_CONCLUDE",
-      "owner": "QA",
-      "risk": "HIGH",
-      "coverageState": "LEGACY_DIRECT"
-    },
-    {
-      "id": "ACT-039",
+      "id": "ACT-008",
       "trigger": "APP_SERVICE_MUTATION",
       "location": "src/services/app/PharmacopoeiaAppService.ts:45",
       "category": "LIFECYCLE",
@@ -569,7 +159,7 @@
       "coverageState": "LEGACY_DIRECT"
     },
     {
-      "id": "ACT-040",
+      "id": "ACT-009",
       "trigger": "APP_SERVICE_MUTATION",
       "location": "src/services/app/PharmacopoeiaAppService.ts:74",
       "category": "LIFECYCLE",
@@ -582,7 +172,7 @@
       "coverageState": "LEGACY_DIRECT"
     },
     {
-      "id": "ACT-041",
+      "id": "ACT-010",
       "trigger": "APP_SERVICE_MUTATION",
       "location": "src/services/app/PharmacopoeiaAppService.ts:101",
       "category": "LIFECYCLE",
@@ -595,7 +185,7 @@
       "coverageState": "LEGACY_DIRECT"
     },
     {
-      "id": "ACT-042",
+      "id": "ACT-011",
       "trigger": "APP_SERVICE_MUTATION",
       "location": "src/services/app/PharmacopoeiaAppService.ts:124",
       "category": "LIFECYCLE",
@@ -608,98 +198,7 @@
       "coverageState": "LEGACY_DIRECT"
     },
     {
-      "id": "ACT-043",
-      "trigger": "APP_SERVICE_MUTATION",
-      "location": "src/services/app/ProductAppService.ts:27",
-      "category": "LIFECYCLE",
-      "entity": "PRODUCT",
-      "mutation": true,
-      "currentPath": "ProductAppService.createProduct",
-      "desiredAction": "PRODUCT_CREATE",
-      "owner": "QA",
-      "risk": "MEDIUM",
-      "coverageState": "LEGACY_DIRECT"
-    },
-    {
-      "id": "ACT-044",
-      "trigger": "APP_SERVICE_MUTATION",
-      "location": "src/services/app/ProductAppService.ts:58",
-      "category": "LIFECYCLE",
-      "entity": "PRODUCT",
-      "mutation": true,
-      "currentPath": "ProductAppService.updateProduct",
-      "desiredAction": "PRODUCT_UPDATE",
-      "owner": "QA",
-      "risk": "MEDIUM",
-      "coverageState": "LEGACY_DIRECT"
-    },
-    {
-      "id": "ACT-045",
-      "trigger": "APP_SERVICE_MUTATION",
-      "location": "src/services/app/ProductAppService.ts:107",
-      "category": "LIFECYCLE",
-      "entity": "PRODUCT",
-      "mutation": true,
-      "currentPath": "ProductAppService.deleteProduct",
-      "desiredAction": "PRODUCT_ARCHIVE",
-      "owner": "ADMIN",
-      "risk": "HIGH",
-      "coverageState": "LEGACY_DIRECT"
-    },
-    {
-      "id": "ACT-046",
-      "trigger": "APP_SERVICE_MUTATION",
-      "location": "src/services/app/ProductAppService.ts:136",
-      "category": "LIFECYCLE",
-      "entity": "PRODUCT",
-      "mutation": true,
-      "currentPath": "ProductAppService.bulkCreateProducts",
-      "desiredAction": "SYSTEM_CONFIG_UPDATE",
-      "owner": "QA",
-      "risk": "MEDIUM",
-      "coverageState": "LEGACY_DIRECT"
-    },
-    {
-      "id": "ACT-047",
-      "trigger": "APP_SERVICE_MUTATION",
-      "location": "src/services/app/ReleaseService.ts:76",
-      "category": "APPROVAL",
-      "entity": "BATCH",
-      "mutation": true,
-      "currentPath": "ReleaseService.releaseBatch",
-      "desiredAction": "BATCH_RELEASE_APPROVE",
-      "owner": "QA",
-      "risk": "HIGH",
-      "coverageState": "LEGACY_DIRECT"
-    },
-    {
-      "id": "ACT-048",
-      "trigger": "APP_SERVICE_MUTATION",
-      "location": "src/services/app/ReleaseService.ts:161",
-      "category": "LIFECYCLE",
-      "entity": "BATCH",
-      "mutation": true,
-      "currentPath": "ReleaseService.executeBatchHold",
-      "desiredAction": "SYSTEM_CONFIG_UPDATE",
-      "owner": "QA",
-      "risk": "MEDIUM",
-      "coverageState": "LEGACY_DIRECT"
-    },
-    {
-      "id": "ACT-049",
-      "trigger": "APP_SERVICE_MUTATION",
-      "location": "src/services/app/ReleaseService.ts:215",
-      "category": "LIFECYCLE",
-      "entity": "BATCH",
-      "mutation": true,
-      "currentPath": "ReleaseService.executeBatchRecall",
-      "desiredAction": "SYSTEM_CONFIG_UPDATE",
-      "owner": "QA",
-      "risk": "MEDIUM",
-      "coverageState": "LEGACY_DIRECT"
-    },
-    {
-      "id": "ACT-050",
+      "id": "ACT-012",
       "trigger": "APP_SERVICE_MUTATION",
       "location": "src/services/app/SystemAppService.ts:65",
       "category": "ADMIN",
@@ -712,7 +211,7 @@
       "coverageState": "LEGACY_DIRECT"
     },
     {
-      "id": "ACT-051",
+      "id": "ACT-013",
       "trigger": "APP_SERVICE_MUTATION",
       "location": "src/services/app/SystemAppService.ts:96",
       "category": "ADMIN",
@@ -725,7 +224,7 @@
       "coverageState": "LEGACY_DIRECT"
     },
     {
-      "id": "ACT-052",
+      "id": "ACT-014",
       "trigger": "APP_SERVICE_MUTATION",
       "location": "src/services/app/SystemAppService.ts:144",
       "category": "ADMIN",
@@ -738,7 +237,7 @@
       "coverageState": "LEGACY_DIRECT"
     },
     {
-      "id": "ACT-053",
+      "id": "ACT-015",
       "trigger": "APP_SERVICE_MUTATION",
       "location": "src/services/app/SystemAppService.ts:185",
       "category": "ADMIN",
@@ -751,202 +250,7 @@
       "coverageState": "LEGACY_DIRECT"
     },
     {
-      "id": "ACT-054",
-      "trigger": "APP_SERVICE_MUTATION",
-      "location": "src/services/app/TCCSAppService.ts:43",
-      "category": "LIFECYCLE",
-      "entity": "TCCS",
-      "mutation": true,
-      "currentPath": "TCCSAppService.createTCCS",
-      "desiredAction": "TCCS_CREATE",
-      "owner": "QA",
-      "risk": "HIGH",
-      "coverageState": "LEGACY_DIRECT"
-    },
-    {
-      "id": "ACT-055",
-      "trigger": "APP_SERVICE_MUTATION",
-      "location": "src/services/app/TCCSAppService.ts:101",
-      "category": "LIFECYCLE",
-      "entity": "TCCS",
-      "mutation": true,
-      "currentPath": "TCCSAppService.updateTCCS",
-      "desiredAction": "TCCS_UPDATE_DRAFT",
-      "owner": "QA",
-      "risk": "MEDIUM",
-      "coverageState": "LEGACY_DIRECT"
-    },
-    {
-      "id": "ACT-056",
-      "trigger": "APP_SERVICE_MUTATION",
-      "location": "src/services/app/TCCSAppService.ts:195",
-      "category": "LIFECYCLE",
-      "entity": "TCCS",
-      "mutation": true,
-      "currentPath": "TCCSAppService.deleteTCCS",
-      "desiredAction": "SYSTEM_CONFIG_UPDATE",
-      "owner": "QA",
-      "risk": "MEDIUM",
-      "coverageState": "LEGACY_DIRECT"
-    },
-    {
-      "id": "ACT-057",
-      "trigger": "APP_SERVICE_MUTATION",
-      "location": "src/services/app/TCCSAppService.ts:245",
-      "category": "LIFECYCLE",
-      "entity": "TCCS",
-      "mutation": true,
-      "currentPath": "TCCSAppService.addAiLearnedMapping",
-      "desiredAction": "SYSTEM_CONFIG_UPDATE",
-      "owner": "QA",
-      "risk": "MEDIUM",
-      "coverageState": "LEGACY_DIRECT"
-    },
-    {
-      "id": "ACT-058",
-      "trigger": "APP_SERVICE_MUTATION",
-      "location": "src/services/app/TCCSAppService.ts:295",
-      "category": "LIFECYCLE",
-      "entity": "TCCS",
-      "mutation": true,
-      "currentPath": "TCCSAppService.addCriteriaAlias",
-      "desiredAction": "SYSTEM_CONFIG_UPDATE",
-      "owner": "QA",
-      "risk": "MEDIUM",
-      "coverageState": "LEGACY_DIRECT"
-    },
-    {
-      "id": "ACT-059",
-      "trigger": "APP_SERVICE_MUTATION",
-      "location": "src/services/app/TCCSAppService.ts:321",
-      "category": "LIFECYCLE",
-      "entity": "TCCS",
-      "mutation": true,
-      "currentPath": "TCCSAppService.updateCriteriaAlias",
-      "desiredAction": "TCCS_UPDATE_DRAFT",
-      "owner": "QA",
-      "risk": "MEDIUM",
-      "coverageState": "LEGACY_DIRECT"
-    },
-    {
-      "id": "ACT-060",
-      "trigger": "APP_SERVICE_MUTATION",
-      "location": "src/services/app/TCCSAppService.ts:347",
-      "category": "LIFECYCLE",
-      "entity": "TCCS",
-      "mutation": true,
-      "currentPath": "TCCSAppService.deleteCriteriaAlias",
-      "desiredAction": "SYSTEM_CONFIG_UPDATE",
-      "owner": "QA",
-      "risk": "MEDIUM",
-      "coverageState": "LEGACY_DIRECT"
-    },
-    {
-      "id": "ACT-061",
-      "trigger": "APP_SERVICE_MUTATION",
-      "location": "src/services/app/TCCSAppService.ts:370",
-      "category": "LIFECYCLE",
-      "entity": "TCCS",
-      "mutation": true,
-      "currentPath": "TCCSAppService.confirmCriteriaAlias",
-      "desiredAction": "SYSTEM_CONFIG_UPDATE",
-      "owner": "QA",
-      "risk": "MEDIUM",
-      "coverageState": "LEGACY_DIRECT"
-    },
-    {
-      "id": "ACT-062",
-      "trigger": "APP_SERVICE_MUTATION",
-      "location": "src/services/app/TCCSAppService.ts:383",
-      "category": "LIFECYCLE",
-      "entity": "TCCS",
-      "mutation": true,
-      "currentPath": "TCCSAppService.addAliasToExisting",
-      "desiredAction": "SYSTEM_CONFIG_UPDATE",
-      "owner": "QA",
-      "risk": "MEDIUM",
-      "coverageState": "LEGACY_DIRECT"
-    },
-    {
-      "id": "ACT-063",
-      "trigger": "APP_SERVICE_MUTATION",
-      "location": "src/services/app/TestResultAppService.ts:30",
-      "category": "LIFECYCLE",
-      "entity": "TEST_RESULT",
-      "mutation": true,
-      "currentPath": "TestResultAppService.createTestResult",
-      "desiredAction": "TEST_RESULT_CREATE",
-      "owner": "LAB",
-      "risk": "HIGH",
-      "coverageState": "LEGACY_DIRECT"
-    },
-    {
-      "id": "ACT-064",
-      "trigger": "APP_SERVICE_MUTATION",
-      "location": "src/services/app/TestResultAppService.ts:44",
-      "category": "QUALITY",
-      "entity": "TEST_RESULT",
-      "mutation": true,
-      "currentPath": "TestResultAppService.updateTestResult",
-      "desiredAction": "TEST_RESULT_ENTRY_INPUT",
-      "owner": "LAB",
-      "risk": "HIGH",
-      "coverageState": "LEGACY_DIRECT"
-    },
-    {
-      "id": "ACT-065",
-      "trigger": "APP_SERVICE_MUTATION",
-      "location": "src/services/app/TestResultAppService.ts:63",
-      "category": "QUALITY",
-      "entity": "TEST_RESULT",
-      "mutation": true,
-      "currentPath": "TestResultAppService.updateWorkflowStatus",
-      "desiredAction": "TEST_RESULT_ENTRY_INPUT",
-      "owner": "LAB",
-      "risk": "HIGH",
-      "coverageState": "LEGACY_DIRECT"
-    },
-    {
-      "id": "ACT-066",
-      "trigger": "APP_SERVICE_MUTATION",
-      "location": "src/services/app/TestResultAppService.ts:86",
-      "category": "LIFECYCLE",
-      "entity": "TEST_RESULT",
-      "mutation": true,
-      "currentPath": "TestResultAppService.deleteTestResult",
-      "desiredAction": "SYSTEM_CONFIG_UPDATE",
-      "owner": "QA",
-      "risk": "MEDIUM",
-      "coverageState": "LEGACY_DIRECT"
-    },
-    {
-      "id": "ACT-067",
-      "trigger": "REPOSITORY_WRITE",
-      "location": "src/repositories/BatchRepository.ts:12",
-      "category": "LIFECYCLE",
-      "entity": "BATCH",
-      "mutation": true,
-      "currentPath": "BatchRepository.updateStatus",
-      "desiredAction": "BATCH_DISPATCH_TESTING",
-      "owner": "QA",
-      "risk": "HIGH",
-      "coverageState": "LEGACY_DIRECT"
-    },
-    {
-      "id": "ACT-068",
-      "trigger": "REPOSITORY_WRITE",
-      "location": "src/repositories/BatchRepository.ts:13",
-      "category": "LIFECYCLE",
-      "entity": "BATCH",
-      "mutation": true,
-      "currentPath": "BatchRepository.updateProgress",
-      "desiredAction": "BATCH_UPDATE_METADATA",
-      "owner": "QA",
-      "risk": "HIGH",
-      "coverageState": "LEGACY_DIRECT"
-    },
-    {
-      "id": "ACT-069",
+      "id": "ACT-016",
       "trigger": "REPOSITORY_WRITE",
       "location": "src/repositories/firebase/BaseFirebaseRepository.ts:253",
       "category": "LIFECYCLE",
@@ -959,7 +263,7 @@
       "coverageState": "LEGACY_DIRECT"
     },
     {
-      "id": "ACT-070",
+      "id": "ACT-017",
       "trigger": "REPOSITORY_WRITE",
       "location": "src/repositories/firebase/BaseFirebaseRepository.ts:262",
       "category": "LIFECYCLE",
@@ -972,7 +276,7 @@
       "coverageState": "LEGACY_DIRECT"
     },
     {
-      "id": "ACT-071",
+      "id": "ACT-018",
       "trigger": "REPOSITORY_WRITE",
       "location": "src/repositories/firebase/FirebaseAILearnedMappingRepository.ts:24",
       "category": "LIFECYCLE",
@@ -985,7 +289,7 @@
       "coverageState": "LEGACY_DIRECT"
     },
     {
-      "id": "ACT-072",
+      "id": "ACT-019",
       "trigger": "REPOSITORY_WRITE",
       "location": "src/repositories/firebase/FirebaseApprovalTaskRepository.ts:32",
       "category": "LIFECYCLE",
@@ -998,7 +302,7 @@
       "coverageState": "LEGACY_DIRECT"
     },
     {
-      "id": "ACT-073",
+      "id": "ACT-020",
       "trigger": "REPOSITORY_WRITE",
       "location": "src/repositories/firebase/FirebaseBatchRepository.ts:43",
       "category": "LIFECYCLE",
@@ -1011,7 +315,7 @@
       "coverageState": "LEGACY_DIRECT"
     },
     {
-      "id": "ACT-074",
+      "id": "ACT-021",
       "trigger": "REPOSITORY_WRITE",
       "location": "src/repositories/firebase/FirebaseBatchRepository.ts:54",
       "category": "LIFECYCLE",
@@ -1024,7 +328,7 @@
       "coverageState": "LEGACY_DIRECT"
     },
     {
-      "id": "ACT-075",
+      "id": "ACT-022",
       "trigger": "REPOSITORY_WRITE",
       "location": "src/repositories/firebase/FirebaseBatchRepository.ts:61",
       "category": "LIFECYCLE",
@@ -1037,7 +341,7 @@
       "coverageState": "LEGACY_DIRECT"
     },
     {
-      "id": "ACT-076",
+      "id": "ACT-023",
       "trigger": "REPOSITORY_WRITE",
       "location": "src/repositories/firebase/FirebaseChangeControlRepository.ts:26",
       "category": "LIFECYCLE",
@@ -1050,7 +354,7 @@
       "coverageState": "LEGACY_DIRECT"
     },
     {
-      "id": "ACT-077",
+      "id": "ACT-024",
       "trigger": "REPOSITORY_WRITE",
       "location": "src/repositories/firebase/FirebaseCriteriaAliasRepository.ts:23",
       "category": "LIFECYCLE",
@@ -1063,7 +367,7 @@
       "coverageState": "LEGACY_DIRECT"
     },
     {
-      "id": "ACT-078",
+      "id": "ACT-025",
       "trigger": "REPOSITORY_WRITE",
       "location": "src/repositories/firebase/FirebaseDeviationRepository.ts:23",
       "category": "LIFECYCLE",
@@ -1076,7 +380,7 @@
       "coverageState": "LEGACY_DIRECT"
     },
     {
-      "id": "ACT-079",
+      "id": "ACT-026",
       "trigger": "REPOSITORY_WRITE",
       "location": "src/repositories/firebase/FirebaseDeviationRepository.ts:39",
       "category": "LIFECYCLE",
@@ -1089,7 +393,7 @@
       "coverageState": "LEGACY_DIRECT"
     },
     {
-      "id": "ACT-080",
+      "id": "ACT-027",
       "trigger": "REPOSITORY_WRITE",
       "location": "src/repositories/firebase/FirebaseFormulaRepository.ts:24",
       "category": "LIFECYCLE",
@@ -1102,7 +406,7 @@
       "coverageState": "LEGACY_DIRECT"
     },
     {
-      "id": "ACT-081",
+      "id": "ACT-028",
       "trigger": "REPOSITORY_WRITE",
       "location": "src/repositories/firebase/FirebaseLaboratoryRepository.ts:13",
       "category": "LIFECYCLE",
@@ -1115,7 +419,7 @@
       "coverageState": "LEGACY_DIRECT"
     },
     {
-      "id": "ACT-082",
+      "id": "ACT-029",
       "trigger": "REPOSITORY_WRITE",
       "location": "src/repositories/firebase/FirebaseMasterCriterionRepository.ts:49",
       "category": "LIFECYCLE",
@@ -1128,7 +432,7 @@
       "coverageState": "LEGACY_DIRECT"
     },
     {
-      "id": "ACT-083",
+      "id": "ACT-030",
       "trigger": "REPOSITORY_WRITE",
       "location": "src/repositories/firebase/FirebaseMaterialRepository.ts:42",
       "category": "LIFECYCLE",
@@ -1141,7 +445,7 @@
       "coverageState": "LEGACY_DIRECT"
     },
     {
-      "id": "ACT-084",
+      "id": "ACT-031",
       "trigger": "REPOSITORY_WRITE",
       "location": "src/repositories/firebase/FirebasePharmacopoeiaRepository.ts:13",
       "category": "LIFECYCLE",
@@ -1154,7 +458,7 @@
       "coverageState": "LEGACY_DIRECT"
     },
     {
-      "id": "ACT-085",
+      "id": "ACT-032",
       "trigger": "REPOSITORY_WRITE",
       "location": "src/repositories/firebase/FirebaseProductRepository.ts:35",
       "category": "LIFECYCLE",
@@ -1167,7 +471,7 @@
       "coverageState": "LEGACY_DIRECT"
     },
     {
-      "id": "ACT-086",
+      "id": "ACT-033",
       "trigger": "REPOSITORY_WRITE",
       "location": "src/repositories/firebase/FirebaseTCCSRepository.ts:34",
       "category": "LIFECYCLE",
@@ -1180,7 +484,7 @@
       "coverageState": "LEGACY_DIRECT"
     },
     {
-      "id": "ACT-087",
+      "id": "ACT-034",
       "trigger": "REPOSITORY_WRITE",
       "location": "src/repositories/firebase/FirebaseTestResultRepository.ts:42",
       "category": "LIFECYCLE",
@@ -1193,20 +497,7 @@
       "coverageState": "LEGACY_DIRECT"
     },
     {
-      "id": "ACT-088",
-      "trigger": "REPOSITORY_WRITE",
-      "location": "src/repositories/IDeviationRepository.ts:10",
-      "category": "LIFECYCLE",
-      "entity": "DEVIATION",
-      "mutation": true,
-      "currentPath": "IDeviationRepository.updateStatus",
-      "desiredAction": "DEVIATION_INVESTIGATE",
-      "owner": "QA",
-      "risk": "HIGH",
-      "coverageState": "LEGACY_DIRECT"
-    },
-    {
-      "id": "ACT-089",
+      "id": "ACT-035",
       "trigger": "REPOSITORY_WRITE",
       "location": "src/repositories/ILaboratoryRepository.ts:6",
       "category": "LIFECYCLE",
@@ -1219,7 +510,7 @@
       "coverageState": "LEGACY_DIRECT"
     },
     {
-      "id": "ACT-090",
+      "id": "ACT-036",
       "trigger": "REPOSITORY_WRITE",
       "location": "src/repositories/ILaboratoryRepository.ts:7",
       "category": "LIFECYCLE",
@@ -1232,7 +523,7 @@
       "coverageState": "LEGACY_DIRECT"
     },
     {
-      "id": "ACT-091",
+      "id": "ACT-037",
       "trigger": "REPOSITORY_WRITE",
       "location": "src/repositories/ILaboratoryRepository.ts:8",
       "category": "LIFECYCLE",
@@ -1245,7 +536,85 @@
       "coverageState": "LEGACY_DIRECT"
     },
     {
-      "id": "ACT-092",
+      "id": "ACT-038",
+      "trigger": "REPOSITORY_WRITE",
+      "location": "src/repositories/interfaces/IBatchRepository.ts:12",
+      "category": "LIFECYCLE",
+      "entity": "BATCH",
+      "mutation": true,
+      "currentPath": "IBatchRepository.updateStatus",
+      "desiredAction": "BATCH_DISPATCH_TESTING",
+      "owner": "QA",
+      "risk": "HIGH",
+      "coverageState": "LEGACY_DIRECT"
+    },
+    {
+      "id": "ACT-039",
+      "trigger": "REPOSITORY_WRITE",
+      "location": "src/repositories/interfaces/IBatchRepository.ts:13",
+      "category": "LIFECYCLE",
+      "entity": "BATCH",
+      "mutation": true,
+      "currentPath": "IBatchRepository.updateProgress",
+      "desiredAction": "BATCH_UPDATE_METADATA",
+      "owner": "QA",
+      "risk": "HIGH",
+      "coverageState": "LEGACY_DIRECT"
+    },
+    {
+      "id": "ACT-040",
+      "trigger": "REPOSITORY_WRITE",
+      "location": "src/repositories/interfaces/IDeviationRepository.ts:10",
+      "category": "LIFECYCLE",
+      "entity": "DEVIATION",
+      "mutation": true,
+      "currentPath": "IDeviationRepository.updateStatus",
+      "desiredAction": "DEVIATION_INVESTIGATE",
+      "owner": "QA",
+      "risk": "HIGH",
+      "coverageState": "LEGACY_DIRECT"
+    },
+    {
+      "id": "ACT-041",
+      "trigger": "REPOSITORY_WRITE",
+      "location": "src/repositories/interfaces/IPharmacopoeiaRepository.ts:10",
+      "category": "LIFECYCLE",
+      "entity": "MASTER_DATA",
+      "mutation": true,
+      "currentPath": "IPharmacopoeiaRepository.save",
+      "desiredAction": "PHARMACOPOEIA_UPDATE",
+      "owner": "QA",
+      "risk": "MEDIUM",
+      "coverageState": "LEGACY_DIRECT"
+    },
+    {
+      "id": "ACT-042",
+      "trigger": "REPOSITORY_WRITE",
+      "location": "src/repositories/interfaces/IPharmacopoeiaRepository.ts:11",
+      "category": "LIFECYCLE",
+      "entity": "MASTER_DATA",
+      "mutation": true,
+      "currentPath": "IPharmacopoeiaRepository.update",
+      "desiredAction": "PHARMACOPOEIA_UPDATE",
+      "owner": "QA",
+      "risk": "MEDIUM",
+      "coverageState": "LEGACY_DIRECT"
+    },
+    {
+      "id": "ACT-043",
+      "trigger": "REPOSITORY_WRITE",
+      "location": "src/repositories/interfaces/IPharmacopoeiaRepository.ts:12",
+      "category": "LIFECYCLE",
+      "entity": "MASTER_DATA",
+      "mutation": true,
+      "currentPath": "IPharmacopoeiaRepository.delete",
+      "desiredAction": "PHARMACOPOEIA_UPDATE",
+      "owner": "QA",
+      "risk": "MEDIUM",
+      "coverageState": "LEGACY_DIRECT"
+    },
+    {
+      "id": "ACT-044",
       "trigger": "REPOSITORY_WRITE",
       "location": "src/repositories/IPharmacopoeiaRepository.ts:6",
       "category": "LIFECYCLE",
@@ -1258,7 +627,7 @@
       "coverageState": "LEGACY_DIRECT"
     },
     {
-      "id": "ACT-093",
+      "id": "ACT-045",
       "trigger": "REPOSITORY_WRITE",
       "location": "src/repositories/IPharmacopoeiaRepository.ts:7",
       "category": "LIFECYCLE",
@@ -1271,7 +640,7 @@
       "coverageState": "LEGACY_DIRECT"
     },
     {
-      "id": "ACT-094",
+      "id": "ACT-046",
       "trigger": "REPOSITORY_WRITE",
       "location": "src/repositories/IPharmacopoeiaRepository.ts:8",
       "category": "LIFECYCLE",
@@ -1284,7 +653,7 @@
       "coverageState": "LEGACY_DIRECT"
     },
     {
-      "id": "ACT-095",
+      "id": "ACT-047",
       "trigger": "AI_TOOL_EXECUTE",
       "location": "src/services/ai/tools/aiInsightsTool.ts:1",
       "category": "GOVERNANCE",
@@ -1297,7 +666,7 @@
       "coverageState": "ADAPTER_BRIDGED"
     },
     {
-      "id": "ACT-096",
+      "id": "ACT-048",
       "trigger": "AI_TOOL_EXECUTE",
       "location": "src/services/ai/tools/autoHealingTool.ts:1",
       "category": "ADMIN",
@@ -1310,7 +679,7 @@
       "coverageState": "ADAPTER_BRIDGED"
     },
     {
-      "id": "ACT-097",
+      "id": "ACT-049",
       "trigger": "AI_TOOL_EXECUTE",
       "location": "src/services/ai/tools/batchActionTools.ts:1",
       "category": "QUALITY",
@@ -1323,7 +692,7 @@
       "coverageState": "ADAPTER_BRIDGED"
     },
     {
-      "id": "ACT-098",
+      "id": "ACT-050",
       "trigger": "AI_TOOL_EXECUTE",
       "location": "src/services/ai/tools/batchSummaryTool.ts:1",
       "category": "GOVERNANCE",
@@ -1336,7 +705,7 @@
       "coverageState": "ADAPTER_BRIDGED"
     },
     {
-      "id": "ACT-099",
+      "id": "ACT-051",
       "trigger": "AI_TOOL_EXECUTE",
       "location": "src/services/ai/tools/dataIntegrityTool.ts:1",
       "category": "GOVERNANCE",
@@ -1349,7 +718,7 @@
       "coverageState": "ADAPTER_BRIDGED"
     },
     {
-      "id": "ACT-100",
+      "id": "ACT-052",
       "trigger": "AI_TOOL_EXECUTE",
       "location": "src/services/ai/tools/deviationReportTool.ts:1",
       "category": "GOVERNANCE",
@@ -1362,7 +731,7 @@
       "coverageState": "ADAPTER_BRIDGED"
     },
     {
-      "id": "ACT-101",
+      "id": "ACT-053",
       "trigger": "AI_TOOL_EXECUTE",
       "location": "src/services/ai/tools/labComparisonTool.ts:1",
       "category": "QUALITY",
@@ -1375,7 +744,7 @@
       "coverageState": "ADAPTER_BRIDGED"
     },
     {
-      "id": "ACT-102",
+      "id": "ACT-054",
       "trigger": "AI_TOOL_EXECUTE",
       "location": "src/services/ai/tools/navigationTool.ts:1",
       "category": "GOVERNANCE",
@@ -1388,7 +757,7 @@
       "coverageState": "ADAPTER_BRIDGED"
     },
     {
-      "id": "ACT-103",
+      "id": "ACT-055",
       "trigger": "AI_TOOL_EXECUTE",
       "location": "src/services/ai/tools/nlQueryTool.ts:1",
       "category": "GOVERNANCE",
@@ -1401,7 +770,7 @@
       "coverageState": "ADAPTER_BRIDGED"
     },
     {
-      "id": "ACT-104",
+      "id": "ACT-056",
       "trigger": "AI_TOOL_EXECUTE",
       "location": "src/services/ai/tools/oosInvestigationTool.ts:1",
       "category": "GOVERNANCE",
@@ -1414,7 +783,7 @@
       "coverageState": "ADAPTER_BRIDGED"
     },
     {
-      "id": "ACT-105",
+      "id": "ACT-057",
       "trigger": "AI_TOOL_EXECUTE",
       "location": "src/services/ai/tools/pharmacopoeiaTool.ts:1",
       "category": "GOVERNANCE",
@@ -1427,7 +796,7 @@
       "coverageState": "ADAPTER_BRIDGED"
     },
     {
-      "id": "ACT-106",
+      "id": "ACT-058",
       "trigger": "AI_TOOL_EXECUTE",
       "location": "src/services/ai/tools/productionSynthesisTool.ts:1",
       "category": "GOVERNANCE",
@@ -1440,7 +809,7 @@
       "coverageState": "ADAPTER_BRIDGED"
     },
     {
-      "id": "ACT-107",
+      "id": "ACT-059",
       "trigger": "AI_TOOL_EXECUTE",
       "location": "src/services/ai/tools/qualityReportTool.ts:1",
       "category": "GOVERNANCE",
@@ -1453,7 +822,7 @@
       "coverageState": "ADAPTER_BRIDGED"
     },
     {
-      "id": "ACT-108",
+      "id": "ACT-060",
       "trigger": "AI_TOOL_EXECUTE",
       "location": "src/services/ai/tools/qualityRiskTool.ts:1",
       "category": "GOVERNANCE",
@@ -1466,7 +835,7 @@
       "coverageState": "ADAPTER_BRIDGED"
     },
     {
-      "id": "ACT-109",
+      "id": "ACT-061",
       "trigger": "AI_TOOL_EXECUTE",
       "location": "src/services/ai/tools/qualityTrendTool.ts:1",
       "category": "GOVERNANCE",
@@ -1479,7 +848,7 @@
       "coverageState": "ADAPTER_BRIDGED"
     },
     {
-      "id": "ACT-110",
+      "id": "ACT-062",
       "trigger": "AI_TOOL_EXECUTE",
       "location": "src/services/ai/tools/rootCauseAnalysisTool.ts:1",
       "category": "GOVERNANCE",
@@ -1492,7 +861,7 @@
       "coverageState": "ADAPTER_BRIDGED"
     },
     {
-      "id": "ACT-111",
+      "id": "ACT-063",
       "trigger": "AI_TOOL_EXECUTE",
       "location": "src/services/ai/tools/stabilityPredictionTool.ts:1",
       "category": "QUALITY",
@@ -1505,9 +874,9 @@
       "coverageState": "ADAPTER_BRIDGED"
     },
     {
-      "id": "ACT-112",
+      "id": "ACT-064",
       "trigger": "UI_FORM_SUBMIT",
-      "location": "src/pages/batches/BatchFormPage.tsx:53",
+      "location": "src/pages/batches/BatchFormPage.tsx:57",
       "category": "LIFECYCLE",
       "entity": "BATCH",
       "mutation": true,
@@ -1518,7 +887,7 @@
       "coverageState": "LEGACY_DIRECT"
     },
     {
-      "id": "ACT-113",
+      "id": "ACT-065",
       "trigger": "UI_FORM_SUBMIT",
       "location": "src/pages/products/MaterialFormPage.tsx:142",
       "category": "LIFECYCLE",
@@ -1531,9 +900,9 @@
       "coverageState": "LEGACY_DIRECT"
     },
     {
-      "id": "ACT-114",
+      "id": "ACT-066",
       "trigger": "UI_FORM_SUBMIT",
-      "location": "src/pages/products/ProductFormPage.tsx:177",
+      "location": "src/pages/products/ProductFormPage.tsx:181",
       "category": "LIFECYCLE",
       "entity": "PRODUCT",
       "mutation": true,
@@ -1544,7 +913,7 @@
       "coverageState": "LEGACY_DIRECT"
     },
     {
-      "id": "ACT-115",
+      "id": "ACT-067",
       "trigger": "UI_FORM_SUBMIT",
       "location": "src/pages/qa/CriteriaFormPage.tsx:173",
       "category": "LIFECYCLE",
@@ -1557,7 +926,7 @@
       "coverageState": "LEGACY_DIRECT"
     },
     {
-      "id": "ACT-116",
+      "id": "ACT-068",
       "trigger": "UI_FORM_SUBMIT",
       "location": "src/pages/qa/ProductFormulaFormPage.tsx:165",
       "category": "LIFECYCLE",
@@ -1570,7 +939,7 @@
       "coverageState": "LEGACY_DIRECT"
     },
     {
-      "id": "ACT-117",
+      "id": "ACT-069",
       "trigger": "UI_FORM_SUBMIT",
       "location": "src/pages/qa/TCCSFormPage.tsx:333",
       "category": "LIFECYCLE",
@@ -1583,7 +952,7 @@
       "coverageState": "LEGACY_DIRECT"
     },
     {
-      "id": "ACT-118",
+      "id": "ACT-070",
       "trigger": "UI_FORM_SUBMIT",
       "location": "src/pages/system/components/PharmacopoeiaManager.tsx:107",
       "category": "LIFECYCLE",
@@ -1596,7 +965,7 @@
       "coverageState": "LEGACY_DIRECT"
     },
     {
-      "id": "ACT-119",
+      "id": "ACT-071",
       "trigger": "FILE_EXPORT",
       "location": "src/utils/excelExporter.ts:1",
       "category": "DOCUMENT",
@@ -1609,7 +978,7 @@
       "coverageState": "ADAPTER_BRIDGED"
     },
     {
-      "id": "ACT-120",
+      "id": "ACT-072",
       "trigger": "FILE_UPLOAD",
       "location": "src/services/storageService.ts:1",
       "category": "DOCUMENT",
@@ -1622,7 +991,7 @@
       "coverageState": "ADAPTER_BRIDGED"
     },
     {
-      "id": "ACT-121",
+      "id": "ACT-073",
       "trigger": "CLOUD_FUNCTION_CALL",
       "location": "src/services/cloudFunctionsService.ts:1",
       "category": "QUALITY",
@@ -1635,7 +1004,7 @@
       "coverageState": "ADAPTER_BRIDGED"
     },
     {
-      "id": "ACT-122",
+      "id": "ACT-074",
       "trigger": "SYSTEM_BACKGROUND_JOB",
       "location": "src/services/dataConsistencyService.ts:1",
       "category": "ADMIN",
