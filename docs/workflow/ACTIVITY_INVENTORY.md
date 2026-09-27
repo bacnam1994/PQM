@@ -2,7 +2,7 @@
 
 > **Mã tài liệu**: `PQM-ACT-INV-001`  
 > **Phiên bản**: `1.0.0-BASELINE`  
-> **Thời điểm xuất**: `2026-09-27T02:06:28.729Z`  
+> **Thời điểm xuất**: `2026-09-27T02:11:31.337Z`  
 > **Trạng thái Gate**: `PASSED` (Phân loại: **100%**)
 
 ---
