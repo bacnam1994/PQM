@@ -1,7 +1,7 @@
 # PQM — KẾ HOẠCH REBUILD TOÀN DIỆN THEO WORKFLOW
 
 Repository: `bacnam1994/PQM`  
-Trạng thái hiện tại: **PHASE 12 (CAPA DOMAIN REBUILD - VS-09) — COMPLETED | NEXT: PHASE 13 (CHANGE REQUEST DOMAIN REBUILD - VS-10)**
+Trạng thái hiện tại: **PHASE 14 (COA DOMAIN REBUILD - VS-11) — COMPLETED | NEXT: PHASE 15 (APPROVAL DOMAIN REBUILD - VS-12)**
 
 ---
 
@@ -14,7 +14,7 @@ Trạng thái hiện tại: **PHASE 12 (CAPA DOMAIN REBUILD - VS-09) — COMPLET
 | **P-03** | **Dependency Graph**                | Lập đồ thị phụ thuộc đơn hướng: UI → App → Workflow → Domain → Repo → Infra                        |   ✅ **HOÀN THÀNH**   | `docs/audit/PQM_REBUILD_SOURCE_MIGRATION_MAP_V1.md`      |
 | **P-04** | **Rebuild Workflow Kernel**         | Chuẩn hóa contracts, registry, kernel, guards, handlers, events trong `src/workflow/`              |   ✅ **HOÀN THÀNH**   | `src/workflow/kernel/`, `guards/`, `registry/`           |
 | **P-05** | **Rebuild Repository Boundary**     | Tách Interface (`src/repositories/interfaces/`) khỏi Firebase (`src/infrastructure/repositories/`) |   ✅ **HOÀN THÀNH**   | `src/repositories/interfaces/`, `infrastructure/`        |
-| **P-06** | **Rebuild Domain Slices (1-16)**    | Di chuyển 16 lát dọc độc lập theo template DDD (Domain / App / Workflow / Infra / Tests)           | 🟡 **ĐANG THỰC HIỆN** | Tuần tự theo 16 Vertical Slices (VS-01 -> VS-09 ĐÃ XONG) |
+| **P-06** | **Rebuild Domain Slices (1-16)**    | Di chuyển 16 lát dọc độc lập theo template DDD (Domain / App / Workflow / Infra / Tests)           | 🟡 **ĐANG THỰC HIỆN** | Tuần tự theo 16 Vertical Slices (VS-01 -> VS-11 ĐÃ XONG) |
 | **P-07** | **Product Domain Rebuild**          | Audit → Move → Rewire → Test → Verify cho toàn bộ Product CRUD, FSM, Approval, Bulk, AI            |   ✅ **HOÀN THÀNH**   | `src/domains/product/`                                   |
 | **P-08** | **Material Domain Rebuild**         | Audit → Move → Rewire → Test → Verify cho Material CRUD, Status, Approval, Import, Bulk            |   ✅ **HOÀN THÀNH**   | `src/domains/material/`                                  |
 | **P-09** | **TCCS Domain Rebuild**             | Rebuild TCCS CREATE, UPDATE, SUBMIT, APPROVE, REJECT, REVISE. Zero bypass approval                 |   ✅ **HOÀN THÀNH**   | `src/domains/tccs/`                                      |
@@ -22,8 +22,8 @@ Trạng thái hiện tại: **PHASE 12 (CAPA DOMAIN REBUILD - VS-09) — COMPLET
 | **P-11** | **Batch Domain Rebuild**            | Rebuild Batch FSM (Hold, Start, Release, Cancel, Close, Reopen), 7 Release Gates, AI Quick Batch   |   ✅ **HOÀN THÀNH**   | `src/domains/batch/`                                     |
 | **P-12** | **Test Result Domain Rebuild**      | Rebuild Test Result Draft, Submit, Finalize, Approve, Reject, Supersede, Quality Evaluation        |   ✅ **HOÀN THÀNH**   | `src/domains/test-result/`                               |
 | **P-13** | **Deviation / OOS / CAPA**          | Tách bạch Deviation, OOS, CAPA thành 3 domain riêng biệt có FSM, rules, services độc lập           |   ✅ **HOÀN THÀNH**   | `src/domains/deviation/`, `oos/`, `capa/`                |
-| **P-14** | **Change Request Rebuild**          | Chuẩn hóa Change Request & Change Action FSM, đồng nhất State Authority                            |   📋 Chờ kích hoạt    | `src/domains/change-request/`                            |
-| **P-15** | **CoA & Approval Rebuild**          | Tách Document Generation, Approval, Release, Signature, ALCOA+ Audit Trail                         |   📋 Chờ kích hoạt    | `src/domains/coa/`, `approval/`                          |
+| **P-14** | **Change Request Rebuild**          | Chuẩn hóa Change Request & Change Action FSM, đồng nhất State Authority                            |   ✅ **HOÀN THÀNH**   | `src/domains/change-request/`                            |
+| **P-15** | **CoA & Approval Rebuild**          | Tách Document Generation, Approval, Release, Signature, ALCOA+ Audit Trail                         | 🟡 **ĐANG THỰC HIỆN** | `src/domains/coa/` (Xong), `approval/` (Tiếp theo)       |
 | **P-16** | **Master Data & System**            | Rebuild Users, Roles, Criteria, Labs, Pharmacopoeia, Settings, Destructive Tokens                  |   📋 Chờ kích hoạt    | `src/domains/master-data/`, `system/`                    |
 | **P-17** | **AI Boundary Rebuild**             | Cách ly AI Proposal tools, Human-in-the-loop confirmation, Zero direct repository mutation         |   📋 Chờ kích hoạt    | `src/interfaces/ai/`                                     |
 | **P-18** | **UI / Pages / Hooks Rebuild**      | Page → Feature Hook → Workflow/Application API. Zero direct Firebase/Repo mutation                 |   📋 Chờ kích hoạt    | `src/ui/`                                                |
@@ -52,9 +52,9 @@ Trạng thái hiện tại: **PHASE 12 (CAPA DOMAIN REBUILD - VS-09) — COMPLET
 | **VS-07** | **Deviation**      | `services/app/DeviationAppService.ts`, `repositories/IDeviationRepository.ts`, `pages/qa/Deviation*`                           | `src/domains/deviation/`                | ✅ **HOÀN THÀNH** |   🔴 Cao (GMP)    |
 | **VS-08** | **OOS**            | `services/app/OOSService.ts`, `components/features/OOSInvestigationModal.tsx`                                                  | `src/domains/oos/`                      | ✅ **HOÀN THÀNH** |   🔴 Cao (GMP)    |
 | **VS-09** | **CAPA**           | `services/app/CAPAService.ts`, `domain/capa/`                                                                                  | `src/domains/capa/`                     | ✅ **HOÀN THÀNH** |   🔴 Cao (GMP)    |
-| **VS-10** | **Change Request** | `services/app/ChangeControlAppService.ts`, `repositories/IChangeControlRepository.ts`                                          | `src/domains/change-request/`           | 🟡 **TIẾP THEO**  |   🔴 Cao (GMP)    |
-| **VS-11** | **CoA**            | `services/app/CoAService.ts`, `pages/qa/CoAReportPage.tsx`, `pages/public/CoAVerifyPage.tsx`                                   | `src/domains/coa/`                      | 📋 Chờ kích hoạt  |   🔴 Cao (GMP)    |
-| **VS-12** | **Approval**       | `services/app/ApprovalWorkflowService.ts`, `repositories/IApprovalTaskRepository.ts`                                           | `src/domains/approval/`                 | 📋 Chờ kích hoạt  |   🔴 Cao (GMP)    |
+| **VS-10** | **Change Request** | `services/app/ChangeControlAppService.ts`, `repositories/IChangeControlRepository.ts`                                          | `src/domains/change-request/`           | ✅ **HOÀN THÀNH** |   🔴 Cao (GMP)    |
+| **VS-11** | **CoA**            | `services/app/CoAService.ts`, `pages/qa/CoAReportPage.tsx`, `pages/public/CoAVerifyPage.tsx`                                   | `src/domains/coa/`                      | ✅ **HOÀN THÀNH** |   🔴 Cao (GMP)    |
+| **VS-12** | **Approval**       | `services/app/ApprovalWorkflowService.ts`, `repositories/IApprovalTaskRepository.ts`                                           | `src/domains/approval/`                 | 🟡 **TIẾP THEO**  |   🔴 Cao (GMP)    |
 | **VS-13** | **Master Data**    | `services/app/MasterCriterionAppService.ts`, `services/app/PharmacopoeiaAppService.ts`, `services/app/LaboratoryAppService.ts` | `src/domains/master-data/`              | 📋 Chờ kích hoạt  |   🟡 Trung bình   |
 | **VS-14** | **System**         | `services/app/SystemAppService.ts`, `services/userService.ts`, `services/permissionService.ts`                                 | `src/domains/system/`                   | 📋 Chờ kích hoạt  |   🟡 Trung bình   |
 | **VS-15** | **AI Boundary**    | `services/ai/`, `architecture/aiGovernance*`                                                                                   | `src/domains/ai/` hoặc `interfaces/ai/` | 📋 Chờ kích hoạt  |  🔴 Cao (Safety)  |
@@ -779,68 +779,39 @@ Reopen
 
 ---
 
-# XVIII. PHASE 14 — CHANGE REQUEST
+# XVIII. PHASE 14 — CHANGE REQUEST (✅ ĐÃ HOÀN THÀNH - COMMIT VS-10)
 
-Chuẩn hóa:
+Đã hoàn thành tái cấu trúc canonical change-request domain theo DDD / Clean Architecture:
 
-```text
-Create
-Submit
-Review
-Approve
-Reject
-Implement
-Complete
-Close
-Add Action
-Complete Action
-```
-
-Kiểm tra tránh tình trạng:
-
-```text
-Change Request state
-```
-
-và:
-
-```text
-Change Action state
-```
-
-bị quản lý bởi hai authority không đồng nhất.
+- `src/domains/change-request/domain/types.ts`: Chuẩn hóa thực thể Change Request, FMEA Risk Assessment, Change Action Items.
+- `src/domains/change-request/domain/rules.ts`: State Machine FSM (`ChangeRequestStateMachine`), kiểm tra điều kiện đóng thay đổi (QA/Admin + hoàn tất mọi actions), tính toán FMEA RPN/Risk Level.
+- `src/domains/change-request/application/service.ts`: `ChangeControlAppService` ủy quyền toàn bộ đột biến qua `WorkflowFacade.dispatch()`.
+- `src/domains/change-request/application/queries.ts`: `ChangeControlQueries` (getAll, getById, getByStatus, getByProductId).
+- `src/domains/change-request/infrastructure/repository.ts`: Binding `IChangeControlRepository` với `FirebaseChangeControlRepository`.
+- `src/domains/change-request/workflow/definitions.ts`: Định danh canonical workflow action IDs & nhãn trạng thái/nhóm thay đổi.
+- `src/domains/change-request/tests/changeRequestDomain.test.ts`: 100% pass bộ kiểm thử tự động.
+- `src/services/app/ChangeControlAppService.ts` & `src/repositories/IChangeControlRepository.ts`: Thin adapter duy trì 100% backward compatibility.
 
 ---
 
-# XIX. PHASE 15 — COA / APPROVAL
+# XIX. PHASE 15 — COA / APPROVAL (VS-11 COA: ✅ ĐÃ HOÀN THÀNH | VS-12 APPROVAL: 🟡 TIẾP THEO)
 
-Tách:
+### 1. CoA Domain (`src/domains/coa/`) - ✅ ĐÃ HOÀN THÀNH (VS-11)
 
-```text
-Document generation
-Approval
-Release
-Signature
-Audit
-```
+- `src/domains/coa/domain/types.ts`: Định nghĩa `CoADocumentPayload`, `CoAFootnote`, `CoAVerificationData`, `CoACriterionEntry`.
+- `src/domains/coa/domain/rules.ts`: Thẩm định tính toàn vẹn chữ ký băm SHA-256 (`CoARules.verifySnapshotIntegrity`), tổng hợp tự động Footnote cho chỉ tiêu Miễn kiểm/Thay thế (`CoARules.buildCriteriaAndFootnotes`), kiểm tra độ dài lý do thu hồi (`validateRevocationReason`), FSM (`CoAStateMachine`: GENERATED ➔ SIGNED ➔ REVOKED).
+- `src/domains/coa/application/service.ts`: `CoAService` điều phối `generateCoAPayload` (100% từ EvaluationSnapshot niêm phong), `generateCoAPayloadAsync`, `signCoA` (21 CFR Part 11 e-Signature), `revokeCoA`, `getCoAVerificationData` qua `WorkflowFacade`.
+- `src/domains/coa/application/queries.ts`: `CoAQueries` (getVerificationData, getDocumentPayload).
+- `src/domains/coa/infrastructure/repository.ts`: Binding các repositories & signatureService.
+- `src/domains/coa/workflow/definitions.ts`: Định danh canonical workflow action IDs (`COA_GENERATE`, `COA_SIGN`, `COA_REVOKE`) & nhãn trạng thái.
+- `src/domains/coa/tests/coaDomain.test.ts`: 100% pass unit tests (ALCOA+ tamper detection, footnotes, e-signature, verification).
+- `src/services/app/CoAService.ts`: Thin adapter duy trì 100% backward compatibility.
 
-Document generation không được tự động bypass approval.
+### 2. Approval Domain (`src/domains/approval/`) - 🟡 TIẾP THEO (VS-12)
 
-Luồng:
-
-```text
-Generate
- ↓
-Draft
- ↓
-Submit
- ↓
-Approve
- ↓
-Release
-```
-
-theo canonical workflow hiện có.
+- Tách bạch quy trình phê duyệt (Approval Tasks) chuẩn GMP:
+  - Document generation không được tự động bypass approval.
+  - Chuẩn hóa: Task Creation ➔ Review ➔ Multi-step Approval / Rejection ➔ Delegation ➔ Audit Trail.
 
 ---
 
