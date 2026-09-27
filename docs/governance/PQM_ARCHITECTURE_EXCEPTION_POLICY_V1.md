@@ -40,7 +40,7 @@ Kế hoạch xóa bỏ:      [Lộ trình thay thế hoàn toàn khi hết hạn
 
 | Exception ID | Tên ngoại lệ                    | Quy tắc bị ảnh hưởng              | Phạm vi áp dụng                                       | Ngày hết hạn | Biện pháp bù đắp (Compensating Control)                                                 |
 | :----------: | ------------------------------- | --------------------------------- | ----------------------------------------------------- | :----------: | --------------------------------------------------------------------------------------- |
-| **EXC-001**  | Thin Adapters Tương Thích Ngược | Direct imports trong legacy tests | 37 files tại `src/services/app/`, `src/repositories/` | `2026-12-31` | Toàn bộ các adapter chỉ re-export thuần túy từ Domain Slices, không chứa logic thứ hai. |
+| **EXC-001**  | Thin Adapters Tương Thích Ngược | Direct imports trong legacy tests | 37 files tại `src/services/app/`, `src/repositories/` | `2026-10-27` | Toàn bộ các adapter chỉ re-export thuần túy từ Domain Slices, không chứa logic thứ hai. |
 
 ---
 
