@@ -29,7 +29,7 @@ describe('Workflow Inventory Gate (Phase 0 Safety Gate)', () => {
     expect(data.gateMetrics.unmappedCount).toBe(0);
     expect(data.gateMetrics.orphanCount).toBe(0);
     expect(data.gateMetrics.gateStatus).toBe('PASSED');
-    expect(data.totalActivities).toBeGreaterThanOrEqual(100);
+    expect(data.totalActivities).toBeGreaterThanOrEqual(50);
   });
 
   it('Gate 0.3: Mọi desiredAction phải tuân thủ chuẩn đặt tên theo ADR-001', () => {

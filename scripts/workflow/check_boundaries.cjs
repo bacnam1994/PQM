@@ -17,9 +17,7 @@ const SRC_DIR = path.join(ROOT_DIR, 'src');
 const ALLOWED_FIREBASE_DB_FILES = new Set([
   path.join(SRC_DIR, 'hooks', 'useAuthSync.ts'),
   path.join(SRC_DIR, 'hooks', 'useFirebaseSync.ts'),
-  path.join(SRC_DIR, 'hooks', 'useTestResultPrint.ts'),
   path.join(SRC_DIR, 'hooks', 'operational', 'useOperationalWorkflow.ts'),
-  path.join(SRC_DIR, 'hooks', 'test-results', 'useTestResultForm.ts'),
   path.join(SRC_DIR, 'services', 'databaseService.ts'),
   path.join(SRC_DIR, 'services', 'authService.ts'),
 ]);
