@@ -1,6 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { testResultRepository } from '../../repositories/firebase/FirebaseTestResultRepository';
-import { testResultAppService } from '../../services/app/TestResultAppService';
+import { testResultQueries, testResultAppService } from '../../domains/test-result';
 import { useAppStore } from '../../store/useAppStore';
 import { TestResult, Batch } from '../../types';
 import { PaginationOptions, QueryFilter, PaginatedResult } from '../../repositories/types';
@@ -16,8 +15,8 @@ export function useTestResultsQuery(limit?: number) {
     queryKey: limit ? TEST_RESULT_QUERY_KEYS.recent(limit) : TEST_RESULT_QUERY_KEYS.all,
     queryFn: async () => {
       const items = limit
-        ? await testResultRepository.findRecent(limit)
-        : await testResultRepository.findRecent(500);
+        ? await testResultQueries.findRecent(limit)
+        : await testResultQueries.findRecent(500);
       return items.sort(
         (a, b) =>
           new Date(b.testDate || b.createdAt || 0).getTime() -
@@ -37,7 +36,7 @@ export function useTestResultsPaginatedQuery(
   return useQuery<PaginatedResult<TestResult>>({
     queryKey: TEST_RESULT_QUERY_KEYS.paginated(options, filters),
     queryFn: async () => {
-      return await testResultRepository.findPaginated(options, filters);
+      return await testResultQueries.findPaginated(options, filters);
     },
   });
 }
@@ -50,7 +49,7 @@ export function useTestResultQuery(id: string | undefined) {
     queryKey: TEST_RESULT_QUERY_KEYS.detail(id || ''),
     queryFn: async () => {
       if (!id) return null;
-      return await testResultRepository.findById(id);
+      return await testResultQueries.getById(id);
     },
     enabled: Boolean(id),
   });
@@ -64,7 +63,7 @@ export function useTestResultsByBatchQuery(batchId: string | undefined) {
     queryKey: TEST_RESULT_QUERY_KEYS.byBatch(batchId || ''),
     queryFn: async () => {
       if (!batchId) return [];
-      return await testResultRepository.findByBatchId(batchId);
+      return await testResultQueries.getByBatchId(batchId);
     },
     enabled: Boolean(batchId),
   });

@@ -7,7 +7,7 @@
  */
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { masterCriterionRepository } from '../../repositories/firebase/FirebaseMasterCriterionRepository';
+import { masterDataQueries, masterCriterionAppService } from '../../domains/master-data';
 import { MasterCriterion, MasterCriterionCategory, MasterCriterionFormData } from '../../types';
 import { MASTER_CRITERION_QUERY_KEYS } from '../../constants/queryKeys';
 import { useAppStore } from '../../store/useAppStore';
@@ -37,7 +37,7 @@ function generateMasterCriterionId(canonicalName: string): string {
 export function useMasterCriteriaQuery() {
   return useQuery<MasterCriterion[]>({
     queryKey: MASTER_CRITERION_QUERY_KEYS.all,
-    queryFn: () => masterCriterionRepository.findAll(),
+    queryFn: () => masterDataQueries.getAllCriteria(),
     staleTime: 1000 * 60 * 10, // 10 phút
   });
 }
@@ -48,7 +48,7 @@ export function useMasterCriteriaQuery() {
 export function useMasterCriteriaActiveQuery() {
   return useQuery<MasterCriterion[]>({
     queryKey: MASTER_CRITERION_QUERY_KEYS.active,
-    queryFn: () => masterCriterionRepository.findActive(),
+    queryFn: () => masterDataQueries.getActiveCriteria(),
     staleTime: 1000 * 60 * 10,
   });
 }
@@ -59,7 +59,7 @@ export function useMasterCriteriaActiveQuery() {
 export function useMasterCriterionQuery(id: string | undefined) {
   return useQuery<MasterCriterion | null>({
     queryKey: MASTER_CRITERION_QUERY_KEYS.detail(id || ''),
-    queryFn: () => (id ? masterCriterionRepository.findById(id) : null),
+    queryFn: () => (id ? masterDataQueries.getCriterionById(id) : null),
     enabled: Boolean(id),
   });
 }
@@ -71,7 +71,7 @@ export function useMasterCriteriaByCategory(category: MasterCriterionCategory | 
   return useQuery<MasterCriterion[]>({
     queryKey: MASTER_CRITERION_QUERY_KEYS.byCategory(category || ''),
     queryFn: () =>
-      category ? masterCriterionRepository.findByCategory(category) : Promise.resolve([]),
+      category ? masterDataQueries.getCriteriaByCategory(category) : Promise.resolve([]),
     enabled: Boolean(category),
   });
 }
@@ -79,7 +79,7 @@ export function useMasterCriteriaByCategory(category: MasterCriterionCategory | 
 // ─── Mutation Hooks ───────────────────────────────────────────────────────────
 
 /**
- * Mutation tạo mới MasterCriterion
+ * Mutation tạo mới MasterCriterion qua Application Service & Workflow
  */
 export function useCreateMasterCriterionMutation() {
   const queryClient = useQueryClient();
@@ -97,7 +97,7 @@ export function useCreateMasterCriterionMutation() {
         createdBy: user?.email || 'unknown',
         updatedBy: user?.email || 'unknown',
       };
-      await masterCriterionRepository.save(item);
+      await masterCriterionAppService.create(item, user);
       return item;
     },
     onSuccess: (newItem) => {
@@ -112,7 +112,7 @@ export function useCreateMasterCriterionMutation() {
 }
 
 /**
- * Mutation cập nhật MasterCriterion
+ * Mutation cập nhật MasterCriterion qua Application Service & Workflow
  */
 export function useUpdateMasterCriterionMutation() {
   const queryClient = useQueryClient();
@@ -126,7 +126,7 @@ export function useUpdateMasterCriterionMutation() {
       id: string;
       formData: Partial<MasterCriterionFormData>;
     }) => {
-      const existing = await masterCriterionRepository.findById(id);
+      const existing = await masterDataQueries.getCriterionById(id);
       if (!existing) throw new Error(`Không tìm thấy chỉ tiêu ID: ${id}`);
       const updated: MasterCriterion = {
         ...existing,
@@ -135,7 +135,7 @@ export function useUpdateMasterCriterionMutation() {
         updatedAt: new Date().toISOString(),
         updatedBy: user?.email || 'unknown',
       };
-      await masterCriterionRepository.save(updated);
+      await masterCriterionAppService.update(updated, user);
       return updated;
     },
     onSuccess: (updated) => {
@@ -150,14 +150,15 @@ export function useUpdateMasterCriterionMutation() {
 }
 
 /**
- * Mutation xóa MasterCriterion (chỉ ADMIN)
+ * Mutation xóa MasterCriterion qua Application Service & Workflow (chỉ ADMIN)
  */
 export function useDeleteMasterCriterionMutation() {
   const queryClient = useQueryClient();
+  const user = useAppStore((s) => s.user);
 
   return useMutation({
     mutationFn: async (id: string) => {
-      await masterCriterionRepository.delete(id);
+      await masterCriterionAppService.delete(id, user, undefined, 'Xóa chỉ tiêu từ giao diện');
       return id;
     },
     onSuccess: (deletedId) => {

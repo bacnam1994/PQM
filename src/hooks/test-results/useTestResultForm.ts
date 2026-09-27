@@ -33,8 +33,6 @@ import {
   calculateCompletionStatus,
   parseDateToISO,
 } from '../../utils';
-import { ref, query, orderByChild, equalTo, get } from 'firebase/database';
-import { db } from '../../firebase';
 import {
   buildAliasLookupMap,
   resolveCriteriaName,

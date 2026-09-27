@@ -25,6 +25,10 @@ export class DeviationQueries {
     const all = await this.repo.findAll();
     return all.filter((dev) => dev.status === status);
   }
+
+  async findPaginated(options?: any, filters?: any): Promise<any> {
+    return (this.repo as any).findPaginated(options, filters);
+  }
 }
 
 export const deviationQueries = new DeviationQueries();

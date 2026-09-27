@@ -38,6 +38,10 @@ export class TestResultQueries {
       .sort((a, b) => new Date(b.testDate || 0).getTime() - new Date(a.testDate || 0).getTime())
       .slice(0, limitCount);
   }
+
+  async findPaginated(options?: any, filters?: any): Promise<any> {
+    return this.repo.findPaginated(options, filters);
+  }
 }
 
 export const testResultQueries = new TestResultQueries();

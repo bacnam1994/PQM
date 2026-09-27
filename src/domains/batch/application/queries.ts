@@ -27,6 +27,18 @@ export class BatchQueries {
   async getByStatus(status: Batch['status']): Promise<Batch[]> {
     return this.repo.findByStatus(status);
   }
+
+  async findRecent(limit: number): Promise<Batch[]> {
+    if ((this.repo as any).findRecent) {
+      return (this.repo as any).findRecent(limit);
+    }
+    const all = await this.repo.findAll();
+    return all.slice(0, limit);
+  }
+
+  async findPaginated(options?: any, filters?: any): Promise<any> {
+    return this.repo.findPaginated(options, filters);
+  }
 }
 
 export const batchQueries = new BatchQueries();

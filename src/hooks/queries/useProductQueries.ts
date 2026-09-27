@@ -1,10 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { productRepository } from '../../repositories/firebase/FirebaseProductRepository';
-import { formulaRepository } from '../../repositories/firebase/FirebaseFormulaRepository';
-import { materialRepository } from '../../repositories/firebase/FirebaseMaterialRepository';
-import { productAppService } from '../../services/app/ProductAppService';
-import { formulaAppService } from '../../services/app/FormulaAppService';
-import { materialAppService } from '../../services/app/MaterialAppService';
+import { productQueries, productAppService } from '../../domains/product';
+import { formulaQueries, formulaAppService } from '../../domains/formula';
+import { materialQueries, materialAppService } from '../../domains/material';
 import { useAppStore } from '../../store/useAppStore';
 import { Product, ProductFormula, RawMaterial } from '../../types';
 
@@ -18,7 +15,7 @@ export function useProductsQuery() {
   return useQuery<Product[]>({
     queryKey: PRODUCT_QUERY_KEYS.all,
     queryFn: async () => {
-      return await productRepository.findAll();
+      return await productQueries.getAll();
     },
   });
 }
@@ -31,7 +28,7 @@ export function useProductQuery(id: string | undefined) {
     queryKey: PRODUCT_QUERY_KEYS.detail(id || ''),
     queryFn: async () => {
       if (!id) return null;
-      return await productRepository.findById(id);
+      return await productQueries.getById(id);
     },
     enabled: Boolean(id),
   });
@@ -44,7 +41,7 @@ export function useProductFormulasQuery() {
   return useQuery<ProductFormula[]>({
     queryKey: PRODUCT_QUERY_KEYS.formulas,
     queryFn: async () => {
-      return await formulaRepository.findAll();
+      return await formulaQueries.getAll();
     },
   });
 }
@@ -57,7 +54,7 @@ export function useFormulaByProductQuery(productId: string | undefined) {
     queryKey: PRODUCT_QUERY_KEYS.formulaByProduct(productId || ''),
     queryFn: async () => {
       if (!productId) return null;
-      return await formulaRepository.findByProductId(productId);
+      return await formulaQueries.getByProductId(productId);
     },
     enabled: Boolean(productId),
   });
@@ -70,7 +67,7 @@ export function useRawMaterialsQuery() {
   return useQuery<RawMaterial[]>({
     queryKey: PRODUCT_QUERY_KEYS.materials,
     queryFn: async () => {
-      return await materialRepository.findAll();
+      return await materialQueries.getAll();
     },
   });
 }

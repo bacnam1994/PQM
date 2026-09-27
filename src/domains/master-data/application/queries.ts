@@ -29,6 +29,18 @@ export class MasterDataQueries {
     return this.criteriaRepo.findActive();
   }
 
+  async getCriterionById(id: string): Promise<MasterCriterion | null> {
+    return this.criteriaRepo.findById(id);
+  }
+
+  async getCriteriaByCategory(category: any): Promise<MasterCriterion[]> {
+    if ((this.criteriaRepo as any).findByCategory) {
+      return (this.criteriaRepo as any).findByCategory(category);
+    }
+    const all = await this.criteriaRepo.findAll();
+    return all.filter((c: any) => c.category === category);
+  }
+
   // Pharmacopoeia
   async getAllPharmacopoeiaStandards(): Promise<PharmacopoeiaStandard[]> {
     return this.pharmaRepo.findAll();

@@ -5,8 +5,7 @@ import { TestResultEntry } from '../types';
 import { ensureArray, parseNumberFromText, TEST_RESULT_STATUS, getFromCache } from '../utils';
 import { calculateOverallStatusForTestResult } from '../domain/test-result/testResultStatusResolver';
 import { AlternateRuleResolver } from '../domain/evaluation';
-import { ref, query, orderByChild, equalTo, get } from 'firebase/database';
-import { db } from '../firebase';
+import { testResultQueries } from '../domains/test-result';
 
 export const useTestResultPrint = () => {
   const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
@@ -31,15 +30,10 @@ export const useTestResultPrint = () => {
       if (!batchId) return;
       setIsConsolidating(true);
       try {
-        // 1. Lấy toàn bộ PKN của lô từ Firebase để tránh mất dữ liệu do phân trang
+        // 1. Lấy toàn bộ PKN của lô từ domain queries để tránh mất dữ liệu do phân trang
         let fetchedResults: any[] = [];
         try {
-          const testResultsRef = ref(db, 'testResults');
-          const batchQuery = query(testResultsRef, orderByChild('batchId'), equalTo(batchId));
-          const snapshot = await get(batchQuery);
-          if (snapshot.exists()) {
-            fetchedResults = Object.values(snapshot.val());
-          }
+          fetchedResults = await testResultQueries.getByBatchId(batchId);
         } catch (error) {
           console.warn('Lỗi tải lịch sử PKN từ DB:', error);
         }

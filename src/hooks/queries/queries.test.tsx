@@ -8,9 +8,11 @@ import { useDeviationsQuery, useDeviationsByBatchQuery } from './useDeviationQue
 import { useAppStore } from '../../store/useAppStore';
 
 import { vi } from 'vitest';
-import { productRepository } from '../../repositories/firebase/FirebaseProductRepository';
-import { batchRepository } from '../../repositories/firebase/FirebaseBatchRepository';
-import { firebaseDeviationRepository } from '../../repositories/firebase/FirebaseDeviationRepository';
+import { productQueries } from '../../domains/product';
+import { batchQueries } from '../../domains/batch';
+import { deviationQueries } from '../../domains/deviation';
+import { masterDataQueries } from '../../domains/master-data';
+import { useMasterCriteriaQuery } from './useMasterCriterionQueries';
 
 describe('TanStack Query - Server State Caching Hooks', () => {
   let queryClient: QueryClient;
@@ -40,6 +42,15 @@ describe('TanStack Query - Server State Caching Hooks', () => {
     } as any,
   ];
 
+  const mockCriteria = [
+    {
+      id: 'crit-1',
+      canonicalName: 'Độ đồng đều khối lượng',
+      category: 'PHYSICAL',
+      isActive: true,
+    } as any,
+  ];
+
   const createWrapper = () => {
     queryClient = new QueryClient({
       defaultOptions: {
@@ -55,12 +66,13 @@ describe('TanStack Query - Server State Caching Hooks', () => {
   };
 
   beforeEach(() => {
-    vi.spyOn(productRepository, 'findAll').mockResolvedValue(mockProducts);
-    vi.spyOn(productRepository, 'findById').mockResolvedValue(mockProducts[0]);
-    vi.spyOn(batchRepository, 'findAll').mockResolvedValue(mockBatches);
-    vi.spyOn(batchRepository, 'findById').mockResolvedValue(mockBatches[0]);
-    vi.spyOn(firebaseDeviationRepository, 'findAll').mockResolvedValue(mockDeviations);
-    vi.spyOn(firebaseDeviationRepository, 'findByBatchId').mockResolvedValue(mockDeviations);
+    vi.spyOn(productQueries, 'getAll').mockResolvedValue(mockProducts);
+    vi.spyOn(productQueries, 'getById').mockResolvedValue(mockProducts[0]);
+    vi.spyOn(batchQueries, 'getAll').mockResolvedValue(mockBatches);
+    vi.spyOn(batchQueries, 'getById').mockResolvedValue(mockBatches[0]);
+    vi.spyOn(deviationQueries, 'getAll').mockResolvedValue(mockDeviations);
+    vi.spyOn(deviationQueries, 'getByBatchId').mockResolvedValue(mockDeviations);
+    vi.spyOn(masterDataQueries, 'getAllCriteria').mockResolvedValue(mockCriteria);
   });
 
   it('useProductsQuery trả về danh sách sản phẩm từ query repository', async () => {
@@ -115,5 +127,16 @@ describe('TanStack Query - Server State Caching Hooks', () => {
     expect(result.current.data).toBeDefined();
     expect(result.current.data?.length).toBe(1);
     expect(result.current.data?.[0].batchId).toBe('batch-1');
+  });
+
+  it('useMasterCriteriaQuery trả về danh sách chỉ tiêu mẫu từ MasterDataQueries', async () => {
+    const { result } = renderHook(() => useMasterCriteriaQuery(), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(result.current.data).toBeDefined();
+    expect(result.current.data?.length).toBe(1);
+    expect(result.current.data?.[0].canonicalName).toBe('Độ đồng đều khối lượng');
   });
 });

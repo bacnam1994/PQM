@@ -1,6 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { firebaseDeviationRepository } from '../../repositories/firebase/FirebaseDeviationRepository';
-import { deviationAppService } from '../../services/app/DeviationAppService';
+import { deviationQueries, deviationAppService } from '../../domains/deviation';
 import { useAppStore } from '../../store/useAppStore';
 import { QualityDeviation, DeviationStatus } from '../../types/deviation';
 import { PaginationOptions, QueryFilter, PaginatedResult } from '../../repositories/types';
@@ -18,14 +17,14 @@ export function useDeviationsQuery(limit?: number) {
       : DEVIATION_QUERY_KEYS.all,
     queryFn: async () => {
       if (limit) {
-        const paginated = await firebaseDeviationRepository.findPaginated({
+        const paginated = await deviationQueries.findPaginated({
           pageSize: limit,
           orderBy: 'loggedAt',
           orderDirection: 'desc',
         });
         return paginated.items;
       }
-      const items = await firebaseDeviationRepository.findAll();
+      const items = await deviationQueries.getAll();
       return items.sort((a, b) => (b.loggedAt || '').localeCompare(a.loggedAt || ''));
     },
   });
@@ -41,7 +40,7 @@ export function useDeviationsPaginatedQuery(
   return useQuery<PaginatedResult<QualityDeviation>>({
     queryKey: DEVIATION_QUERY_KEYS.paginated(options, filters),
     queryFn: async () => {
-      return await firebaseDeviationRepository.findPaginated(options, filters);
+      return await deviationQueries.findPaginated(options, filters);
     },
   });
 }
@@ -54,7 +53,7 @@ export function useDeviationQuery(id: string | undefined) {
     queryKey: DEVIATION_QUERY_KEYS.detail(id || ''),
     queryFn: async () => {
       if (!id) return null;
-      return await firebaseDeviationRepository.findById(id);
+      return await deviationQueries.getById(id);
     },
     enabled: Boolean(id),
   });
@@ -68,7 +67,7 @@ export function useDeviationsByBatchQuery(batchId: string | undefined) {
     queryKey: DEVIATION_QUERY_KEYS.byBatch(batchId || ''),
     queryFn: async () => {
       if (!batchId) return [];
-      return await firebaseDeviationRepository.findByBatchId(batchId);
+      return await deviationQueries.getByBatchId(batchId);
     },
     enabled: Boolean(batchId),
   });

@@ -1,8 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { tccsRepository } from '../../repositories/firebase/FirebaseTCCSRepository';
+import { tccsQueries, tccsAppService } from '../../domains/tccs';
 import { criteriaAliasRepository } from '../../repositories/firebase/FirebaseCriteriaAliasRepository';
 import { aiLearnedMappingRepository } from '../../repositories/firebase/FirebaseAILearnedMappingRepository';
-import { tccsAppService } from '../../services/app/TCCSAppService';
 import { useAppStore } from '../../store/useAppStore';
 import { TCCS, CriteriaAlias, AILearnedMapping, Batch } from '../../types';
 import { BATCH_QUERY_KEYS } from './useBatchQueries';
@@ -17,7 +16,7 @@ export function useTCCSListQuery() {
   return useQuery<TCCS[]>({
     queryKey: TCCS_QUERY_KEYS.all,
     queryFn: async () => {
-      return await tccsRepository.findAll();
+      return await tccsQueries.getAll();
     },
   });
 }
@@ -30,7 +29,7 @@ export function useTCCSQuery(id: string | undefined) {
     queryKey: TCCS_QUERY_KEYS.detail(id || ''),
     queryFn: async () => {
       if (!id) return null;
-      return await tccsRepository.findById(id);
+      return await tccsQueries.getById(id);
     },
     enabled: Boolean(id),
   });
@@ -44,7 +43,7 @@ export function useTCCSByProductQuery(productId: string | undefined) {
     queryKey: TCCS_QUERY_KEYS.byProduct(productId || ''),
     queryFn: async () => {
       if (!productId) return [];
-      return await tccsRepository.findByProductId(productId);
+      return await tccsQueries.getByProductId(productId);
     },
     enabled: Boolean(productId),
   });

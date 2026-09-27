@@ -1,6 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { batchRepository } from '../../repositories/firebase/FirebaseBatchRepository';
-import { batchAppService } from '../../services/app/BatchAppService';
+import { batchQueries, batchAppService } from '../../domains/batch';
 import { useAppStore } from '../../store/useAppStore';
 import { Batch, ElectronicSignature } from '../../types';
 import { PaginationOptions, QueryFilter, PaginatedResult } from '../../repositories/types';
@@ -16,9 +15,9 @@ export function useBatchesQuery(limit?: number) {
     queryKey: limit ? BATCH_QUERY_KEYS.recent(limit) : BATCH_QUERY_KEYS.all,
     queryFn: async () => {
       if (limit) {
-        return await batchRepository.findRecent(limit);
+        return await batchQueries.findRecent(limit);
       }
-      return await batchRepository.findAll();
+      return await batchQueries.getAll();
     },
   });
 }
@@ -33,7 +32,7 @@ export function useBatchesPaginatedQuery(
   return useQuery<PaginatedResult<Batch>>({
     queryKey: BATCH_QUERY_KEYS.paginated(options, filters),
     queryFn: async () => {
-      return await batchRepository.findPaginated(options, filters);
+      return await batchQueries.findPaginated(options, filters);
     },
   });
 }
@@ -46,7 +45,7 @@ export function useBatchQuery(id: string | undefined) {
     queryKey: BATCH_QUERY_KEYS.detail(id || ''),
     queryFn: async () => {
       if (!id) return null;
-      return await batchRepository.findById(id);
+      return await batchQueries.getById(id);
     },
     enabled: Boolean(id),
   });
@@ -60,7 +59,7 @@ export function useBatchesByProductQuery(productId: string | undefined) {
     queryKey: BATCH_QUERY_KEYS.byProduct(productId || ''),
     queryFn: async () => {
       if (!productId) return [];
-      return await batchRepository.findByProductId(productId);
+      return await batchQueries.getByProductId(productId);
     },
     enabled: Boolean(productId),
   });

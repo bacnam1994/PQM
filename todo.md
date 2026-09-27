@@ -1,7 +1,7 @@
 # PQM — KẾ HOẠCH REBUILD TOÀN DIỆN THEO WORKFLOW
 
 Repository: `bacnam1994/PQM`  
-Trạng thái hiện tại: **PHASE 6 & 16 VERTICAL SLICES (VS-01 -> VS-16) — COMPLETED | NEXT: PHASE 18 (UI / PAGES / HOOKS REBUILD)**
+Trạng thái hiện tại: **PHASE 18 (UI / PAGES / HOOKS REBUILD) — COMPLETED | NEXT: PHASE 19 (LEGACY CLEANUP)**
 
 ---
 
@@ -26,8 +26,8 @@ Trạng thái hiện tại: **PHASE 6 & 16 VERTICAL SLICES (VS-01 -> VS-16) — 
 | **P-15** | **CoA & Approval Rebuild**          | Tách Document Generation, Approval, Release, Signature, ALCOA+ Audit Trail                         | ✅ **HOÀN THÀNH** | `src/domains/coa/` (Xong), `approval/` (Xong)                   |
 | **P-16** | **Master Data & System**            | Rebuild Users, Roles, Criteria, Labs, Pharmacopoeia, Settings, Destructive Tokens                  | ✅ **HOÀN THÀNH** | `src/domains/master-data/` (Xong), `src/domains/system/` (Xong) |
 | **P-17** | **AI Boundary Rebuild**             | Cách ly AI Proposal tools, Human-in-the-loop confirmation, Zero direct repository mutation         | ✅ **HOÀN THÀNH** | `src/domains/ai/` (Xong)                                        |
-| **P-18** | **UI / Pages / Hooks Rebuild**      | Page → Feature Hook → Workflow/Application API. Zero direct Firebase/Repo mutation                 | 🟡 **TIẾP THEO**  | `src/ui/`                                                       |
-| **P-19** | **Xóa Legacy (Cleanup)**            | Xóa an toàn mã cũ đã di chuyển thành công (MIGRATED, REMOVED, EXPLICITLY RETAINED)                 | 📋 Chờ kích hoạt  | `docs/audit/PQM_LEGACY_REMOVAL_REGISTER_V1.md`                  |
+| **P-18** | **UI / Pages / Hooks Rebuild**      | Page → Feature Hook → Workflow/Application API. Zero direct Firebase/Repo mutation                 | ✅ **HOÀN THÀNH** | `src/hooks/queries/`, `src/hooks/` rewired to domains           |
+| **P-19** | **Xóa Legacy (Cleanup)**            | Xóa an toàn mã cũ đã di chuyển thành công (MIGRATED, REMOVED, EXPLICITLY RETAINED)                 | 🟡 **TIẾP THEO**  | `docs/audit/PQM_LEGACY_REMOVAL_REGISTER_V1.md`                  |
 | **P-20** | **Import / Export / Bulk Rebuild**  | Đảm bảo CSV/Excel Import, Bulk Create/Release/Delete tuân thủ 100% canonical workflow              | 📋 Chờ kích hoạt  | Bulk workflow isolation                                         |
 | **P-21** | **Automated Architecture Gates**    | Bổ sung tests tự động chặn direct repo mutation, bypass, orphan mutation trên CI                   | 📋 Chờ kích hoạt  | `tests/architecture/` suite                                     |
 | **P-22** | **Domain-by-Domain Regression**     | Chạy toàn bộ test suites sau mỗi domain slice migration                                            | 📋 Chờ kích hoạt  | Regression check                                                |
@@ -886,11 +886,9 @@ Canonical Workflow (WorkflowFacade.dispatch)
 
 ---
 
-# XXII. PHASE 18 — UI / PAGES / HOOKS (🟡 TIẾP THEO)
+# XXII. PHASE 18 — UI / PAGES / HOOKS (✅ ĐÃ HOÀN THÀNH)
 
-Sau khi domain/application đã ổn định mới rebuild UI layer.
-
-Mục tiêu:
+Đã hoàn thành chuẩn hóa toàn bộ tầng UI Hooks và Queries theo đúng ranh giới kiến trúc:
 
 ```text
 Page
@@ -900,33 +898,18 @@ Feature Hook
 Workflow/Application API
 ```
 
-Không:
+Đã loại bỏ hoàn toàn các vi phạm:
 
-```text
-Page
- ↓
-Firebase
-```
-
-Không:
-
-```text
-Hook
- ↓
-Repository mutation
-```
-
-Hook chỉ quản lý:
-
-```text
-query
-loading
-mutation invocation
-cache
-UI state
-```
-
-Business rule nằm ngoài hook.
+- ❌ `Page ↓ Firebase`: Không còn truy vấn trực tiếp Firebase RTDB từ UI / Hooks (đã chuẩn hóa `useTestResultPrint.ts` dùng `testResultQueries.getByBatchId`, dọn dẹp import thừa ở `useTestResultForm.ts`).
+- ❌ `Hook ↓ Repository mutation`: Đã chuẩn hóa `useMasterCriterionQueries.ts` gọi qua `masterCriterionAppService.create/update/delete` với đầy đủ WorkflowFacade dispatch & audit trail thay vì gọi trực tiếp `masterCriterionRepository.save()/delete()`.
+- ✅ Chuẩn hóa toàn bộ Query Hooks sang Domain Queries:
+  - `src/hooks/queries/useProductQueries.ts`: `productQueries`, `formulaQueries`, `materialQueries`, `productAppService`, `formulaAppService`, `materialAppService`.
+  - `src/hooks/queries/useBatchQueries.ts`: `batchQueries` (`findAll`, `findRecent`, `findPaginated`, `getById`, `getByProductId`), `batchAppService`.
+  - `src/hooks/queries/useTestResultQueries.ts`: `testResultQueries` (`findRecent`, `findPaginated`, `getById`, `getByBatchId`), `testResultAppService`.
+  - `src/hooks/queries/useTCCSQueries.ts`: `tccsQueries` (`getAll`, `getById`, `getByProductId`), `tccsAppService`.
+  - `src/hooks/queries/useMasterCriterionQueries.ts`: `masterDataQueries` (`getAllCriteria`, `getActiveCriteria`, `getCriterionById`, `getCriteriaByCategory`), `masterCriterionAppService`.
+  - `src/hooks/queries/useDeviationQueries.ts`: `deviationQueries` (`getAll`, `findPaginated`, `getById`, `getByBatchId`), `deviationAppService`.
+- ✅ Test Suite `src/hooks/queries/queries.test.tsx`: 7/7 tests pass 100%. Quality Guard: 0 vi phạm trên 713 source files. TypeScript: 0 lỗi. Build production: Hoàn thành sạch sẽ.
 
 ---
 
