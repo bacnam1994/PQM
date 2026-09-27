@@ -222,4 +222,71 @@ describe('Batch Integrity & Relationship Validation Engine', () => {
     expect(evaluation.relationshipType).toBe('PRIMARY');
     expect(evaluation.matchedTestIds).toContain('-Ny_test_result_for_272501');
   });
+
+  it('Regression Test Case 362605: Lô có phiếu nội bộ FAIL cũ + Phiếu Pasteur PASS mới -> integrityStatus: PASS, shouldAlert: false', () => {
+    const batch362605: Batch = {
+      id: 'batch_6084364acec540d092456f584c06fee8',
+      productId: 'prod_bacillus',
+      tccsId: '4968c448-4f82-432d-8949-24ab166353a9',
+      batchNo: '362605',
+      mfgDate: '2026-06-20',
+      expDate: '2028-06-20',
+      theoreticalYield: 10000,
+      actualYield: 9950,
+      yieldUnit: 'hộp',
+      status: 'RELEASED',
+      createdAt: '2026-06-20T00:00:00Z',
+    };
+
+    // Phiếu nội bộ cũ bị FAIL
+    const internalQcFailTest: TestResult = {
+      id: 'res_074c29c7c2f343be8b4568affdd0c37b',
+      batchId: 'batch_6084364acec540d092456f584c06fee8',
+      labName: 'Phòng QC',
+      testDate: '2026-06-24',
+      version: 1,
+      overallStatus: 'FAIL',
+      results: [
+        { criteriaName: 'Cảm quan', value: 'Đục lắng', isPass: false },
+        { criteriaName: 'Độ đồng đều thể tích', value: '4.2 ml', isPass: false, unit: 'ml' },
+      ],
+      createdAt: '2026-06-24T08:00:00Z',
+    };
+
+    // Phiếu kiểm nghiệm Viện Pasteur mới đạt chuẩn PASS (workflowStatus APPROVED, version 5)
+    const pasteurPassTest: TestResult = {
+      id: 'res_d376f00ee0a24cb3857981c676541f07',
+      batchId: 'batch_6084364acec540d092456f584c06fee8',
+      labName: 'Viện Pasteur',
+      testDate: '2026-08-20',
+      version: 5,
+      overallStatus: 'PASS',
+      workflowStatus: 'APPROVED',
+      results: [
+        { criteriaName: 'Bacillus clausii', value: '2.5 x 10^9', isPass: true, unit: 'CFU/g' },
+        { criteriaName: 'Độ nhiễm khuẩn', value: 'Âm tính', isPass: true },
+      ],
+      createdAt: '2026-08-20T10:00:00Z',
+      updatedAt: '2026-09-15T04:34:09.668Z',
+    };
+
+    // Thẩm định tính hợp lệ của phiếu
+    expect(isValidTestResultForBatch(pasteurPassTest, batch362605)).toBe(true);
+
+    const resolution = resolveTestResultsForBatch(
+      batch362605,
+      [internalQcFailTest, pasteurPassTest],
+      [batch362605]
+    );
+    const evaluation = evaluateBatchReleaseIntegrity(batch362605, resolution, {
+      testResultsLoaded: true,
+      isTestResultsLoading: false,
+    });
+
+    expect(evaluation.integrityStatus).toBe('PASS');
+    expect(evaluation.shouldAlert).toBe(false);
+    expect(evaluation.relationshipType).toBe('PRIMARY');
+    expect(evaluation.validPassCount).toBeGreaterThanOrEqual(1);
+    expect(evaluation.matchedTestIds).toContain('res_d376f00ee0a24cb3857981c676541f07');
+  });
 });

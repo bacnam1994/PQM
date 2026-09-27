@@ -21,6 +21,7 @@ import { calculateOverallStatus } from '../../utils/evaluation';
 import {
   resolveTestResultStatus,
   resolveAuthoritativeTestResultsForBatch,
+  resolveFinalTestResultForBatch,
   calculateOverallStatusForTestResult,
 } from '../test-result/testResultStatusResolver';
 
@@ -81,14 +82,22 @@ export function isValidTestResultForBatch(testResult: TestResult, batch?: Batch)
   if ((testResult as any).isDeleted || (testResult as any).deleted) return false;
 
   // 2. Không ở trạng thái vô hiệu / bị hủy
-  const statusUpper = String((testResult as any).status || '').toUpperCase();
+  const statusUpper = String(
+    (testResult as any).workflowStatus || (testResult as any).status || ''
+  ).toUpperCase();
   if (statusUpper === 'CANCELLED' || statusUpper === 'VOIDED' || statusUpper === 'INVALID') {
     return false;
   }
 
   // 3. Có dữ liệu kiểm nghiệm cần thiết
-  const hasResults = Array.isArray(testResult.results) && testResult.results.length > 0;
-  const hasOverall = Boolean(testResult.overallStatus);
+  const entries =
+    Array.isArray(testResult.results) && testResult.results.length > 0
+      ? testResult.results
+      : Array.isArray((testResult as any).criteria)
+        ? (testResult as any).criteria
+        : [];
+  const hasResults = entries.length > 0;
+  const hasOverall = Boolean(testResult.overallStatus || (testResult as any).qualityStatus);
   if (!hasResults && !hasOverall) return false;
 
   // 4. Nếu có truyền batch, đối chiếu ID kỹ thuật
@@ -182,24 +191,17 @@ export function evaluateBatchReleaseIntegrity(
   const validPrimary = resolution.primaryResults.filter((r) => isValidTestResultForBatch(r, batch));
 
   if (validPrimary.length > 0) {
-    // Chọn danh sách phiếu Authoritative theo từng phòng kiểm nghiệm (Multi-Lab, Mục 8, 9, 10, 11)
-    const authResults = resolveAuthoritativeTestResultsForBatch(batch, validPrimary, boundTccs);
+    // Sử dụng Canonical Supreme Result làm Single Source of Truth
+    const finalResolution = resolveFinalTestResultForBatch(batch, validPrimary, boundTccs);
+    const supremeResult = finalResolution.finalTestResult;
+    const finalStatus = finalResolution.status;
 
-    const authStatuses = authResults.map((t) => {
-      if (Array.isArray(t.results) && t.results.length > 0) {
-        return calculateOverallStatusForTestResult(t, boundTccs, authResults);
-      }
-      return resolveTestResultStatus(t);
-    });
-
-    const hasFail = authStatuses.some((s) => s === 'FAIL');
-    const isAllPass = authStatuses.length > 0 && authStatuses.every((s) => s === 'PASS');
-
-    if (!hasFail && isAllPass) {
-      // ĐẠT: Tất cả phiếu authoritative đều đạt chuẩn
-      const validPassCount = authResults.filter(
-        (t) => resolveTestResultStatus(t) === 'PASS'
+    if (finalStatus === 'PASS') {
+      // ĐẠT: Kết quả Authoritative tối cao đạt chuẩn
+      const validPassCount = validPrimary.filter(
+        (t) => resolveTestResultStatus(t, boundTccs) === 'PASS'
       ).length;
+
       return {
         batchId: batch.id,
         batchNo: batch.batchNo,
@@ -208,16 +210,20 @@ export function evaluateBatchReleaseIntegrity(
         candidateCount: validPrimary.length,
         primaryCount: validPrimary.length,
         legacyCount: 0,
-        validPassCount,
+        validPassCount: Math.max(validPassCount, 1),
         matchedTestIds: validPrimary.map((r) => r.id),
         relationshipType: 'PRIMARY',
         summaryMessage: `✓ Lô đã xuất xưởng và đã có hồ sơ kiểm nghiệm hợp lệ (${validPrimary.length} phiếu).`,
         shouldAlert: false,
-        debugInfo: { resolution, freshness },
+        debugInfo: {
+          resolution,
+          freshness,
+          authoritativeResults: supremeResult ? [supremeResult] : [],
+        },
       };
     } else {
-      // Có phiếu kiểm nghiệm nhưng kết quả authoritative cuối cùng không đạt (FAIL hoặc PENDING)
-      const isPending = authStatuses.some((s) => s === 'PENDING');
+      // Có phiếu kiểm nghiệm nhưng kết quả supreme authoritative cuối cùng không đạt (FAIL hoặc PENDING)
+      const isPending = finalStatus === 'PENDING';
       return {
         batchId: batch.id,
         batchNo: batch.batchNo,
@@ -236,7 +242,11 @@ export function evaluateBatchReleaseIntegrity(
         alertType: 'CRITICAL',
         suggestedAction:
           'Xem xét lại quyết định duyệt xuất xưởng, thực hiện kiểm nghiệm lại hoặc chuyển trạng thái sang BỊ LOẠI (REJECTED).',
-        debugInfo: { resolution, freshness },
+        debugInfo: {
+          resolution,
+          freshness,
+          authoritativeResults: supremeResult ? [supremeResult] : [],
+        },
       };
     }
   }

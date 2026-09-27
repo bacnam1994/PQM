@@ -193,7 +193,7 @@ const DEFAULT_STATE: Omit<
     'https://drive.google.com/drive/folders/10tDp_k40fk8iuotqazP1BsROiN5jXzK-?usp=sharing',
   googleDriveFolderId: '10tDp_k40fk8iuotqazP1BsROiN5jXzK-',
   googleDriveClientId:
-    import.meta.env.VITE_GOOGLE_DRIVE_CLIENT_ID ||
+    (typeof import.meta !== 'undefined' && import.meta?.env?.VITE_GOOGLE_DRIVE_CLIENT_ID) ||
     '1012122917408-cghpfis2qisbu6fb37qk4gnceicqpc0o.apps.googleusercontent.com',
   googleDriveApiKey: '',
   useGoogleDriveUpload: false,

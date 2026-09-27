@@ -464,11 +464,16 @@ export function calculateOverallStatusForTestResult(
   boundTccs?: TCCS | null,
   allBatchResults?: TestResult[]
 ): CanonicalTestStatus {
-  if (!testResult || !Array.isArray(testResult.results) || testResult.results.length === 0) {
+  const currentResults: TestResultEntry[] =
+    Array.isArray(testResult?.results) && testResult.results.length > 0
+      ? testResult.results
+      : Array.isArray((testResult as any)?.criteria)
+        ? (testResult as any).criteria
+        : [];
+
+  if (!testResult || !Array.isArray(currentResults) || currentResults.length === 0) {
     return 'UNKNOWN';
   }
-
-  const currentResults = testResult.results;
 
   // Lọc các kết quả chỉ tiêu có hiệu lực trong phiếu hiện tại
   // Xây dựng map chỉ tiêu trong phiếu hiện tại (ưu tiên hàng đầu)
@@ -486,10 +491,17 @@ export function calculateOverallStatusForTestResult(
     allBatchResults.forEach((tr) => {
       if (!tr) return;
       if ((tr as any).isDeleted || (tr as any).deleted) return;
-      const s = String((tr as any).status || '').toUpperCase();
+      const s = String((tr as any).workflowStatus || (tr as any).status || '').toUpperCase();
       if (s === 'CANCELLED' || s === 'VOIDED' || s === 'INVALID') return;
 
-      (tr.results || []).forEach((entry) => {
+      const entries: TestResultEntry[] =
+        Array.isArray(tr.results) && tr.results.length > 0
+          ? tr.results
+          : Array.isArray((tr as any).criteria)
+            ? (tr as any).criteria
+            : [];
+
+      entries.forEach((entry) => {
         if (entry && entry.criteriaName) {
           const key = normalizeName(entry.criteriaName);
           // Không ghi đè nếu phiếu hiện tại đã có chỉ tiêu này
@@ -766,7 +778,7 @@ export function resolveFinalTestResultForBatch(
   // Cấp độ: APPROVED (40) > FINAL (30) > RELEASED (20) > DRAFT/PENDING (10)
   // Kết hợp: version > updatedAt/testDate > id deterministic tie-breaker
   function getStatusPrecedenceScore(tr: TestResult): number {
-    const s = String((tr as any).status || '').toUpperCase();
+    const s = String((tr as any).workflowStatus || (tr as any).status || '').toUpperCase();
     if (s === 'APPROVED') return 40;
     if (s === 'FINAL' || (tr as any).isFinal === true) return 30;
     if (s === 'RELEASED') return 20;
@@ -801,11 +813,18 @@ export function resolveFinalTestResultForBatch(
   // 4. Đánh giá trạng thái Authoritative Test Result
   // Ưu tiên tính toán từ các chỉ tiêu thực tế, fallback sang stored status
   let computedStatus: CanonicalTestStatus = 'UNKNOWN';
-  if (Array.isArray(finalTestResult.results) && finalTestResult.results.length > 0) {
+  const finalEntries =
+    Array.isArray(finalTestResult.results) && finalTestResult.results.length > 0
+      ? finalTestResult.results
+      : Array.isArray((finalTestResult as any).criteria)
+        ? (finalTestResult as any).criteria
+        : [];
+
+  if (finalEntries.length > 0) {
     computedStatus = calculateOverallStatusForTestResult(finalTestResult, boundTccs, candidates);
   }
   if (computedStatus === 'UNKNOWN') {
-    computedStatus = resolveTestResultStatus(finalTestResult);
+    computedStatus = resolveTestResultStatus(finalTestResult, boundTccs);
   }
 
   const hasPassTest = computedStatus === 'PASS';
@@ -813,7 +832,13 @@ export function resolveFinalTestResultForBatch(
   // Tính trạng thái hợp nhất
   const consolidatedMap = new Map<string, TestResultEntry>();
   candidates.forEach((tr) => {
-    (tr.results || []).forEach((r) => {
+    const list =
+      Array.isArray(tr.results) && tr.results.length > 0
+        ? tr.results
+        : Array.isArray((tr as any).criteria)
+          ? (tr as any).criteria
+          : [];
+    list.forEach((r) => {
       if (r && r.criteriaName) {
         consolidatedMap.set(normalizeName(r.criteriaName), r);
       }
@@ -913,12 +938,25 @@ export function resolveAuthoritativeTestResultsForBatch(
   candidates.forEach((tr) => {
     const reportCode = ((tr as any).reportNo || (tr as any).code || '').trim().toLowerCase();
     const parentId = ((tr as any).supersedesId || (tr as any).originalResultId || '').trim();
+    const labName = normalizeName((tr as any).labName || '');
+    const trEntries =
+      Array.isArray(tr.results) && tr.results.length > 0
+        ? tr.results
+        : Array.isArray((tr as any).criteria)
+          ? (tr as any).criteria
+          : [];
+    const criteriaKey = trEntries
+      .map((r: any) => normalizeName(r.criteriaName || ''))
+      .sort()
+      .join('|');
 
     const chainKey = reportCode
       ? `code:${reportCode}`
       : parentId
         ? `parent:${parentId}`
-        : `id:${tr.id}`;
+        : criteriaKey && labName
+          ? `lab:${labName}:crit:${criteriaKey}`
+          : `id:${tr.id}`;
 
     if (!chainMap.has(chainKey)) {
       chainMap.set(chainKey, []);
@@ -964,13 +1002,24 @@ export function resolveAuthoritativeTestResultsForBatch(
     if (tr.id === supremeAuth.id) return true;
 
     // Trích xuất tập chỉ tiêu của tr và supremeAuth
-    const trCriteria = (tr.results || [])
+    const trList =
+      Array.isArray(tr.results) && tr.results.length > 0
+        ? tr.results
+        : Array.isArray((tr as any).criteria)
+          ? (tr as any).criteria
+          : [];
+    const supremeList =
+      Array.isArray(supremeAuth.results) && supremeAuth.results.length > 0
+        ? supremeAuth.results
+        : Array.isArray((supremeAuth as any).criteria)
+          ? (supremeAuth as any).criteria
+          : [];
+
+    const trCriteria = trList
       .map((r) => (r.criteriaName || '').trim().toLowerCase())
       .filter(Boolean);
     const supremeCriteria = new Set(
-      (supremeAuth.results || [])
-        .map((r) => (r.criteriaName || '').trim().toLowerCase())
-        .filter(Boolean)
+      supremeList.map((r) => (r.criteriaName || '').trim().toLowerCase()).filter(Boolean)
     );
 
     // Nếu tr không có chỉ tiêu nào thì bỏ qua

@@ -33,6 +33,7 @@ functions/lib/
 # Backups & Firebase cache
 *.zip
 .firebase/
+temp_*.json
 
 /blob-report/
 /playwright/.cache/
