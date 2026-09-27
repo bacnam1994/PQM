@@ -1,7 +1,7 @@
 # PQM — KẾ HOẠCH REBUILD TOÀN DIỆN THEO WORKFLOW
 
 Repository: `bacnam1994/PQM`  
-Trạng thái hiện tại: **PHASE 16 (MASTER DATA & SYSTEM - VS-13 & VS-14) — COMPLETED | NEXT: PHASE 17 (AI BOUNDARY REBUILD - VS-15)**
+Trạng thái hiện tại: **PHASE 17 (AI BOUNDARY REBUILD - VS-15) — COMPLETED | NEXT: PHASE 18 (UI / PAGES / HOOKS REBUILD)**
 
 ---
 
@@ -14,7 +14,7 @@ Trạng thái hiện tại: **PHASE 16 (MASTER DATA & SYSTEM - VS-13 & VS-14) �
 | **P-03** | **Dependency Graph**                | Lập đồ thị phụ thuộc đơn hướng: UI → App → Workflow → Domain → Repo → Infra                        |   ✅ **HOÀN THÀNH**   | `docs/audit/PQM_REBUILD_SOURCE_MIGRATION_MAP_V1.md`             |
 | **P-04** | **Rebuild Workflow Kernel**         | Chuẩn hóa contracts, registry, kernel, guards, handlers, events trong `src/workflow/`              |   ✅ **HOÀN THÀNH**   | `src/workflow/kernel/`, `guards/`, `registry/`                  |
 | **P-05** | **Rebuild Repository Boundary**     | Tách Interface (`src/repositories/interfaces/`) khỏi Firebase (`src/infrastructure/repositories/`) |   ✅ **HOÀN THÀNH**   | `src/repositories/interfaces/`, `infrastructure/`               |
-| **P-06** | **Rebuild Domain Slices (1-16)**    | Di chuyển 16 lát dọc độc lập theo template DDD (Domain / App / Workflow / Infra / Tests)           | 🟡 **ĐANG THỰC HIỆN** | Tuần tự theo 16 Vertical Slices (VS-01 -> VS-14 ĐÃ XONG)        |
+| **P-06** | **Rebuild Domain Slices (1-16)**    | Di chuyển 16 lát dọc độc lập theo template DDD (Domain / App / Workflow / Infra / Tests)           | 🟡 **ĐANG THỰC HIỆN** | Tuần tự theo 16 Vertical Slices (VS-01 -> VS-15 ĐÃ XONG)        |
 | **P-07** | **Product Domain Rebuild**          | Audit → Move → Rewire → Test → Verify cho toàn bộ Product CRUD, FSM, Approval, Bulk, AI            |   ✅ **HOÀN THÀNH**   | `src/domains/product/`                                          |
 | **P-08** | **Material Domain Rebuild**         | Audit → Move → Rewire → Test → Verify cho Material CRUD, Status, Approval, Import, Bulk            |   ✅ **HOÀN THÀNH**   | `src/domains/material/`                                         |
 | **P-09** | **TCCS Domain Rebuild**             | Rebuild TCCS CREATE, UPDATE, SUBMIT, APPROVE, REJECT, REVISE. Zero bypass approval                 |   ✅ **HOÀN THÀNH**   | `src/domains/tccs/`                                             |
@@ -25,8 +25,8 @@ Trạng thái hiện tại: **PHASE 16 (MASTER DATA & SYSTEM - VS-13 & VS-14) �
 | **P-14** | **Change Request Rebuild**          | Chuẩn hóa Change Request & Change Action FSM, đồng nhất State Authority                            |   ✅ **HOÀN THÀNH**   | `src/domains/change-request/`                                   |
 | **P-15** | **CoA & Approval Rebuild**          | Tách Document Generation, Approval, Release, Signature, ALCOA+ Audit Trail                         |   ✅ **HOÀN THÀNH**   | `src/domains/coa/` (Xong), `approval/` (Xong)                   |
 | **P-16** | **Master Data & System**            | Rebuild Users, Roles, Criteria, Labs, Pharmacopoeia, Settings, Destructive Tokens                  |   ✅ **HOÀN THÀNH**   | `src/domains/master-data/` (Xong), `src/domains/system/` (Xong) |
-| **P-17** | **AI Boundary Rebuild**             | Cách ly AI Proposal tools, Human-in-the-loop confirmation, Zero direct repository mutation         |   🟡 **TIẾP THEO**    | `src/interfaces/ai/`                                            |
-| **P-18** | **UI / Pages / Hooks Rebuild**      | Page → Feature Hook → Workflow/Application API. Zero direct Firebase/Repo mutation                 |   📋 Chờ kích hoạt    | `src/ui/`                                                       |
+| **P-17** | **AI Boundary Rebuild**             | Cách ly AI Proposal tools, Human-in-the-loop confirmation, Zero direct repository mutation         |   ✅ **HOÀN THÀNH**   | `src/domains/ai/` (Xong)                                        |
+| **P-18** | **UI / Pages / Hooks Rebuild**      | Page → Feature Hook → Workflow/Application API. Zero direct Firebase/Repo mutation                 |   🟡 **TIẾP THEO**    | `src/ui/`                                                       |
 | **P-19** | **Xóa Legacy (Cleanup)**            | Xóa an toàn mã cũ đã di chuyển thành công (MIGRATED, REMOVED, EXPLICITLY RETAINED)                 |   📋 Chờ kích hoạt    | `docs/audit/PQM_LEGACY_REMOVAL_REGISTER_V1.md`                  |
 | **P-20** | **Import / Export / Bulk Rebuild**  | Đảm bảo CSV/Excel Import, Bulk Create/Release/Delete tuân thủ 100% canonical workflow              |   📋 Chờ kích hoạt    | Bulk workflow isolation                                         |
 | **P-21** | **Automated Architecture Gates**    | Bổ sung tests tự động chặn direct repo mutation, bypass, orphan mutation trên CI                   |   📋 Chờ kích hoạt    | `tests/architecture/` suite                                     |
@@ -856,37 +856,37 @@ Reopen
 
 ---
 
-# XXI. PHASE 17 — AI (VS-15 AI BOUNDARY: 🟡 TIẾP THEO)
+# XXI. PHASE 17 — AI (VS-15 AI BOUNDARY: ✅ ĐÃ HOÀN THÀNH)
 
-AI phải được đưa về đúng boundary:
-
-```text
-AI
- ↓
-Analyze
- ↓
-Proposal
- ↓
-Human confirmation
- ↓
-Canonical Workflow
-```
-
-AI không được:
+Đã hoàn thành chuẩn hóa ranh giới an toàn cho toàn bộ phân hệ Trí tuệ Nhân tạo (AI Copilot / Vision / Inference):
 
 ```text
-write repository
-update Firebase
-change business state
-approve
-release
+AI Inference
+     ↓
+AIGateway (PromptRegistry, SemanticCache, Audit)
+     ↓
+AIActionGuard (RBAC & Regulated Action Check)
+     ↓
+AIActionProposal (Rationale & Evidence)
+     ↓
+Human-in-the-loop Confirmation
+     ↓
+Canonical Workflow (WorkflowFacade.dispatch)
 ```
 
-trực tiếp.
+- `src/domains/ai/domain/types.ts`: Định nghĩa `AIActionProposal`, `GuardValidationResult`, `AIGatewayRequest`, `AIGatewayResponse`, `AIDraftEnvelope`, `NormalizedAIData`, `NormalizedAITestResultItem`.
+- `src/domains/ai/domain/rules.ts`: `AIBoundaryRules` (cưỡng chế ranh giới Zero Direct Mutation, chặn AI role trực tiếp can thiệp trạng thái Lô/Phiếu kiểm nghiệm, phân định hành động nhạy cảm `isRegulatedToolAction`, chuẩn hóa tính toán điểm tin cậy `calculateConfidenceScore`).
+- `src/domains/ai/infrastructure/gateway.ts`: `AIGatewayService` kết nối an toàn với Gemini API, quản lý phiên bản Prompt từ `PromptRegistry`, tăng tốc truy vấn qua `SemanticCache`, và ghi vết ALCOA+ Audit Trail cho 100% lượt suy luận.
+- `src/domains/ai/application/aiActionGuard.ts`: `AIActionGuard` chốt chặn an ninh ngăn chặn AI tự ý thực thi các hành động nhạy cảm trong ngành Dược (phê duyệt, từ chối, giải phóng lô, auto-heal, hài hòa nguyên liệu), tự động chuyển đổi thành `AIActionProposal` chờ người có thẩm quyền phê duyệt.
+- `src/domains/ai/application/aiDraftManager.ts`: `AIDraftManager` cách ly hoàn toàn dữ liệu bản thảo trích xuất với core database qua sessionStorage có TTL 10 phút, tự động chuẩn hóa dữ liệu đầu vào `normalizeAIData`.
+- `src/domains/ai/application/queries.ts`: `AIQueries` cung cấp điểm truy vấn an toàn về bản thảo AI.
+- `src/domains/ai/workflow/definitions.ts`: Khóa chặt canonical action IDs (`AI_OCR_EXTRACT`, `AI_MAPPING_PROPOSE`, `AI_STABILITY_PREDICT`, `AI_BATCH_CLEARANCE_PROPOSE`, `AI_NATURAL_QUERY`, `AI_VOICE_PARSE`, `AI_LAB_COMPARE`, `AI_DATA_INTEGRITY_SCAN`, `SYSTEM_AUTO_HEAL_PROPOSE`).
+- `src/domains/ai/tests/aiDomain.test.ts`: 100% pass unit tests (Advisory Boundary, RBAC Guard, Regulated Actions, Confidence Calculation, Temporary Storage Isolation).
+- Các adapter `aiActionGuard.ts`, `aiDraftManager.ts`, `AIGateway.ts`: Thin adapters duy trì 100% backward compatibility.
 
 ---
 
-# XXII. PHASE 18 — UI / PAGES / HOOKS
+# XXII. PHASE 18 — UI / PAGES / HOOKS (🟡 TIẾP THEO)
 
 Sau khi domain/application đã ổn định mới rebuild UI layer.
 
