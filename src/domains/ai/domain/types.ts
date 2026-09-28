@@ -83,6 +83,7 @@ export interface NormalizedAITestResultItem {
 }
 
 export interface NormalizedAIData {
+  reportNo?: string;
   labName?: string;
   testDate?: string;
   batchNo?: string;

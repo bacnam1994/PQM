@@ -110,6 +110,8 @@ export function normalizeAIData(input: any): NormalizedAIData | null {
   }
 
   return {
+    reportNo: typeof input.reportNo === 'string' ? input.reportNo.trim() : undefined,
+
     labName: typeof input.labName === 'string' ? input.labName.trim() : undefined,
 
     testDate: typeof input.testDate === 'string' ? input.testDate.trim() : undefined,

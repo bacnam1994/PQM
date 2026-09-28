@@ -17,6 +17,7 @@ import {
   calculateOverallStatus,
   getActiveLocale,
   calculateRelativePercentage,
+  generateDefaultReportNo,
 } from '../../utils';
 import { useCriteriaResolver } from '../../hooks/useCriteriaResolver';
 import { normalizeName, diceScore } from '../../services/criteriaAliasService';
@@ -812,7 +813,12 @@ const CoAReport = memo(({ res, batch, product, tccs, formula }: CoAReportProps) 
         <div className="text-right mt-1 text-[13px] font-medium text-slate-800">
           <span>{isInternalLab ? 'Số: ' : 'Số / No: '}</span>
           <span className="font-bold text-slate-950">
-            {(res as any).reportNo || res.id || '---'}
+            {(res as any).reportNo ||
+              generateDefaultReportNo({
+                batchNo: batch?.batchNo,
+                labName: res.labName,
+                testDate: res.testDate,
+              })}
           </span>
         </div>
       </div>

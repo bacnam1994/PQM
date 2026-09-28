@@ -88,6 +88,7 @@ interface UseTestResultAIIntegrationProps {
   products: Product[];
   formValues: {
     batchId: string;
+    reportNo?: string;
     labId?: string;
     labName: string;
     testDate: string;
@@ -327,10 +328,15 @@ export function useTestResultAIIntegration({
         ? resolveCanonicalLab(normalized.labName, testingLaboratories)
         : null;
 
+      if (normalized.reportNo) {
+        newAiFilled.add('reportNo');
+      }
+
       // Atomic form values update
       if (setFormValues) {
         setFormValues((prev: any) => ({
           ...prev,
+          ...(normalized.reportNo ? { reportNo: normalized.reportNo } : {}),
           ...(labInfo?.labName
             ? { labName: labInfo.labName }
             : normalized.labName
@@ -346,6 +352,7 @@ export function useTestResultAIIntegration({
           extraCriteria: [...(prev?.extraCriteria || []), ...nextExtraCriteria],
         }));
       } else {
+        if (normalized.reportNo) setFieldValue('reportNo', normalized.reportNo);
         if (labInfo?.labName) setFieldValue('labName', labInfo.labName);
         else if (normalized.labName) setFieldValue('labName', normalized.labName);
         if (labInfo?.labId) setFieldValue('labId', labInfo.labId);

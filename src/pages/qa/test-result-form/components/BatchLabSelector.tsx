@@ -34,6 +34,8 @@ export interface BatchLabSelectorProps {
   availableBatchesForDropdown: HydratedBatch[];
   handleBatchSelect: (batchId: string) => void;
   setFieldValue: (field: string, value: any) => void;
+  reportNo?: string;
+  isAiFilledReportNo?: boolean;
   labId?: string;
   labName: string;
   testDate: string;
@@ -52,6 +54,8 @@ export const BatchLabSelector: React.FC<BatchLabSelectorProps> = ({
   availableBatchesForDropdown,
   handleBatchSelect,
   setFieldValue,
+  reportNo,
+  isAiFilledReportNo,
   labId,
   labName,
   testDate,
@@ -330,7 +334,34 @@ export const BatchLabSelector: React.FC<BatchLabSelectorProps> = ({
             ) : null}
           </div>
 
-          <div className="sm:col-span-2">
+          {/* Số phiếu kiểm nghiệm (Ưu tiên từ AI scan OCR, để trống tự sinh mặc định) */}
+          <div className="sm:col-span-1 space-y-1.5">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-semibold text-ink-muted uppercase tracking-wider flex items-center gap-1.5">
+                <HashtagIcon className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                Số phiếu kiểm nghiệm
+              </label>
+              {isAiFilledReportNo && (
+                <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-purple-600 dark:text-purple-400 bg-purple-500/10 px-1.5 py-0.5 rounded-full border border-purple-500/20">
+                  <SparklesIcon className="w-3 h-3" />
+                  AI OCR
+                </span>
+              )}
+            </div>
+            <input
+              type="text"
+              name="reportNo"
+              value={reportNo || ''}
+              onChange={(e) => setFieldValue('reportNo', e.target.value)}
+              placeholder="Ưu tiên từ AI scan (để trống tự sinh)"
+              className="w-full px-3.5 py-2.5 bg-surface border border-border rounded-xl font-medium text-ink placeholder:text-ink-muted outline-none text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all"
+            />
+            <p className="text-[11px] text-ink-muted">
+              Ưu tiên từ phiếu scan; nếu trống sẽ tự sinh mặc định khi lưu.
+            </p>
+          </div>
+
+          <div className="sm:col-span-1">
             <DSDateInput
               label="Ngày xuất phiếu *"
               name="testDate"

@@ -56,10 +56,7 @@ describe('aiDraftManager', () => {
   });
 
   it('rejects malformed storage', () => {
-    sessionStorage.setItem(
-      'pqm:ai-draft:test-result',
-      JSON.stringify({ invalid: true })
-    );
+    sessionStorage.setItem('pqm:ai-draft:test-result', JSON.stringify({ invalid: true }));
 
     expect(peekAIDraft()).toBeNull();
     expect(hasAIDraft()).toBe(false);
@@ -96,7 +93,8 @@ describe('aiDraftManager', () => {
 
     it('normalizes valid AI extraction payload', () => {
       const raw = {
-        labName: '   QUATEST 3  ',
+        reportNo: '  KN-2026-999  ',
+        labName: '  QUATEST 3  ',
         testDate: '12/09/2026',
         batchNo: '  LO-2026-01  ',
         productName: ' GINKGO BILOBA ',
@@ -113,6 +111,7 @@ describe('aiDraftManager', () => {
 
       const normalized = normalizeAIData(raw);
       expect(normalized).not.toBeNull();
+      expect(normalized?.reportNo).toBe('KN-2026-999');
       expect(normalized?.labName).toBe('QUATEST 3');
       expect(normalized?.testDate).toBe('12/09/2026');
       expect(normalized?.batchNo).toBe('LO-2026-01');
@@ -138,6 +137,7 @@ describe('aiDraftManager', () => {
     it('handles payload with missing or empty fields safely', () => {
       const normalized = normalizeAIData({});
       expect(normalized).toEqual({
+        reportNo: undefined,
         labName: undefined,
         testDate: undefined,
         batchNo: undefined,

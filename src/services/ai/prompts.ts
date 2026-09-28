@@ -345,6 +345,7 @@ LƯU Ý: Không có danh sách TCCS. Hãy trích xuất tên chỉ tiêu nguyên
 CẤU TRÚC JSON YÊU CẦU (Trả về đúng định dạng này, bao gồm đầy đủ các field mới):
 {
   "labName": "Tên đơn vị kiểm nghiệm / Phòng thí nghiệm (ví dụ: CASE, Quatest 3, Eurofins, Phòng QC nội bộ...)",
+  "reportNo": "Số hiệu phiếu kiểm nghiệm / Số kết quả phân tích / Report No / Số PKN đọc được từ phiếu (ví dụ: CASE-2024/1234, 24/09/KN-012, PKN/240101...). Để rỗng nếu không có.",
   "documentType": "Loại phiếu: External_Lab | Internal | CoA | Supplier_CoA (xem hướng dẫn VN_LAB_TERMINOLOGY)",
   "pageCount": 1,
   "productCode": "Mã số / Mã hàng hóa / Mã sản phẩm / SKU / Mã SP đọc được từ phiếu (ví dụ: VBT-001, SP-GBE-500, GBE500...). Thường xuất hiện ở header phiếu gần tên sản phẩm. Để rỗng nếu không có.",
@@ -414,6 +415,7 @@ LƯU Ý QUAN TRỌNG:
 10. Điền "analysisMethod" cho từng chỉ tiêu nếu phiếu ghi rõ phương pháp thử (cột "Phương pháp", "Method", "Test method").
 11. Điền "productCode" là mã số sản phẩm (thường ký hiệu: Mã SP, Mã HH, Product Code, SKU, Item Code, Ref. No...) thường xuất hiện ở header phiếu gần tên sản phẩm hoặc trong bảng thông tin mẫu. Đây là ưu tiên số 1 để nhận diện sản phẩm.
 12. Điền "productName" là tên đầy đủ của sản phẩm được kiểm nghiệm (thường đứng đầu phiếu, sau label "Tên sản phẩm:", "Product:", "Commodity:", "Sample name:").
+13. Điền "reportNo" là số hiệu phiếu kiểm nghiệm / Số kết quả phân tích / Report No / Số KQPT (thường xuất hiện ở phần đầu trang, cạnh hoặc dưới tiêu đề phiếu sau các nhãn: "Số:", "Số/No.:", "Report No:", "Số KQPT:", "Số phiếu:"). Nếu không tìm thấy, để rỗng.
 `;
 };
 

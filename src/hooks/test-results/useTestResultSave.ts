@@ -8,6 +8,7 @@ import {
   parseNumberFromText,
   ensureArray,
   checkRuleExemption,
+  generateDefaultReportNo,
 } from '../../utils';
 import { QualityEvaluationEngine } from '../../domain/evaluation/QualityEvaluationEngine';
 import { CriterionEvaluator } from '../../domain/evaluation/CriterionEvaluator';
@@ -70,6 +71,18 @@ export const useTestResultSave = ({
         const finalLabName = resolvedLab.labName || rawLabName;
         const finalLabId = resolvedLab.labId || rawLabId || undefined;
         const testDate = formData.get('testDate')?.toString() || formValues.testDate || '';
+        const rawReportNo = (
+          formData.get('reportNo')?.toString() ||
+          formValues.reportNo ||
+          ''
+        ).trim();
+        const finalReportNo =
+          rawReportNo ||
+          generateDefaultReportNo({
+            batchNo: currentBatch?.batchNo,
+            labName: finalLabName,
+            testDate,
+          });
 
         if (!finalLabName.trim()) {
           setIsSubmitting(false);
@@ -352,6 +365,7 @@ export const useTestResultSave = ({
 
         const resultData: any = {
           batchId: formValues.batchId,
+          reportNo: finalReportNo,
           labName: finalLabName,
           testDate: (formData.get('testDate') as string) || formValues.testDate,
           results: results,

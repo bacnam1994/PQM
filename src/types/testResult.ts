@@ -133,6 +133,7 @@ export interface EvaluationSnapshot {
  */
 export interface CanonicalTestResult {
   id: string;
+  reportNo?: string;
   batchId: string;
   productId: string;
 
@@ -162,6 +163,8 @@ export interface CanonicalTestResult {
 
 export interface TestResult {
   id: string;
+  /** Số hiệu phiếu kiểm nghiệm / Số kết quả phân tích (Ưu tiên từ AI scan OCR hoặc người dùng nhập) */
+  reportNo?: string;
   batchId: string;
   productId?: string; // Khóa ngoại kỹ thuật liên kết Product (Model 1 & 3)
   /**

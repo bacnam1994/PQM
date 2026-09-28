@@ -435,6 +435,8 @@ const TestResultFormPage: React.FC = () => {
               availableBatchesForDropdown={availableBatchesForDropdown}
               handleBatchSelect={handleBatchSelect}
               setFieldValue={setFieldValue}
+              reportNo={formValues.reportNo}
+              isAiFilledReportNo={aiFilledFields.has('reportNo')}
               labId={(formValues as any).labId}
               labName={formValues.labName}
               testDate={formValues.testDate}

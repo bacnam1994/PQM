@@ -125,6 +125,11 @@ const OCR_RESPONSE_SCHEMA = {
       type: SchemaType.STRING,
       description: 'Tên đơn vị kiểm nghiệm / Phòng thí nghiệm. Để rỗng nếu không tìm thấy.',
     },
+    reportNo: {
+      type: SchemaType.STRING,
+      description:
+        'Số hiệu phiếu kiểm nghiệm / Số kết quả phân tích / Report No / Số PKN đọc được từ phiếu scan (nếu có, không có thì để rỗng)',
+    },
     documentType: {
       type: SchemaType.STRING,
       description: 'Loại phiếu: External_Lab | Internal | CoA | Supplier_CoA',
