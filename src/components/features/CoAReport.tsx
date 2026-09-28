@@ -22,6 +22,8 @@ import { useCriteriaResolver } from '../../hooks/useCriteriaResolver';
 import { normalizeName, diceScore } from '../../services/criteriaAliasService';
 import { lookupPharmaTerm, isCriteriaMatch } from '../../utils/aiMapping';
 import { AlternateRuleResolver } from '../../domain/evaluation';
+import { detectLabOrganization } from '../../services/ai/externalLabTemplates';
+import { matchLaboratory } from '../../services/laboratoryService';
 
 interface ExtraTestResultEntry extends TestResultEntry {
   limit?: string;
@@ -228,21 +230,117 @@ const CoAReport = memo(({ res, batch, product, tccs, formula }: CoAReportProps) 
     };
   }, [snapshot?.timestamp, res.testDate, (res as any).createdAt]);
 
-  // Tên người ký Trưởng phòng QC theo mẫu biểu chính thức V-Biotech
-  const qcManagerName = useMemo(() => {
-    const rawReviewer = (res as any).reviewedBy || (res as any).qcManager;
-    if (rawReviewer && typeof rawReviewer === 'string' && !rawReviewer.includes('@')) {
-      return rawReviewer;
-    }
+  // Xác định phiếu kiểm nghiệm là Nội bộ (V-Biotech) hay Ngoại kiểm (Đơn vị bên ngoài)
+  const isInternalLab = useMemo(() => {
+    if (res.labId === 'lab_internal') return true;
+    const lab = (res.labName || '').trim().toLowerCase();
+    if (!lab) return true; // Mặc định là nội bộ nếu không nhập lab
     if (
-      snapshot?.evaluatedBy &&
-      typeof snapshot.evaluatedBy === 'string' &&
-      !snapshot.evaluatedBy.includes('@')
+      lab.includes('nội bộ') ||
+      lab.includes('v-biotech') ||
+      lab.includes('nam việt') ||
+      lab.includes('phòng qc') ||
+      lab.includes('phòng qa') ||
+      lab === 'qc' ||
+      lab === 'qa/qc' ||
+      lab === 'pqm'
     ) {
-      return snapshot.evaluatedBy;
+      return true;
     }
-    return 'Nguyễn Thiên Hoa';
-  }, [res, snapshot?.evaluatedBy]);
+    const matched = matchLaboratory(res.labName);
+    if (matched && matched.lab.type === 'INTERNAL') return true;
+    if (matched && matched.lab.type === 'EXTERNAL') return false;
+    return false;
+  }, [res.labId, res.labName]);
+
+  // Cấu hình mẫu form phiếu kiểm nghiệm ngoại kiểm tương ứng theo đơn vị bên ngoài
+  const externalLabInfo = useMemo(() => {
+    const labKey = detectLabOrganization(res.labName || '');
+    const rawName = (res.labName || '').trim();
+
+    switch (labKey) {
+      case 'QUATEST3':
+        return {
+          parentOrg: 'BỘ KHOA HỌC VÀ CÔNG NGHỆ - TỔNG CỤC TIÊU CHUẨN ĐO LƯỜNG CHẤT LƯỢNG',
+          name: 'TRUNG TÂM KỸ THUẬT TIÊU CHUẨN ĐO LƯỜNG CHẤT LƯỢNG 3',
+          subName: 'QUALITY ASSURANCE AND TESTING CENTER 3 (QUATEST 3)',
+          address: '49 Pasteur, Phường Bến Nghé, Quận 1, TP. Hồ Chí Minh | ĐT: (028) 3829 4274',
+          reportTitle: 'PHIẾU KẾT QUẢ THỬ NGHIỆM',
+          reportSubTitle: 'TEST REPORT',
+          location: 'TP. Hồ Chí Minh',
+          signerTitle: 'TRƯỞNG PHÒNG THỬ NGHIỆM',
+          signerSubTitle: 'HEAD OF TESTING LABORATORY',
+          defaultMethod: 'TCVN / AOAC / SMEWW',
+        };
+      case 'CASE':
+        return {
+          parentOrg: 'SỞ KHOA HỌC VÀ CÔNG NGHỆ THÀNH PHỐ HỒ CHÍ MINH',
+          name: 'TRUNG TÂM DỊCH VỤ PHÂN TÍCH THÍ NGHIỆM TP.HCM',
+          subName: 'CENTER OF ANALYTICAL SERVICES AND EXPERIMENTATION (CASE)',
+          address:
+            '02 Nguyễn Văn Thủ, Phường Đa Kao, Quận 1, TP. Hồ Chí Minh | ĐT: (028) 3911 7211',
+          reportTitle: 'PHIẾU KẾT QUẢ PHÂN TÍCH',
+          reportSubTitle: 'TEST REPORT',
+          location: 'TP. Hồ Chí Minh',
+          signerTitle: 'GIÁM ĐỐC / TRƯỞNG PHÒNG PHÂN TÍCH',
+          signerSubTitle: 'DIRECTOR / HEAD OF LABORATORY',
+          defaultMethod: 'CASE-SOP / AOAC / TCVN',
+        };
+      case 'PASTEUR':
+        return {
+          parentOrg: 'BỘ Y TẾ',
+          name: 'VIỆN PASTEUR THÀNH PHỐ HỒ CHÍ MINH',
+          subName: 'PASTEUR INSTITUTE IN HO CHI MINH CITY',
+          address: '167 Pasteur, Phường Võ Thị Sáu, Quận 3, TP. Hồ Chí Minh | ĐT: (028) 3823 0352',
+          reportTitle: 'PHIẾU KẾT QUẢ XÉT NGHIỆM',
+          reportSubTitle: 'TEST REPORT',
+          location: 'TP. Hồ Chí Minh',
+          signerTitle: 'TRƯỞNG KHOA XÉT NGHIỆM',
+          signerSubTitle: 'HEAD OF LABORATORY',
+          defaultMethod: 'ISO / DĐVN / TCVN',
+        };
+      case 'NIFC':
+        return {
+          parentOrg: 'BỘ Y TẾ',
+          name: 'VIỆN KIỂM NGHIỆM AN TOÀN VỆ SINH THỰC PHẨM QUỐC GIA',
+          subName: 'NATIONAL INSTITUTE FOR FOOD CONTROL (NIFC)',
+          address:
+            '65 Phạm Thận Duật, Phường Mai Dịch, Quận Cầu Giấy, Hà Nội | ĐT: (024) 3933 5735',
+          reportTitle: 'PHIẾU KẾT QUẢ KIỂM NGHIỆM',
+          reportSubTitle: 'TEST REPORT',
+          location: 'Hà Nội',
+          signerTitle: 'VIỆN TRƯỞNG / TRƯỞNG PHÒNG THỬ NGHIỆM',
+          signerSubTitle: 'DIRECTOR / HEAD OF TESTING LAB',
+          defaultMethod: 'ISO / TCVN / AOAC',
+        };
+      case 'EUROFINS':
+        return {
+          parentOrg: 'EUROFINS SCIENTIFIC',
+          name: 'CÔNG TY TNHH EUROFINS SẮC KÝ HẢI ĐĂNG',
+          subName: 'EUROFINS SAC KY HAI DANG CO., LTD',
+          address: 'Lô E2b-3, Đường D6, Khu Công nghệ cao, TP. Thủ Đức, TP. Hồ Chí Minh',
+          reportTitle: 'PHIẾU KẾT QUẢ THỬ NGHIỆM',
+          reportSubTitle: 'CERTIFICATE OF ANALYSIS',
+          location: 'TP. Hồ Chí Minh',
+          signerTitle: 'TRƯỞNG PHÒNG THÍ NGHIỆM',
+          signerSubTitle: 'LABORATORY MANAGER',
+          defaultMethod: 'AOAC / ISO / CEN',
+        };
+      default:
+        return {
+          parentOrg: 'ĐƠN VỊ THỬ NGHIỆM NGOẠI KIỂM',
+          name: rawName || 'TRUNG TÂM KIỂM NGHIỆM ĐỘC LẬP',
+          subName: 'ACCREDITED TESTING LABORATORY',
+          address: 'Phòng thử nghiệm được công nhận / Hợp đồng dịch vụ phân tích',
+          reportTitle: 'PHIẾU KẾT QUẢ THỬ NGHIỆM',
+          reportSubTitle: 'TEST REPORT',
+          location: 'Việt Nam',
+          signerTitle: 'TRƯỞNG PHÒNG THÍ NGHIỆM',
+          signerSubTitle: 'HEAD OF LABORATORY',
+          defaultMethod: 'TCVN / AOAC / DĐVN',
+        };
+    }
+  }, [res.labName]);
 
   // Lọc và trích xuất danh sách chỉ tiêu
   // Ưu tiên số 1: Nếu TestResult hoặc Batch đã có Frozen EvaluationSnapshot -> Đọc 100% trực tiếp từ snapshot!
@@ -463,6 +561,15 @@ const CoAReport = memo(({ res, batch, product, tccs, formula }: CoAReportProps) 
     return r.unit || '';
   };
 
+  const getAnalysisMethod = (r: TestResultEntry) => {
+    if (r.analysisMethod && r.analysisMethod.trim() !== '') return r.analysisMethod;
+    if (tccs) {
+      const c = resolver.lookupCriterion(r.criteriaName, allCriteriaMap);
+      if (c && c.analysisMethod && c.analysisMethod.trim() !== '') return c.analysisMethod;
+    }
+    return externalLabInfo.defaultMethod || 'TCVN / AOAC / DĐVN';
+  };
+
   // Đánh giá lại kết luận chung: Phân biệt ĐẠT, KHÔNG ĐẠT và CHƯA HOÀN THIỆN
   // FIX: Dùng calculateOverallStatus() để xét đúng Alternate Rules (Miễn kiểm)
   // Tránh lỗi kết luận KHÔNG ĐẠT sai khi TC chính fail nhưng TC phụ đã đạt theo quy tắc thay thế
@@ -612,131 +719,268 @@ const CoAReport = memo(({ res, batch, product, tccs, formula }: CoAReportProps) 
       `}</style>
 
       {/* Header Công ty & Phòng QC theo mẫu chính thức V-Biotech */}
-      <div className="flex items-start justify-between pb-3 border-b-2 border-slate-900 mb-4 print:pb-2 print:mb-3">
-        {/* Góc trái: Logo V-Biotech + PHÒNG QC */}
-        <div className="flex flex-col items-center shrink-0 w-36 text-center">
-          <img
-            src="/logo.png"
-            alt="V-Biotech"
-            className="h-14 w-auto object-contain mb-1 print:h-12"
-            onError={(e) => {
-              (e.target as HTMLElement).style.display = 'none';
-            }}
-          />
-          <span className="text-[14px] font-black text-slate-950 uppercase tracking-wider">
-            PHÒNG QC
-          </span>
-        </div>
+      {/* Header phiếu kiểm nghiệm: Phân biệt Phiếu QC nội bộ V-Biotech vs Phiếu Ngoại kiểm bên ngoài */}
+      {isInternalLab ? (
+        <div className="flex items-start justify-between pb-3 border-b-2 border-slate-900 mb-4 print:pb-2 print:mb-3">
+          {/* Góc trái: Logo V-Biotech + PHÒNG QC */}
+          <div className="flex flex-col items-center shrink-0 w-36 text-center">
+            <img
+              src="/logo.png"
+              alt="V-Biotech"
+              className="h-14 w-auto object-contain mb-1 print:h-12"
+              onError={(e) => {
+                (e.target as HTMLElement).style.display = 'none';
+              }}
+            />
+            <span className="text-[14px] font-black text-slate-950 uppercase tracking-wider">
+              PHÒNG QC
+            </span>
+          </div>
 
-        {/* Giữa: Thông tin pháp nhân công ty */}
-        <div className="text-center flex-1 px-4 space-y-0.5 text-slate-900">
-          <p className="text-[13px] font-black uppercase tracking-tight text-slate-950">
-            CÔNG TY CỔ PHẦN CÔNG NGHỆ SINH PHẨM NAM VIỆT
-          </p>
-          <p className="text-[10px] font-bold uppercase tracking-wide text-slate-700">
-            NAM VIET BIOTECHNOLOGY JOINT STOCK COMPANY
-          </p>
-          <p className="text-[11px] text-slate-700">
-            Lô A3-A4 Cụm Công nghiệp vừa và nhỏ, Xã Diên Điền, Tỉnh Khánh Hòa.
-          </p>
-          <p className="text-[11px] text-slate-700">Điện thoại: 0258 3771868. Fax: 0258 3771869.</p>
-        </div>
+          {/* Giữa: Thông tin pháp nhân công ty */}
+          <div className="text-center flex-1 px-4 space-y-0.5 text-slate-900">
+            <p className="text-[13px] font-black uppercase tracking-tight text-slate-950">
+              CÔNG TY CỔ PHẦN CÔNG NGHỆ SINH PHẨM NAM VIỆT
+            </p>
+            <p className="text-[10px] font-bold uppercase tracking-wide text-slate-700">
+              NAM VIET BIOTECHNOLOGY JOINT STOCK COMPANY
+            </p>
+            <p className="text-[11px] text-slate-700">
+              Lô A3-A4 Cụm Công nghiệp vừa và nhỏ, Xã Diên Điền, Tỉnh Khánh Hòa.
+            </p>
+            <p className="text-[11px] text-slate-700">
+              Điện thoại: 0258 3771868. Fax: 0258 3771869.
+            </p>
+          </div>
 
-        {/* Góc phải: Mã QR tra cứu công khai theo SC-14 */}
-        <div className="shrink-0 flex flex-col items-center justify-center p-1 bg-white border border-slate-300 rounded shadow-xs print:shadow-none">
-          {coaUrl ? (
-            <QRCodeSVG value={coaUrl} size={48} level="M" />
-          ) : (
-            <div className="w-[48px] h-[48px] bg-slate-100 flex items-center justify-center text-[8px] text-slate-400">
-              QR
-            </div>
-          )}
-          <span className="text-[7px] text-slate-500 font-mono mt-0.5">Xác thực QR</span>
+          {/* Góc phải: Mã QR tra cứu công khai theo SC-14 */}
+          <div className="shrink-0 flex flex-col items-center justify-center p-1 bg-white border border-slate-300 rounded shadow-xs print:shadow-none">
+            {coaUrl ? (
+              <QRCodeSVG value={coaUrl} size={48} level="M" />
+            ) : (
+              <div className="w-[48px] h-[48px] bg-slate-100 flex items-center justify-center text-[8px] text-slate-400">
+                QR
+              </div>
+            )}
+            <span className="text-[7px] text-slate-500 font-mono mt-0.5">Xác thực QR</span>
+          </div>
         </div>
-      </div>
+      ) : (
+        <div className="flex items-start justify-between pb-3 border-b-2 border-slate-900 mb-4 print:pb-2 print:mb-3">
+          {/* Thông tin Đơn vị thử nghiệm ngoại kiểm bên ngoài */}
+          <div className="flex-1 space-y-0.5 text-slate-900 pr-4">
+            {externalLabInfo.parentOrg && (
+              <p className="text-[11px] font-bold uppercase tracking-tight text-slate-600">
+                {externalLabInfo.parentOrg}
+              </p>
+            )}
+            <p className="text-[14px] font-black uppercase tracking-tight text-slate-950">
+              {externalLabInfo.name}
+            </p>
+            {externalLabInfo.subName && (
+              <p className="text-[10px] font-bold uppercase tracking-wide text-slate-700">
+                {externalLabInfo.subName}
+              </p>
+            )}
+            <p className="text-[11px] text-slate-700">{externalLabInfo.address}</p>
+          </div>
+
+          {/* Góc phải: Mã QR tra cứu */}
+          <div className="shrink-0 flex flex-col items-center justify-center p-1 bg-white border border-slate-300 rounded shadow-xs print:shadow-none">
+            {coaUrl ? (
+              <QRCodeSVG value={coaUrl} size={48} level="M" />
+            ) : (
+              <div className="w-[48px] h-[48px] bg-slate-100 flex items-center justify-center text-[8px] text-slate-400">
+                QR
+              </div>
+            )}
+            <span className="text-[7px] text-slate-500 font-mono mt-0.5">Xác thực QR</span>
+          </div>
+        </div>
+      )}
 
       {/* Tiêu đề Phiếu kiểm nghiệm & Số hiệu báo cáo */}
       <div className="relative text-center mb-5 print:mb-3">
         <h1 className="text-2xl font-black uppercase tracking-wide text-slate-950">
-          PHIẾU KIỂM NGHIỆM
+          {isInternalLab ? 'PHIẾU KIỂM NGHIỆM' : externalLabInfo.reportTitle}
         </h1>
+        {!isInternalLab && (
+          <p className="text-[12px] font-bold text-slate-600 tracking-wider uppercase italic">
+            {externalLabInfo.reportSubTitle}
+          </p>
+        )}
         <div className="text-right mt-1 text-[13px] font-medium text-slate-800">
-          <span>Số: </span>
+          <span>{isInternalLab ? 'Số: ' : 'Số / No: '}</span>
           <span className="font-bold text-slate-950">
             {(res as any).reportNo || res.id || '---'}
           </span>
         </div>
       </div>
 
-      {/* Thông tin mẫu thử theo mẫu chính thức */}
-      <div className="space-y-1.5 mb-6 print:mb-4 text-[13px] text-slate-900 border-b border-slate-300 pb-3 print:pb-2">
-        {/* Dòng 1: Tên sản phẩm */}
-        <div className="flex">
-          <span className="w-36 shrink-0 font-medium text-slate-800">Tên sản phẩm:</span>
-          <span className="font-bold uppercase text-slate-950 flex-1">
-            {product?.name || '---'}
-          </span>
-        </div>
-
-        {/* Dòng 2: Mã số & Số lô */}
-        <div className="grid grid-cols-2 gap-x-8">
+      {/* Thông tin mẫu thử & Khách hàng */}
+      {isInternalLab ? (
+        /* Form thông tin QC Nội bộ V-Biotech */
+        <div className="space-y-1.5 mb-6 print:mb-4 text-[13px] text-slate-900 border-b border-slate-300 pb-3 print:pb-2">
+          {/* Dòng 1: Tên sản phẩm */}
           <div className="flex">
-            <span className="w-36 shrink-0 font-medium text-slate-800">Mã số:</span>
-            <span className="font-bold text-slate-950">{product?.code || '---'}</span>
-          </div>
-          <div className="flex">
-            <span className="w-28 shrink-0 font-medium text-slate-800">Số lô:</span>
-            <span className="font-bold text-slate-950">{batch?.batchNo || '---'}</span>
-          </div>
-        </div>
-
-        {/* Dòng 3: Ngày sản xuất & Hạn dùng */}
-        <div className="grid grid-cols-2 gap-x-8">
-          <div className="flex">
-            <span className="w-36 shrink-0 font-medium text-slate-800">Ngày sản xuất:</span>
-            <span className="font-bold text-slate-950">
-              {batch && batch.mfgDate ? formatDateStandard(batch.mfgDate) : '---'}
+            <span className="w-36 shrink-0 font-medium text-slate-800">Tên sản phẩm:</span>
+            <span className="font-bold uppercase text-slate-950 flex-1">
+              {product?.name || '---'}
             </span>
           </div>
+
+          {/* Dòng 2: Mã số & Số lô */}
+          <div className="grid grid-cols-2 gap-x-8">
+            <div className="flex">
+              <span className="w-36 shrink-0 font-medium text-slate-800">Mã số:</span>
+              <span className="font-bold text-slate-950">{product?.code || '---'}</span>
+            </div>
+            <div className="flex">
+              <span className="w-28 shrink-0 font-medium text-slate-800">Số lô:</span>
+              <span className="font-bold text-slate-950">{batch?.batchNo || '---'}</span>
+            </div>
+          </div>
+
+          {/* Dòng 3: Ngày sản xuất & Hạn dùng */}
+          <div className="grid grid-cols-2 gap-x-8">
+            <div className="flex">
+              <span className="w-36 shrink-0 font-medium text-slate-800">Ngày sản xuất:</span>
+              <span className="font-bold text-slate-950">
+                {batch && batch.mfgDate ? formatDateStandard(batch.mfgDate) : '---'}
+              </span>
+            </div>
+            <div className="flex">
+              <span className="w-28 shrink-0 font-medium text-slate-800">Hạn dùng:</span>
+              <span className="font-bold text-slate-950">
+                {batch && batch.expDate ? formatDateStandard(batch.expDate) : '---'}
+              </span>
+            </div>
+          </div>
+
+          {/* Dòng 4: Dạng bào chế */}
           <div className="flex">
-            <span className="w-28 shrink-0 font-medium text-slate-800">Hạn dùng:</span>
-            <span className="font-bold text-slate-950">
-              {batch && batch.expDate ? formatDateStandard(batch.expDate) : '---'}
+            <span className="w-36 shrink-0 font-medium text-slate-800">Dạng bào chế:</span>
+            <span className="font-medium text-slate-950">
+              {tccs?.sensory?.dosageForm ||
+                formula?.sensory?.dosageForm ||
+                (batch as any)?.dosageForm ||
+                '---'}
             </span>
           </div>
-        </div>
 
-        {/* Dòng 4: Dạng bào chế */}
-        <div className="flex">
-          <span className="w-36 shrink-0 font-medium text-slate-800">Dạng bào chế:</span>
-          <span className="font-medium text-slate-950">
-            {tccs?.sensory?.dosageForm ||
+          {/* Dòng 5: Quy cách đóng gói */}
+          <div className="flex">
+            <span className="w-36 shrink-0 font-medium text-slate-800">Quy cách đóng gói:</span>
+            <span className="font-medium text-slate-950">
+              {batch?.packaging || formula?.packaging || '---'}
+            </span>
+          </div>
+
+          {/* Dòng 6: Tiêu chuẩn / Ngày thực hiện & Ngày kết thúc */}
+          <div className="grid grid-cols-2 gap-x-8">
+            <div className="flex">
+              <span className="w-36 shrink-0 font-medium text-slate-800">Tiêu chuẩn:</span>
+              <span className="font-bold text-slate-950">{tccs?.code || '---'}</span>
+            </div>
+            <div className="flex">
+              <span className="w-28 shrink-0 font-medium text-slate-800">Ngày kiểm:</span>
+              <span className="font-bold text-slate-950">{formatDateStandard(res.testDate)}</span>
+            </div>
+          </div>
+        </div>
+      ) : (
+        /* Form thông tin Khách hàng & Mẫu thử dành cho Ngoại kiểm */
+        <div className="space-y-1.5 mb-6 print:mb-4 text-[13px] text-slate-900 border-b border-slate-300 pb-3 print:pb-2">
+          {/* Đơn vị gửi mẫu / Client */}
+          <div className="flex">
+            <span className="w-48 shrink-0 font-medium text-slate-800">
+              Đơn vị gửi mẫu / Client:
+            </span>
+            <span className="font-bold uppercase text-slate-950 flex-1">
+              CÔNG TY CỔ PHẦN CÔNG NGHỆ SINH PHẨM NAM VIỆT
+            </span>
+          </div>
+
+          {/* Địa chỉ khách hàng / Address */}
+          <div className="flex">
+            <span className="w-48 shrink-0 font-medium text-slate-800">Địa chỉ / Address:</span>
+            <span className="font-medium text-slate-900 flex-1">
+              Lô A3-A4 Cụm Công nghiệp vừa và nhỏ, Xã Diên Điền, Huyện Diên Khánh, Tỉnh Khánh Hòa
+            </span>
+          </div>
+
+          {/* Tên mẫu thử / Sample name */}
+          <div className="flex">
+            <span className="w-48 shrink-0 font-medium text-slate-800">Tên mẫu thử / Sample:</span>
+            <span className="font-bold uppercase text-slate-950 flex-1">
+              {product?.name || '---'}
+            </span>
+          </div>
+
+          {/* Ký hiệu mẫu & Số lô */}
+          <div className="grid grid-cols-2 gap-x-8">
+            <div className="flex">
+              <span className="w-48 shrink-0 font-medium text-slate-800">Ký hiệu mẫu / Code:</span>
+              <span className="font-bold text-slate-950">{product?.code || '---'}</span>
+            </div>
+            <div className="flex">
+              <span className="w-32 shrink-0 font-medium text-slate-800">Số lô / Batch No:</span>
+              <span className="font-bold text-slate-950">{batch?.batchNo || '---'}</span>
+            </div>
+          </div>
+
+          {/* Ngày sản xuất & Hạn dùng */}
+          <div className="grid grid-cols-2 gap-x-8">
+            <div className="flex">
+              <span className="w-48 shrink-0 font-medium text-slate-800">Ngày sản xuất / Mfg:</span>
+              <span className="font-bold text-slate-950">
+                {batch && batch.mfgDate ? formatDateStandard(batch.mfgDate) : '---'}
+              </span>
+            </div>
+            <div className="flex">
+              <span className="w-32 shrink-0 font-medium text-slate-800">Hạn dùng / Exp:</span>
+              <span className="font-bold text-slate-950">
+                {batch && batch.expDate ? formatDateStandard(batch.expDate) : '---'}
+              </span>
+            </div>
+          </div>
+
+          {/* Mô tả tình trạng mẫu khi nhận */}
+          <div className="flex">
+            <span className="w-48 shrink-0 font-medium text-slate-800">Mô tả mẫu / Condition:</span>
+            <span className="font-medium text-slate-950">
+              {tccs?.sensory?.dosageForm ||
               formula?.sensory?.dosageForm ||
-              (batch as any)?.dosageForm ||
-              '---'}
-          </span>
-        </div>
-
-        {/* Dòng 5: Quy cách đóng gói */}
-        <div className="flex">
-          <span className="w-36 shrink-0 font-medium text-slate-800">Quy cách đóng gói:</span>
-          <span className="font-medium text-slate-950">
-            {batch?.packaging || formula?.packaging || '---'}
-          </span>
-        </div>
-
-        {/* Dòng 6: Tiêu chuẩn / Ngày thực hiện & Ngày kết thúc */}
-        <div className="grid grid-cols-2 gap-x-8">
-          <div className="flex">
-            <span className="w-36 shrink-0 font-medium text-slate-800">Tiêu chuẩn:</span>
-            <span className="font-bold text-slate-950">{tccs?.code || '---'}</span>
+              (batch as any)?.dosageForm
+                ? `${tccs?.sensory?.dosageForm || formula?.sensory?.dosageForm || (batch as any)?.dosageForm}, `
+                : ''}
+              quy cách: {batch?.packaging || formula?.packaging || 'Mẫu nguyên bao bì niêm phong'}
+            </span>
           </div>
+
+          {/* Ngày nhận mẫu & Ngày thử nghiệm */}
+          <div className="grid grid-cols-2 gap-x-8">
+            <div className="flex">
+              <span className="w-48 shrink-0 font-medium text-slate-800">
+                Ngày nhận mẫu / Received:
+              </span>
+              <span className="font-bold text-slate-950">
+                {formatDateStandard((batch as any)?.mfgDate || res.testDate)}
+              </span>
+            </div>
+            <div className="flex">
+              <span className="w-32 shrink-0 font-medium text-slate-800">Ngày thử / Tested:</span>
+              <span className="font-bold text-slate-950">{formatDateStandard(res.testDate)}</span>
+            </div>
+          </div>
+
+          {/* Đơn vị thực hiện kiểm nghiệm */}
           <div className="flex">
-            <span className="w-28 shrink-0 font-medium text-slate-800">Ngày kiểm:</span>
-            <span className="font-bold text-slate-950">{formatDateStandard(res.testDate)}</span>
+            <span className="w-48 shrink-0 font-medium text-slate-800">Nơi thử nghiệm / Lab:</span>
+            <span className="font-bold text-slate-950">{res.labName || externalLabInfo.name}</span>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Bảng kết quả */}
       <div className="mb-10 print:mb-6">
@@ -746,29 +990,62 @@ const CoAReport = memo(({ res, batch, product, tccs, formula }: CoAReportProps) 
         </h4>
         <table className="w-full text-[13px] border-collapse border border-slate-800">
           <thead className="bg-slate-50 text-center table-header-group">
-            <tr>
-              <th className="py-2 print:py-1 px-2 border border-slate-800 w-[6%]">STT</th>
-              <th className="py-2 print:py-1 px-3 print:px-2 border border-slate-800 w-[34%]">
-                Chỉ tiêu
-                <br />
-                <span className="text-[10px] font-normal italic">Test Parameter</span>
-              </th>
-              <th className="py-2 print:py-1 px-3 print:px-2 border border-slate-800 w-[28%]">
-                Yêu cầu
-                <br />
-                <span className="text-[10px] font-normal italic">Specification</span>
-              </th>
-              <th className="py-2 print:py-1 px-3 print:px-2 border border-slate-800 w-[14%]">
-                Đơn vị
-                <br />
-                <span className="text-[10px] font-normal italic">Unit</span>
-              </th>
-              <th className="py-2 print:py-1 px-3 print:px-2 border border-slate-800 w-[18%]">
-                Kết quả
-                <br />
-                <span className="text-[10px] font-normal italic">Result</span>
-              </th>
-            </tr>
+            {isInternalLab ? (
+              /* Header bảng 5 cột cho Phiếu QC Nội bộ */
+              <tr>
+                <th className="py-2 print:py-1 px-2 border border-slate-800 w-[6%]">STT</th>
+                <th className="py-2 print:py-1 px-3 print:px-2 border border-slate-800 w-[34%]">
+                  Chỉ tiêu
+                  <br />
+                  <span className="text-[10px] font-normal italic">Test Parameter</span>
+                </th>
+                <th className="py-2 print:py-1 px-3 print:px-2 border border-slate-800 w-[28%]">
+                  Yêu cầu
+                  <br />
+                  <span className="text-[10px] font-normal italic">Specification</span>
+                </th>
+                <th className="py-2 print:py-1 px-3 print:px-2 border border-slate-800 w-[14%]">
+                  Đơn vị
+                  <br />
+                  <span className="text-[10px] font-normal italic">Unit</span>
+                </th>
+                <th className="py-2 print:py-1 px-3 print:px-2 border border-slate-800 w-[18%]">
+                  Kết quả
+                  <br />
+                  <span className="text-[10px] font-normal italic">Result</span>
+                </th>
+              </tr>
+            ) : (
+              /* Header bảng 6 cột cho Phiếu Kiểm ngoài (Kèm Phương pháp thử) */
+              <tr>
+                <th className="py-2 print:py-1 px-2 border border-slate-800 w-[5%]">STT</th>
+                <th className="py-2 print:py-1 px-3 print:px-2 border border-slate-800 w-[29%]">
+                  Chỉ tiêu thử nghiệm
+                  <br />
+                  <span className="text-[10px] font-normal italic">Test Parameter</span>
+                </th>
+                <th className="py-2 print:py-1 px-3 print:px-2 border border-slate-800 w-[22%]">
+                  Phương pháp thử
+                  <br />
+                  <span className="text-[10px] font-normal italic">Test Method</span>
+                </th>
+                <th className="py-2 print:py-1 px-2 border border-slate-800 w-[11%]">
+                  Đơn vị
+                  <br />
+                  <span className="text-[10px] font-normal italic">Unit</span>
+                </th>
+                <th className="py-2 print:py-1 px-3 print:px-2 border border-slate-800 w-[18%]">
+                  Mức quy định
+                  <br />
+                  <span className="text-[10px] font-normal italic">Specification</span>
+                </th>
+                <th className="py-2 print:py-1 px-3 print:px-2 border border-slate-800 w-[15%]">
+                  Kết quả
+                  <br />
+                  <span className="text-[10px] font-normal italic">Result</span>
+                </th>
+              </tr>
+            )}
           </thead>
           <tbody>
             {(() => {
@@ -777,7 +1054,7 @@ const CoAReport = memo(({ res, batch, product, tccs, formula }: CoAReportProps) 
                 <React.Fragment key={group.title}>
                   <tr className="bg-slate-100 break-inside-avoid">
                     <td
-                      colSpan={5}
+                      colSpan={isInternalLab ? 5 : 6}
                       className="py-2 print:py-1 px-3 print:px-2 font-bold text-slate-800 border border-slate-800"
                     >
                       {group.title}
@@ -792,10 +1069,8 @@ const CoAReport = memo(({ res, batch, product, tccs, formula }: CoAReportProps) 
                       const criterion = allCriteriaMap.get(rName);
 
                       // Tìm thành phần tương ứng trong công thức đã công bố
-                      // Fallback: Tìm theo tên chính xác nếu không có liên kết
                       let formulaItem = formulaItemMap.get(rName);
 
-                      // Nếu TCCS có khai báo liên kết rõ ràng với thành phần nào, sử dụng liên kết đó
                       if (criterion && criterion.formulaIngredientId) {
                         const linkedName = criterion.formulaIngredientId.trim().toLowerCase();
                         const linkedItem = formulaItemMap.get(linkedName);
@@ -822,11 +1097,6 @@ const CoAReport = memo(({ res, batch, product, tccs, formula }: CoAReportProps) 
 
                       if (isMainCriteria) {
                         if (criterion && criterion.formulaIngredientId) {
-                          // ƯU TIÊN 1: Chỉ tiêu có liên kết công thức rõ ràng
-                          // → Dùng hàm lượng từ Công thức (formulaItem) làm cơ sở 100%
-                          // → criterion.declaredContent chỉ là fallback nếu công thức không có số
-                          // (Sửa bug 15%: criterion.declaredContent có thể vô tình bị gán bằng ngưỡng
-                          //  tối thiểu TCCS, VD: Tổng Bacillus "10^9" thay vì hàm lượng "10^8")
                           if (
                             criterion.calculationBasis === 'ELEMENTAL' &&
                             elementalContent != null &&
@@ -840,27 +1110,23 @@ const CoAReport = memo(({ res, batch, product, tccs, formula }: CoAReportProps) 
                           ) {
                             basisForCalculation = declaredContent as number;
                           } else if (criterion.declaredContent != null) {
-                            // Fallback: dùng criterion.declaredContent khi formulaItem không có hàm lượng
                             basisForCalculation =
                               typeof criterion.declaredContent === 'string'
                                 ? parseNumberFromText(criterion.declaredContent as any)
                                 : criterion.declaredContent;
                           }
                         } else if (criterion?.declaredContent != null) {
-                          // ƯU TIÊN 2: Không có liên kết công thức → dùng criterion.declaredContent
                           basisForCalculation =
                             typeof criterion.declaredContent === 'string'
                               ? parseNumberFromText(criterion.declaredContent as any)
                               : criterion.declaredContent;
                         } else {
-                          // FALLBACK: Tìm hàm lượng theo tên trong công thức (không có liên kết tường minh)
                           basisForCalculation =
                             elementalContent != null && elementalContent > 0
                               ? elementalContent
                               : (declaredContent as number);
                         }
                       } else {
-                        // Chỉ tiêu ngoài TCCS: tra cứu công thức 3 lớp (exact → pharma dict → fuzzy)
                         const extraFormulaItem = lookupFormulaItem(r.criteriaName);
                         if (extraFormulaItem) {
                           let dc = extraFormulaItem.declaredContent;
@@ -872,8 +1138,6 @@ const CoAReport = memo(({ res, batch, product, tccs, formula }: CoAReportProps) 
                         }
                       }
 
-                      // Giới hạn mặc định ±20% áp dụng khi chỉ tiêu KHÔNG có trong TCCS nhưng có trong Công thức
-                      // Đây là dải chấp nhận theo thực hành GMP: 80% ~ 120% hàm lượng công bố
                       let formulaDefaultMin: number | undefined;
                       let formulaDefaultMax: number | undefined;
                       if (
@@ -885,12 +1149,9 @@ const CoAReport = memo(({ res, batch, product, tccs, formula }: CoAReportProps) 
                         formulaDefaultMax = basisForCalculation * 1.2;
                       }
 
-                      // Sử dụng parseNumberFromText để xử lý kết quả kiểm nghiệm (hỗ trợ số mũ 10^3, 1.5x10^5...)
                       const actualValue = parseNumberFromText(String(r.value));
                       let percentageView = null;
 
-                      // Đánh giá lại isPass theo ±20% nếu chỉ tiêu không có TCCS nhưng có trong Công thức (chỉ áp dụng cho bản nháp DRAFT)
-                      // Đối với bản chính thức có EvaluationSnapshot: tuyệt đối tôn trọng r.isPass từ snapshot
                       let effectiveIsPass = r.isPass;
                       if (
                         !isOfficialSnapshot &&
@@ -903,9 +1164,7 @@ const CoAReport = memo(({ res, batch, product, tccs, formula }: CoAReportProps) 
                           actualValue >= formulaDefaultMin && actualValue <= formulaDefaultMax;
                       }
 
-                      // Đồng bộ hiển thị "Không phát hiện" nếu Yêu cầu là nhóm ND và người dùng nhập 0
                       const limitText = getLimitText(r);
-                      // Lọc sentinel '__FORMULA__' trước khi dùng vào các hàm xử lý chuỗi
                       const limitTextDisplay = limitText === '__FORMULA__' ? '' : limitText;
                       const limitUpper = String(limitTextDisplay).toUpperCase();
 
@@ -914,7 +1173,6 @@ const CoAReport = memo(({ res, batch, product, tccs, formula }: CoAReportProps) 
                         String(limitTextDisplay)
                       );
 
-                      // Định dạng hiển thị riêng cho trạng thái miễn kiểm, quy đổi các chuỗi cũ về chung 1 format
                       if (
                         r.value === 'Miễn kiểm' ||
                         r.value === 'Đạt (theo quy tắc thay thế)' ||
@@ -924,7 +1182,6 @@ const CoAReport = memo(({ res, batch, product, tccs, formula }: CoAReportProps) 
                           <span className="italic font-semibold text-slate-600">Miễn kiểm</span>
                         );
                       } else {
-                        // Ngăn chặn lỗi hiển thị "Không phát hiện" khi người dùng nhập "Dương tính" hoặc chuỗi chữ
                         const isNumericZero =
                           actualValue === 0 && /^0(\.0+)?$/.test(String(r.value).trim());
                         if (isNumericZero && ND_KEYWORDS.some((kw) => limitUpper.includes(kw))) {
@@ -932,7 +1189,6 @@ const CoAReport = memo(({ res, batch, product, tccs, formula }: CoAReportProps) 
                         }
                       }
 
-                      // Sử dụng calculateRelativePercentage chuẩn hóa kế thừa từ Domain Engine
                       const relativePercText = calculateRelativePercentage(
                         r.value,
                         basisForCalculation,
@@ -946,7 +1202,6 @@ const CoAReport = memo(({ res, batch, product, tccs, formula }: CoAReportProps) 
                         );
                       }
 
-                      // Nội dung cột "Yêu cầu": ưu tiên giới hạn ±20% từ Công thức nếu không có TCCS
                       let limitCellContent: React.ReactNode;
                       if (formulaDefaultMin !== undefined && formulaDefaultMax !== undefined) {
                         const locale = getActiveLocale();
@@ -979,6 +1234,11 @@ const CoAReport = memo(({ res, batch, product, tccs, formula }: CoAReportProps) 
                           <td className="py-2 print:py-1.5 px-3 print:px-2 border-r border-slate-800 font-medium">
                             {r.criteriaName}
                           </td>
+                          {!isInternalLab && (
+                            <td className="py-2 print:py-1.5 px-3 print:px-2 border-r border-slate-800 text-[12px] text-slate-700">
+                              {getAnalysisMethod(r)}
+                            </td>
+                          )}
                           <td className="py-2 print:py-1.5 px-3 print:px-2 text-center border-r border-slate-800 font-bold">
                             {limitCellContent}
                           </td>
@@ -1003,21 +1263,43 @@ const CoAReport = memo(({ res, batch, product, tccs, formula }: CoAReportProps) 
           </tbody>
         </table>
 
-        {/* Chú thích pháp lý chân trang theo Screen Contract SC-14 & BR-ALT-004 */}
-        {(deduplicatedResults.some((r: any) => r.isExempted || r.alternateState === 'EXEMPTED') ||
-          (res.evaluationSnapshot?.footnotes && res.evaluationSnapshot.footnotes.length > 0)) && (
+        {/* Chú thích chân bảng */}
+        {isInternalLab ? (
+          /* Chú thích pháp lý Tiêu chuẩn cơ sở nội bộ */
+          (deduplicatedResults.some((r: any) => r.isExempted || r.alternateState === 'EXEMPTED') ||
+            (res.evaluationSnapshot?.footnotes && res.evaluationSnapshot.footnotes.length > 0)) && (
+            <div className="mt-2 text-[11px] text-slate-600 italic space-y-0.5 border-t border-slate-300 pt-1.5 print:mt-1">
+              <p>
+                (*) Miễn kiểm tra theo quy định của Tiêu chuẩn cơ sở khi chỉ tiêu chính tương ứng đã
+                đạt yêu cầu.
+              </p>
+              {deduplicatedResults
+                .filter((r: any) => r.alternateNote && String(r.alternateNote).trim() !== '')
+                .map((r: any, idx: number) => (
+                  <p key={`alt-note-${idx}`}>
+                    - {r.criteriaName}: {r.alternateNote}
+                  </p>
+                ))}
+              {res.evaluationSnapshot?.footnotes?.map((fn, idx) => (
+                <p key={idx}>{fn}</p>
+              ))}
+            </div>
+          )
+        ) : (
+          /* Ghi chú chuẩn cho phiếu kiểm nghiệm của đơn vị bên ngoài */
           <div className="mt-2 text-[11px] text-slate-600 italic space-y-0.5 border-t border-slate-300 pt-1.5 print:mt-1">
             <p>
-              (*) Miễn kiểm tra theo quy định của Tiêu chuẩn cơ sở khi chỉ tiêu chính tương ứng đã
-              đạt yêu cầu.
+              1. Các kết quả thử nghiệm ghi trong phiếu này chỉ có giá trị đối với mẫu thử do khách
+              hàng gửi đến phòng thí nghiệm.
             </p>
-            {deduplicatedResults
-              .filter((r: any) => r.alternateNote && String(r.alternateNote).trim() !== '')
-              .map((r: any, idx: number) => (
-                <p key={`alt-note-${idx}`}>
-                  - {r.criteriaName}: {r.alternateNote}
-                </p>
-              ))}
+            <p>
+              2. Không được trích sao một phần phiếu kết quả thử nghiệm này nếu không có sự đồng ý
+              bằng văn bản của phòng kiểm nghiệm.
+            </p>
+            <p>
+              3. KPH (ND): Không phát hiện / Not Detected (dưới ngưỡng định lượng LOQ hoặc ngưỡng
+              phát hiện LOD của phương pháp thử).
+            </p>
             {res.evaluationSnapshot?.footnotes?.map((fn, idx) => (
               <p key={idx}>{fn}</p>
             ))}
@@ -1025,9 +1307,11 @@ const CoAReport = memo(({ res, batch, product, tccs, formula }: CoAReportProps) 
         )}
       </div>
 
-      {/* Khối Kết luận Chất lượng chuẩn tắc theo mẫu */}
+      {/* Khối Kết luận Chất lượng */}
       <div className="mb-6 text-[13px] text-slate-900 leading-relaxed break-inside-avoid">
-        <span className="font-bold underline uppercase">KẾT LUẬN:</span>{' '}
+        <span className="font-bold underline uppercase">
+          {isInternalLab ? 'KẾT LUẬN:' : 'KẾT LUẬN / CONCLUSION:'}
+        </span>{' '}
         {isOfficialSnapshot && snapshot ? (
           <span
             className={
@@ -1037,70 +1321,107 @@ const CoAReport = memo(({ res, batch, product, tccs, formula }: CoAReportProps) 
             }
           >
             {snapshot.overallStatus === 'PASS'
-              ? `Mẫu thử ${product?.name || ''} lô ${batch?.batchNo || ''} đạt yêu cầu chất lượng theo TCCS.`
-              : `Mẫu thử ${product?.name || ''} lô ${batch?.batchNo || ''} không đạt yêu cầu chất lượng theo TCCS.`}
+              ? isInternalLab
+                ? `Mẫu thử ${product?.name || ''} lô ${batch?.batchNo || ''} đạt yêu cầu chất lượng theo TCCS.`
+                : `Các chỉ tiêu kiểm nghiệm trên mẫu thử đạt yêu cầu theo quy chuẩn kỹ thuật.`
+              : isInternalLab
+                ? `Mẫu thử ${product?.name || ''} lô ${batch?.batchNo || ''} không đạt yêu cầu chất lượng theo TCCS.`
+                : `Mẫu thử không đạt ở một số chỉ tiêu kiểm nghiệm.`}
           </span>
         ) : (
           <span className="font-bold text-amber-700">
             {conclusion.label === 'ĐẠT'
-              ? `Bản dự thảo: Mẫu thử ${product?.name || ''} lô ${batch?.batchNo || ''} đạt yêu cầu chất lượng theo TCCS (chưa thẩm định chính thức).`
+              ? isInternalLab
+                ? `Bản dự thảo: Mẫu thử ${product?.name || ''} lô ${batch?.batchNo || ''} đạt yêu cầu chất lượng theo TCCS (chưa thẩm định chính thức).`
+                : `Các chỉ tiêu đã thử nghiệm phù hợp quy chuẩn kỹ thuật.`
               : `Bản dự thảo: Mẫu thử không đạt yêu cầu chất lượng.`}
           </span>
         )}
       </div>
 
-      {/* Khối Chữ ký Trưởng phòng QC theo mẫu Phiếu Kiểm Nghiệm thực tế */}
-      <div className="flex justify-end mt-4 mb-6 break-inside-avoid">
-        <div className="w-80 text-center text-slate-900">
-          <p className="italic text-[12px] text-slate-700 mb-1">
-            Khánh Hòa, ngày {signDate.day} tháng {signDate.month} năm {signDate.year}
-          </p>
-          <p className="font-bold text-[12px] uppercase tracking-wide text-slate-800">
-            TL. GIÁM ĐỐC
-          </p>
-          <p className="font-black text-[13px] uppercase tracking-wide text-slate-950 mb-1">
-            TRƯỞNG PHÒNG QC
-          </p>
+      {/* Khối Chữ ký: Phân biệt rõ ràng giữa Nội bộ và Ngoại kiểm */}
+      {isInternalLab ? (
+        /* Khối Chữ ký Trưởng phòng QC theo mẫu Phiếu Kiểm Nghiệm nội bộ thực tế */
+        <div className="flex justify-end mt-4 mb-6 break-inside-avoid">
+          <div className="w-80 text-center text-slate-900">
+            <p className="italic text-[12px] text-slate-700 mb-1">
+              Khánh Hòa, ngày {signDate.day} tháng {signDate.month} năm {signDate.year}
+            </p>
+            <p className="font-bold text-[12px] uppercase tracking-wide text-slate-800">
+              TL. GIÁM ĐỐC
+            </p>
+            <p className="font-black text-[13px] uppercase tracking-wide text-slate-950 mb-1">
+              TRƯỞNG PHÒNG QC
+            </p>
 
-          {/* Vùng thể hiện Chữ ký / Ký số */}
-          <div className="min-h-[85px] flex flex-col items-center justify-center py-1">
-            {isOfficialSnapshot ? (
-              <div className="border border-emerald-600/40 bg-emerald-50/70 rounded-md px-3 py-1.5 text-center my-1 print:border-emerald-700 print:bg-emerald-50/20">
-                <div className="text-[11px] font-bold text-emerald-800 print:text-emerald-900 flex items-center justify-center gap-1">
-                  <span>✓</span> ĐÃ KÝ SỐ ĐIỆN TỬ
-                </div>
-                <div className="text-[9px] text-emerald-700 print:text-emerald-800 font-mono mt-0.5 truncate max-w-[220px]">
-                  {snapshot?.evaluatedBy || (res as any).reviewedBy || 'Trưởng phòng QC'}
-                </div>
-                {snapshot?.timestamp && (
-                  <div className="text-[8px] text-slate-500 font-mono">
-                    {formatDateStandard(snapshot.timestamp)}
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="text-[11px] italic text-slate-400">(Ký, ghi rõ họ tên)</div>
-            )}
+            {/* Vùng chừa trống chữ ký sống & con dấu đỏ công ty (bỏ ký số điện tử và tên in sẵn theo yêu cầu) */}
+            <div className="h-28 flex items-center justify-center">
+              {/* Khoảng trống để ký tay sống và đóng dấu mộc đỏ */}
+            </div>
+          </div>
+        </div>
+      ) : (
+        /* Khối Chữ ký Đơn vị Thử nghiệm Ngoại kiểm (2 bên: Người thử nghiệm & Đại diện phòng thử nghiệm) */
+        <div className="flex justify-between items-start mt-6 mb-6 break-inside-avoid">
+          {/* Cột trái: Người thử nghiệm */}
+          <div className="w-72 text-center text-slate-900">
+            <p className="font-bold text-[12px] uppercase tracking-wide text-slate-800">
+              NGƯỜI THỬ NGHIỆM
+            </p>
+            <p className="text-[10px] font-medium text-slate-600 uppercase italic mb-1">
+              TESTED BY / ANALYST
+            </p>
+            <div className="h-28 flex items-end justify-center">
+              <span className="text-[11px] italic text-slate-400">(Ký, ghi rõ họ tên)</span>
+            </div>
           </div>
 
-          <p className="font-bold text-[14px] text-slate-950 mt-1">{qcManagerName}</p>
+          {/* Cột phải: Trưởng phòng thí nghiệm / Đại diện đơn vị kiểm nghiệm */}
+          <div className="w-80 text-center text-slate-900">
+            <p className="italic text-[12px] text-slate-700 mb-1">
+              {externalLabInfo.location}, ngày {signDate.day} tháng {signDate.month} năm{' '}
+              {signDate.year}
+            </p>
+            <p className="font-bold text-[12px] uppercase tracking-wide text-slate-800">
+              {externalLabInfo.signerTitle}
+            </p>
+            <p className="text-[10px] font-medium text-slate-600 uppercase italic mb-1">
+              {externalLabInfo.signerSubTitle}
+            </p>
+            <div className="h-28 flex items-end justify-center">
+              <span className="text-[11px] italic text-slate-400">
+                (Ký tên và đóng dấu / Signature & Stamp)
+              </span>
+            </div>
+          </div>
         </div>
-      </div>
+      )}
 
-      {/* Chân trang Biểu mẫu kiểm soát theo tiêu chuẩn ISO/GMP (Mã số: HS-BM-03-QC-6-04) */}
-      <div className="mt-8 pt-3 border-t-2 border-slate-900 flex justify-between items-center text-[11px] text-slate-800 break-inside-avoid print:mt-4 print:pt-2">
-        <div>
-          <span className="font-bold">Mã số:</span> HS-BM-03-QC-6-04
+      {/* Chân trang Biểu mẫu: Nội bộ hiển thị HS-BM-03-QC-6-04, Ngoại kiểm không hiển thị mã biểu mẫu nội bộ */}
+      {isInternalLab ? (
+        <div className="mt-8 pt-3 border-t-2 border-slate-900 flex justify-between items-center text-[11px] text-slate-800 break-inside-avoid print:mt-4 print:pt-2">
+          <div>
+            <span className="font-bold">Mã số:</span> HS-BM-03-QC-6-04
+          </div>
+          <div>
+            <span className="font-bold">Lần ban hành:</span> 02
+            <span className="mx-3">|</span>
+            <span className="font-bold">Ngày ban hành:</span> 03/01/2022
+          </div>
+          <div>
+            <span className="font-bold">Trang:</span> 1/1
+          </div>
         </div>
-        <div>
-          <span className="font-bold">Lần ban hành:</span> 02
-          <span className="mx-3">|</span>
-          <span className="font-bold">Ngày ban hành:</span> 03/01/2022
+      ) : (
+        <div className="mt-8 pt-3 border-t-2 border-slate-900 flex justify-between items-center text-[11px] text-slate-800 break-inside-avoid print:mt-4 print:pt-2">
+          <div>
+            <span className="font-bold">Đơn vị thử nghiệm:</span> {externalLabInfo.name}
+          </div>
+          <div>
+            <span className="font-bold">Trang / Page:</span> 1/1
+          </div>
         </div>
-        <div>
-          <span className="font-bold">Trang:</span> 1/1
-        </div>
-      </div>
+      )}
 
       {/* Chân trang ALCOA+ SHA-256 Hash niêm phong */}
       {isOfficialSnapshot && snapshot?.evaluationHash && (

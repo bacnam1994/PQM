@@ -12,7 +12,14 @@
 import { TestingLaboratory } from '../../types/laboratory';
 import { matchLaboratory, DEFAULT_TESTING_LABORATORIES } from '../laboratoryService';
 
-export type RecognizedLab = 'QUATEST3' | 'CASE' | 'NIFC' | 'EUROFINS' | 'INTERNAL' | 'GENERIC';
+export type RecognizedLab =
+  | 'QUATEST3'
+  | 'CASE'
+  | 'NIFC'
+  | 'EUROFINS'
+  | 'PASTEUR'
+  | 'INTERNAL'
+  | 'GENERIC';
 
 export interface LabSignature {
   code: RecognizedLab;
@@ -131,6 +138,20 @@ export const EXTERNAL_LAB_SIGNATURES: Record<RecognizedLab, LabSignature> = {
 [TEMPLATE EUROFINS]
 - Nhận dạng: Tiêu đề "TEST REPORT / PHIẾU KẾT QUẢ THỬ NGHIỆM" Eurofins.
 - Thường dùng "ND" (Not Detected) hoặc "< [LOQ]" cho các chỉ tiêu dư lượng hóa chất/vi chất.
+`,
+  },
+
+  PASTEUR: {
+    code: 'PASTEUR',
+    name: 'Viện Pasteur TP.HCM',
+    fullName: 'Viện Pasteur Thành phố Hồ Chí Minh',
+    patterns: [/pasteur/i, /viện\s*pasteur/i],
+    commonMethods: ['ISO', 'TCVN', 'DĐVN V', 'SMEWW'],
+    nonDetectKeywords: ['Âm tính', 'KPH', 'Không phát hiện', 'Negative'],
+    typicalReportPrefix: ['PAS-', 'XN-'],
+    extractionGuidePrompt: `
+[TEMPLATE PASTEUR]
+- Nhận dạng: Tiêu đề "PHIẾU KẾT QUẢ XÉT NGHIỆM / TEST REPORT" từ Viện Pasteur TP.HCM.
 `,
   },
 
