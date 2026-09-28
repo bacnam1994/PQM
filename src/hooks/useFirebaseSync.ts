@@ -55,8 +55,7 @@ const COLLECTION_CONFIGS: Record<string, CollectionConfig> = {
     storeName: 'batches',
     firebasePath: 'batches',
     queryKey: BATCH_QUERY_KEYS.all,
-    syncScope: 'BOUNDED_SYNC',
-    getInitialQuery: (reference) => query(reference, limitToLast(100)),
+    syncScope: 'FULL_SYNC',
     sortFn: (a, b) =>
       new Date(b.mfgDate || b.createdAt || 0).getTime() -
       new Date(a.mfgDate || a.createdAt || 0).getTime(),
@@ -110,8 +109,7 @@ const COLLECTION_CONFIGS: Record<string, CollectionConfig> = {
     storeName: 'testResults',
     firebasePath: 'testResults',
     queryKey: TEST_RESULT_QUERY_KEYS.all,
-    syncScope: 'BOUNDED_SYNC',
-    getInitialQuery: (reference) => query(reference, limitToLast(500)),
+    syncScope: 'FULL_SYNC',
     sortFn: (a, b) =>
       new Date(b.testDate || b.createdAt || 0).getTime() -
       new Date(a.testDate || a.createdAt || 0).getTime(),

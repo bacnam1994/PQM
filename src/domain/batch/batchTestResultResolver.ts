@@ -81,6 +81,11 @@ export function buildTestResultIndex(
   const orphanResults: TestResult[] = [];
   const invalidLinkResults: ResolvedTestResultItem[] = [];
 
+  const trIdMap = new Map<string, TestResult>();
+  testResults.forEach((tr) => {
+    if (tr && tr.id) trIdMap.set(tr.id, tr);
+  });
+
   const getBatchForTestResult = (
     r: TestResult
   ): { batch?: Batch; relationshipType: RelationshipType; reason?: string } => {
@@ -119,15 +124,84 @@ export function buildTestResultIndex(
       };
     }
 
-    // 4. Nếu không có batchId
-    if (!rawBatchId) {
+    // 4. Kế thừa liên kết từ chuỗi sửa đổi (Retest / Revision Chain: originalResultId / supersedesId)
+    const parentId = (
+      (r as any).originalResultId ||
+      (r as any).supersedesId ||
+      (r as any).retestOfId ||
+      ''
+    ).trim();
+    if (parentId && trIdMap.has(parentId) && parentId !== r.id) {
+      const parent = trIdMap.get(parentId)!;
+      const parentBatchId = (parent.batchId || '').trim();
+      const parentBatchNo = ((parent as any).batchNo || '').trim().toLowerCase();
+      const parentBatch =
+        (parentBatchId && batchIdMap.get(parentBatchId)) ||
+        (parentBatchId && batchNoMap.get(parentBatchId.toLowerCase())) ||
+        (parentBatchNo && batchNoMap.get(parentBatchNo));
+
+      if (parentBatch) {
+        return {
+          batch: parentBatch,
+          relationshipType: 'PRIMARY',
+          reason: `Phiếu kiểm nghiệm kế thừa liên kết Lô từ phiếu gốc (${parentId})`,
+        };
+      }
+    }
+
+    // 5. Khôi phục liên kết qua số phiếu báo cáo (reportNo peer match)
+    const reportCode = ((r as any).reportNo || (r as any).reportNumber || (r as any).code || '')
+      .trim()
+      .toLowerCase();
+    if (reportCode) {
+      const peer = testResults.find(
+        (other) =>
+          other &&
+          other.id !== r.id &&
+          ((other as any).reportNo || (other as any).reportNumber || (other as any).code || '')
+            .trim()
+            .toLowerCase() === reportCode &&
+          ((other.batchId && batchIdMap.has(other.batchId.trim())) ||
+            (other.batchId && batchNoMap.has(other.batchId.trim().toLowerCase())))
+      );
+      if (peer) {
+        const peerBatchId = (peer.batchId || '').trim();
+        const peerBatch = batchIdMap.get(peerBatchId) || batchNoMap.get(peerBatchId.toLowerCase());
+        if (peerBatch) {
+          return {
+            batch: peerBatch,
+            relationshipType: 'PRIMARY',
+            reason: `Phiếu kiểm nghiệm khôi phục liên kết Lô qua số phiếu ${reportCode} từ phiếu đồng cấp (${peer.id})`,
+          };
+        }
+      }
+    }
+
+    // 6. Kiểm tra so khớp hậu tố (Suffix match) cho batchId hoặc số hiệu lô
+    if (rawBatchId) {
+      const partialBatch = batches.find(
+        (b) =>
+          (b.id && (rawBatchId.endsWith(b.id) || b.id.endsWith(rawBatchId))) ||
+          (b.batchNo && b.batchNo.toLowerCase() === rawBatchId.toLowerCase())
+      );
+      if (partialBatch) {
+        return {
+          batch: partialBatch,
+          relationshipType: 'LEGACY_BATCH_NO',
+          reason: `Phiếu kiểm nghiệm khớp hậu tố/mã lô với ${partialBatch.batchNo} (${partialBatch.id})`,
+        };
+      }
+    }
+
+    // 7. Nếu không có batchId
+    if (!rawBatchId && !rawBatchNo) {
       return {
         relationshipType: 'INVALID_EMPTY_BATCH_ID',
-        reason: 'Phiếu kiểm nghiệm không có thuộc tính batchId',
+        reason: 'Phiếu kiểm nghiệm không có thuộc tính batchId hoặc batchNo',
       };
     }
 
-    // 5. Trỏ tới batchId không tồn tại -> ORPHAN
+    // 8. Trỏ tới batchId không tồn tại -> ORPHAN
     return {
       relationshipType: 'INVALID_ORPHAN',
       reason: `Batch ID "${rawBatchId}" không tồn tại trong danh sách Lô sản xuất`,

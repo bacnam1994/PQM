@@ -17,14 +17,38 @@ export const fetchTestResultsByBatchId = async (targetBatchId: string): Promise<
     let fbResults: TestResult[] = [];
     let localResults: TestResult[] = [];
 
+    const appState = useAppStore.getState();
+    const currentBatches = appState.batches || [];
+    const matchedBatch = currentBatches.find(
+      (b) =>
+        b &&
+        (b.id === targetBatchId ||
+          (b.batchNo && b.batchNo.toLowerCase() === targetBatchId.toLowerCase()))
+    );
+
+    const candidateBatchKeys = new Set<string>([targetBatchId]);
+    if (matchedBatch) {
+      if (matchedBatch.id) candidateBatchKeys.add(matchedBatch.id);
+      if (matchedBatch.batchNo) candidateBatchKeys.add(matchedBatch.batchNo);
+    }
+
     // 1. Fetch từ Firebase bằng targeted query (Model 2.5: Fail-Closed, không quét toàn bộ DB)
     try {
       const testResultsRef = ref(db, 'testResults');
-      const batchQuery = query(testResultsRef, orderByChild('batchId'), equalTo(targetBatchId));
-      const snapshot = await get(batchQuery);
-      if (snapshot.exists()) {
-        fbResults = Object.values(snapshot.val()) as TestResult[];
-      }
+      const keysToQuery = Array.from(candidateBatchKeys);
+
+      const snapshots = await Promise.all(
+        keysToQuery.map((k) =>
+          get(query(testResultsRef, orderByChild('batchId'), equalTo(k))).catch(() => null)
+        )
+      );
+
+      snapshots.forEach((snap) => {
+        if (snap && snap.exists()) {
+          const list = Object.values(snap.val()) as TestResult[];
+          fbResults.push(...list);
+        }
+      });
     } catch (error) {
       console.error('[testResultService] Lỗi khi tải PKN theo batchId (Fail-Closed):', error);
       // FAIL CLOSED: Tuyệt đối không fallback quét toàn bộ database get(ref(db, 'testResults'))
@@ -35,7 +59,11 @@ export const fetchTestResultsByBatchId = async (targetBatchId: string): Promise<
       const cached = await getFromCache('testResults');
       if (cached && Array.isArray(cached)) {
         localResults = cached.filter(
-          (r: any) => r && (r.batchId === targetBatchId || r.batchId?.endsWith(targetBatchId))
+          (r: any) =>
+            r &&
+            (candidateBatchKeys.has(r.batchId) ||
+              (r.batchNo && candidateBatchKeys.has(r.batchNo)) ||
+              r.batchId?.endsWith(targetBatchId))
         );
       }
     } catch (error) {
@@ -43,11 +71,17 @@ export const fetchTestResultsByBatchId = async (targetBatchId: string): Promise<
     }
 
     // 3. Lấy từ Global Store hiện có
-    const appState = useAppStore.getState();
     const storeResults = [
       ...(appState.allTestResults || []),
       ...(appState.testResults || []),
-    ].filter((r) => r && (r.batchId === targetBatchId || r.batchId?.endsWith(targetBatchId)));
+    ].filter(
+      (r) =>
+        r &&
+        (candidateBatchKeys.has(r.batchId) ||
+          (r.batch?.batchNo && candidateBatchKeys.has(r.batch.batchNo)) ||
+          ((r as any).batchNo && candidateBatchKeys.has((r as any).batchNo)) ||
+          r.batchId?.endsWith(targetBatchId))
+    );
 
     // 4. Gộp dữ liệu (ưu tiên DB nếu trùng ID)
     const merged = new Map<string, TestResult>();

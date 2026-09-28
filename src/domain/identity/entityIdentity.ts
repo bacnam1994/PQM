@@ -259,7 +259,23 @@ export class EntityIdentityManager {
     testResult: TestResult,
     batches: Batch[]
   ): IdentityRelationshipValidationResult {
-    if (!testResult.batchId || !testResult.batchId.trim()) {
+    if (!testResult) {
+      return {
+        isValid: false,
+        relationship: 'TEST_RESULT_BATCH',
+        sourceEntityId: '',
+        sourceEntityType: 'TEST_RESULT',
+        targetEntityId: '',
+        targetEntityType: 'BATCH',
+        classification: 'EMPTY_REFERENCE',
+        error: 'Dữ liệu TestResult không hợp lệ.',
+      };
+    }
+
+    const rawBatchId = (testResult.batchId || '').trim();
+    const rawBatchNo = ((testResult as any).batchNo || '').trim().toLowerCase();
+
+    if (!rawBatchId && !rawBatchNo) {
       return {
         isValid: false,
         relationship: 'TEST_RESULT_BATCH',
@@ -273,21 +289,25 @@ export class EntityIdentityManager {
     }
 
     // 1. Kiểm tra khóa ngoại chính xác bằng Technical ID
-    const primaryBatch = batches.find((b) => b.id === testResult.batchId);
+    const primaryBatch = rawBatchId ? batches.find((b) => b.id === rawBatchId) : undefined;
     if (primaryBatch) {
       return {
         isValid: true,
         relationship: 'TEST_RESULT_BATCH_PRIMARY',
         sourceEntityId: testResult.id,
         sourceEntityType: 'TEST_RESULT',
-        targetEntityId: testResult.batchId,
+        targetEntityId: rawBatchId,
         targetEntityType: 'BATCH',
         classification: 'PRIMARY',
       };
     }
 
     // 2. Phát hiện lỗi trỏ bằng batchNo (Legacy Pattern cần chuẩn hóa)
-    const legacyBatch = batches.find((b) => b.batchNo === testResult.batchId);
+    const legacyBatch = batches.find(
+      (b) =>
+        (rawBatchId && b.batchNo && b.batchNo.toLowerCase() === rawBatchId.toLowerCase()) ||
+        (rawBatchNo && b.batchNo && b.batchNo.toLowerCase() === rawBatchNo)
+    );
     if (legacyBatch) {
       return {
         isValid: false,
@@ -295,10 +315,10 @@ export class EntityIdentityManager {
         relationship: 'TEST_RESULT_BATCH_LEGACY_MATCH',
         sourceEntityId: testResult.id,
         sourceEntityType: 'TEST_RESULT',
-        targetEntityId: testResult.batchId,
+        targetEntityId: legacyBatch.id,
         targetEntityType: 'BATCH',
         classification: 'LEGACY_BUSINESS_KEY',
-        error: `Phiếu kiểm nghiệm ${testResult.id} trỏ batchId bằng số lô (${testResult.batchId}) thay vì technical ID (${legacyBatch.id}).`,
+        error: `Phiếu kiểm nghiệm ${testResult.id} trỏ batchId bằng số lô (${rawBatchId || rawBatchNo}) thay vì technical ID (${legacyBatch.id}).`,
       };
     }
 
@@ -308,10 +328,10 @@ export class EntityIdentityManager {
       relationship: 'TEST_RESULT_BATCH_ORPHAN',
       sourceEntityId: testResult.id,
       sourceEntityType: 'TEST_RESULT',
-      targetEntityId: testResult.batchId,
+      targetEntityId: rawBatchId || rawBatchNo,
       targetEntityType: 'BATCH',
       classification: 'BROKEN_ORPHAN',
-      error: `Phiếu kiểm nghiệm ${testResult.id} có batchId (${testResult.batchId}) không tồn tại trong danh mục Lô.`,
+      error: `Phiếu kiểm nghiệm ${testResult.id} có batchId (${rawBatchId || rawBatchNo}) không tồn tại trong danh mục Lô.`,
     };
   }
 
@@ -632,21 +652,54 @@ export class EntityIdentityManager {
 
     const productIds = new Set(products.map((p) => p.id));
     const batchIds = new Set(batches.map((b) => b.id));
+    const batchNos = new Set(
+      batches.map((b) => (b.batchNo || '').trim().toLowerCase()).filter(Boolean)
+    );
+    const trIdMap = new Map<string, TestResult>();
+    testResults.forEach((t) => {
+      if (t && t.id) trIdMap.set(t.id, t);
+    });
     const tccsIds = new Set(tccsList.map((t) => t.id));
 
     const orphanTestResults: { testResultId: string; batchId: string; reason: string }[] = [];
     for (const tr of testResults) {
-      if (!tr.batchId || !tr.batchId.trim()) {
+      const rawBatchId = (tr.batchId || '').trim();
+      const rawBatchNo = ((tr as any).batchNo || '').trim().toLowerCase();
+      const parentId = (
+        (tr as any).originalResultId ||
+        (tr as any).supersedesId ||
+        (tr as any).retestOfId ||
+        ''
+      ).trim();
+      const parentTr = parentId ? trIdMap.get(parentId) : undefined;
+      const parentBatchId = (parentTr?.batchId || '').trim();
+      const parentBatchNo = ((parentTr as any)?.batchNo || '').trim().toLowerCase();
+
+      const isResolvedDirect = rawBatchId && batchIds.has(rawBatchId);
+      const isResolvedByBatchNo =
+        (rawBatchId && batchNos.has(rawBatchId.toLowerCase())) ||
+        (rawBatchNo && batchNos.has(rawBatchNo));
+      const isResolvedByParent =
+        parentTr &&
+        ((parentBatchId && batchIds.has(parentBatchId)) ||
+          (parentBatchId && batchNos.has(parentBatchId.toLowerCase())) ||
+          (parentBatchNo && batchNos.has(parentBatchNo)));
+
+      if (isResolvedDirect || isResolvedByBatchNo || isResolvedByParent) {
+        continue;
+      }
+
+      if (!rawBatchId && !rawBatchNo && !parentId) {
         orphanTestResults.push({
           testResultId: tr.id,
           batchId: '',
-          reason: 'Thiếu batchId',
+          reason: 'Thiếu thông tin liên kết batchId/batchNo',
         });
-      } else if (!batchIds.has(tr.batchId)) {
+      } else {
         orphanTestResults.push({
           testResultId: tr.id,
-          batchId: tr.batchId,
-          reason: `batchId ${tr.batchId} không tồn tại trong danh mục Lô`,
+          batchId: rawBatchId || rawBatchNo,
+          reason: `batchId "${rawBatchId || rawBatchNo}" không tồn tại trong danh mục Lô`,
         });
       }
     }

@@ -222,8 +222,27 @@ export const useDataGraph = () => {
       rawTestResults.length >= (rawAllTestResults?.length || 0)
         ? rawTestResults
         : rawAllTestResults;
+
+    const sourceTestsById = new Map<string, TestResult>();
+    sourceTests.forEach((t) => {
+      if (t && t.id) sourceTestsById.set(t.id, t);
+    });
+
     sourceTests.forEach((r) => {
-      const matchedBatch = getBatchForTestResult(r.batchId);
+      let matchedBatch = getBatchForTestResult(r.batchId);
+      if (!matchedBatch && (r as any).batchNo) {
+        matchedBatch = getBatchForTestResult((r as any).batchNo);
+      }
+      if (!matchedBatch && ((r as any).originalResultId || (r as any).supersedesId)) {
+        const parentId = ((r as any).originalResultId || (r as any).supersedesId || '').trim();
+        const parent = parentId ? sourceTestsById.get(parentId) : undefined;
+        if (parent) {
+          matchedBatch =
+            getBatchForTestResult(parent.batchId) ||
+            ((parent as any).batchNo ? getBatchForTestResult((parent as any).batchNo) : undefined);
+        }
+      }
+
       const key = matchedBatch ? matchedBatch.id : r.batchId;
       const list = map.get(key) || [];
       list.push(r);
