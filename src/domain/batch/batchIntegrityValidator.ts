@@ -24,6 +24,7 @@ import {
   resolveFinalTestResultForBatch,
   calculateOverallStatusForTestResult,
 } from '../test-result/testResultStatusResolver';
+import { resolveCanonicalBatchQualityDecision } from './canonicalBatchQualityDecision';
 
 export type BatchIntegrityStatus =
   | 'PASS'
@@ -113,6 +114,7 @@ export function isValidTestResultForBatch(testResult: TestResult, batch?: Batch)
 
 /**
  * Đánh giá tính toàn vẹn xuất xưởng của Lô (RELEASED Batch Integrity Evaluation)
+ * Sử dụng Canonical Batch Quality Decision Engine làm Single Source of Truth (SSoT).
  */
 export function evaluateBatchReleaseIntegrity(
   batch: Batch,
@@ -124,173 +126,46 @@ export function evaluateBatchReleaseIntegrity(
     ? resolveTestResultsForBatch(batch, resolutionOrResults)
     : resolutionOrResults;
 
-  const safeFreshness = freshness || {};
-  const { isTestResultsLoading = false, testResultsLoaded = true, isError = false } = safeFreshness;
+  const decision = resolveCanonicalBatchQualityDecision({
+    batch,
+    testResults: resolution.allCandidateResults,
+    boundTccs,
+    dataFreshness: freshness,
+  });
 
-  // 1. Guard: Lô chưa xuất xưởng thì không áp dụng luật bắt buộc có phiếu PASS xuất xưởng
-  if (batch.status !== 'RELEASED') {
-    return {
-      batchId: batch.id,
-      batchNo: batch.batchNo,
-      releaseStatus: batch.status,
-      integrityStatus: 'NOT_APPLICABLE',
-      candidateCount: resolution.allCandidateResults.length,
-      primaryCount: resolution.primaryResults.length,
-      legacyCount: resolution.legacyResults.length,
-      validPassCount: 0,
-      matchedTestIds: resolution.allCandidateResults.map((r) => r.id),
-      relationshipType: resolution.hasPrimaryMatch
-        ? 'PRIMARY'
-        : resolution.hasLegacyMatch
-          ? 'LEGACY'
-          : 'NONE',
-      summaryMessage: `Lô ở trạng thái ${batch.status}, không yêu cầu kiểm tra toàn vẹn xuất xưởng.`,
-      shouldAlert: false,
-      debugInfo: { resolution, freshness },
-    };
-  }
+  const validPassCount =
+    decision.qualityStatus === 'PASS' ? Math.max(decision.authoritativeCount, 1) : 0;
 
-  // 2. Guard: Data Freshness - Đang nạp dữ liệu hoặc lỗi kết nối
-  if (isError) {
-    return {
-      batchId: batch.id,
-      batchNo: batch.batchNo,
-      releaseStatus: batch.status,
-      integrityStatus: 'DATA_UNAVAILABLE',
-      candidateCount: 0,
-      primaryCount: 0,
-      legacyCount: 0,
-      validPassCount: 0,
-      matchedTestIds: [],
-      relationshipType: 'NONE',
-      summaryMessage: `Không thể xác minh dữ liệu kiểm nghiệm cho lô "${batch.batchNo}" do lỗi kết nối CSDL.`,
-      shouldAlert: false,
-      debugInfo: { resolution, freshness },
-    };
-  }
-
-  if (isTestResultsLoading || (!testResultsLoaded && resolution.allCandidateResults.length === 0)) {
-    return {
-      batchId: batch.id,
-      batchNo: batch.batchNo,
-      releaseStatus: batch.status,
-      integrityStatus: 'DATA_UNAVAILABLE',
-      candidateCount: 0,
-      primaryCount: 0,
-      legacyCount: 0,
-      validPassCount: 0,
-      matchedTestIds: [],
-      relationshipType: 'NONE',
-      summaryMessage: `Đang tải dữ liệu kiểm nghiệm từ máy chủ... Chưa đủ dữ liệu để kết luận lô "${batch.batchNo}".`,
-      shouldAlert: false,
-      debugInfo: { resolution, freshness },
-    };
-  }
-
-  // 3. Trường hợp A: Có kết quả Primary hợp lệ
-  const validPrimary = resolution.primaryResults.filter((r) => isValidTestResultForBatch(r, batch));
-
-  if (validPrimary.length > 0) {
-    // Sử dụng Canonical Supreme Result làm Single Source of Truth
-    const finalResolution = resolveFinalTestResultForBatch(batch, validPrimary, boundTccs);
-    const supremeResult = finalResolution.finalTestResult;
-    const finalStatus = finalResolution.status;
-
-    if (finalStatus === 'PASS') {
-      // ĐẠT: Kết quả Authoritative tối cao đạt chuẩn
-      const validPassCount = validPrimary.filter(
-        (t) => resolveTestResultStatus(t, boundTccs) === 'PASS'
-      ).length;
-
-      return {
-        batchId: batch.id,
-        batchNo: batch.batchNo,
-        releaseStatus: batch.status,
-        integrityStatus: 'PASS',
-        candidateCount: validPrimary.length,
-        primaryCount: validPrimary.length,
-        legacyCount: 0,
-        validPassCount: Math.max(validPassCount, 1),
-        matchedTestIds: validPrimary.map((r) => r.id),
-        relationshipType: 'PRIMARY',
-        summaryMessage: `✓ Lô đã xuất xưởng và đã có hồ sơ kiểm nghiệm hợp lệ (${validPrimary.length} phiếu).`,
-        shouldAlert: false,
-        debugInfo: {
-          resolution,
-          freshness,
-          authoritativeResults: supremeResult ? [supremeResult] : [],
-        },
-      };
-    } else {
-      // Có phiếu kiểm nghiệm nhưng kết quả supreme authoritative cuối cùng không đạt (FAIL hoặc PENDING)
-      const isPending = finalStatus === 'PENDING';
-      return {
-        batchId: batch.id,
-        batchNo: batch.batchNo,
-        releaseStatus: batch.status,
-        integrityStatus: 'TEST_RESULT_INVALID_STATUS',
-        candidateCount: validPrimary.length,
-        primaryCount: validPrimary.length,
-        legacyCount: 0,
-        validPassCount: 0,
-        matchedTestIds: validPrimary.map((r) => r.id),
-        relationshipType: 'PRIMARY',
-        summaryMessage: isPending
-          ? `Lô "${batch.batchNo}" đã xuất xưởng nhưng phiếu kiểm nghiệm hiện hành chưa hoàn tất kiểm nghiệm (PENDING).`
-          : `Lô "${batch.batchNo}" đã xuất xưởng nhưng kết quả kiểm nghiệm cuối cùng là KHÔNG ĐẠT (FAIL).`,
-        shouldAlert: true,
-        alertType: 'CRITICAL',
-        suggestedAction:
-          'Xem xét lại quyết định duyệt xuất xưởng, thực hiện kiểm nghiệm lại hoặc chuyển trạng thái sang BỊ LOẠI (REJECTED).',
-        debugInfo: {
-          resolution,
-          freshness,
-          authoritativeResults: supremeResult ? [supremeResult] : [],
-        },
-      };
-    }
-  }
-
-  // 4. Trường hợp C: Có TestResult khớp số lô nhưng sai khóa ID kỹ thuật (Legacy / Relationship Error)
-  if (resolution.legacyResults.length > 0) {
-    const legacyValid = resolution.legacyResults.filter((r) => isValidTestResultForBatch(r));
-    return {
-      batchId: batch.id,
-      batchNo: batch.batchNo,
-      releaseStatus: batch.status,
-      integrityStatus: 'RELATIONSHIP_ERROR',
-      candidateCount: resolution.legacyResults.length,
-      primaryCount: 0,
-      legacyCount: resolution.legacyResults.length,
-      validPassCount: legacyValid.filter((r) => resolveTestResultStatus(r) === 'PASS').length,
-      matchedTestIds: resolution.legacyResults.map((r) => r.id),
-      relationshipType: 'LEGACY',
-      summaryMessage: `Lô "${batch.batchNo}" đã có ${resolution.legacyResults.length} phiếu kiểm nghiệm nhưng liên kết qua số lô (Legacy) thay vì ID kỹ thuật.`,
-      shouldAlert: true,
-      alertType: 'WARNING',
-      suggestedAction:
-        'Cập nhật khóa liên kết kỹ thuật (batchId = batch.id) cho phiếu kiểm nghiệm để đảm bảo toàn vẹn dữ liệu.',
-      debugInfo: { resolution, freshness },
-    };
-  }
-
-  // 5. Trường hợp B: Hoàn toàn không có TestResult nào (thực sự thiếu kiểm nghiệm)
   return {
-    batchId: batch.id,
-    batchNo: batch.batchNo,
-    releaseStatus: batch.status,
-    integrityStatus: 'MISSING_TEST_RESULT',
-    candidateCount: 0,
-    primaryCount: 0,
-    legacyCount: 0,
-    validPassCount: 0,
-    matchedTestIds: [],
-    relationshipType: 'NONE',
-    summaryMessage: `Lô "${batch.batchNo}" ở trạng thái ĐÃ XUẤT XƯỞNG (RELEASED) nhưng chưa có bất kỳ phiếu kiểm nghiệm nào.`,
-    shouldAlert: true,
-    alertType: 'CRITICAL',
+    batchId: decision.batchId,
+    batchNo: decision.batchNo,
+    releaseStatus: decision.workflowStatus,
+    integrityStatus: decision.integrityStatus,
+    candidateCount: decision.candidateCount,
+    primaryCount: resolution.primaryResults.length,
+    legacyCount: resolution.legacyResults.length,
+    validPassCount,
+    matchedTestIds: resolution.allCandidateResults.map((r) => r.id),
+    relationshipType: resolution.hasPrimaryMatch
+      ? 'PRIMARY'
+      : resolution.hasLegacyMatch
+        ? 'LEGACY'
+        : 'NONE',
+    summaryMessage: decision.decisionReason,
+    shouldAlert: decision.shouldAlert,
+    alertType: decision.alertType,
     suggestedAction:
-      'Xem xét lại quyết định duyệt lô hoặc chuyển trạng thái sang ĐANG KIỂM TRA (TESTING).',
-    debugInfo: { resolution, freshness },
+      decision.integrityStatus === 'RELATIONSHIP_ERROR'
+        ? 'Cập nhật khóa liên kết kỹ thuật (batchId = batch.id) cho phiếu kiểm nghiệm để đảm bảo toàn vẹn dữ liệu.'
+        : decision.integrityStatus === 'MISSING_TEST_RESULT'
+          ? 'Xem xét lại quyết định duyệt lô hoặc chuyển trạng thái sang ĐANG KIỂM TRA (TESTING).'
+          : decision.integrityStatus === 'TEST_RESULT_INVALID_STATUS'
+            ? 'Xem xét lại quyết định duyệt xuất xưởng, thực hiện kiểm nghiệm lại hoặc chuyển trạng thái sang BỊ LOẠI (REJECTED).'
+            : undefined,
+    debugInfo: {
+      resolution,
+      freshness,
+      authoritativeResults: decision.authoritativeResults,
+    },
   };
 }

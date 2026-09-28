@@ -1028,27 +1028,44 @@ export function resolveAuthoritativeTestResultsForBatch(
     // Kiểm tra xem tất cả chỉ tiêu của tr có nằm trong supremeAuth hay không
     const isSubsetOfSupreme = trCriteria.every((c) => supremeCriteria.has(c));
 
-    // Nếu tr là tập con của supremeAuth (cùng kiểm các chỉ tiêu đó) và cũ hơn supremeAuth:
-    const trDate = tr.updatedAt || tr.testDate || tr.createdAt || '';
-    if (isSubsetOfSupreme && trDate && supremeDate && trDate <= supremeDate) {
-      const trStatus = resolveTestResultStatus(tr);
-      // Nếu tr FAIL và supremeAuth PASS -> tr là phiếu re-test cũ bị thay thế -> loại
-      if (trStatus === 'FAIL' && supremeCanonicalStatus === 'PASS') {
+    const trStatus = resolveTestResultStatus(tr);
+    const vTr = (tr as any).version || (tr as any).revision || 0;
+    const vSup = (supremeAuth as any).version || (supremeAuth as any).revision || 0;
+    const trTestDate = tr.testDate || tr.updatedAt || tr.createdAt || '';
+    const supremeTestDate =
+      supremeAuth.testDate || supremeAuth.updatedAt || supremeAuth.createdAt || '';
+    const trUpdated = tr.updatedAt || tr.testDate || tr.createdAt || '';
+    const supremeUpdated =
+      supremeAuth.updatedAt || supremeAuth.testDate || supremeAuth.createdAt || '';
+
+    // a. Nếu tr FAIL và supremeAuth PASS:
+    // tr là phiếu kiểm nghiệm cũ không đạt đã được kiểm nghiệm lại / phê duyệt thay thế
+    if (trStatus === 'FAIL' && supremeCanonicalStatus === 'PASS') {
+      if (
+        vSup > vTr ||
+        trTestDate <= supremeTestDate ||
+        trUpdated <= supremeUpdated ||
+        isSubsetOfSupreme ||
+        !isFinalized(tr)
+      ) {
         return false;
       }
-      // Nếu supremeAuth đã APPROVED/FINAL mà tr chỉ là DRAFT/PENDING -> loại tr
+    }
+
+    // b. Nếu tr là tập con của supremeAuth và cũ hơn / phiên bản thấp hơn supremeAuth
+    if (
+      isSubsetOfSupreme &&
+      (trTestDate <= supremeTestDate || trUpdated <= supremeUpdated || vSup >= vTr)
+    ) {
       if (isSupremeFinal && !isFinalized(tr)) {
         return false;
       }
-      // Nếu cả hai đều FINAL/APPROVED và supremeAuth có version cao hơn tr -> tr là bản cũ -> loại
-      const vTr = (tr as any).version || (tr as any).revision || 0;
-      const vSup = (supremeAuth as any).version || (supremeAuth as any).revision || 0;
       if (vSup > vTr) {
         return false;
       }
     }
 
-    // Nếu supremeAuth đã duyệt (APPROVED/FINAL) và tr là DRAFT không chứa chỉ tiêu mới nào so với các phiếu đã duyệt
+    // c. Nếu supremeAuth đã APPROVED/FINAL mà tr chỉ là DRAFT/PENDING không chứa chỉ tiêu mới
     if (isSupremeFinal && !isFinalized(tr) && isSubsetOfSupreme) {
       return false;
     }

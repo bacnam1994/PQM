@@ -1,12 +1,18 @@
 /**
  * scripts/dryRunBatchIntegrity.ts
  * ===============================
- * Script kiểm chứng Dry-Run trực tiếp trên dữ liệu thật (Firebase Production)
- * cho 3 Lô sản xuất: 362605, 332605, 292605.
+ * Dry-Run Verification Engine (Phase 10)
+ * Kiểm chứng toàn diện trên Snapshot Production thật theo đúng pipeline:
+ * Production snapshot -> Normalization -> Canonical Batch Quality Decision SSoT -> Alert Producer -> UI Alert Contracts
  *
  * Tiêu chí nghiệm thu:
- * - Trạng thái toàn vẹn (integrityStatus) của cả 3 lô: 'PASS'
- * - Cảnh báo đỏ (shouldAlert): false
+ * - 362605, 332605, 292605:
+ *   + Canonical Batch Quality: PASS
+ *   + Batch Integrity Status: PASS
+ *   + shouldAlert: false
+ *   + alertType: NONE
+ * - Genuine failure (synthetic):
+ *   + Alert xuất hiện đúng (True Positive)
  */
 
 import fs from 'fs';
@@ -21,6 +27,13 @@ import {
   isValidTestResultForBatch,
 } from '../src/domain/batch/batchIntegrityValidator';
 import { resolveTestResultsForBatch } from '../src/domain/batch/batchTestResultResolver';
+import {
+  resolveCanonicalBatchQualityDecision,
+  CANONICAL_DECISION_RESOLVER_VERSION,
+} from '../src/domain/batch/canonicalBatchQualityDecision';
+import { CanonicalStatusResolver } from '../src/domain/canonical/canonicalResolver';
+import { auditDataConsistency } from '../src/services/dataConsistencyService';
+import { ReleaseRules } from '../src/domain/rules/ReleaseRules';
 import { Batch, TestResult, TCCS } from '../src/types';
 
 const FIREBASE_RTDB_BASE_URL =
@@ -36,30 +49,18 @@ function readJsonFile(filePath: string) {
 async function fetchFromFirebase(collection: string): Promise<Record<string, any>> {
   try {
     const url = `${FIREBASE_RTDB_BASE_URL}/${collection}.json`;
-    console.log(`[Firebase RTDB] Đang kết nối tải dữ liệu từ ${url}...`);
-    const res = await fetch(url, { signal: AbortSignal.timeout(10000) });
+    const res = await fetch(url, { signal: AbortSignal.timeout(5000) });
     if (res.ok) {
       const data = await res.json();
-      if (data) {
-        console.log(
-          `[Firebase RTDB] Nạp thành công collection "${collection}" (${Object.keys(data).length} bản ghi).`
-        );
-        return data;
-      }
+      if (data) return data;
     }
   } catch (error) {
-    console.warn(
-      `[Firebase RTDB] Không thể kết nối trực tiếp (${(error as Error).message}), kích hoạt local snapshot fallback...`
-    );
+    // Fallback to local snapshot
   }
 
-  // Fallback to local snapshot files if available
   const localFileName = `temp_${collection}.json`;
   const localData = readJsonFile(localFileName);
   if (localData) {
-    console.log(
-      `[Local Snapshot] Đã nạp thành công ${localFileName} (${Object.keys(localData).length} bản ghi).`
-    );
     return localData;
   }
 
@@ -68,8 +69,7 @@ async function fetchFromFirebase(collection: string): Promise<Record<string, any
 
 async function runDryRun() {
   console.log('========================================================================');
-  console.log('🚀 DRY-RUN XÁC MINH TOÀN VẸN CHẤT LƯỢNG LÔ (BATCH INTEGRITY VALIDATOR)');
-  console.log('Target Batches: 362605, 332605, 292605');
+  console.log('🚀 PHASE 10 DRY-RUN: END-TO-END CANONICAL DECISION & ALERT CONTRACT AUDIT');
   console.log('========================================================================\n');
 
   const [rawBatches, rawTestResults, rawTccs] = await Promise.all([
@@ -93,25 +93,9 @@ async function runDryRun() {
   );
 
   const targetBatchNos = ['362605', '332605', '292605'];
-  const summaryReport: Array<{
-    batchNo: string;
-    batchId: string;
-    releaseStatus: string;
-    supremeTestId: string;
-    supremeLab: string;
-    supremeStatus: string;
-    integrityStatus: string;
-    shouldAlert: boolean;
-    pass: boolean;
-  }> = [];
-
   let allPassed = true;
 
   for (const targetNo of targetBatchNos) {
-    console.log(`\n------------------------------------------------------------------------`);
-    console.log(`🔍 KIỂM TRA LÔ: [${targetNo}]`);
-    console.log(`------------------------------------------------------------------------`);
-
     const batch = allBatches.find((b) => b && String(b.batchNo).trim() === targetNo);
 
     if (!batch) {
@@ -121,39 +105,17 @@ async function runDryRun() {
     }
 
     const boundTccs = batch.tccsId ? tccsMap.get(batch.tccsId) : undefined;
-    console.log(`Lô ID: ${batch.id} | Số hiệu: ${batch.batchNo} | Trạng thái: ${batch.status}`);
-    console.log(`TCCS ID: ${batch.tccsId || 'N/A'} | Mã TCCS: ${boundTccs?.code || 'N/A'}`);
-
-    // Phân giải danh sách phiếu kiểm nghiệm liên kết
     const resolution = resolveTestResultsForBatch(batch, allTestResults, allBatches);
-    console.log(
-      `Tổng số phiếu liên kết: Primary=${resolution.primaryResults.length}, Legacy=${resolution.legacyResults.length}`
-    );
 
-    resolution.primaryResults.forEach((tr, idx) => {
-      const entries =
-        Array.isArray(tr.results) && tr.results.length > 0
-          ? tr.results
-          : (tr as any).criteria || [];
-      console.log(
-        `  [PKN ${idx + 1}] ID=${tr.id} | Lab=${tr.labName} | Ngày=${tr.testDate} | Ver=${tr.version} | WF=${(tr as any).workflowStatus} | Status=${(tr as any).status} | Chỉ tiêu=${entries.length}`
-      );
+    // 1. Phân giải qua SSoT Canonical Batch Quality Decision Engine
+    const decision = resolveCanonicalBatchQualityDecision({
+      batch,
+      testResults: resolution.primaryResults,
+      tccs: boundTccs,
+      dataFreshness: { testResultsLoaded: true, isTestResultsLoading: false },
     });
 
-    // 1. Phân giải Canonical Supreme Test Result
-    const finalResolution = resolveFinalTestResultForBatch(
-      batch,
-      resolution.primaryResults,
-      boundTccs
-    );
-
-    const supreme = finalResolution.finalTestResult;
-    console.log(
-      `\n[Supreme Resolution] Phiếu tối cao: ID=${supreme?.id} | Lab=${supreme?.labName}`
-    );
-    console.log(`[Supreme Resolution] Trạng thái tính toán: ${finalResolution.status}`);
-
-    // 2. Thẩm định toàn vẹn xuất xưởng
+    // 2. Thẩm định qua batchIntegrityValidator (Adapter gọi SSoT)
     const evaluation = evaluateBatchReleaseIntegrity(
       batch,
       resolution,
@@ -161,46 +123,120 @@ async function runDryRun() {
       boundTccs
     );
 
-    console.log(`\n[Kết quả Thẩm định Toàn vẹn Lô]`);
-    console.log(`- Trạng thái toàn vẹn (integrityStatus): ${evaluation.integrityStatus}`);
-    console.log(`- Cảnh báo đỏ (shouldAlert): ${evaluation.shouldAlert}`);
-    console.log(`- Mức độ cảnh báo (alertType): ${evaluation.alertType || 'NONE'}`);
-    console.log(`- Thông điệp tóm tắt: ${evaluation.summaryMessage}`);
+    // 3. Thẩm định qua CanonicalStatusResolver (Adapter gọi SSoT)
+    const canonicalQuality = CanonicalStatusResolver.calculateCanonicalBatchQualityStatus(
+      batch,
+      resolution.primaryResults,
+      boundTccs
+    );
 
-    const isSuccess = evaluation.integrityStatus === 'PASS' && evaluation.shouldAlert === false;
+    // 4. Thẩm định qua auditDataConsistency (Alert Producer thực tế trong UI)
+    const consistencyReport = auditDataConsistency({
+      products: [],
+      batches: [batch],
+      tccsList: boundTccs ? [boundTccs] : [],
+      productFormulas: [],
+      rawMaterials: [],
+      testResults: resolution.primaryResults,
+      dataFreshness: { testResultsLoaded: true, isTestResultsLoading: false },
+    });
+    const alertProducerIssues = consistencyReport.issues.filter(
+      (iss) =>
+        (iss.entityId === batch.id || iss.entityId === batch.batchNo) &&
+        (iss.type === 'STATUS_MISMATCH' ||
+          iss.type === 'TEST_RESULT_STATUS_MISMATCH' ||
+          iss.type === 'RELEASED_BATCH_NO_PASSING_TEST' ||
+          iss.type === 'MISSING_TEST_RESULT')
+    );
 
-    if (isSuccess) {
-      console.log(`✅ LÔ ${targetNo}: ĐẠT CHUẨN (PASS - 0 FALSE POSITIVE ALERT)`);
-    } else {
-      console.error(`❌ LÔ ${targetNo}: KHÔNG ĐẠT (Cảnh báo sai lệch vẫn còn tồn tại)`);
+    // In format bắt buộc của Phase 10
+    console.log(`BATCH ${targetNo}`);
+    console.log('---------------------------------');
+    console.log(`Candidate Results       : ${decision.candidateCount}`);
+    console.log(`Supreme Result          : ${decision.supremeTestResultId || 'NONE'}`);
+    console.log(`Supreme Lab             : ${decision.supremeTestResultLab || 'NONE'}`);
+    console.log(`Workflow Status         : ${decision.workflowStatus}`);
+    console.log(`Stored Quality Status   : ${batch.status}`);
+    console.log(`Computed Quality Status : ${decision.qualityStatus}`);
+    console.log(`Canonical Batch Status  : ${canonicalQuality}`);
+    console.log(`Integrity Status        : ${decision.integrityStatus}`);
+    console.log(`Alert Type              : ${decision.alertType || 'NONE'}`);
+    console.log(`Should Alert            : ${decision.shouldAlert}`);
+    console.log(`Decision Source         : ${decision.decisionReason}`);
+    console.log(`Resolver Version        : ${decision.resolverVersion}`);
+    console.log(`Alert Producer Issues   : ${alertProducerIssues.length}`);
+    console.log('');
+
+    const isSuccess =
+      decision.qualityStatus === 'PASS' &&
+      decision.integrityStatus === 'PASS' &&
+      decision.shouldAlert === false &&
+      evaluation.shouldAlert === false &&
+      alertProducerIssues.length === 0;
+
+    if (!isSuccess) {
       allPassed = false;
     }
-
-    summaryReport.push({
-      batchNo: batch.batchNo,
-      batchId: batch.id,
-      releaseStatus: batch.status,
-      supremeTestId: supreme?.id || 'N/A',
-      supremeLab: supreme?.labName || 'N/A',
-      supremeStatus: finalResolution.status,
-      integrityStatus: evaluation.integrityStatus,
-      shouldAlert: evaluation.shouldAlert,
-      pass: isSuccess,
-    });
   }
 
-  console.log('\n========================================================================');
-  console.log('📊 BẢNG TỔNG HỢP NGHIỆM THU DRY-RUN');
-  console.log('========================================================================');
-  console.table(summaryReport);
+  // Verification của True Positive: Lô lỗi thật
+  console.log('VERIFYING TRUE POSITIVE DETECTION (GENUINE FAILURE)');
+  console.log('---------------------------------');
+  const genuineFailBatch: Batch = {
+    id: 'batch_genuine_fail',
+    batchNo: 'FAIL_TEST',
+    status: 'RELEASED',
+    tccsId: 'tccs_dummy',
+    productId: 'prod_dummy',
+    mfgDate: '2026-06-01',
+    expDate: '2028-06-01',
+    theoreticalYield: 1000,
+    actualYield: 990,
+    yieldUnit: 'chai',
+    createdAt: '2026-06-01T00:00:00Z',
+  };
+  const genuineFailResults: TestResult[] = [
+    {
+      id: 'res_genuine_fail',
+      batchId: 'batch_genuine_fail',
+      labName: 'Lab QC',
+      testDate: '2026-07-01',
+      version: 1,
+      workflowStatus: 'APPROVED',
+      status: 'APPROVED',
+      overallStatus: 'FAIL',
+      results: [{ criteriaName: 'Độ ẩm', value: '15.0', isPass: false, unit: '%' }],
+      createdAt: '2026-07-01T00:00:00Z',
+    },
+  ];
+  const failDecision = resolveCanonicalBatchQualityDecision({
+    batch: genuineFailBatch,
+    testResults: genuineFailResults,
+    dataFreshness: { testResultsLoaded: true, isTestResultsLoading: false },
+  });
+  console.log(`Genuine Fail Batch Quality : ${failDecision.qualityStatus}`);
+  console.log(`Genuine Fail Integrity     : ${failDecision.integrityStatus}`);
+  console.log(`Genuine Fail Alert Type    : ${failDecision.alertType}`);
+  console.log(`Genuine Fail Should Alert  : ${failDecision.shouldAlert}`);
+
+  const truePositiveOk =
+    failDecision.qualityStatus === 'FAIL' &&
+    failDecision.integrityStatus === 'TEST_RESULT_INVALID_STATUS' &&
+    failDecision.shouldAlert === true;
+
+  if (truePositiveOk) {
+    console.log('✅ True Positive Check: PASS (Cảnh báo đỏ kích hoạt chính xác cho lô lỗi thật)\n');
+  } else {
+    console.error('❌ True Positive Check: FAILED\n');
+    allPassed = false;
+  }
 
   if (allPassed) {
-    console.log('\n🎉 KẾT QUẢ NGHIỆM THU: 100% CẢNH BÁO SAI ĐÃ ĐƯỢC LOẠI BỎ THÀNH CÔNG!');
-    console.log(
-      'Cả 3 lô (362605, 332605, 292605) đều đạt integrityStatus = "PASS" và shouldAlert = false.'
-    );
+    console.log('========================================================================');
+    console.log('🎉 100% DRY RUN AUDIT PASSED: ZERO FALSE POSITIVE & RELIABLE TRUE POSITIVE');
+    console.log('========================================================================');
   } else {
-    console.error('\n❌ KẾT QUẢ NGHIỆM THU THẤT BẠI: Vẫn còn lô có trạng thái cảnh báo sai!');
+    console.error('❌ DRY RUN AUDIT FAILED');
     process.exitCode = 1;
   }
 }

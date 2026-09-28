@@ -54,6 +54,7 @@ import {
   CanonicalTestStatus,
 } from '../test-result/testResultStatusResolver';
 import { isValidTestResultForBatch } from '../batch/batchIntegrityValidator';
+import { resolveCanonicalBatchQualityDecision } from '../batch/canonicalBatchQualityDecision';
 import { CriterionEvaluator, isExemptValue } from '../evaluation/CriterionEvaluator';
 import { AlternateRuleEvaluator } from '../evaluation/AlternateRuleEvaluator';
 import { ensureArray } from '../../utils';
@@ -294,54 +295,12 @@ export class CanonicalStatusResolver {
     boundTccs?: TCCS | null
   ): CanonicalBatchQualityStatus {
     if (!batch) return 'INVALID';
-
-    // Tìm các phiếu liên kết chính thức với batch
-    const validTests = (testResults || []).filter(
-      (tr) => tr && tr.batchId === batch.id && isValidTestResultForBatch(tr, batch)
-    );
-
-    if (validTests.length === 0) {
-      if (batch.status === 'PENDING') {
-        return 'NOT_TESTED';
-      }
-      if (batch.status === 'TESTING') {
-        return 'TESTING';
-      }
-      return 'NOT_TESTED';
-    }
-
-    // Chọn phiếu authoritative chính thức cho batch
-    const resolution = resolveFinalTestResultForBatch(batch, validTests, boundTccs);
-    const authoritative = resolution.finalTestResult;
-    if (!authoritative) {
-      return 'INCOMPLETE';
-    }
-
-    // Sử dụng bộ giải pháp Multi-Lab authoritative chính quy
-    const labAuthResults = resolveAuthoritativeTestResultsForBatch(batch, validTests, boundTccs);
-    if (labAuthResults.length === 0) {
-      return 'INCOMPLETE';
-    }
-
-    const labStatuses = labAuthResults.map((tr) =>
-      this.calculateCanonicalTestStatus(tr, boundTccs, labAuthResults)
-    );
-
-    if (labStatuses.some((s) => s === 'FAIL')) {
-      return 'FAIL';
-    }
-    if (labStatuses.some((s) => s === 'PENDING')) {
-      return 'TESTING';
-    }
-    if (labStatuses.length > 0 && labStatuses.every((s) => s === 'PASS')) {
-      return 'PASS';
-    }
-
-    return resolution.status === 'PASS'
-      ? 'PASS'
-      : resolution.status === 'FAIL'
-        ? 'FAIL'
-        : 'INCOMPLETE';
+    const decision = resolveCanonicalBatchQualityDecision({
+      batch,
+      testResults,
+      boundTccs,
+    });
+    return decision.qualityStatus;
   }
 
   /**
