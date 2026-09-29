@@ -149,8 +149,23 @@ export const fetchTestResultById = async (idOrSuffix: string): Promise<TestResul
       return found;
     }
 
-    // 3.2 Targeted Fail-Closed: Tuyệt đối không fetch toàn bộ collection testResults về client (EVAL-011)
-    // Nếu ID trực tiếp không tìm thấy trên Firebase, trả về null để bảo vệ hiệu năng & băng thông
+    // 3.2 Hỗ trợ tìm kiếm theo hậu tố ID (VD: URL rút gọn hoặc 6 ký tự cuối)
+    if (idOrSuffix.length < 15) {
+      const recentQuery = query(ref(db, 'testResults'), limitToLast(100));
+      const recentSnap = await get(recentQuery);
+      if (recentSnap.exists()) {
+        const val = recentSnap.val();
+        for (const key of Object.keys(val)) {
+          if (key === idOrSuffix || key.endsWith(idOrSuffix)) {
+            const found = val[key] as TestResult;
+            const mergeTestResults = useAppStore.getState().mergeTestResults;
+            if (mergeTestResults) mergeTestResults([found]);
+            return found;
+          }
+        }
+      }
+    }
+
     console.warn(
       `[testResultService] Không tìm thấy phiếu kiểm nghiệm với khóa: "${idOrSuffix}" trực tiếp trên RTDB.`
     );

@@ -44,8 +44,8 @@ export const useTestResultList = () => {
   }, [crud, deleteTestResult, notify, batches, user]);
 
   const handlePrint = useCallback((res: HydratedTestResult) => {
-    // Rút gọn URL chỉ dùng 6 ký tự cuối của ID và nối đúng BASE_URL
-    const targetUrl = getAppUrl(`/test-results/print/${res.id.slice(-6)}`);
+    // Dùng ID đầy đủ để đảm bảo truy xuất trực tiếp O(1) từ Firebase và IndexedDB
+    const targetUrl = getAppUrl(`/test-results/print/${res.id}`);
     window.open(targetUrl, '_blank');
   }, []);
 

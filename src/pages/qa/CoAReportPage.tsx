@@ -65,28 +65,22 @@ const CoAReportPage = () => {
             return;
           }
 
-          // [FAIL CLOSED ENFORCEMENT - SECTION 15]
-          if (!rawResult.evaluationSnapshot) {
-            if (isMounted) {
-              setFailClosedReason(
-                'Từ chối phát hành CoA: Phiếu kiểm nghiệm chưa có Bản chụp thẩm định niêm phong (EvaluationSnapshot). Theo chuẩn GMP ALCOA+, kết quả phải được phê duyệt và niêm phong trước khi phát hành CoA.'
-              );
+          // [ALCOA+ TAMPER DETECTION]
+          // Nếu phiếu đã có Bản chụp thẩm định niêm phong (EvaluationSnapshot), bắt buộc kiểm tra mã băm SHA-256
+          if (rawResult.evaluationSnapshot) {
+            const isSnapValid = verifyEvaluationSnapshotIntegrity(
+              rawResult.evaluationSnapshot,
+              rawResult.id,
+              rawResult.batchId
+            );
+            if (!isSnapValid) {
+              if (isMounted) {
+                setFailClosedReason(
+                  'CẢNH BÁO BẢO MẬT ALCOA+: Chữ ký băm toàn vẹn (SHA-256 Hash) của Evaluation Snapshot không khớp. Dữ liệu đã bị can thiệp trái phép!'
+                );
+              }
+              return;
             }
-            return;
-          }
-
-          const isSnapValid = verifyEvaluationSnapshotIntegrity(
-            rawResult.evaluationSnapshot,
-            rawResult.id,
-            rawResult.batchId
-          );
-          if (!isSnapValid) {
-            if (isMounted) {
-              setFailClosedReason(
-                'CẢNH BÁO BẢO MẬT ALCOA+: Chữ ký băm toàn vẹn (SHA-256 Hash) của Evaluation Snapshot không khớp. Dữ liệu đã bị can thiệp trái phép!'
-              );
-            }
-            return;
           }
 
           // Bước 2: Hydrate Batch, Product, TCCS đầy đủ
@@ -300,45 +294,53 @@ const CoAReportPage = () => {
           let tccsForEvaluation = batch.tccs || null;
           const batchSnapshot = batch.evaluationSnapshot || latestResult?.evaluationSnapshot;
 
-          // [FAIL CLOSED ENFORCEMENT - SECTION 15]
-          // CoA tuyệt đối không tự tính lại business rules nếu thiếu Evaluation Snapshot
-          if (!batchSnapshot) {
-            if (isMounted) {
-              setFailClosedReason(
-                'Từ chối phát hành CoA: Lô sản xuất chưa có Bản chụp thẩm định niêm phong (EvaluationSnapshot). Không thể fallback sang tính toán cục bộ unverified theo chuẩn GMP ALCOA+.'
-              );
+          // Nếu có snapshot niêm phong, kiểm tra tính toàn vẹn chữ ký SHA-256
+          if (batchSnapshot) {
+            const isBatchSnapValid = verifyEvaluationSnapshotIntegrity(
+              batchSnapshot,
+              batchSnapshot.testResultId || latestResult?.id || batchId,
+              batchId
+            );
+            if (!isBatchSnapValid) {
+              if (isMounted) {
+                setFailClosedReason(
+                  'CẢNH BÁO BẢO MẬT ALCOA+: Chữ ký băm toàn vẹn (SHA-256 Hash) của Evaluation Snapshot trên Lô không khớp. Dữ liệu Lô đã bị can thiệp trái phép!'
+                );
+              }
+              return;
             }
-            return;
-          }
 
-          const isBatchSnapValid = verifyEvaluationSnapshotIntegrity(
-            batchSnapshot,
-            batchSnapshot.testResultId || latestResult?.id || batchId,
-            batchId
-          );
-          if (!isBatchSnapValid) {
             if (isMounted) {
-              setFailClosedReason(
-                'CẢNH BÁO BẢO MẬT ALCOA+: Chữ ký băm toàn vẹn (SHA-256 Hash) của Evaluation Snapshot trên Lô không khớp. Dữ liệu Lô đã bị can thiệp trái phép!'
-              );
+              setResult({
+                id: `coa-${batchId}`,
+                batchId: batchId,
+                labName: 'Phòng Kiểm Nghiệm',
+                testDate: latestResult?.testDate || new Date().toISOString(),
+                results: finalResults,
+                evaluationSnapshot: batchSnapshot,
+                overallStatus: batchSnapshot.overallStatus === 'PASS' ? 'PASS' : 'FAIL',
+                notes: `CoA chính thức phát hành từ Bản chụp thẩm định niêm phong.`,
+                createdAt: batchSnapshot.timestamp || new Date().toISOString(),
+                batch: { ...batch, tccs: tccsForEvaluation, evaluationSnapshot: batchSnapshot },
+                product: batch.product,
+              } as HydratedTestResult);
             }
-            return;
-          }
-
-          if (isMounted) {
-            setResult({
-              id: `coa-${batchId}`,
-              batchId: batchId,
-              labName: 'Phòng Kiểm Nghiệm',
-              testDate: latestResult?.testDate || new Date().toISOString(),
-              results: finalResults,
-              evaluationSnapshot: batchSnapshot,
-              overallStatus: batchSnapshot.overallStatus === 'PASS' ? 'PASS' : 'FAIL',
-              notes: `CoA chính thức phát hành từ Bản chụp thẩm định niêm phong.`,
-              createdAt: batchSnapshot.timestamp || new Date().toISOString(),
-              batch: { ...batch, tccs: tccsForEvaluation, evaluationSnapshot: batchSnapshot },
-              product: batch.product,
-            } as HydratedTestResult);
+          } else {
+            // [SC-14 CONTRACT]: Chưa có bản chụp niêm phong chính thức -> Hiển thị bản nháp nội bộ (DRAFT)
+            if (isMounted) {
+              setResult({
+                id: `coa-draft-${batchId}`,
+                batchId: batchId,
+                labName: 'Phòng Kiểm Nghiệm',
+                testDate: latestResult?.testDate || new Date().toISOString(),
+                results: finalResults,
+                overallStatus: latestResult?.overallStatus || 'UNKNOWN',
+                notes: `Bản nháp CoA nội bộ từ ${resultsForBatch.length} kết quả kiểm nghiệm (chưa có niêm phong chính thức).`,
+                createdAt: new Date().toISOString(),
+                batch: { ...batch, tccs: tccsForEvaluation },
+                product: batch.product,
+              } as HydratedTestResult);
+            }
           }
 
           // Tải công thức sản phẩm liên quan
