@@ -32,6 +32,8 @@ export interface Batch {
   hasActiveOOS?: boolean;
   /** Cờ cảnh báo có sai lệch (Deviation) chưa đóng */
   hasActiveDeviation?: boolean;
+  /** Trạng thái thẩm định Hồ sơ sản xuất (BPR Review Status - Gate 6) */
+  bprReviewStatus?: 'DRAFT' | 'SUBMITTED' | 'UNDER_REVIEW' | 'APPROVED' | 'REJECTED';
   releasedAt?: string;
   releasedBy?: string;
   rejectReason?: string;

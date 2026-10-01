@@ -364,12 +364,12 @@ export function buildTestResultIndex(
       }
     }
 
-    // 5. Khôi phục liên kết qua số phiếu báo cáo (reportNo peer match)
+    // 5. Khôi phục liên kết qua số phiếu báo cáo (reportNo peer match - Identity Guarded)
     const reportCode = ((r as any).reportNo || (r as any).reportNumber || (r as any).code || '')
       .trim()
       .toLowerCase();
     if (reportCode) {
-      const peer = testResults.find(
+      const peers = testResults.filter(
         (other) =>
           other &&
           other.id !== r.id &&
@@ -379,15 +379,82 @@ export function buildTestResultIndex(
           ((other.batchId && batchIdMap.has(other.batchId.trim())) ||
             (other.batchId && batchNoGroupMap.has(other.batchId.trim().toLowerCase())))
       );
-      if (peer) {
-        const peerBatchId = (peer.batchId || '').trim();
-        const peerBatch =
-          batchIdMap.get(peerBatchId) || batchNoGroupMap.get(peerBatchId.toLowerCase())?.[0];
-        if (peerBatch) {
+
+      if (peers.length > 0) {
+        // Thu thập tất cả các lô từ các peer trùng reportNo
+        const matchedBatches: Batch[] = [];
+        const matchedBatchIds = new Set<string>();
+
+        for (const peer of peers) {
+          const peerBatchId = (peer.batchId || '').trim();
+          const peerBatch =
+            batchIdMap.get(peerBatchId) || batchNoGroupMap.get(peerBatchId.toLowerCase())?.[0];
+          if (peerBatch && !matchedBatchIds.has(peerBatch.id)) {
+            matchedBatchIds.add(peerBatch.id);
+            matchedBatches.push(peerBatch);
+          }
+        }
+
+        // P1 – REPORT NO RECOVERY: Không được tự động gán nếu reportNo không unique trên nhiều Lô
+        if (matchedBatches.length > 1) {
           return {
-            batch: peerBatch,
+            relationshipType: 'AMBIGUOUS_MATCH',
+            reason: `Phát hiện số phiếu "${reportCode}" trùng lặp trên ${matchedBatches.length} Lô khác nhau. Không được tự động liên kết.`,
+          };
+        }
+
+        if (matchedBatches.length === 1) {
+          const targetBatch = matchedBatches[0];
+          const representativePeer = peers[0];
+
+          // Bắt buộc kiểm tra thêm tính đồng nhất của Identity:
+          // * productId, * batchNo, * lab, * testDate
+          const rProdId = (r.productId || (r as any).productCode || '').trim();
+          const bProdId = (targetBatch.productId || '').trim();
+          if (rProdId && bProdId && rProdId !== bProdId) {
+            return {
+              relationshipType: 'AMBIGUOUS_MATCH',
+              reason: `Xung đột Product ID khi khôi phục số phiếu ${reportCode}: Phiếu có ${rProdId}, Lô có ${bProdId}.`,
+            };
+          }
+
+          const rBatchNo = ((r as any).batchNo || '').trim().toLowerCase();
+          const bBatchNo = (targetBatch.batchNo || '').trim().toLowerCase();
+          if (rBatchNo && bBatchNo && rBatchNo !== bBatchNo) {
+            return {
+              relationshipType: 'AMBIGUOUS_MATCH',
+              reason: `Xung đột Batch No khi khôi phục số phiếu ${reportCode}: Phiếu có ${rBatchNo}, Lô có ${bBatchNo}.`,
+            };
+          }
+
+          const rLab = (r.labName || (r as any).lab || '').trim().toLowerCase();
+          const peerLab = (representativePeer.labName || (representativePeer as any).lab || '')
+            .trim()
+            .toLowerCase();
+          if (rLab && peerLab && rLab !== peerLab) {
+            return {
+              relationshipType: 'AMBIGUOUS_MATCH',
+              reason: `Xung đột Lab khi khôi phục số phiếu ${reportCode}: ${rLab} vs ${peerLab}.`,
+            };
+          }
+
+          const rTestDate = (r.testDate || (r as any).date || '').trim();
+          const peerTestDate = (
+            representativePeer.testDate ||
+            (representativePeer as any).date ||
+            ''
+          ).trim();
+          if (rTestDate && peerTestDate && rTestDate !== peerTestDate) {
+            return {
+              relationshipType: 'AMBIGUOUS_MATCH',
+              reason: `Xung đột ngày kiểm nghiệm khi khôi phục số phiếu ${reportCode}: ${rTestDate} vs ${peerTestDate}.`,
+            };
+          }
+
+          return {
+            batch: targetBatch,
             relationshipType: 'PRIMARY',
-            reason: `Phiếu kiểm nghiệm khôi phục liên kết Lô qua số phiếu ${reportCode} từ phiếu đồng cấp (${peer.id})`,
+            reason: `Phiếu kiểm nghiệm khôi phục liên kết Lô qua số phiếu ${reportCode} từ phiếu đồng cấp (${representativePeer.id}) với danh tính xác thực.`,
           };
         }
       }

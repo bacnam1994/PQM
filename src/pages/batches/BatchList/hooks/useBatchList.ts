@@ -221,13 +221,12 @@ export function useBatchList() {
         const targetBatch = hydratedBatches.find((b) => b.id === batchId);
         if (!targetBatch) return;
         const resolution = resolveTestResultsForBatch(targetBatch, sourceResults);
-        const releaseDecision = BatchReleaseDecisionService.resolveBatchReleaseDecision({
+        const releaseDecision = BatchReleaseDecisionService.evaluateReleasePreview({
           batch: targetBatch,
           testResults: resolution.allCandidateResults,
           userRole: user?.role,
           boundTccs: (targetBatch as any)?.tccs,
           asOfDate: new Date(),
-          skipBprRequirementForTestingStatus: true,
         });
         if (!releaseDecision.eligible) {
           notify({

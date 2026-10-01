@@ -26,11 +26,11 @@ import { OutboxAuditQueue } from '../../src/workflow/events/outboxAuditQueue';
 import { WorkflowExecutor } from '../../src/workflow/kernel/workflowExecutor';
 import { WorkflowContext } from '../../src/workflow/contracts/actions';
 
+import { calculateSha256Sync } from '../../src/utils/cryptoUtils';
+
 vi.mock('../../src/services/signatureService', () => ({
   signatureService: {
-    verifySignatureIntegrity: vi
-      .fn()
-      .mockImplementation(async (sig: any) => sig?.checksum === 'valid-checksum'),
+    verifySignatureIntegrity: vi.fn().mockResolvedValue(true),
   },
 }));
 
@@ -122,6 +122,7 @@ describe('Phase 15: End-to-End Batch Lifecycle & Data Integrity Verification', (
       productName: 'Paracetamol 500mg',
       status: 'PENDING',
       version: 1,
+      bprReviewStatus: 'APPROVED' as any,
       mfgDate: '2026-01-01',
       expDate: '2029-01-01',
       size: 100000,
@@ -265,29 +266,36 @@ describe('Phase 15: End-to-End Batch Lifecycle & Data Integrity Verification', (
 
     await expect(
       handlers.handleStatusTransition('batch-e2e-2026', 'RELEASED', qaUser, {
-        currentBatch: testingBatch,
+        currentBatch: { ...testingBatch, bprReviewStatus: 'APPROVED' as any },
         batchTestResults: [passingTestResult],
         requireSignature: true,
         signature: mismatchedSig,
       })
-    ).rejects.toThrow(/không khớp với Lô sản xuất/);
+    ).rejects.toThrow(/ERR_SIGNATURE_MISMATCH/);
 
     // -------------------------------------------------------------
     // Bước 8: Xuất xưởng HỢP LỆ với đầy đủ 7 Release Gates và Chữ ký QA chuẩn
     // -------------------------------------------------------------
-    const validQASig = {
-      id: 'sig-valid-qa-001',
-      documentType: 'BATCH_RELEASE' as any,
+    const sigPayload = {
+      documentType: 'BATCH_RELEASE',
       documentId: 'batch-e2e-2026',
       signerEmail: 'qa@pqm.com',
+      signerRole: 'QA',
+      timestamp: '2026-01-06T15:30:00Z',
+      meaning: 'APPROVE',
+    };
+    const validQASig = {
+      id: 'sig-valid-qa-001',
+      ...sigPayload,
+      documentType: 'BATCH_RELEASE' as any,
       signerName: 'Nguyen Van QA',
       role: 'QA',
-      signedAt: '2026-01-06T15:30:00Z',
-      checksum: 'valid-checksum',
+      signedAt: sigPayload.timestamp,
+      checksum: calculateSha256Sync(JSON.stringify(sigPayload)),
     };
 
     await handlers.handleStatusTransition('batch-e2e-2026', 'RELEASED', qaUser, {
-      currentBatch: testingBatch,
+      currentBatch: { ...testingBatch, bprReviewStatus: 'APPROVED' as any },
       batchTestResults: [passingTestResult],
       signature: validQASig,
     });

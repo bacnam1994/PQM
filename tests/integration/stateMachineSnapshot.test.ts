@@ -117,6 +117,7 @@ describe('Integration Test: State Machine Pipeline & Snapshot Sealed Release', (
       productName: 'Amoxicillin 500mg',
       tccsId: tccs.id,
       status: batchStatus,
+      bprReviewStatus: 'APPROVED' as any,
       createdAt: new Date().toISOString(),
       manufacturingDate: '2026-01-01',
       expiryDate: '2028-01-01',

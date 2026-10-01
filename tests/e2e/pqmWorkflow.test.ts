@@ -319,9 +319,14 @@ describe('PHASE C — Real Workflow E2E (Happy Path & 12 Negative Paths)', () =>
       const testingBatch = await batchRepo.findById('BATCH-2026-001');
       expect(testingBatch?.status).toBe('TESTING');
 
+      // QA thẩm định và phê duyệt Hồ sơ sản xuất (BPR Review: APPROVED)
+      await batchRepo.update({ ...testingBatch!, bprReviewStatus: 'APPROVED' });
+      const readyBatch = (await batchRepo.findById('BATCH-2026-001'))!;
+      expect(readyBatch.bprReviewStatus).toBe('APPROVED');
+
       // Thẩm định tất cả điều kiện tiên quyết trước khi xuất xưởng (Release Gate)
       const releasePrereq = ReleaseRules.evaluateReleasePrerequisites({
-        batch: testingBatch!,
+        batch: readyBatch,
         testResults: [approvedTr!],
         userRole: 'QA',
         boundTccs: savedTccs!,
@@ -348,7 +353,7 @@ describe('PHASE C — Real Workflow E2E (Happy Path & 12 Negative Paths)', () =>
       };
 
       await batchService.updateStatus('BATCH-2026-001', 'RELEASED', qaUser, {
-        currentBatch: testingBatch!,
+        currentBatch: readyBatch,
         batchTestResults: [approvedTr!],
         signature: eSignature,
         requireSignature: true,

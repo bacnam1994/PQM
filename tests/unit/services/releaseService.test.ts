@@ -35,6 +35,7 @@ describe('ReleaseService Unit Tests', () => {
     productName: 'Paracetamol 500mg',
     tccsId: 'tccs-01',
     status: 'TESTING',
+    bprReviewStatus: 'APPROVED',
     mfgDate: '2026-01-01',
     expDate: '2028-01-01',
     createdAt: '2026-01-01',

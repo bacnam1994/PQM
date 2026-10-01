@@ -165,8 +165,14 @@ export function resolveCanonicalBatchQualityDecision(
   );
   const candidateCount = primaryCandidates.length + legacyCandidates.length;
 
-  // 3. Xử lý trạng thái nạp dữ liệu (Data Freshness Aware)
-  const { isTestResultsLoading = false, testResultsLoaded = true, isError = false } = dataFreshness;
+  // 3. Xử lý trạng thái nạp dữ liệu (Data Freshness Aware - P1 Propagation)
+  const {
+    isTestResultsLoading = false,
+    testResultsLoaded = true,
+    isBatchesLoading = false,
+    loadState,
+    isError = false,
+  } = dataFreshness;
 
   if (isError) {
     return {
@@ -191,7 +197,14 @@ export function resolveCanonicalBatchQualityDecision(
     };
   }
 
-  if (isTestResultsLoading || (!testResultsLoaded && candidateCount === 0)) {
+  const isPartialOrLoading =
+    isTestResultsLoading ||
+    isBatchesLoading ||
+    loadState === 'LOADING' ||
+    loadState === 'PARTIAL' ||
+    (!testResultsLoaded && candidateCount === 0);
+
+  if (isPartialOrLoading) {
     return {
       batchId,
       batchNo,
@@ -204,13 +217,13 @@ export function resolveCanonicalBatchQualityDecision(
       supersededTestResultIds: [],
       failedCriteria: [],
       pendingCriteria: [],
-      decisionReason: `Đang nạp dữ liệu kiểm nghiệm từ máy chủ cho lô "${batchNo}".`,
+      decisionReason: `Dữ liệu Lô sản xuất hoặc Phiếu kiểm nghiệm đang được nạp hoặc ở trạng thái cục bộ/partial cho lô "${batchNo}". Chưa thể thẩm định toàn vẹn.`,
       resolverVersion: CANONICAL_DECISION_RESOLVER_VERSION,
       authoritativeResults: [],
       boundTccs: resolvedTccs,
       criterionEvaluations: [],
       completion: emptyCompletion,
-      blockers: ['Đang nạp dữ liệu kiểm nghiệm.'],
+      blockers: ['Đang nạp dữ liệu kiểm nghiệm từ máy chủ.'],
     };
   }
 
@@ -242,9 +255,50 @@ export function resolveCanonicalBatchQualityDecision(
     };
   }
 
-  // 5. Thống nhất danh sách ứng viên (Primary Candidates hoặc Legacy Candidates)
-  const isLegacyOnly = primaryCandidates.length === 0 && legacyCandidates.length > 0;
-  const candidates = primaryCandidates.length > 0 ? primaryCandidates : legacyCandidates;
+  // 5. Thống nhất danh sách ứng viên (Primary vs Legacy Result Policy)
+  // Không bỏ Legacy Result một cách mù quáng khi Primary chỉ là bản nháp (DRAFT).
+  const isApprovedResult = (tr: TestResult) => {
+    const s = String((tr as any).workflowStatus || (tr as any).status || '').toUpperCase();
+    return s === 'APPROVED' || s === 'COMPLETED' || s === 'RELEASED';
+  };
+  const isDraftResult = (tr: TestResult) => {
+    const s = String((tr as any).workflowStatus || (tr as any).status || '').toUpperCase();
+    return s === 'DRAFT' || s === 'PENDING' || s === 'TESTING' || s === 'IN_PROGRESS';
+  };
+
+  const primaryApproved = primaryCandidates.filter(isApprovedResult);
+  const primaryDraft = primaryCandidates.filter(isDraftResult);
+  const legacyApproved = legacyCandidates.filter(isApprovedResult);
+  const legacyDraft = legacyCandidates.filter(isDraftResult);
+
+  let candidates: TestResult[] = [];
+  let isLegacyAuthoritativeOverPrimaryDraft = false;
+  let authoritativeSelectionReason = '';
+
+  if (primaryApproved.length > 0) {
+    // Ưu tiên cao nhất: Primary có kết quả Approved chính thức
+    candidates = primaryCandidates;
+    authoritativeSelectionReason = 'PRIMARY_APPROVED';
+  } else if (legacyApproved.length > 0) {
+    // CASE 11: Nếu Primary chỉ là DRAFT nhưng Legacy ĐÃ CÓ kết quả APPROVED có hiệu lực:
+    // Chọn Legacy Approved làm authoritative để không mất kết quả kiểm định hợp lệ
+    candidates = legacyApproved;
+    isLegacyAuthoritativeOverPrimaryDraft = primaryDraft.length > 0;
+    authoritativeSelectionReason =
+      primaryDraft.length > 0 ? 'LEGACY_APPROVED_OVER_PRIMARY_DRAFT' : 'LEGACY_APPROVED';
+  } else if (primaryCandidates.length > 0) {
+    // Cả 2 đều chưa Approved -> chọn Primary
+    candidates = primaryCandidates;
+    authoritativeSelectionReason = 'PRIMARY_DRAFT_FALLBACK';
+  } else {
+    // Chỉ có Legacy
+    candidates = legacyCandidates;
+    authoritativeSelectionReason = 'LEGACY_ONLY';
+  }
+
+  const isLegacyOnly =
+    (primaryCandidates.length === 0 && legacyCandidates.length > 0) ||
+    isLegacyAuthoritativeOverPrimaryDraft;
 
   // 6. Chọn Canonical Supreme Test Result từ tập candidates
   const finalResolution = resolveFinalTestResultForBatch(batch, candidates, resolvedTccs);
@@ -585,5 +639,13 @@ export function resolveCanonicalBatchQualityDecision(
     criterionEvaluations,
     completion,
     blockers,
+    decisionTrace: {
+      ...((finalResolution as any).decisionTrace || {}),
+      authoritativeSelectionReason,
+      primaryCandidateCount: primaryCandidates.length,
+      legacyCandidateCount: legacyCandidates.length,
+      primaryApprovedCount: primaryApproved.length,
+      legacyApprovedCount: legacyApproved.length,
+    },
   };
 }

@@ -23,6 +23,7 @@ describe('ReleaseRules - 7 Mandatory Release Gates (BR-REL-001)', () => {
     productId: 'prod-01',
     tccsId: 'tccs-01',
     status: 'TESTING',
+    bprReviewStatus: 'APPROVED',
     mfgDate: '2026-01-01',
     expDate: '2029-01-01',
     theoreticalYield: 100000,

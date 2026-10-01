@@ -19,6 +19,7 @@ import {
 import { resolveTestResultStatus } from '../../domain/test-result/testResultStatusResolver';
 import { validateEvaluationSnapshot } from '../../domain/evaluation/EvaluationSnapshotBuilder';
 import { can } from '../permissionService';
+import { BatchReleaseDecisionService } from '../../domain/batch/BatchReleaseDecisionService';
 
 export type RegulatedWorkflowType =
   | 'BATCH_RELEASE'
@@ -91,10 +92,17 @@ export class WorkflowExplainabilityService {
     });
 
     // 2. Kiểm tra trạng thái vòng đời Lô (State Machine)
+    const previewDecision = BatchReleaseDecisionService.evaluateReleasePreview({
+      batch,
+      testResults,
+      deviations,
+      boundTccs,
+      userRole: user?.role as any,
+    });
     const transitionCheck = BatchStateMachine.canTransition(batch.status, 'RELEASED', {
       actorRole: user?.role,
       actorId: user?.uid,
-      conditionsMet: true,
+      conditionsMet: previewDecision.eligible,
     });
     reasons.push({
       id: 'STATE_TRANSITION',

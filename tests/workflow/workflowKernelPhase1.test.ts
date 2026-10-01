@@ -223,7 +223,7 @@ describe('Workflow Kernel Phase 1: Engine & Gate Verification', () => {
   });
 
   describe('Gate 3: ALCOA+ Fail-Closed Audit Trail', () => {
-    it('3.1. Thất bại ghi nhận Audit Trail khiến transaction Fail-Closed', async () => {
+    it('3.1. Thất bại ghi nhận Audit Trail tạm thời được chuyển sang Durable Outbox RETRYING (Chống Split-Brain)', async () => {
       vi.mocked(auditService.logAuditAction).mockRejectedValue(
         new Error('Firebase RTDB permission-denied / network down')
       );
@@ -239,10 +239,12 @@ describe('Workflow Kernel Phase 1: Engine & Gate Verification', () => {
         async () => ({ batchId: 'batch_002' })
       );
 
-      expect(result.success).toBe(false);
-      expect(result.failureCode).toBe('AUDIT_LOG_FAILED');
-      expect(result.auditStatus).toBe('AUDIT_FAILED');
-      expect(result.failureReason).toContain('Nguyên tắc ALCOA+ (Fail-Closed)');
+      // P0 – AUDIT/MUTATION CONSISTENCY: Mutation đã thành công thì workflow không được FAIL gây split-brain
+      expect(result.success).toBe(true);
+      expect(result.auditStatus).toBe('RETRYING');
+      const outboxItem = OutboxAuditQueue.getQueue().find((e) => e.entityId === 'batch_002');
+      expect(outboxItem).toBeDefined();
+      expect(outboxItem?.state).toBe('RETRYING');
     });
 
     it('3.2. Thành công ghi nhận Audit Trail đồng bộ khi đường truyền thông suốt', async () => {

@@ -23,6 +23,7 @@ import {
   resetWorkflowFeatureFlags,
 } from '../../src/workflow/contracts/featureFlags';
 import { TestResult, Batch, ElectronicSignature } from '../../src/types';
+import { calculateSha256Sync } from '../../src/utils/cryptoUtils';
 
 vi.mock('../../src/services/auditService', () => ({
   logAuditAction: vi.fn().mockResolvedValue(undefined),
@@ -30,9 +31,7 @@ vi.mock('../../src/services/auditService', () => ({
 
 vi.mock('../../src/services/signatureService', () => ({
   signatureService: {
-    verifySignatureIntegrity: vi
-      .fn()
-      .mockImplementation(async (sig: any) => sig?.checksum === 'valid-checksum'),
+    verifySignatureIntegrity: vi.fn().mockResolvedValue(true),
   },
 }));
 
@@ -350,7 +349,11 @@ describe('Phase 2 Vertical Slices: Test Result & Batch Workflows', () => {
     });
 
     it('BATCH_RELEASE_APPROVE: Xuất xưởng thành công khi đạt chuẩn và có chữ ký điện tử 21 CFR Part 11', async () => {
-      const testingBatch: Batch = { ...validBatch, status: 'TESTING' };
+      const testingBatch: Batch = {
+        ...validBatch,
+        status: 'TESTING',
+        bprReviewStatus: 'APPROVED' as any,
+      };
       mockBatchRepo.findById.mockResolvedValue(testingBatch);
 
       const passedTR: TestResult = {
@@ -363,6 +366,14 @@ describe('Phase 2 Vertical Slices: Test Result & Batch Workflows', () => {
         results: [{ criteriaName: 'Độ tinh khiết', value: '99.5%', isPass: true }],
       };
 
+      const sigPayload = {
+        documentType: 'BATCH_RELEASE',
+        documentId: 'batch_slice_002',
+        signerEmail: qaActor.email,
+        signerRole: 'QA',
+        timestamp: new Date().toISOString(),
+        meaning: 'Phê duyệt xuất xưởng Lô sản phẩm',
+      };
       const validSig: ElectronicSignature = {
         id: 'sig_rel_01',
         documentType: 'BATCH_RELEASE',
@@ -371,9 +382,9 @@ describe('Phase 2 Vertical Slices: Test Result & Batch Workflows', () => {
         signerName: qaActor.name,
         signerEmail: qaActor.email,
         role: 'QA',
-        meaning: 'Phê duyệt xuất xưởng Lô sản phẩm',
-        signedAt: new Date().toISOString(),
-        checksum: 'valid-checksum',
+        meaning: sigPayload.meaning,
+        signedAt: sigPayload.timestamp,
+        checksum: calculateSha256Sync(JSON.stringify(sigPayload)),
       };
 
       const released = await batchHandlers.handleStatusTransition(

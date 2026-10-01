@@ -205,7 +205,7 @@ export interface WorkflowExecutionResult<TData = any> {
   data?: TData;
   failureCode?: string;
   failureReason?: string;
-  auditStatus?: 'COMMITTED' | 'AUDIT_FAILED' | 'SKIPPED';
+  auditStatus?: 'COMMITTED' | 'AUDIT_FAILED' | 'SKIPPED' | 'RETRYING' | 'PENDING';
   auditError?: string;
   timestamp: string;
   durationMs: number;

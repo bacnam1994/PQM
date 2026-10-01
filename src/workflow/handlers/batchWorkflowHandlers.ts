@@ -219,6 +219,7 @@ export class BatchWorkflowHandlers {
       batchTestResults?: TestResult[];
       signature?: ElectronicSignature;
       requireSignature?: boolean;
+      expectedVersion?: number;
     }
   ): Promise<Batch> {
     const flags = getWorkflowFeatureFlags();
@@ -245,41 +246,18 @@ export class BatchWorkflowHandlers {
       }
     }
 
-    // 1. Rào chắn State Machine FSM - Topology & User Permissions
+    // 1. Rào chắn State Machine FSM - Topology & User Permissions (Không dùng cờ bypass conditionsMet)
     const currentStatus = currentBatch.status || 'PENDING';
     const transitionCheck = BatchStateMachine.canTransition(currentStatus, status, {
       actorRole: currentUser?.role,
       actorId: currentUser?.uid,
       reason: effectiveReason,
-      conditionsMet: status === 'RELEASED' ? true : undefined,
     });
     if (!transitionCheck.allowed) {
       throw new Error(`Quy chuẩn State Machine: ${transitionCheck.reason}`);
     }
 
-    // 2. Rào chắn Chữ ký số 21 CFR Part 11 (Xóa bỏ hoàn toàn sig_auto_*)
-    if (status === 'RELEASED' || status === 'REJECTED') {
-      if (options?.requireSignature || options?.signature) {
-        if (!options?.signature) {
-          throw new Error(
-            `Quy định 21 CFR Part 11: Yêu cầu chữ ký điện tử hợp lệ của QA/Admin trước khi ${status === 'RELEASED' ? 'xuất xưởng' : 'từ chối'} Lô.`
-          );
-        }
-        if (
-          (options.signature.documentType !== 'BATCH_RELEASE' &&
-            (options.signature.documentType as string) !== 'BATCH') ||
-          options.signature.documentId !== batchId
-        ) {
-          throw new Error('Chữ ký điện tử không khớp với Lô sản xuất đang phê duyệt.');
-        }
-        const isValid = await signatureService.verifySignatureIntegrity(options.signature);
-        if (!isValid) {
-          throw new Error('Chữ ký điện tử không hợp lệ hoặc đã bị can thiệp trái phép.');
-        }
-      }
-    }
-
-    // 3. Tính toán Canonical Release Decision nếu chuyển sang RELEASED
+    // 2. Tính toán Canonical Release Decision nếu chuyển sang RELEASED (SSoT Gate Check)
     let releaseDecision: any = undefined;
     if (status === 'RELEASED') {
       let freshTestResults: TestResult[] = options?.batchTestResults || [];
@@ -294,13 +272,34 @@ export class BatchWorkflowHandlers {
         userSignature: options?.signature,
         asOfDate: new Date(),
         boundTccs: currentBatch.tccsSnapshot || (currentBatch as any)?.tccs,
-        skipBprRequirementForTestingStatus: true,
       });
 
       if (!releaseDecision.eligible) {
         throw new Error(
           `Quy chuẩn GMP & Release Guard: ${releaseDecision.blockers[0] || 'Lô không đủ điều kiện xuất xưởng.'}`
         );
+      }
+    }
+
+    // 3. Rào chắn Chữ ký số 21 CFR Part 11 đối với REJECTED
+    if (status === 'REJECTED') {
+      if (options?.requireSignature || options?.signature) {
+        if (!options?.signature) {
+          throw new Error(
+            'Quy định 21 CFR Part 11: Yêu cầu chữ ký điện tử hợp lệ của QA/Admin trước khi từ chối Lô.'
+          );
+        }
+        if (
+          (options.signature.documentType !== 'BATCH_REJECT' &&
+            (options.signature.documentType as string) !== 'BATCH') ||
+          options.signature.documentId !== batchId
+        ) {
+          throw new Error('Chữ ký điện tử không khớp với Lô sản xuất đang từ chối.');
+        }
+        const isValid = await signatureService.verifySignatureIntegrity(options.signature);
+        if (!isValid) {
+          throw new Error('Chữ ký điện tử không hợp lệ hoặc đã bị can thiệp trái phép.');
+        }
       }
     }
 
@@ -323,7 +322,7 @@ export class BatchWorkflowHandlers {
     if (!flags.enableBatchWorkflowFacade) {
       if (typeof this.repo.updateStatus === 'function') {
         await this.repo.updateStatus(batchId, status, effectiveReason, {
-          expectedVersion: currentBatch.version ?? 1,
+          expectedVersion: options?.expectedVersion ?? currentBatch.version ?? 1,
           releasedAt: cleanBatch.releasedAt,
           releasedBy: cleanBatch.releasedBy,
           rejectReason: cleanBatch.rejectReason,
@@ -348,15 +347,16 @@ export class BatchWorkflowHandlers {
         entityType: 'BATCH',
         entityId: batchId,
         actor,
-        payload: cleanBatch,
+        payload: { ...cleanBatch, currentVersion: currentBatch.version ?? 1 },
         reason: effectiveReason,
         signature: options?.signature,
+        expectedVersion: options?.expectedVersion ?? currentBatch.version,
         currentState: currentStatus,
       },
       async () => {
         if (typeof this.repo.updateStatus === 'function') {
           await this.repo.updateStatus(batchId, status, effectiveReason, {
-            expectedVersion: currentBatch.version ?? 1,
+            expectedVersion: options?.expectedVersion ?? currentBatch.version ?? 1,
             releasedAt: cleanBatch.releasedAt,
             releasedBy: cleanBatch.releasedBy,
             rejectReason: cleanBatch.rejectReason,
@@ -372,8 +372,11 @@ export class BatchWorkflowHandlers {
     );
 
     if (!execution.success) {
+      const prefix = execution.failureCode ? `${execution.failureCode}: ` : '';
       throw new Error(
-        execution.failureReason || `Lỗi chuyển trạng thái Lô sang ${status} qua Workflow.`
+        execution.failureReason
+          ? `${prefix}${execution.failureReason}`
+          : `Lỗi chuyển trạng thái Lô sang ${status} qua Workflow.`
       );
     }
 

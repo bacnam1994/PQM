@@ -201,8 +201,13 @@ export class UnifiedWorkflowExecutor {
     }
 
     // 7. OCC Concurrency Check
-    if (expectedVersion != null && (payload as any)?.version != null) {
-      const occCheck = WorkflowGuards.verifyOCC(expectedVersion, (payload as any).version);
+    const serverVersion =
+      (payload as any)?.currentVersion !== undefined
+        ? (payload as any).currentVersion
+        : (payload as any)?.version;
+
+    if (expectedVersion != null && serverVersion != null) {
+      const occCheck = WorkflowGuards.verifyOCC(expectedVersion, serverVersion);
       if (!occCheck.passed) {
         const result: WorkflowExecutionResult<TData> = {
           success: false,
@@ -300,11 +305,48 @@ export class UnifiedWorkflowExecutor {
       }
     }
 
-    // 10. Atomic Mutation Execution
+    // 10. Persist Durable Outbox Audit Event (Before Mutation)
+    let auditEvent: any = null;
+    if (actionMeta.requiresAudit) {
+      const deterministicEventId = OutboxAuditQueue.generateDeterministicEventId(
+        entityType,
+        entityId,
+        actionId,
+        expectedVersion !== undefined ? expectedVersion + 1 : 1
+      );
+      auditEvent = {
+        eventId: deterministicEventId,
+        executionId,
+        actionId,
+        entityType,
+        entityId,
+        actor: {
+          id: actor.id,
+          name: actor.name,
+          role: actor.role,
+          email: actor.email,
+        },
+        fromState: currentState,
+        toState: calculatedNextState,
+        version: expectedVersion !== undefined ? expectedVersion + 1 : undefined,
+        details: `${actionMeta.description} cho ${entityType} #${entityId}${reason ? ` [Lý do: ${reason}]` : ''}`,
+        timestamp,
+        correlationId,
+        state: 'PENDING',
+        createdAt: timestamp,
+        retryCount: 0,
+      };
+      await OutboxAuditQueue.persistPending(auditEvent);
+    }
+
+    // 11. Atomic Mutation Execution
     let mutationData: TData;
     try {
       mutationData = await mutationHandler();
     } catch (err: any) {
+      if (auditEvent) {
+        await OutboxAuditQueue.markFailed(auditEvent.eventId, err?.message || 'Mutation failed');
+      }
       const result: WorkflowExecutionResult<TData> = {
         success: false,
         executionId,
@@ -322,60 +364,22 @@ export class UnifiedWorkflowExecutor {
       return result;
     }
 
-    // 11. ALCOA+ Awaited Outbox Audit Logging (Fail-Closed)
-    let auditStatus: 'COMMITTED' | 'AUDIT_FAILED' | 'SKIPPED' = 'SKIPPED';
+    // 12. ALCOA+ Outbox Audit Dispatch (Post-Mutation Consistency)
+    let auditStatus: 'COMMITTED' | 'AUDIT_FAILED' | 'SKIPPED' | 'RETRYING' | 'PENDING' = 'SKIPPED';
     let auditError: string | undefined = undefined;
 
-    if (actionMeta.requiresAudit) {
-      const auditResult = await OutboxAuditQueue.dispatchAudit({
-        eventId: `AUD-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-        executionId,
-        actionId,
-        entityType,
-        entityId,
-        actor: {
-          id: actor.id,
-          name: actor.name,
-          role: actor.role,
-          email: actor.email,
-        },
-        fromState: currentState,
-        toState: calculatedNextState,
-        version: expectedVersion !== undefined ? expectedVersion + 1 : undefined,
-        details: `${actionMeta.description} cho ${entityType} #${entityId}${reason ? ` [Lý do: ${reason}]` : ''}`,
-        timestamp,
-        correlationId,
-      });
+    if (auditEvent) {
+      const auditResult = await OutboxAuditQueue.dispatchAudit(auditEvent);
 
       if (auditResult.success) {
         auditStatus = 'COMMITTED';
       } else {
-        auditStatus = 'AUDIT_FAILED';
+        // P0 – AUDIT/MUTATION CONSISTENCY:
+        // Mutation ĐÃ thành công trong Database. Tuyệt đối KHÔNG trả về workflow fail
+        // gây Split-Brain (Client báo lỗi nhưng DB đã lưu trạng thái).
+        // OutboxAuditQueue bảo toàn sự kiện ở trạng thái RETRYING trên Durable Store (LocalStorage + Firebase RTDB).
+        auditStatus = 'RETRYING';
         auditError = auditResult.error;
-
-        // ALCOA+ Fail-Closed Rule: Nếu audit thất bại thì action không được xem là thành công
-        const failClosedResult: WorkflowExecutionResult<TData> = {
-          success: false,
-          executionId,
-          actionId,
-          entityType,
-          entityId,
-          fromState: currentState,
-          toState: calculatedNextState,
-          data: mutationData,
-          failureCode: 'AUDIT_LOG_FAILED',
-          failureReason: `Nguyên tắc ALCOA+ (Fail-Closed): Giao dịch bị từ chối do không thể lưu vết kiểm toán: ${auditError}`,
-          auditStatus: 'AUDIT_FAILED',
-          auditError,
-          timestamp,
-          durationMs: Date.now() - startTime,
-        };
-        WorkflowTelemetry.recordFailure(
-          executionId,
-          failClosedResult.failureCode!,
-          failClosedResult.failureReason!
-        );
-        return failClosedResult;
       }
     }
 

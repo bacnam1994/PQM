@@ -163,6 +163,17 @@ function sha256Pure(message: string): string {
  */
 export function calculateSha256Sync(data: string | Record<string, any>): string {
   const message = typeof data === 'string' ? data : canonicalJsonStringify(data);
+  try {
+    if (typeof process !== 'undefined' && process.versions?.node) {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const nodeCrypto = require('crypto');
+      if (nodeCrypto && typeof nodeCrypto.createHash === 'function') {
+        return nodeCrypto.createHash('sha256').update(message, 'utf8').digest('hex');
+      }
+    }
+  } catch {
+    // Browser fallback
+  }
   return sha256Pure(message);
 }
 

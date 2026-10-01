@@ -55,6 +55,7 @@ describe('PQM E2E Business Scenarios (S-001 -> S-018)', () => {
       productName: 'Paracetamol 500mg',
       tccsId: baseTccs.id,
       status: 'TESTING',
+      bprReviewStatus: 'APPROVED' as any,
       createdAt: '2026-01-01T08:00:00.000Z',
       manufacturingDate: '2026-01-01',
       expiryDate: '2028-01-01',

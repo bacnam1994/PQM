@@ -147,6 +147,7 @@ export class ReleaseRules {
     userRole?: Role | string;
     boundTccs?: TCCS | null;
     asOfDate?: string | Date;
+    signature?: any;
   }): {
     allGatesPassed: boolean;
     gates: Array<{
@@ -157,15 +158,24 @@ export class ReleaseRules {
     }>;
     blockers: string[];
   } {
-    const decision = BatchReleaseDecisionService.resolveBatchReleaseDecision({
-      batch: options.batch,
-      testResults: options.testResults,
-      deviations: options.deviations,
-      boundTccs: options.boundTccs,
-      userRole: options.userRole,
-      asOfDate: options.asOfDate,
-      skipBprRequirementForTestingStatus: true,
-    });
+    const decision = options.signature
+      ? BatchReleaseDecisionService.resolveBatchReleaseDecision({
+          batch: options.batch,
+          testResults: options.testResults,
+          deviations: options.deviations,
+          boundTccs: options.boundTccs,
+          userRole: options.userRole,
+          asOfDate: options.asOfDate,
+          userSignature: options.signature,
+        })
+      : BatchReleaseDecisionService.evaluateReleasePreview({
+          batch: options.batch,
+          testResults: options.testResults,
+          deviations: options.deviations,
+          boundTccs: options.boundTccs,
+          userRole: options.userRole,
+          asOfDate: options.asOfDate,
+        });
 
     return {
       allGatesPassed: decision.eligible,

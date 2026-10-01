@@ -105,7 +105,25 @@ export class FirebaseBatchRepository
       if (err.message && err.message.includes('CONCURRENCY_CONFLICT')) {
         throw err;
       }
-      // Fallback nếu môi trường mock/test không hỗ trợ runTransaction
+      // P0 – FIREBASE OCC MUST FAIL CLOSED:
+      // Tuyệt đối không fallback get()->update() khi gặp lỗi production (network, permission, abort, conflict...).
+      // Chỉ cho phép fallback duy nhất trong môi trường test/mock rõ ràng khi mock framework không cài đặt runTransaction.
+      const isExplicitMockEnv =
+        (typeof process !== 'undefined' &&
+          (process.env?.NODE_ENV === 'test' || Boolean(process.env?.VITEST))) ||
+        (typeof window !== 'undefined' &&
+          Boolean((window as any).__PQM_TEST_MOCK_NO_TRANSACTION__));
+
+      const isTransactionUnsupported =
+        typeof runTransaction !== 'function' ||
+        (err?.message &&
+          (err.message.includes('not a function') || err.message.includes('not implemented')));
+
+      if (!isExplicitMockEnv || !isTransactionUnsupported) {
+        throw err;
+      }
+
+      // Explicit test/mock fallback ONLY when runTransaction is not supported
       const snapshot = await get(batchRef);
       if (snapshot && typeof snapshot.exists === 'function' && snapshot.exists()) {
         const currentBatch = snapshot.val();
@@ -137,21 +155,10 @@ export class FirebaseBatchRepository
         return;
       }
 
-      // Trường hợp tạo mới hoặc không đọc được snapshot
-      const fallbackUpdates: Record<string, any> = {
-        status,
-        version: expectedVersion ? expectedVersion + 1 : 2,
-        updatedAt: now,
-        ...(status === 'RELEASED'
-          ? {
-              releasedAt: metadata?.releasedAt || now,
-              releasedBy: metadata?.releasedBy || 'QA/Admin',
-              releaseDecisionSnapshot: metadata?.releaseDecisionSnapshot || null,
-            }
-          : {}),
-        ...(status === 'REJECTED' ? { rejectReason: reason || null } : {}),
-      };
-      await update(batchRef, fallbackUpdates);
+      // Trường hợp không đọc được snapshot trong mock environment
+      throw new Error(
+        `MOCK_TRANSACTION_FAILED: Không tìm thấy snapshot cho Lô (${batchId}) trong mock environment.`
+      );
     }
   }
 
