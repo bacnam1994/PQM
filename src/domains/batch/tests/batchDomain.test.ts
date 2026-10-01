@@ -70,6 +70,13 @@ describe('Batch Domain - Vertical Slice 5 (Core GMP)', () => {
       ),
       updateStatus: vi.fn().mockResolvedValue(undefined),
       updateProgress: vi.fn().mockResolvedValue(undefined),
+      updateBprReview: vi
+        .fn()
+        .mockImplementation(async (_id: string, bprStatus: any, meta: any) => ({
+          ...sampleBatch,
+          bprReviewStatus: bprStatus,
+          ...meta,
+        })),
     };
 
     service = new BatchAppService(mockRepo);

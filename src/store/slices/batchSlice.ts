@@ -106,6 +106,118 @@ export const createBatchSlice: StoreSlice<BatchSlice> = (set, get) => ({
     }
   },
 
+  approveBatchRelease: async (
+    id: string,
+    signature: ElectronicSignature,
+    options?: { reason?: string }
+  ) => {
+    try {
+      const state = get();
+      const currentBatch = state.batches.find((b: Batch) => b.id === id);
+
+      let batchTestResults = queryClient.getQueryData<TestResult[]>(
+        TEST_RESULT_QUERY_KEYS.byBatch(id)
+      );
+      if (!batchTestResults || batchTestResults.length === 0) {
+        batchTestResults = await testResultRepository.findByRelation('batchId', id);
+      }
+      if ((!batchTestResults || batchTestResults.length === 0) && state.testResults?.length) {
+        batchTestResults = state.testResults.filter((r: any) => r.batchId === id);
+      }
+
+      const currentUser = resolveCurrentIdentity(state);
+      const releasedBatch = await batchAppService.approveRelease(id, currentUser, {
+        signature,
+        reason: options?.reason,
+        batchTestResults,
+      });
+
+      queryClient.invalidateQueries({ queryKey: BATCH_QUERY_KEYS.all });
+      queryClient.invalidateQueries({ queryKey: BATCH_QUERY_KEYS.detail(id) });
+      await get().syncQualityAlerts();
+      return releasedBatch;
+    } catch (error: any) {
+      get().notify({
+        type: 'ERROR',
+        title: 'Lỗi xuất xưởng lô',
+        message: error.message || 'Không thể xuất xưởng lô',
+      });
+      throw error;
+    }
+  },
+
+  submitBpr: async (id: string, comment?: string) => {
+    try {
+      const state = get();
+      const currentUser = resolveCurrentIdentity(state);
+      const result = await batchAppService.submitBpr(id, currentUser, { comment });
+      queryClient.invalidateQueries({ queryKey: BATCH_QUERY_KEYS.all });
+      queryClient.invalidateQueries({ queryKey: BATCH_QUERY_KEYS.detail(id) });
+      return result;
+    } catch (error: any) {
+      get().notify({
+        type: 'ERROR',
+        title: 'Lỗi nộp hồ sơ BPR',
+        message: error.message || 'Không thể nộp hồ sơ BPR',
+      });
+      throw error;
+    }
+  },
+
+  startBprReview: async (id: string, comment?: string) => {
+    try {
+      const state = get();
+      const currentUser = resolveCurrentIdentity(state);
+      const result = await batchAppService.startBprReview(id, currentUser, { comment });
+      queryClient.invalidateQueries({ queryKey: BATCH_QUERY_KEYS.all });
+      queryClient.invalidateQueries({ queryKey: BATCH_QUERY_KEYS.detail(id) });
+      return result;
+    } catch (error: any) {
+      get().notify({
+        type: 'ERROR',
+        title: 'Lỗi bắt đầu thẩm tra BPR',
+        message: error.message || 'Không thể bắt đầu thẩm tra BPR',
+      });
+      throw error;
+    }
+  },
+
+  approveBpr: async (id: string, comment?: string) => {
+    try {
+      const state = get();
+      const currentUser = resolveCurrentIdentity(state);
+      const result = await batchAppService.approveBpr(id, currentUser, { comment });
+      queryClient.invalidateQueries({ queryKey: BATCH_QUERY_KEYS.all });
+      queryClient.invalidateQueries({ queryKey: BATCH_QUERY_KEYS.detail(id) });
+      return result;
+    } catch (error: any) {
+      get().notify({
+        type: 'ERROR',
+        title: 'Lỗi phê duyệt BPR',
+        message: error.message || 'Không thể phê duyệt BPR',
+      });
+      throw error;
+    }
+  },
+
+  rejectBpr: async (id: string, reason: string) => {
+    try {
+      const state = get();
+      const currentUser = resolveCurrentIdentity(state);
+      const result = await batchAppService.rejectBpr(id, reason, currentUser);
+      queryClient.invalidateQueries({ queryKey: BATCH_QUERY_KEYS.all });
+      queryClient.invalidateQueries({ queryKey: BATCH_QUERY_KEYS.detail(id) });
+      return result;
+    } catch (error: any) {
+      get().notify({
+        type: 'ERROR',
+        title: 'Lỗi từ chối BPR',
+        message: error.message || 'Không thể từ chối BPR',
+      });
+      throw error;
+    }
+  },
+
   updateBatchProgress: async (id: string, progressPercent: number) => {
     try {
       await batchAppService.updateProgress(id, progressPercent, get().user);

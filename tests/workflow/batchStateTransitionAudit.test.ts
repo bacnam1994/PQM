@@ -244,9 +244,9 @@ describe('FINAL STATE TRANSITION AUDIT & HARDENING – BATCH WORKFLOW', () => {
       expect(BatchStateMachine.canTransition('RELEASED', 'REJECTED').allowed).toBe(false); // Không dùng REJECT để recall
     });
 
-    it('REJECTED: -> [] (TERMINAL STATE - BẤT BIẾN KHÔNG THỂ CHUYỂN TIẾP)', () => {
-      expect(BatchStateMachine.getValidNextStates('REJECTED')).toEqual([]);
-      expect(BatchStateMachine.canTransition('REJECTED', 'PENDING').allowed).toBe(false);
+    it('REJECTED: -> [PENDING] (Chỉ mở lại qua CAPA, cấm chuyển tiếp sang TESTING/RELEASED/BLOCKED)', () => {
+      expect(BatchStateMachine.getValidNextStates('REJECTED')).toEqual(['PENDING']);
+      expect(BatchStateMachine.canTransition('REJECTED', 'PENDING').allowed).toBe(false); // thiếu QA/ADMIN và lý do CAPA
       expect(BatchStateMachine.canTransition('REJECTED', 'TESTING').allowed).toBe(false);
       expect(BatchStateMachine.canTransition('REJECTED', 'RELEASED').allowed).toBe(false);
       expect(BatchStateMachine.canTransition('REJECTED', 'BLOCKED').allowed).toBe(false);

@@ -34,6 +34,9 @@ export interface Batch {
   hasActiveDeviation?: boolean;
   /** Trạng thái thẩm định Hồ sơ sản xuất (BPR Review Status - Gate 6) */
   bprReviewStatus?: 'DRAFT' | 'SUBMITTED' | 'UNDER_REVIEW' | 'APPROVED' | 'REJECTED';
+  bprReviewedAt?: string;
+  bprReviewedBy?: string;
+  bprReviewComment?: string;
   releasedAt?: string;
   releasedBy?: string;
   rejectReason?: string;

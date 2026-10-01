@@ -126,9 +126,9 @@ describe('ReleaseService Unit Tests', () => {
     });
 
     it('Cho phép ADMIN xuất xưởng lô kèm lý do', async () => {
-      const updateStatusSpy = vi
-        .spyOn(batchAppService, 'updateStatus')
-        .mockResolvedValue(undefined);
+      const approveReleaseSpy = vi
+        .spyOn(batchAppService, 'approveRelease')
+        .mockResolvedValue({ ...mockBatch, status: 'RELEASED' });
 
       const res = await service.releaseBatch({
         batchId: 'batch-01',
@@ -139,9 +139,8 @@ describe('ReleaseService Unit Tests', () => {
       });
 
       expect(res.success).toBe(true);
-      expect(updateStatusSpy).toHaveBeenCalledWith(
+      expect(approveReleaseSpy).toHaveBeenCalledWith(
         'batch-01',
-        'RELEASED',
         expect.objectContaining({ role: 'ADMIN' }),
         expect.objectContaining({ reason: 'Quản trị viên xuất xưởng' })
       );
@@ -172,9 +171,9 @@ describe('ReleaseService Unit Tests', () => {
     });
 
     it('QA ban hành Lệnh giữ Lô (Batch Hold) thành công, cập nhật trạng thái BLOCKED', async () => {
-      const updateStatusSpy = vi
-        .spyOn(batchAppService, 'updateStatus')
-        .mockResolvedValue(undefined);
+      const holdBatchSpy = vi
+        .spyOn(batchAppService, 'holdBatch')
+        .mockResolvedValue({ ...mockBatch, status: 'BLOCKED' });
 
       const res = await service.executeBatchHold({
         batchId: 'batch-01',
@@ -184,18 +183,18 @@ describe('ReleaseService Unit Tests', () => {
       });
 
       expect(res.success).toBe(true);
-      expect(updateStatusSpy).toHaveBeenCalledWith(
+      expect(holdBatchSpy).toHaveBeenCalledWith(
         'batch-01',
-        'BLOCKED',
+        expect.stringContaining('vỡ viên'),
         expect.objectContaining({ role: 'QA' }),
-        expect.objectContaining({ reason: expect.stringContaining('LỆNH GIỮ LÔ') })
+        expect.anything()
       );
     });
 
     it('QA ban hành Lệnh thu hồi Lô (Batch Recall) thành công với cấp độ Class I', async () => {
-      const updateStatusSpy = vi
-        .spyOn(batchAppService, 'updateStatus')
-        .mockResolvedValue(undefined);
+      const recallBatchSpy = vi
+        .spyOn(batchAppService, 'recallBatch')
+        .mockResolvedValue({ ...mockBatch, status: 'BLOCKED' });
 
       const res = await service.executeBatchRecall({
         batchId: 'batch-01',
@@ -206,11 +205,11 @@ describe('ReleaseService Unit Tests', () => {
       });
 
       expect(res.success).toBe(true);
-      expect(updateStatusSpy).toHaveBeenCalledWith(
+      expect(recallBatchSpy).toHaveBeenCalledWith(
         'batch-01',
-        'BLOCKED',
+        expect.stringContaining('[CLASS_I]'),
         expect.objectContaining({ role: 'QA' }),
-        expect.objectContaining({ reason: expect.stringContaining('THU HỒI CLASS_I') })
+        expect.anything()
       );
     });
   });

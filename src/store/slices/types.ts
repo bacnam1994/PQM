@@ -120,6 +120,15 @@ export interface BatchSliceActions {
     rejectReason?: string,
     signature?: ElectronicSignature
   ) => Promise<void>;
+  approveBatchRelease: (
+    id: string,
+    signature: ElectronicSignature,
+    options?: { reason?: string }
+  ) => Promise<Batch>;
+  submitBpr: (id: string, comment?: string) => Promise<Batch>;
+  startBprReview: (id: string, comment?: string) => Promise<Batch>;
+  approveBpr: (id: string, comment?: string) => Promise<Batch>;
+  rejectBpr: (id: string, reason: string) => Promise<Batch>;
   updateBatchProgress: (id: string, progressPercent: number) => Promise<void>;
 }
 

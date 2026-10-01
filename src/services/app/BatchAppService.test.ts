@@ -50,6 +50,13 @@ describe('BatchAppService', () => {
       findByStatus: vi.fn().mockResolvedValue([]),
       updateStatus: vi.fn().mockResolvedValue(undefined),
       updateProgress: vi.fn().mockResolvedValue(undefined),
+      updateBprReview: vi
+        .fn()
+        .mockImplementation(async (_id: string, bprStatus: any, meta: any) => ({
+          ...validBatch,
+          bprReviewStatus: bprStatus,
+          ...meta,
+        })),
     };
     service = new BatchAppService(mockRepo);
   });

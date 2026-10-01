@@ -78,6 +78,7 @@ describe('WorkflowExplainabilityService (Structured Explainability Engine)', () 
         productId: 'PROD-01',
         tccsId: 'TCCS-EXP-01',
         status: 'TESTING',
+        bprReviewStatus: 'APPROVED',
         version: 1,
       } as unknown as Batch;
 

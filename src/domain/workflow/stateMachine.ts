@@ -135,7 +135,7 @@ export class BatchStateMachine {
     TESTING: ['RELEASED', 'REJECTED', 'BLOCKED'],
     BLOCKED: ['TESTING', 'REJECTED'],
     RELEASED: ['BLOCKED'],
-    REJECTED: [], // Trạng thái kết thúc bất biến (Terminal State)
+    REJECTED: ['PENDING'], // Mở lại khi có biên bản giải trình CAPA hợp lệ
   };
 
   /** Danh sách transitions bắt buộc phải tạo ALCOA+ Audit Record */
@@ -145,6 +145,7 @@ export class BatchStateMachine {
       RELEASED: ['BLOCKED'],
       BLOCKED: ['TESTING', 'REJECTED'],
       PENDING: ['REJECTED', 'BLOCKED'],
+      REJECTED: ['PENDING'],
     };
 
   /** Danh sách transitions bắt buộc thẩm quyền QA/ADMIN */
@@ -155,6 +156,7 @@ export class BatchStateMachine {
     TESTING: ['RELEASED', 'REJECTED', 'BLOCKED'],
     BLOCKED: ['TESTING', 'REJECTED'],
     RELEASED: ['BLOCKED'],
+    REJECTED: ['PENDING'],
   };
 
   /**
@@ -287,7 +289,7 @@ export class BatchStateMachine {
           allowed: false,
           reason:
             fromState === 'RELEASED'
-              ? 'Thu hồi lô đã xuất xưởng bắt buộc phải có lý do thu hồi (Recall Reason) rõ ràng.'
+              ? 'Thu hồi lô đã xuất xưởng bắt buộc phải có lý do thu hồi rõ ràng.'
               : 'Tạm đình chỉ / Giữ lô (Batch Hold) bắt buộc phải có lý do giải trình (Hold Reason) rõ ràng.',
         };
       }
@@ -300,6 +302,23 @@ export class BatchStateMachine {
           allowed: false,
           reason:
             'Mở khóa Lô bị chặn (BLOCKED sang TESTING) bắt buộc phải có lý do giải trình hoặc kế hoạch kiểm nghiệm lại (Retest Plan).',
+        };
+      }
+    }
+
+    // Mở lại lô REJECTED bắt buộc phải có lý do thẩm định (CAPA) và thẩm quyền QA/ADMIN
+    if (fromState === 'REJECTED' && toState === 'PENDING') {
+      if (!context?.reason || context.reason.trim().length === 0) {
+        return {
+          allowed: false,
+          reason:
+            'Mở lại Lô đã bị từ chối bắt buộc phải có biên bản giải trình và lý do xét duyệt CAPA.',
+        };
+      }
+      if (!context?.actorRole || !['ADMIN', 'QA'].includes(String(context.actorRole))) {
+        return {
+          allowed: false,
+          reason: 'Mở lại Lô đã bị từ chối bắt buộc phải do QA hoặc ADMIN phê duyệt.',
         };
       }
     }

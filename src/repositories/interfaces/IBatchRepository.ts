@@ -16,4 +16,14 @@ export interface IBatchRepository extends IRepository<Batch> {
     metadata?: Partial<Batch> & { expectedVersion?: number }
   ): Promise<void>;
   updateProgress(batchId: string, progressPercent: number): Promise<void>;
+  updateBprReview(
+    batchId: string,
+    bprReviewStatus: 'DRAFT' | 'SUBMITTED' | 'UNDER_REVIEW' | 'APPROVED' | 'REJECTED',
+    metadata?: {
+      bprReviewedAt?: string;
+      bprReviewedBy?: string;
+      bprReviewComment?: string;
+      expectedVersion?: number;
+    }
+  ): Promise<Batch>;
 }

@@ -184,6 +184,40 @@ export class BatchAppService {
     return this.workflowHandlers.recallBatch(batchId, reason, currentUser, options);
   }
 
+  // --- BPR REVIEW WORKFLOW (GATE 6) ---
+  async submitBpr(
+    batchId: string,
+    currentUser: any,
+    options?: { comment?: string; expectedVersion?: number; idempotencyKey?: string }
+  ): Promise<Batch> {
+    return this.workflowHandlers.submitBpr(batchId, currentUser, options);
+  }
+
+  async startBprReview(
+    batchId: string,
+    currentUser: any,
+    options?: { comment?: string; expectedVersion?: number; idempotencyKey?: string }
+  ): Promise<Batch> {
+    return this.workflowHandlers.startBprReview(batchId, currentUser, options);
+  }
+
+  async approveBpr(
+    batchId: string,
+    currentUser: any,
+    options?: { comment?: string; expectedVersion?: number; idempotencyKey?: string }
+  ): Promise<Batch> {
+    return this.workflowHandlers.approveBpr(batchId, currentUser, options);
+  }
+
+  async rejectBpr(
+    batchId: string,
+    reason: string,
+    currentUser: any,
+    options?: { expectedVersion?: number; idempotencyKey?: string }
+  ): Promise<Batch> {
+    return this.workflowHandlers.rejectBpr(batchId, reason, currentUser, options);
+  }
+
   /**
    * Cập nhật tiến độ kiểm nghiệm lô (%)
    */

@@ -391,11 +391,11 @@ export class BatchReleaseDecisionService {
         gate7Blockers.push(msg);
         blockers.push(msg);
       } else {
-        // a. Document Type check
+        // a. Document Type check (Phase 6: Chỉ chấp nhận BATCH_RELEASE, từ chối BATCH, BATCH_REJECT, TEST_RESULT_APPROVAL, COA_ISSUE)
         const docType = userSignature.documentType;
-        if (docType !== 'BATCH_RELEASE' && (docType as string) !== 'BATCH') {
+        if (docType !== 'BATCH_RELEASE') {
           signaturePassed = false;
-          const msg = `ERR_SIGNATURE_MISMATCH: Loại tài liệu ký '${docType}' không hợp lệ (yêu cầu BATCH_RELEASE hoặc BATCH).`;
+          const msg = `ERR_SIGNATURE_MISMATCH: Loại tài liệu ký '${docType}' không hợp lệ (yêu cầu BATCH_RELEASE). Không chấp nhận chữ ký từ loại tài liệu khác.`;
           gate7Blockers.push(msg);
           blockers.push(msg);
         }
@@ -408,7 +408,19 @@ export class BatchReleaseDecisionService {
           blockers.push(msg);
         }
 
-        // c. Signer identity check
+        // c. Document Version check
+        if (
+          userSignature.documentVersion !== undefined &&
+          batch.version !== undefined &&
+          userSignature.documentVersion !== batch.version
+        ) {
+          signaturePassed = false;
+          const msg = `ERR_SIGNATURE_VERSION_MISMATCH: Phiên bản tài liệu ký (v${userSignature.documentVersion}) không khớp với phiên bản lô (v${batch.version}).`;
+          gate7Blockers.push(msg);
+          blockers.push(msg);
+        }
+
+        // d. Signer identity check
         const signerId = userSignature.signerEmail || userSignature.signerUid;
         if (!signerId || signerId.trim().length === 0) {
           signaturePassed = false;

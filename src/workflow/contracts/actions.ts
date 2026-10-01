@@ -57,6 +57,11 @@ export type WorkflowActionId =
   | 'BATCH_RESUME'
   | 'BATCH_RECALL'
   | 'BATCH_DELETE'
+  // BPR (Hồ sơ sản xuất)
+  | 'BPR_SUBMIT'
+  | 'BPR_START_REVIEW'
+  | 'BPR_APPROVE'
+  | 'BPR_REJECT'
 
   // Test Result
   | 'TEST_RESULT_CREATE'

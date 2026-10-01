@@ -26,6 +26,7 @@ export function useBatchList() {
   const addBatch = useAppStore((s) => s.addBatch);
   const deleteBatch = useAppStore((s) => s.deleteBatch);
   const updateBatchStatus = useAppStore((s) => s.updateBatchStatus);
+  const approveBatchRelease = useAppStore((s) => s.approveBatchRelease);
   const isAdmin = useAppStore((s) => s.isAdmin);
   const notify = useAppStore((s) => s.notify);
   const testResults = useAppStore((s) => s.testResults);
@@ -250,7 +251,7 @@ export function useBatchList() {
   const handleESignatureSuccess = async (signature: ElectronicSignature) => {
     if (!eSignatureTarget) return;
     try {
-      await updateBatchStatus(eSignatureTarget.batchId, 'RELEASED', undefined, signature);
+      await approveBatchRelease(eSignatureTarget.batchId, signature);
       notify({
         type: 'SUCCESS',
         title: 'Xuất xưởng Lô thành công',

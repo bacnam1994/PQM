@@ -20,6 +20,7 @@ import { signatureService } from '../../services/signatureService';
 import { BatchRules } from '../../domain/rules';
 import { BatchReleaseDecisionService } from '../../domain/batch/BatchReleaseDecisionService';
 import { BatchStateMachine } from '../../domain/workflow/stateMachine';
+import { BprStateMachine, BprReviewStatus } from '../../domain/workflow/bprStateMachine';
 import { WorkflowFacade } from '../WorkflowFacade';
 import { WorkflowActor, WorkflowActionId } from '../contracts/actions';
 import { getWorkflowFeatureFlags } from '../contracts/featureFlags';
@@ -249,8 +250,20 @@ export class BatchWorkflowHandlers {
     // 1. Tự động tính toán nextState từ State Machine SSoT (Caller không được ép nextState)
     const calculatedNextState = BatchStateMachine.resolveNextState(actionId, currentStatus);
     if (!calculatedNextState) {
+      const targetState =
+        actionId === 'BATCH_RELEASE_APPROVE'
+          ? 'RELEASED'
+          : actionId === 'BATCH_DISPATCH_TESTING'
+            ? 'TESTING'
+            : actionId === 'BATCH_REJECT'
+              ? 'REJECTED'
+              : actionId === 'BATCH_HOLD' || actionId === 'BATCH_RECALL'
+                ? 'BLOCKED'
+                : actionId === 'BATCH_RESUME'
+                  ? 'TESTING'
+                  : 'khác';
       throw new Error(
-        `State Machine Violation: Hành động ${actionId} không hợp lệ từ trạng thái hiện tại '${currentStatus}'.`
+        `State Machine Violation / Quy chuẩn State Machine: Hành động ${actionId} không hợp lệ từ trạng thái hiện tại '${currentStatus}'. Không thể chuyển từ ${currentStatus} sang ${targetState}.`
       );
     }
 
@@ -577,6 +590,162 @@ export class BatchWorkflowHandlers {
     return this.executeBatchAction(actionId, batchId, currentUser, {
       ...options,
       currentBatch,
+    });
+  }
+
+  /**
+   * CORE BPR ACTION RUNNER: Chuyển trạng thái BPR qua Workflow Kernel
+   */
+  async executeBprAction(
+    actionId: 'BPR_SUBMIT' | 'BPR_START_REVIEW' | 'BPR_APPROVE' | 'BPR_REJECT',
+    batchId: string,
+    currentUser: any,
+    options?: {
+      comment?: string;
+      currentBatch?: Batch;
+      expectedVersion?: number;
+      idempotencyKey?: string;
+    }
+  ): Promise<Batch> {
+    const flags = getWorkflowFeatureFlags();
+    const actor = this.toActor(currentUser);
+
+    let currentBatch = await this.repo.findById(batchId);
+    if (!currentBatch && options?.currentBatch) {
+      currentBatch = options.currentBatch;
+    }
+    if (!currentBatch) {
+      throw new Error(`Không tìm thấy Lô sản xuất với mã: ${batchId}`);
+    }
+
+    // 0. Idempotency Short-Circuit Check
+    if (options?.idempotencyKey) {
+      const cached = WorkflowFacade.getIdempotencyResult<Batch>(options.idempotencyKey);
+      if (cached && cached.success && cached.data) {
+        return cached.data;
+      }
+    }
+
+    // 1. Phân quyền vai trò (Role check)
+    BprStateMachine.verifyRole(actionId, actor.role);
+
+    // 2. Tính toán trạng thái BPR tiếp theo qua BprStateMachine (SSoT)
+    const nextBprStatus = BprStateMachine.resolveNextBprStatus(
+      actionId,
+      currentBatch.bprReviewStatus
+    );
+
+    // 3. Kiểm tra lý do bắt buộc với BPR_REJECT
+    if (actionId === 'BPR_REJECT' && (!options?.comment || !options.comment.trim())) {
+      throw new Error('Quy chuẩn GMP: Yêu cầu nhập lý do từ chối Hồ sơ sản xuất (BPR REJECT).');
+    }
+
+    const now = new Date().toISOString();
+    const newVersion = nextVersion(currentBatch.version ?? 1);
+    const updatedBatch: Batch = {
+      ...currentBatch,
+      bprReviewStatus: nextBprStatus,
+      version: newVersion,
+      updatedAt: now,
+      ...(actionId === 'BPR_APPROVE'
+        ? {
+            bprReviewedAt: now,
+            bprReviewedBy: actor.email || actor.name || actor.id,
+            bprReviewComment: options?.comment || 'QA phê duyệt Hồ sơ sản xuất (BPR đạt chuẩn)',
+          }
+        : {}),
+      ...(actionId === 'BPR_REJECT'
+        ? {
+            bprReviewedAt: now,
+            bprReviewedBy: actor.email || actor.name || actor.id,
+            bprReviewComment: options?.comment,
+          }
+        : {}),
+      ...(actionId === 'BPR_START_REVIEW'
+        ? {
+            bprReviewComment: options?.comment,
+          }
+        : {}),
+    };
+
+    if (!flags.enableBatchWorkflowFacade) {
+      if (typeof this.repo.updateBprReview === 'function') {
+        return await this.repo.updateBprReview(batchId, nextBprStatus, {
+          bprReviewedAt: updatedBatch.bprReviewedAt,
+          bprReviewedBy: updatedBatch.bprReviewedBy,
+          bprReviewComment: updatedBatch.bprReviewComment,
+          expectedVersion: options?.expectedVersion ?? currentBatch.version ?? 1,
+        });
+      }
+      await this.repo.update(updatedBatch);
+      return updatedBatch;
+    }
+
+    const execution = await WorkflowFacade.dispatch<any, Batch>(
+      {
+        actionId,
+        entityType: 'BATCH',
+        entityId: batchId,
+        actor,
+        payload: { ...updatedBatch, currentVersion: currentBatch.version ?? 1 },
+        expectedVersion: options?.expectedVersion ?? currentBatch.version ?? 1,
+        idempotencyKey: options?.idempotencyKey,
+        reason: options?.comment,
+      },
+      async () => {
+        if (typeof this.repo.updateBprReview === 'function') {
+          return await this.repo.updateBprReview(batchId, nextBprStatus, {
+            bprReviewedAt: updatedBatch.bprReviewedAt,
+            bprReviewedBy: updatedBatch.bprReviewedBy,
+            bprReviewComment: updatedBatch.bprReviewComment,
+            expectedVersion: options?.expectedVersion ?? currentBatch.version ?? 1,
+          });
+        }
+        await this.repo.update(updatedBatch);
+        return updatedBatch;
+      }
+    );
+
+    if (!execution.success) {
+      throw new Error(execution.failureReason || 'Lỗi xử lý BPR qua Workflow.');
+    }
+
+    return execution.data!;
+  }
+
+  async submitBpr(
+    batchId: string,
+    currentUser: any,
+    options?: { comment?: string; expectedVersion?: number; idempotencyKey?: string }
+  ): Promise<Batch> {
+    return this.executeBprAction('BPR_SUBMIT', batchId, currentUser, options);
+  }
+
+  async startBprReview(
+    batchId: string,
+    currentUser: any,
+    options?: { comment?: string; expectedVersion?: number; idempotencyKey?: string }
+  ): Promise<Batch> {
+    return this.executeBprAction('BPR_START_REVIEW', batchId, currentUser, options);
+  }
+
+  async approveBpr(
+    batchId: string,
+    currentUser: any,
+    options?: { comment?: string; expectedVersion?: number; idempotencyKey?: string }
+  ): Promise<Batch> {
+    return this.executeBprAction('BPR_APPROVE', batchId, currentUser, options);
+  }
+
+  async rejectBpr(
+    batchId: string,
+    reason: string,
+    currentUser: any,
+    options?: { expectedVersion?: number; idempotencyKey?: string }
+  ): Promise<Batch> {
+    return this.executeBprAction('BPR_REJECT', batchId, currentUser, {
+      ...options,
+      comment: reason,
     });
   }
 

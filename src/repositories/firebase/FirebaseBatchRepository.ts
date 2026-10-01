@@ -217,6 +217,106 @@ export class FirebaseBatchRepository
     await update(ref(db, targetPath), updates);
   }
 
+  async updateBprReview(
+    batchId: string,
+    bprReviewStatus: 'DRAFT' | 'SUBMITTED' | 'UNDER_REVIEW' | 'APPROVED' | 'REJECTED',
+    metadata?: {
+      bprReviewedAt?: string;
+      bprReviewedBy?: string;
+      bprReviewComment?: string;
+      expectedVersion?: number;
+    }
+  ): Promise<Batch> {
+    if (!batchId) throw new Error('Yêu cầu ID lô sản xuất');
+    const batchRef = ref(db, `${this.collectionPath}/${batchId}`);
+    const now = new Date().toISOString();
+    let updatedBatchResult: Batch | null = null;
+
+    try {
+      const txResult = await runTransaction(batchRef, (currentBatch) => {
+        if (!currentBatch) return currentBatch;
+
+        const currentVersion = currentBatch.version ?? 1;
+        if (
+          metadata?.expectedVersion !== undefined &&
+          currentVersion !== metadata.expectedVersion
+        ) {
+          return;
+        }
+
+        const newVersion = currentVersion + 1;
+        const updatedBatch: Record<string, any> = {
+          ...currentBatch,
+          bprReviewStatus,
+          version: newVersion,
+          updatedAt: now,
+        };
+
+        if (metadata?.bprReviewedAt) updatedBatch.bprReviewedAt = metadata.bprReviewedAt;
+        if (metadata?.bprReviewedBy) updatedBatch.bprReviewedBy = metadata.bprReviewedBy;
+        if (metadata?.bprReviewComment !== undefined) {
+          updatedBatch.bprReviewComment = metadata.bprReviewComment;
+        }
+
+        updatedBatchResult = updatedBatch as Batch;
+        return updatedBatch;
+      });
+
+      if (!txResult || !txResult.committed) {
+        throw new Error(
+          `CONCURRENCY_CONFLICT: Xung đột phiên bản cập nhật BPR Lô (${batchId}). Dữ liệu đã bị thay đổi bởi tác vụ khác.`
+        );
+      }
+
+      return updatedBatchResult!;
+    } catch (err: any) {
+      if (err.message && err.message.includes('CONCURRENCY_CONFLICT')) {
+        throw err;
+      }
+      const isExplicitMockEnv =
+        (typeof process !== 'undefined' &&
+          (process.env?.NODE_ENV === 'test' || Boolean(process.env?.VITEST))) ||
+        (typeof window !== 'undefined' &&
+          Boolean((window as any).__PQM_TEST_MOCK_NO_TRANSACTION__));
+
+      const isTransactionUnsupported =
+        typeof runTransaction !== 'function' ||
+        (err?.message &&
+          (err.message.includes('not a function') || err.message.includes('not implemented')));
+
+      if (!isExplicitMockEnv || !isTransactionUnsupported) {
+        throw err;
+      }
+
+      const snapshot = await get(batchRef);
+      if (snapshot && typeof snapshot.exists === 'function' && snapshot.exists()) {
+        const currentBatch = snapshot.val();
+        const currentVersion = currentBatch?.version ?? 1;
+        if (
+          metadata?.expectedVersion !== undefined &&
+          currentVersion !== metadata.expectedVersion
+        ) {
+          throw new Error(`CONCURRENCY_CONFLICT: Xung đột phiên bản cập nhật BPR Lô (${batchId}).`);
+        }
+        const newVersion = currentVersion + 1;
+        const updatedBatch: Batch = {
+          ...currentBatch,
+          bprReviewStatus,
+          version: newVersion,
+          updatedAt: now,
+          ...(metadata?.bprReviewedAt ? { bprReviewedAt: metadata.bprReviewedAt } : {}),
+          ...(metadata?.bprReviewedBy ? { bprReviewedBy: metadata.bprReviewedBy } : {}),
+          ...(metadata?.bprReviewComment !== undefined
+            ? { bprReviewComment: metadata.bprReviewComment }
+            : {}),
+        };
+        await update(batchRef, updatedBatch);
+        return updatedBatch;
+      }
+      throw new Error(`MOCK_TRANSACTION_FAILED: Không tìm thấy snapshot cho Lô (${batchId}).`);
+    }
+  }
+
   async delete(id: string): Promise<void> {
     if (!id) throw new Error('Yêu cầu ID lô sản xuất để xóa.');
     await deleteBatchService(id);

@@ -18,6 +18,8 @@ import {
   ChartBarSquareIcon,
   PencilSquareIcon,
   LockClosedIcon,
+  ExclamationCircleIcon,
+  EyeIcon,
 } from '@heroicons/react/24/outline';
 import { useDataGraph } from '../../hooks/useDataGraph';
 import { useAppStore } from '../../store/useAppStore';
@@ -55,6 +57,11 @@ const BatchDetailPage = () => {
   const tccsList = useAppStore((state) => state.tccsList);
   const productFormulas = useAppStore((state) => (state as any).productFormulas || []);
   const updateBatchStatus = useAppStore((state) => state.updateBatchStatus);
+  const approveBatchRelease = useAppStore((state) => state.approveBatchRelease);
+  const submitBpr = useAppStore((state) => state.submitBpr);
+  const startBprReview = useAppStore((state) => state.startBprReview);
+  const approveBpr = useAppStore((state) => state.approveBpr);
+  const rejectBpr = useAppStore((state) => state.rejectBpr);
   const notify = useAppStore((state) => state.notify);
   const role = useAppStore((state) => state.role);
   const isAdmin = useAppStore((state) => state.isAdmin);
@@ -75,6 +82,12 @@ const BatchDetailPage = () => {
     batchId: string;
   } | null>(null);
   const [statusReason, setStatusReason] = useState('');
+  const [isBprDetailModalOpen, setIsBprDetailModalOpen] = useState(false);
+  const [isBprApproveModalOpen, setIsBprApproveModalOpen] = useState(false);
+  const [bprApproveComment, setBprApproveComment] = useState('');
+  const [isBprRejectModalOpen, setIsBprRejectModalOpen] = useState(false);
+  const [bprRejectReason, setBprRejectReason] = useState('');
+  const [isBprSubmitting, setIsBprSubmitting] = useState(false);
   const { data: batchDeviations = [] } = useDeviationsByBatchQuery(id);
 
   const batch = useMemo(() => batches.find((b) => b.id === id), [batches, id]);
@@ -92,14 +105,34 @@ const BatchDetailPage = () => {
     });
   }, [batch, viewBatchResults, batchDeviations, role]);
 
+  const gates1to6Pass = useMemo(() => {
+    if (!releaseDecision) return false;
+    return releaseDecision.gates.filter((g) => g.gateIndex <= 6).every((g) => g.passed);
+  }, [releaseDecision]);
+
   const handleOpenSignRelease = () => {
     if (!batch || !releaseDecision) return;
 
-    if (!releaseDecision.eligible) {
+    // Phase 3: Gate 1-6 PASS + User có quyền QA/ADMIN -> Cho phép mở ESignatureModal
+    if (!gates1to6Pass) {
+      const firstBlocker =
+        releaseDecision.gates
+          .filter((g) => g.gateIndex <= 6 && !g.passed)
+          .flatMap((g) => g.blockers)[0] ||
+        'Cần hoàn thành Cổng 1 đến Cổng 6 (đặc biệt: Hồ sơ sản xuất BPR phải được QA phê duyệt) trước khi ký xuất xưởng.';
       notify({
         type: 'ERROR',
         title: 'Quy chuẩn GMP & Release Guard',
-        message: releaseDecision.blockers[0] || 'Lô chưa đủ điều kiện xuất xưởng.',
+        message: firstBlocker,
+      });
+      return;
+    }
+
+    if (!canSignRelease) {
+      notify({
+        type: 'ERROR',
+        title: 'Từ chối quyền hạn',
+        message: 'Chỉ vai trò QA hoặc Quản trị viên (ADMIN) mới có thẩm quyền ký duyệt xuất xưởng.',
       });
       return;
     }
@@ -110,11 +143,32 @@ const BatchDetailPage = () => {
   const handleSignReleaseSuccess = async (signature: ElectronicSignature) => {
     if (!batch) return;
     try {
-      await updateBatchStatus(batch.id, 'RELEASED', undefined, signature);
+      // Phase 5: Re-evaluate 7 Gates với chữ ký thật
+      const reEvaluatedDecision = BatchReleaseDecisionService.resolveBatchReleaseDecision({
+        batch,
+        testResults: viewBatchResults,
+        deviations: batchDeviations,
+        userRole: role,
+        userSignature: signature,
+        boundTccs: (batch as any)?.tccs,
+      });
+
+      if (!reEvaluatedDecision.eligible) {
+        notify({
+          type: 'ERROR',
+          title: 'Release Guard: Chữ ký chưa đủ điều kiện',
+          message:
+            reEvaluatedDecision.blockers[0] || 'Lô chưa thỏa mãn 7 Cổng kiểm soát xuất xưởng.',
+        });
+        return;
+      }
+
+      // Phase 8: Chỉ gọi approveBatchRelease với BATCH_RELEASE_APPROVE
+      await approveBatchRelease(batch.id, signature);
       notify({
         type: 'SUCCESS',
         title: 'Xuất xưởng Lô thành công',
-        message: `Đã phê duyệt xuất xưởng Lô ${batch.batchNo} với chữ ký điện tử hợp lệ (FDA 21 CFR Part 11).`,
+        message: `Đã phê duyệt xuất xưởng Lô ${batch.batchNo} với chữ ký điện tử hợp lệ (FDA 21 CFR Part 11 - 7/7 Gates PASSED).`,
       });
     } catch (error: any) {
       console.error('Lỗi xuất xưởng Lô:', error);
@@ -123,6 +177,103 @@ const BatchDetailPage = () => {
         title: 'Lỗi xuất xưởng',
         message: error.message || 'Không thể xuất xưởng Lô',
       });
+    }
+  };
+
+  // --- BPR REVIEW HANDLERS (PHASE 1 & 2) ---
+  const handleSubmitBpr = async () => {
+    if (!batch) return;
+    setIsBprSubmitting(true);
+    try {
+      await submitBpr(batch.id);
+      notify({
+        type: 'SUCCESS',
+        title: 'Nộp hồ sơ BPR thành công',
+        message: `Hồ sơ sản xuất Lô ${batch.batchNo} đã chuyển sang SUBMITTED (chờ QA thẩm tra).`,
+      });
+    } catch (err: any) {
+      notify({
+        type: 'ERROR',
+        title: 'Lỗi nộp hồ sơ BPR',
+        message: err.message || 'Không thể nộp hồ sơ BPR.',
+      });
+    } finally {
+      setIsBprSubmitting(false);
+    }
+  };
+
+  const handleStartBprReview = async () => {
+    if (!batch) return;
+    setIsBprSubmitting(true);
+    try {
+      await startBprReview(batch.id);
+      notify({
+        type: 'SUCCESS',
+        title: 'Bắt đầu thẩm định BPR',
+        message: `Hồ sơ sản xuất Lô ${batch.batchNo} đã chuyển sang UNDER_REVIEW (QA đang thẩm định).`,
+      });
+    } catch (err: any) {
+      notify({
+        type: 'ERROR',
+        title: 'Lỗi bắt đầu thẩm định BPR',
+        message: err.message || 'Không thể bắt đầu thẩm tra BPR.',
+      });
+    } finally {
+      setIsBprSubmitting(false);
+    }
+  };
+
+  const handleConfirmApproveBpr = async () => {
+    if (!batch) return;
+    setIsBprSubmitting(true);
+    try {
+      await approveBpr(batch.id, bprApproveComment.trim() || undefined);
+      notify({
+        type: 'SUCCESS',
+        title: 'Phê duyệt BPR thành công',
+        message: `Hồ sơ sản xuất Lô ${batch.batchNo} đã được QA phê duyệt đạt chuẩn (APPROVED). Gate 6 đã PASS!`,
+      });
+      setIsBprApproveModalOpen(false);
+      setBprApproveComment('');
+    } catch (err: any) {
+      notify({
+        type: 'ERROR',
+        title: 'Lỗi phê duyệt BPR',
+        message: err.message || 'Không thể phê duyệt BPR.',
+      });
+    } finally {
+      setIsBprSubmitting(false);
+    }
+  };
+
+  const handleConfirmRejectBpr = async () => {
+    if (!batch) return;
+    if (!bprRejectReason.trim()) {
+      notify({
+        type: 'ERROR',
+        title: 'Thiếu lý do từ chối',
+        message: 'Quy chuẩn GMP: Vui lòng nhập lý do từ chối hồ sơ sản xuất BPR.',
+      });
+      return;
+    }
+    setIsBprSubmitting(true);
+    try {
+      await rejectBpr(batch.id, bprRejectReason.trim());
+      notify({
+        type: 'SUCCESS',
+        title: 'Đã từ chối BPR',
+        message: `Hồ sơ sản xuất Lô ${batch.batchNo} đã bị từ chối (REJECTED).`,
+      });
+      setIsBprRejectModalOpen(false);
+      setBprRejectReason('');
+    } catch (err: any) {
+      notify({
+        type: 'ERROR',
+        title: 'Lỗi từ chối BPR',
+        message: err.message || 'Không thể từ chối BPR.',
+      });
+    } finally {
+      setIsBprSubmitting(false);
     }
   };
 
@@ -587,47 +738,289 @@ const BatchDetailPage = () => {
               )}
 
               {/* Danh sách 7 Gates */}
-              <div className="space-y-1.5 pt-1">
+              <div className="space-y-2 pt-1">
                 {releaseDecision.gates.map((g) => (
                   <div
                     key={g.gateIndex}
-                    className={`p-2 rounded-lg border text-xs flex items-start gap-2.5 transition-colors ${
+                    className={`p-2.5 rounded-lg border text-xs flex flex-col gap-1.5 transition-colors ${
                       g.passed
                         ? 'bg-surface-2/40 border-border'
                         : 'bg-rose-500/5 border-rose-500/20 text-rose-900 dark:text-rose-200'
                     }`}
                   >
-                    <div className="mt-0.5 shrink-0">
-                      {g.passed ? (
-                        <CheckCircleIcon className="h-3.5 w-3.5 text-emerald-600" />
-                      ) : (
-                        <XMarkIcon className="h-3.5 w-3.5 text-rose-600" />
-                      )}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between gap-1">
-                        <span className="font-medium text-[11px] truncate text-ink">
-                          {g.gateIndex}. {g.gateName}
-                        </span>
-                        <span
-                          className={`text-[9px] font-bold px-1.5 py-0.2 rounded shrink-0 ${
-                            g.passed
-                              ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400'
-                              : 'bg-rose-500/10 text-rose-700 dark:text-rose-400'
-                          }`}
-                        >
-                          {g.status}
-                        </span>
+                    <div className="flex items-start gap-2.5">
+                      <div className="mt-0.5 shrink-0">
+                        {g.passed ? (
+                          <CheckCircleIcon className="h-3.5 w-3.5 text-emerald-600" />
+                        ) : (
+                          <XMarkIcon className="h-3.5 w-3.5 text-rose-600" />
+                        )}
                       </div>
-                      <p className="text-[10px] text-ink-muted truncate mt-0.5">{g.details}</p>
-                      {g.blockers.length > 0 && (
-                        <p className="text-[10px] text-rose-600 dark:text-rose-400 font-medium mt-0.5">
-                          {g.blockers[0]}
-                        </p>
-                      )}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between gap-1">
+                          <span className="font-semibold text-[11px] truncate text-ink">
+                            {g.gateIndex}. {g.gateName}
+                          </span>
+                          <span
+                            className={`text-[9px] font-bold px-1.5 py-0.2 rounded shrink-0 ${
+                              g.passed
+                                ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400'
+                                : 'bg-rose-500/10 text-rose-700 dark:text-rose-400'
+                            }`}
+                          >
+                            {g.status}
+                          </span>
+                        </div>
+                        <p className="text-[10px] text-ink-muted mt-0.5">{g.details}</p>
+                        {g.blockers.length > 0 && (
+                          <p className="text-[10px] text-rose-600 dark:text-rose-400 font-medium mt-0.5">
+                            {g.blockers[0]}
+                          </p>
+                        )}
+                      </div>
                     </div>
+
+                    {/* GATE 6 ACTIONS (Phase 2) */}
+                    {g.gateIndex === 6 && (
+                      <div className="pt-1.5 border-t border-border/60 flex items-center justify-between flex-wrap gap-1.5 pl-6">
+                        <div className="flex items-center gap-1.5 text-[10px]">
+                          <span className="text-ink-muted">BPR:</span>
+                          <span
+                            className={`font-bold px-1.5 py-0.2 rounded text-[9px] ${
+                              batch.bprReviewStatus === 'APPROVED'
+                                ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+                                : batch.bprReviewStatus === 'UNDER_REVIEW'
+                                  ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400'
+                                  : batch.bprReviewStatus === 'REJECTED'
+                                    ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400'
+                                    : 'bg-surface-2 text-ink-muted border border-border'
+                            }`}
+                          >
+                            {batch.bprReviewStatus || 'DRAFT'}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-1 flex-wrap">
+                          <button
+                            type="button"
+                            onClick={() => setIsBprDetailModalOpen(true)}
+                            className="px-2 py-0.5 bg-surface text-ink-soft hover:bg-surface-2 border border-border rounded text-[10px] font-medium transition-colors cursor-pointer"
+                          >
+                            Mở hồ sơ BPR
+                          </button>
+
+                          {!g.passed && (
+                            <>
+                              {(!batch.bprReviewStatus || batch.bprReviewStatus === 'DRAFT') && (
+                                <>
+                                  <button
+                                    type="button"
+                                    onClick={handleSubmitBpr}
+                                    disabled={isBprSubmitting}
+                                    className="px-2 py-0.5 bg-surface-2 hover:bg-surface-3 text-ink font-medium rounded text-[10px] transition-colors border border-border cursor-pointer"
+                                  >
+                                    Nộp BPR
+                                  </button>
+                                  {canSignRelease && (
+                                    <button
+                                      type="button"
+                                      onClick={handleStartBprReview}
+                                      disabled={isBprSubmitting}
+                                      className="px-2 py-0.5 bg-amber-600 hover:bg-amber-700 text-white font-medium rounded text-[10px] transition-colors cursor-pointer"
+                                    >
+                                      Bắt đầu thẩm định
+                                    </button>
+                                  )}
+                                </>
+                              )}
+
+                              {batch.bprReviewStatus === 'SUBMITTED' && (
+                                <>
+                                  {canSignRelease ? (
+                                    <button
+                                      type="button"
+                                      onClick={handleStartBprReview}
+                                      disabled={isBprSubmitting}
+                                      className="px-2 py-0.5 bg-amber-600 hover:bg-amber-700 text-white font-medium rounded text-[10px] transition-colors cursor-pointer"
+                                    >
+                                      Bắt đầu thẩm định
+                                    </button>
+                                  ) : (
+                                    <span className="text-[10px] text-ink-muted italic">
+                                      Chờ QA thẩm định
+                                    </span>
+                                  )}
+                                </>
+                              )}
+
+                              {batch.bprReviewStatus === 'UNDER_REVIEW' && (
+                                <>
+                                  {canSignRelease ? (
+                                    <>
+                                      <button
+                                        type="button"
+                                        onClick={() => setIsBprApproveModalOpen(true)}
+                                        disabled={isBprSubmitting}
+                                        className="px-2 py-0.5 bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded text-[10px] transition-colors cursor-pointer"
+                                      >
+                                        Phê duyệt BPR
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => setIsBprRejectModalOpen(true)}
+                                        disabled={isBprSubmitting}
+                                        className="px-2 py-0.5 bg-rose-600 hover:bg-rose-700 text-white font-medium rounded text-[10px] transition-colors cursor-pointer"
+                                      >
+                                        Từ chối BPR
+                                      </button>
+                                    </>
+                                  ) : (
+                                    <span className="text-[10px] text-ink-muted italic">
+                                      QA đang thẩm định
+                                    </span>
+                                  )}
+                                </>
+                              )}
+
+                              {batch.bprReviewStatus === 'REJECTED' && (
+                                <button
+                                  type="button"
+                                  onClick={handleSubmitBpr}
+                                  disabled={isBprSubmitting}
+                                  className="px-2 py-0.5 bg-surface-2 hover:bg-surface-3 text-ink font-medium rounded text-[10px] transition-colors border border-border cursor-pointer"
+                                >
+                                  Nộp lại BPR
+                                </button>
+                              )}
+                            </>
+                          )}
+
+                          {g.passed && batch.bprReviewedBy && (
+                            <span className="text-[9px] text-emerald-600 dark:text-emerald-400">
+                              ✓ QA duyệt: {batch.bprReviewedBy}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* GATE 7 ACTIONS (Phase 3 & 4) */}
+                    {g.gateIndex === 7 && !g.passed && (
+                      <div className="pt-1.5 border-t border-border/60 flex items-center justify-between flex-wrap gap-1.5 pl-6">
+                        {gates1to6Pass ? (
+                          canSignRelease ? (
+                            <button
+                              type="button"
+                              onClick={handleOpenSignRelease}
+                              className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded text-[10px] transition-colors cursor-pointer flex items-center gap-1 shadow-xs"
+                            >
+                              <ShieldCheckIcon className="h-3.5 w-3.5" /> Ký duyệt xuất xưởng
+                            </button>
+                          ) : (
+                            <span className="text-[10px] text-rose-600 dark:text-rose-400 font-semibold">
+                              Cần quyền QA hoặc Quản trị viên để ký duyệt
+                            </span>
+                          )
+                        ) : (
+                          <span className="text-[10px] text-ink-muted italic">
+                            (Yêu cầu hoàn tất Cổng 1-6 trước khi ký xuất xưởng)
+                          </span>
+                        )}
+                      </div>
+                    )}
                   </div>
                 ))}
+              </div>
+
+              {/* Action Projection Panel: Hướng dẫn & Nút hành động trực tiếp (Phase 7) */}
+              <div className="pt-3 border-t border-border mt-3 space-y-2">
+                {releaseDecision.eligible ? (
+                  <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-800 dark:text-emerald-300 text-xs font-semibold flex items-center justify-between">
+                    <span className="flex items-center gap-1.5">
+                      <CheckCircleIcon className="h-4 w-4 text-emerald-600" /> 7/7 Cổng đạt chuẩn
+                      GMP
+                    </span>
+                    {canSignRelease && batch.status !== 'RELEASED' && (
+                      <button
+                        type="button"
+                        onClick={handleOpenSignRelease}
+                        className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white rounded-lg text-xs font-bold cursor-pointer transition-colors shadow-xs flex items-center gap-1"
+                      >
+                        <ShieldCheckIcon className="h-4 w-4" /> Phê duyệt xuất xưởng
+                      </button>
+                    )}
+                  </div>
+                ) : gates1to6Pass &&
+                  !releaseDecision.gates.find((x) => x.gateIndex === 7)?.passed ? (
+                  <div className="p-2.5 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-900 dark:text-blue-200 text-xs flex items-center justify-between gap-2">
+                    <div>
+                      <p className="font-bold flex items-center gap-1 text-blue-700 dark:text-blue-300">
+                        <CheckCircleIcon className="h-3.5 w-3.5 text-blue-600" /> Cổng 1-6 đã ĐẠT
+                      </p>
+                      <p className="text-[11px] text-blue-700/80 dark:text-blue-300/80 mt-0.5">
+                        Chờ QA/Admin ký số 21 CFR Part 11 để hoàn tất Gate 7.
+                      </p>
+                    </div>
+                    {canSignRelease ? (
+                      <button
+                        type="button"
+                        onClick={handleOpenSignRelease}
+                        className="shrink-0 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white rounded-lg text-xs font-bold cursor-pointer transition-colors shadow-xs flex items-center gap-1"
+                      >
+                        <ShieldCheckIcon className="h-4 w-4" /> Ký duyệt xuất xưởng
+                      </button>
+                    ) : (
+                      <span className="shrink-0 text-[10px] font-bold px-2 py-1 bg-surface-2 border border-border text-ink-muted rounded-lg">
+                        Không đủ thẩm quyền
+                      </span>
+                    )}
+                  </div>
+                ) : !releaseDecision.gates.find((x) => x.gateIndex === 6)?.passed ? (
+                  <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-900 dark:text-amber-200 text-xs flex items-center justify-between gap-2">
+                    <div>
+                      <p className="font-bold text-amber-800 dark:text-amber-300 flex items-center gap-1">
+                        <ExclamationTriangleIcon className="h-3.5 w-3.5 text-amber-600" /> BPR chưa
+                        được QA duyệt (Cổng 6)
+                      </p>
+                      <p className="text-[11px] text-amber-700 dark:text-amber-400 mt-0.5">
+                        Trạng thái: <strong>{batch.bprReviewStatus || 'DRAFT'}</strong>
+                      </p>
+                    </div>
+                    {canSignRelease && (
+                      <div className="shrink-0 flex items-center gap-1">
+                        {(!batch.bprReviewStatus ||
+                          batch.bprReviewStatus === 'DRAFT' ||
+                          batch.bprReviewStatus === 'SUBMITTED') && (
+                          <button
+                            type="button"
+                            onClick={handleStartBprReview}
+                            disabled={isBprSubmitting}
+                            className="px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-medium cursor-pointer shadow-xs"
+                          >
+                            Bắt đầu thẩm định
+                          </button>
+                        )}
+                        {batch.bprReviewStatus === 'UNDER_REVIEW' && (
+                          <button
+                            type="button"
+                            onClick={() => setIsBprApproveModalOpen(true)}
+                            disabled={isBprSubmitting}
+                            className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-medium cursor-pointer shadow-xs"
+                          >
+                            Phê duyệt BPR
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="p-2.5 rounded-xl bg-surface-2/60 border border-border text-ink-muted text-xs flex items-center gap-2">
+                    <ExclamationCircleIcon className="h-4 w-4 text-ink-muted shrink-0" />
+                    <span>
+                      Cần hoàn tất chỉ tiêu kiểm nghiệm và khắc phục các sai lệch tồn đọng.
+                    </span>
+                  </div>
+                )}
               </div>
             </Surface>
           )}
@@ -908,6 +1301,208 @@ const BatchDetailPage = () => {
         }
         confirmText="Đồng ý"
         icon={ShieldCheckIcon}
+      />
+
+      {/* Modal Xem Hồ Sơ Sản Xuất BPR (Phase 2) */}
+      {isBprDetailModalOpen && batch && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="relative w-full max-w-2xl bg-surface rounded-2xl shadow-2xl border border-border overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="px-6 py-4 bg-surface-2 border-b border-border flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-blue-500/10 text-blue-600 dark:text-blue-400 rounded-xl">
+                  <DocumentTextIcon className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-base leading-tight text-ink">
+                    Hồ Sơ Sản Xuất Lô (BPR - Batch Production Record)
+                  </h3>
+                  <p className="text-xs text-ink-muted mt-0.5">
+                    Số lô: {batch.batchNo} | Mã: {batch.id}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsBprDetailModalOpen(false)}
+                className="p-1 rounded-lg text-ink-muted hover:text-ink hover:bg-surface-3 transition-colors cursor-pointer"
+              >
+                <XMarkIcon className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4 max-h-[75vh] overflow-y-auto">
+              {/* Thông tin chung */}
+              <div className="grid grid-cols-2 gap-4 text-xs">
+                <div className="p-3 bg-surface-2 rounded-xl border border-border space-y-1">
+                  <span className="text-ink-muted font-medium block">Sản phẩm:</span>
+                  <span className="font-bold text-ink text-sm block">
+                    {batch.product?.name || 'Chưa liên kết'}
+                  </span>
+                  <span className="text-[11px] font-mono text-emerald-600">
+                    {batch.product?.code}
+                  </span>
+                </div>
+                <div className="p-3 bg-surface-2 rounded-xl border border-border space-y-1">
+                  <span className="text-ink-muted font-medium block">
+                    Trạng thái thẩm định BPR:
+                  </span>
+                  <span
+                    className={`inline-block font-bold px-2 py-0.5 rounded-full text-xs ${
+                      batch.bprReviewStatus === 'APPROVED'
+                        ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20'
+                        : batch.bprReviewStatus === 'UNDER_REVIEW'
+                          ? 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20'
+                          : batch.bprReviewStatus === 'REJECTED'
+                            ? 'bg-rose-500/10 text-rose-700 dark:text-rose-400 border border-rose-500/20'
+                            : 'bg-surface-3 text-ink-muted border border-border'
+                    }`}
+                  >
+                    {batch.bprReviewStatus || 'DRAFT'}
+                  </span>
+                </div>
+                <div className="p-3 bg-surface-2 rounded-xl border border-border space-y-1">
+                  <span className="text-ink-muted font-medium block">Ngày sản xuất:</span>
+                  <span className="font-semibold text-ink">
+                    {formatDateStandard(batch.mfgDate)}
+                  </span>
+                </div>
+                <div className="p-3 bg-surface-2 rounded-xl border border-border space-y-1">
+                  <span className="text-ink-muted font-medium block">Hạn dùng:</span>
+                  <span className="font-semibold text-rose-600 dark:text-rose-400">
+                    {formatDateStandard(batch.expDate)}
+                  </span>
+                </div>
+                <div className="p-3 bg-surface-2 rounded-xl border border-border space-y-1">
+                  <span className="text-ink-muted font-medium block">Sản lượng lý thuyết:</span>
+                  <span className="font-semibold text-ink">
+                    {batch.theoreticalYield != null
+                      ? `${batch.theoreticalYield} ${batch.yieldUnit || ''}`
+                      : 'N/A'}
+                  </span>
+                </div>
+                <div className="p-3 bg-surface-2 rounded-xl border border-border space-y-1">
+                  <span className="text-ink-muted font-medium block">Sản lượng thực tế:</span>
+                  <span className="font-semibold text-emerald-600">
+                    {batch.actualYield != null
+                      ? `${batch.actualYield} ${batch.yieldUnit || ''}`
+                      : 'N/A'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Lịch sử thẩm tra BPR */}
+              <div className="p-3 bg-surface-2 rounded-xl border border-border text-xs space-y-2">
+                <h4 className="font-bold text-ink flex items-center gap-1.5">
+                  <ShieldCheckIcon className="w-4 h-4 text-emerald-600" /> Thông tin thẩm tra BPR
+                  (Gate 6)
+                </h4>
+                {batch.bprReviewedBy ? (
+                  <div className="space-y-1 text-ink-soft">
+                    <p>
+                      • Người thẩm tra: <strong>{batch.bprReviewedBy}</strong>
+                    </p>
+                    <p>
+                      • Thời điểm thẩm tra:{' '}
+                      <strong>{formatDateStandard(batch.bprReviewedAt)}</strong>
+                    </p>
+                    {batch.bprReviewComment && (
+                      <p>
+                        • Nhận xét: <em>"{batch.bprReviewComment}"</em>
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-ink-muted italic">
+                    Hồ sơ chưa hoàn tất quy trình thẩm tra của QA.
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <div className="px-6 py-3 bg-surface-2 border-t border-border flex items-center justify-between">
+              <span className="text-xs text-ink-muted">
+                Quy chuẩn GMP-WHO Annex 11 & FDA 21 CFR Part 11
+              </span>
+              <button
+                type="button"
+                onClick={() => setIsBprDetailModalOpen(false)}
+                className="px-4 py-2 bg-surface hover:bg-surface-3 text-ink text-xs font-semibold rounded-xl border border-border transition-colors cursor-pointer"
+              >
+                Đóng
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Phê duyệt BPR (Phase 1 & 2) */}
+      <ConfirmationModal
+        isOpen={isBprApproveModalOpen}
+        onClose={() => {
+          setIsBprApproveModalOpen(false);
+          setBprApproveComment('');
+        }}
+        onConfirm={handleConfirmApproveBpr}
+        title="Xác nhận Phê duyệt Hồ sơ sản xuất (BPR)"
+        message={
+          <div className="space-y-3">
+            <p className="text-ink text-sm">
+              Bạn đang thực hiện <strong>Phê duyệt BPR (Gate 6)</strong> cho Lô sản xuất{' '}
+              <strong className="text-emerald-600">{batch?.batchNo}</strong>.
+            </p>
+            <p className="text-xs text-ink-muted leading-relaxed">
+              Hành động này xác nhận hồ sơ sản xuất, định lượng nguyên liệu, và điều kiện vận hành
+              lô đã đạt chuẩn GMP.
+            </p>
+            <div>
+              <label className="text-xs font-semibold text-ink-muted block mb-1">
+                Ghi chú / Nhận xét thẩm định QA:
+              </label>
+              <textarea
+                className="w-full border border-border rounded-lg p-3 text-xs bg-surface-2 text-ink focus:ring-2 focus:ring-emerald-500 outline-none"
+                placeholder="Nhập nhận xét phê duyệt hồ sơ lô (ví dụ: Đã kiểm tra đầy đủ tem nhãn, cân chia nguyên liệu đạt chuẩn)..."
+                value={bprApproveComment}
+                onChange={(e) => setBprApproveComment(e.target.value)}
+                rows={3}
+              />
+            </div>
+          </div>
+        }
+        confirmText="Phê duyệt BPR"
+        icon={ShieldCheckIcon}
+      />
+
+      {/* Modal Từ chối BPR (Phase 1 & 2) */}
+      <ConfirmationModal
+        isOpen={isBprRejectModalOpen}
+        onClose={() => {
+          setIsBprRejectModalOpen(false);
+          setBprRejectReason('');
+        }}
+        onConfirm={handleConfirmRejectBpr}
+        title="Từ chối Hồ sơ sản xuất (BPR REJECT)"
+        message={
+          <div className="space-y-3">
+            <p className="text-ink text-sm">
+              Bạn có chắc chắn muốn <strong>từ chối BPR</strong> của Lô{' '}
+              <strong className="text-rose-600">{batch?.batchNo}</strong> không?
+            </p>
+            <div>
+              <label className="text-xs font-semibold text-rose-600 block mb-1">
+                Lý do từ chối (Bắt buộc theo GMP) *:
+              </label>
+              <textarea
+                className="w-full border border-rose-300 dark:border-rose-900 rounded-lg p-3 text-xs bg-surface-2 text-ink focus:ring-2 focus:ring-rose-500 outline-none"
+                placeholder="Nêu rõ lý do sai lệch trong hồ sơ sản xuất dẫn đến từ chối BPR..."
+                value={bprRejectReason}
+                onChange={(e) => setBprRejectReason(e.target.value)}
+                rows={3}
+              />
+            </div>
+          </div>
+        }
+        confirmText="Xác nhận từ chối BPR"
+        icon={ShieldExclamationIcon}
       />
     </div>
   );
