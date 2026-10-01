@@ -131,13 +131,11 @@ export class ReleaseService {
       }
     }
 
-    // 4. Chuyển trạng thái Lô sang RELEASED thông qua BatchAppService
-    await batchAppService.updateStatus(batchId, 'RELEASED', currentUser, {
+    // 4. Chuyển trạng thái Lô sang RELEASED thông qua BatchAppService approveRelease
+    await batchAppService.approveRelease(batchId, currentUser, {
       reason: reason || 'Phê duyệt xuất xưởng đạt chuẩn 7 Release Gates',
-      currentBatch,
       batchTestResults: testResults,
       signature,
-      requireSignature: !isAdmin,
     });
 
     logAuditAction({
@@ -188,9 +186,7 @@ export class ReleaseService {
       }
     }
 
-    await batchAppService.updateStatus(batchId, 'BLOCKED', currentUser, {
-      reason: `[LỆNH GIỮ LÔ] ${reason}`,
-      currentBatch,
+    await batchAppService.holdBatch(batchId, reason, currentUser, {
       signature,
     });
 
@@ -243,9 +239,7 @@ export class ReleaseService {
       }
     }
 
-    await batchAppService.updateStatus(batchId, 'BLOCKED', currentUser, {
-      reason: `[THU HỒI ${recallClass}] ${reason}`,
-      currentBatch,
+    await batchAppService.recallBatch(batchId, `[${recallClass}] ${reason}`, currentUser, {
       signature,
     });
 

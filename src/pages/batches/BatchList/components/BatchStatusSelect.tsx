@@ -10,6 +10,7 @@ import {
 import { StatusBadge, BatchTestingQABadge } from '../../../../components';
 import { Batch, TestResult, TCCS } from '../../../../types';
 import { useAppStore } from '../../../../store/useAppStore';
+import { BatchStateMachine } from '../../../../domain/workflow/stateMachine';
 
 interface BatchStatusSelectProps {
   status: string;
@@ -66,7 +67,12 @@ export const BatchStatusSelect: React.FC<BatchStatusSelectProps> = ({
   const IconComponent = getStatusIcon(status);
   const iconColor = status === 'PENDING' ? 'text-ink-muted' : 'text-current';
 
-  if (!isAdmin) {
+  const availableActions = BatchStateMachine.getAvailableWorkflowActions(
+    status as any,
+    isAdmin ? 'ADMIN' : 'QA'
+  );
+
+  if (!isAdmin || availableActions.length === 0) {
     return (
       <div className="inline-flex items-center gap-1.5 flex-wrap">
         <StatusBadge type="BATCH" status={status} />
@@ -76,6 +82,19 @@ export const BatchStatusSelect: React.FC<BatchStatusSelectProps> = ({
       </div>
     );
   }
+
+  const currentLabel =
+    status === 'PENDING'
+      ? 'Chờ kiểm'
+      : status === 'TESTING'
+        ? 'Đang kiểm'
+        : status === 'RELEASED'
+          ? 'Đã xuất xưởng'
+          : status === 'REJECTED'
+            ? 'Từ chối'
+            : status === 'BLOCKED'
+              ? 'Tạm khóa'
+              : status;
 
   return (
     <div className="inline-flex items-center gap-1.5 flex-wrap">
@@ -87,24 +106,21 @@ export const BatchStatusSelect: React.FC<BatchStatusSelectProps> = ({
         </div>
         <select
           value={status}
-          onChange={(e) => onUpdate(e.target.value, batchId)}
+          onChange={(e) => {
+            if (e.target.value !== status) {
+              onUpdate(e.target.value, batchId);
+            }
+          }}
           className={`appearance-none pl-6 pr-5 py-1 rounded-full text-xs font-medium border cursor-pointer outline-none focus:ring-2 focus:ring-emerald-500/20 transition-colors ${getStatusColor(status)}`}
         >
-          <option value="PENDING" className="bg-surface text-ink">
-            Chờ kiểm
+          <option value={status} disabled className="bg-surface text-ink font-semibold">
+            {currentLabel} (Hiện tại)
           </option>
-          <option value="TESTING" className="bg-surface text-ink">
-            Đang kiểm
-          </option>
-          <option value="RELEASED" className="bg-surface text-ink">
-            Phê duyệt
-          </option>
-          <option value="REJECTED" className="bg-surface text-ink">
-            Từ chối
-          </option>
-          <option value="BLOCKED" className="bg-surface text-ink">
-            Khóa lô
-          </option>
+          {availableActions.map((act) => (
+            <option key={act.actionId} value={act.to} className="bg-surface text-ink">
+              ➔ {act.label}
+            </option>
+          ))}
         </select>
         <div
           className={`absolute right-1.5 top-1/2 -translate-y-1/2 pointer-events-none opacity-50 group-hover/select:opacity-100 transition-opacity ${iconColor}`}

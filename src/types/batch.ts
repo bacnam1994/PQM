@@ -37,6 +37,17 @@ export interface Batch {
   releasedAt?: string;
   releasedBy?: string;
   rejectReason?: string;
+  rejectedBy?: string;
+  rejectedAt?: string;
+  recalledAt?: string;
+  recalledBy?: string;
+  recallReason?: string;
+  heldAt?: string;
+  heldBy?: string;
+  holdReason?: string;
+  resumedAt?: string;
+  resumedBy?: string;
+  resumeReason?: string;
   progressPercent?: number;
   version?: number;
   tccsSnapshot?: TCCS;

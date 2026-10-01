@@ -46,21 +46,96 @@ export interface WorkflowHistoryEntry<TState> {
 // ============================================================
 // 10a. BatchStateMachine
 // ============================================================
+export interface BatchWorkflowTransitionDef {
+  actionId:
+    | 'BATCH_DISPATCH_TESTING'
+    | 'BATCH_RELEASE_APPROVE'
+    | 'BATCH_REJECT'
+    | 'BATCH_HOLD'
+    | 'BATCH_RESUME'
+    | 'BATCH_RECALL';
+  from: BatchStatus[];
+  to: BatchStatus;
+  label: string;
+  requiresReason?: boolean;
+  requiresQAAdmin?: boolean;
+}
+
 export class BatchStateMachine {
   /**
-   * Bảng ánh xạ chuyển đổi hợp lệ cho Lô sản xuất (Batch State Transitions)
-   * PENDING → TESTING | REJECTED
-   * TESTING → RELEASED | REJECTED | BLOCKED
-   * BLOCKED → TESTING | REJECTED (Thu hồi/Recall rồi tái thẩm định)
-   * RELEASED → BLOCKED (Thu hồi: chỉ chuyển sang BLOCKED, không về PENDING)
-   * REJECTED → PENDING (Mở lại với CAPA bắt buộc)
+   * BẢNG MAPPING DUY NHẤT: WORKFLOW ACTIONS -> CANONICAL TRANSITIONS (SSoT)
+   */
+  public static readonly WORKFLOW_TRANSITIONS: Record<
+    | 'BATCH_DISPATCH_TESTING'
+    | 'BATCH_RELEASE_APPROVE'
+    | 'BATCH_REJECT'
+    | 'BATCH_HOLD'
+    | 'BATCH_RESUME'
+    | 'BATCH_RECALL',
+    BatchWorkflowTransitionDef
+  > = {
+    BATCH_DISPATCH_TESTING: {
+      actionId: 'BATCH_DISPATCH_TESTING',
+      from: ['PENDING'],
+      to: 'TESTING',
+      label: 'Bắt đầu kiểm nghiệm',
+      requiresQAAdmin: false,
+    },
+    BATCH_RELEASE_APPROVE: {
+      actionId: 'BATCH_RELEASE_APPROVE',
+      from: ['TESTING'],
+      to: 'RELEASED',
+      label: 'Phê duyệt xuất xưởng',
+      requiresQAAdmin: true,
+    },
+    BATCH_REJECT: {
+      actionId: 'BATCH_REJECT',
+      from: ['PENDING', 'TESTING', 'BLOCKED'],
+      to: 'REJECTED',
+      label: 'Từ chối lô',
+      requiresReason: true,
+      requiresQAAdmin: true,
+    },
+    BATCH_HOLD: {
+      actionId: 'BATCH_HOLD',
+      from: ['PENDING', 'TESTING'],
+      to: 'BLOCKED',
+      label: 'Tạm đình chỉ (Hold)',
+      requiresReason: true,
+      requiresQAAdmin: true,
+    },
+    BATCH_RESUME: {
+      actionId: 'BATCH_RESUME',
+      from: ['BLOCKED'],
+      to: 'TESTING',
+      label: 'Tiếp tục kiểm nghiệm (Resume)',
+      requiresReason: true,
+      requiresQAAdmin: true,
+    },
+    BATCH_RECALL: {
+      actionId: 'BATCH_RECALL',
+      from: ['RELEASED'],
+      to: 'BLOCKED',
+      label: 'Thu hồi lô (Recall)',
+      requiresReason: true,
+      requiresQAAdmin: true,
+    },
+  };
+
+  /**
+   * Bảng ánh xạ chuyển đổi hợp lệ cho Lô sản xuất (Batch State Transitions SSoT)
+   * PENDING  → TESTING | REJECTED | BLOCKED
+   * TESTING  → RELEASED | REJECTED | BLOCKED
+   * BLOCKED  → TESTING | REJECTED
+   * RELEASED → BLOCKED (chỉ qua BATCH_RECALL)
+   * REJECTED → [] (Terminal state)
    */
   private static readonly VALID_TRANSITIONS: Record<BatchStatus, BatchStatus[]> = {
-    PENDING: ['TESTING', 'REJECTED'],
+    PENDING: ['TESTING', 'REJECTED', 'BLOCKED'],
     TESTING: ['RELEASED', 'REJECTED', 'BLOCKED'],
     BLOCKED: ['TESTING', 'REJECTED'],
     RELEASED: ['BLOCKED'],
-    REJECTED: ['PENDING'],
+    REJECTED: [], // Trạng thái kết thúc bất biến (Terminal State)
   };
 
   /** Danh sách transitions bắt buộc phải tạo ALCOA+ Audit Record */
@@ -68,19 +143,18 @@ export class BatchStateMachine {
     {
       TESTING: ['RELEASED', 'REJECTED'],
       RELEASED: ['BLOCKED'],
-      BLOCKED: ['REJECTED'],
-      REJECTED: ['PENDING'],
+      BLOCKED: ['TESTING', 'REJECTED'],
+      PENDING: ['REJECTED', 'BLOCKED'],
     };
 
   /** Danh sách transitions bắt buộc thẩm quyền QA/ADMIN */
   private static readonly QA_ADMIN_REQUIRED_TRANSITIONS: Partial<
     Record<BatchStatus, BatchStatus[]>
   > = {
-    PENDING: ['REJECTED'],
+    PENDING: ['REJECTED', 'BLOCKED'],
     TESTING: ['RELEASED', 'REJECTED', 'BLOCKED'],
     BLOCKED: ['TESTING', 'REJECTED'],
     RELEASED: ['BLOCKED'],
-    REJECTED: ['PENDING'],
   };
 
   /**
@@ -89,6 +163,47 @@ export class BatchStateMachine {
    */
   public static getValidNextStates(fromState: BatchStatus, _actorRole?: string): BatchStatus[] {
     return this.VALID_TRANSITIONS[fromState] || [];
+  }
+
+  /**
+   * Tính toán nextState dựa trên actionId và currentState (Caller KHÔNG tự quyết định nextState)
+   */
+  public static resolveNextState(
+    actionId:
+      | 'BATCH_DISPATCH_TESTING'
+      | 'BATCH_RELEASE_APPROVE'
+      | 'BATCH_REJECT'
+      | 'BATCH_HOLD'
+      | 'BATCH_RESUME'
+      | 'BATCH_RECALL'
+      | string,
+    currentState: BatchStatus
+  ): BatchStatus | null {
+    const transitionDef = (this.WORKFLOW_TRANSITIONS as any)[actionId] as
+      | BatchWorkflowTransitionDef
+      | undefined;
+    if (!transitionDef) {
+      return null;
+    }
+    if (!transitionDef.from.includes(currentState)) {
+      return null;
+    }
+    return transitionDef.to;
+  }
+
+  /**
+   * Lấy danh sách các Workflow Action hợp lệ tại trạng thái hiện tại cho người dùng (UI Projection SSoT)
+   */
+  public static getAvailableWorkflowActions(
+    currentState: BatchStatus,
+    actorRole?: string
+  ): BatchWorkflowTransitionDef[] {
+    const isQAAdmin = actorRole === 'ADMIN' || actorRole === 'QA';
+    return Object.values(this.WORKFLOW_TRANSITIONS).filter((def) => {
+      if (!def.from.includes(currentState)) return false;
+      if (def.requiresQAAdmin && !isQAAdmin) return false;
+      return true;
+    });
   }
 
   /**
@@ -165,26 +280,15 @@ export class BatchStateMachine {
       }
     }
 
-    // Bắt buộc lý do đối với các hành động BLOCK lô (TESTING -> BLOCKED, RELEASED -> BLOCKED)
+    // Bắt buộc lý do đối với các hành động BLOCK lô (PENDING -> BLOCKED, TESTING -> BLOCKED, RELEASED -> BLOCKED)
     if (toState === 'BLOCKED' && context !== undefined) {
       if (!context?.reason || context.reason.trim().length === 0) {
         return {
           allowed: false,
           reason:
             fromState === 'RELEASED'
-              ? 'Thu hồi lô đã xuất xưởng bắt buộc phải có lý do thu hồi rõ ràng.'
-              : 'Khóa (Block) lô sản xuất bắt buộc phải có lý do giải trình.',
-        };
-      }
-    }
-
-    // Mở lại lô REJECTED bắt buộc phải có lý do thẩm định (CAPA)
-    if (fromState === 'REJECTED' && toState === 'PENDING' && context !== undefined) {
-      if (!context?.reason || context.reason.trim().length === 0) {
-        return {
-          allowed: false,
-          reason:
-            'Mở lại Lô đã bị từ chối bắt buộc phải có biên bản giải trình và lý do xét duyệt CAPA.',
+              ? 'Thu hồi lô đã xuất xưởng bắt buộc phải có lý do thu hồi (Recall Reason) rõ ràng.'
+              : 'Tạm đình chỉ / Giữ lô (Batch Hold) bắt buộc phải có lý do giải trình (Hold Reason) rõ ràng.',
         };
       }
     }

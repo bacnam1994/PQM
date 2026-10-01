@@ -54,6 +54,7 @@ export type WorkflowActionId =
   | 'BATCH_RELEASE_APPROVE'
   | 'BATCH_REJECT'
   | 'BATCH_HOLD'
+  | 'BATCH_RESUME'
   | 'BATCH_RECALL'
   | 'BATCH_DELETE'
 

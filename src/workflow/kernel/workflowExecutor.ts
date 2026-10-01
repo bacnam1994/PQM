@@ -36,6 +36,14 @@ export class UnifiedWorkflowExecutor {
    */
   private static idempotencyCache: Map<string, WorkflowExecutionResult> = new Map();
 
+  public static clearIdempotencyCache(): void {
+    this.idempotencyCache.clear();
+  }
+
+  public static getIdempotencyResult<T = any>(key: string): WorkflowExecutionResult<T> | undefined {
+    return this.idempotencyCache.get(key) as WorkflowExecutionResult<T> | undefined;
+  }
+
   /**
    * Thực thi một Workflow Action có kiểm soát qua 12 bước quy chuẩn.
    *

@@ -60,6 +60,10 @@ export class BatchAppService {
    * Cập nhật trạng thái Lô sản xuất qua Workflow State Machine & Release Guard
    * Luôn thực hiện Fresh DB Read (WF-018), không phụ thuộc vào cache client
    */
+  /**
+   * Cập nhật trạng thái Lô sản xuất qua Workflow State Machine & Release Guard
+   * Luôn thực hiện Fresh DB Read (WF-018), không phụ thuộc vào cache client
+   */
   async updateStatus(
     batchId: string,
     status: Batch['status'],
@@ -70,6 +74,8 @@ export class BatchAppService {
       batchTestResults?: TestResult[];
       signature?: ElectronicSignature;
       requireSignature?: boolean;
+      expectedVersion?: number;
+      idempotencyKey?: string;
     }
   ): Promise<void> {
     let currentBatch = await this.repo.findById(batchId);
@@ -101,6 +107,81 @@ export class BatchAppService {
       ...options,
       currentBatch,
     });
+  }
+
+  async dispatchTesting(
+    batchId: string,
+    currentUser: any,
+    options?: { expectedVersion?: number; idempotencyKey?: string }
+  ): Promise<Batch> {
+    return this.workflowHandlers.dispatchTesting(batchId, currentUser, options);
+  }
+
+  async approveRelease(
+    batchId: string,
+    currentUser: any,
+    options?: {
+      reason?: string;
+      batchTestResults?: TestResult[];
+      signature?: ElectronicSignature;
+      expectedVersion?: number;
+      idempotencyKey?: string;
+    }
+  ): Promise<Batch> {
+    return this.workflowHandlers.approveRelease(batchId, currentUser, options);
+  }
+
+  async rejectBatch(
+    batchId: string,
+    reason: string,
+    currentUser: any,
+    options?: {
+      signature?: ElectronicSignature;
+      requireSignature?: boolean;
+      expectedVersion?: number;
+      idempotencyKey?: string;
+    }
+  ): Promise<Batch> {
+    return this.workflowHandlers.rejectBatch(batchId, reason, currentUser, options);
+  }
+
+  async holdBatch(
+    batchId: string,
+    reason: string,
+    currentUser: any,
+    options?: {
+      signature?: ElectronicSignature;
+      expectedVersion?: number;
+      idempotencyKey?: string;
+    }
+  ): Promise<Batch> {
+    return this.workflowHandlers.holdBatch(batchId, reason, currentUser, options);
+  }
+
+  async resumeBatch(
+    batchId: string,
+    reason: string,
+    currentUser: any,
+    options?: {
+      expectedVersion?: number;
+      idempotencyKey?: string;
+    }
+  ): Promise<Batch> {
+    return this.workflowHandlers.resumeBatch(batchId, reason, currentUser, options);
+  }
+
+  async recallBatch(
+    batchId: string,
+    reason: string,
+    currentUser: any,
+    options?: {
+      signature?: ElectronicSignature;
+      requireSignature?: boolean;
+      expectedVersion?: number;
+      idempotencyKey?: string;
+    }
+  ): Promise<Batch> {
+    return this.workflowHandlers.recallBatch(batchId, reason, currentUser, options);
   }
 
   /**

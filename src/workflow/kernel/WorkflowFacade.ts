@@ -76,4 +76,12 @@ export class WorkflowFacade {
   ): WorkflowActionMetadata | undefined {
     return CANONICAL_ACTION_REGISTRY[actionId as WorkflowActionId];
   }
+
+  public static clearIdempotencyCache(): void {
+    UnifiedWorkflowExecutor.clearIdempotencyCache();
+  }
+
+  public static getIdempotencyResult<T = any>(key: string): WorkflowExecutionResult<T> | undefined {
+    return UnifiedWorkflowExecutor.getIdempotencyResult<T>(key);
+  }
 }

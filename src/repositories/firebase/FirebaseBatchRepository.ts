@@ -83,6 +83,25 @@ export class FirebaseBatchRepository
         } else if (status === 'REJECTED') {
           updatedBatch.rejectReason =
             reason || metadata?.rejectReason || currentBatch.rejectReason || null;
+          updatedBatch.rejectedAt = metadata?.rejectedAt || now;
+          updatedBatch.rejectedBy = metadata?.rejectedBy || 'QA/Admin';
+        } else if (status === 'BLOCKED') {
+          if (currentBatch.status === 'RELEASED') {
+            updatedBatch.recallReason =
+              reason || metadata?.recallReason || currentBatch.recallReason || null;
+            updatedBatch.recalledAt = metadata?.recalledAt || now;
+            updatedBatch.recalledBy = metadata?.recalledBy || 'QA/Admin';
+          } else {
+            updatedBatch.holdReason =
+              reason || metadata?.holdReason || currentBatch.holdReason || null;
+            updatedBatch.heldAt = metadata?.heldAt || now;
+            updatedBatch.heldBy = metadata?.heldBy || 'QA/Admin';
+          }
+        } else if (status === 'TESTING' && currentBatch.status === 'BLOCKED') {
+          updatedBatch.resumeReason =
+            reason || metadata?.resumeReason || currentBatch.resumeReason || null;
+          updatedBatch.resumedAt = metadata?.resumedAt || now;
+          updatedBatch.resumedBy = metadata?.resumedBy || 'QA/Admin';
         }
 
         if (metadata) {
@@ -148,9 +167,38 @@ export class FirebaseBatchRepository
           ...(status === 'REJECTED'
             ? {
                 rejectReason: reason || metadata?.rejectReason || currentBatch.rejectReason || null,
+                rejectedAt: metadata?.rejectedAt || now,
+                rejectedBy: metadata?.rejectedBy || 'QA/Admin',
+              }
+            : {}),
+          ...(status === 'BLOCKED'
+            ? currentBatch.status === 'RELEASED'
+              ? {
+                  recallReason:
+                    reason || metadata?.recallReason || currentBatch.recallReason || null,
+                  recalledAt: metadata?.recalledAt || now,
+                  recalledBy: metadata?.recalledBy || 'QA/Admin',
+                }
+              : {
+                  holdReason: reason || metadata?.holdReason || currentBatch.holdReason || null,
+                  heldAt: metadata?.heldAt || now,
+                  heldBy: metadata?.heldBy || 'QA/Admin',
+                }
+            : {}),
+          ...(status === 'TESTING' && currentBatch.status === 'BLOCKED'
+            ? {
+                resumeReason: reason || metadata?.resumeReason || currentBatch.resumeReason || null,
+                resumedAt: metadata?.resumedAt || now,
+                resumedBy: metadata?.resumedBy || 'QA/Admin',
               }
             : {}),
         };
+        if (metadata) {
+          const { expectedVersion: _, ...rest } = metadata;
+          Object.assign(updates, rest);
+          updates.status = status;
+          updates.version = newVersion;
+        }
         await update(batchRef, updates);
         return;
       }

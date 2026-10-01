@@ -87,6 +87,17 @@ export const CANONICAL_ACTION_REGISTRY: Record<WorkflowActionId, WorkflowActionM
     requiresReason: true,
     targetFsm: 'BatchStateMachine',
   },
+  BATCH_RESUME: {
+    actionId: 'BATCH_RESUME',
+    entityType: 'BATCH',
+    category: 'GOVERNANCE',
+    description: 'Phục hồi Lô sản xuất bị tạm giữ quay lại trạng thái kiểm nghiệm (TESTING)',
+    allowedRoles: ['ADMIN', 'QA'],
+    risk: 'MEDIUM',
+    requiresAudit: true,
+    requiresReason: true,
+    targetFsm: 'BatchStateMachine',
+  },
   BATCH_RECALL: {
     actionId: 'BATCH_RECALL',
     entityType: 'BATCH',

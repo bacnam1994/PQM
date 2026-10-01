@@ -207,11 +207,13 @@ export class BatchWorkflowHandlers {
   }
 
   /**
-   * Chuyển trạng thái Lô sản xuất qua Workflow Kernel
+   * CORE ACTION RUNNER: Chuyển trạng thái Lô sản xuất qua Workflow Kernel
+   * Caller KHÔNG tự quyết định nextState!
+   * nextState = BatchStateMachine.resolveNextState(actionId, currentBatch.status)
    */
-  async handleStatusTransition(
+  async executeBatchAction(
+    actionId: WorkflowActionId,
     batchId: string,
-    status: Batch['status'],
     currentUser: any,
     options?: {
       reason?: string;
@@ -220,6 +222,7 @@ export class BatchWorkflowHandlers {
       signature?: ElectronicSignature;
       requireSignature?: boolean;
       expectedVersion?: number;
+      idempotencyKey?: string;
     }
   ): Promise<Batch> {
     const flags = getWorkflowFeatureFlags();
@@ -233,22 +236,48 @@ export class BatchWorkflowHandlers {
       throw new Error(`Không tìm thấy Lô sản xuất với mã: ${batchId}`);
     }
 
-    // Rào chắn lý do giải trình
-    const isActorAdmin = currentUser?.role === 'ADMIN' || currentUser?.isAdmin === true;
-    let effectiveReason = options?.reason;
-    if (isActorAdmin && (!effectiveReason || !effectiveReason.trim())) {
-      effectiveReason = `Quản trị viên (ADMIN) điều chỉnh trạng thái Lô sang ${status}.`;
-    }
-
-    if (status === 'REJECTED') {
-      if (!effectiveReason || !effectiveReason.trim()) {
-        throw new Error('Từ chối (Reject) lô sản xuất bắt buộc phải có lý do giải trình rõ ràng.');
+    // 0. Idempotency Short-Circuit Check
+    if (options?.idempotencyKey) {
+      const cached = WorkflowFacade.getIdempotencyResult<Batch>(options.idempotencyKey);
+      if (cached && cached.success && cached.data) {
+        return cached.data;
       }
     }
 
-    // 1. Rào chắn State Machine FSM - Topology & User Permissions (Không dùng cờ bypass conditionsMet)
     const currentStatus = currentBatch.status || 'PENDING';
-    const transitionCheck = BatchStateMachine.canTransition(currentStatus, status, {
+
+    // 1. Tự động tính toán nextState từ State Machine SSoT (Caller không được ép nextState)
+    const calculatedNextState = BatchStateMachine.resolveNextState(actionId, currentStatus);
+    if (!calculatedNextState) {
+      throw new Error(
+        `State Machine Violation: Hành động ${actionId} không hợp lệ từ trạng thái hiện tại '${currentStatus}'.`
+      );
+    }
+
+    // 2. Rào chắn lý do giải trình & Phân tách ngữ nghĩa
+    const isActorAdmin = currentUser?.role === 'ADMIN' || currentUser?.isAdmin === true;
+    let effectiveReason = options?.reason;
+    if (isActorAdmin && (!effectiveReason || !effectiveReason.trim())) {
+      effectiveReason = `Quản trị viên (ADMIN) thực hiện hành động ${actionId} cho Lô.`;
+    }
+
+    if (actionId === 'BATCH_REJECT' && (!effectiveReason || !effectiveReason.trim())) {
+      throw new Error('Từ chối (Reject) lô sản xuất bắt buộc phải có lý do giải trình rõ ràng.');
+    }
+    if (actionId === 'BATCH_HOLD' && (!effectiveReason || !effectiveReason.trim())) {
+      throw new Error('Tạm đình chỉ / Giữ lô (Hold) bắt buộc phải có lý do giải trình rõ ràng.');
+    }
+    if (actionId === 'BATCH_RESUME' && (!effectiveReason || !effectiveReason.trim())) {
+      throw new Error(
+        'Mở lại kiểm nghiệm (Resume) bắt buộc phải có kế hoạch kiểm tra hoặc lý do giải trình.'
+      );
+    }
+    if (actionId === 'BATCH_RECALL' && (!effectiveReason || !effectiveReason.trim())) {
+      throw new Error('Thu hồi lô (Recall) bắt buộc phải có lý do thu hồi rõ ràng.');
+    }
+
+    // 3. Topology & Perms check từ BatchStateMachine
+    const transitionCheck = BatchStateMachine.canTransition(currentStatus, calculatedNextState, {
       actorRole: currentUser?.role,
       actorId: currentUser?.uid,
       reason: effectiveReason,
@@ -257,9 +286,9 @@ export class BatchWorkflowHandlers {
       throw new Error(`Quy chuẩn State Machine: ${transitionCheck.reason}`);
     }
 
-    // 2. Tính toán Canonical Release Decision nếu chuyển sang RELEASED (SSoT Gate Check)
+    // 4. Release Decision bắt buộc đối với BATCH_RELEASE_APPROVE
     let releaseDecision: any = undefined;
-    if (status === 'RELEASED') {
+    if (actionId === 'BATCH_RELEASE_APPROVE') {
       let freshTestResults: TestResult[] = options?.batchTestResults || [];
       if (this.repo && typeof (this.repo as any).findTestResultsByBatchId === 'function') {
         freshTestResults = await (this.repo as any).findTestResultsByBatchId(batchId);
@@ -281,20 +310,16 @@ export class BatchWorkflowHandlers {
       }
     }
 
-    // 3. Rào chắn Chữ ký số 21 CFR Part 11 đối với REJECTED
-    if (status === 'REJECTED') {
+    // 5. Chữ ký số 21 CFR Part 11 đối với BATCH_REJECT & BATCH_RECALL
+    if (actionId === 'BATCH_REJECT' || actionId === 'BATCH_RECALL') {
       if (options?.requireSignature || options?.signature) {
         if (!options?.signature) {
           throw new Error(
-            'Quy định 21 CFR Part 11: Yêu cầu chữ ký điện tử hợp lệ của QA/Admin trước khi từ chối Lô.'
+            `Quy định 21 CFR Part 11: Yêu cầu chữ ký điện tử hợp lệ của QA/Admin trước khi thực hiện ${actionId}.`
           );
         }
-        if (
-          (options.signature.documentType !== 'BATCH_REJECT' &&
-            (options.signature.documentType as string) !== 'BATCH') ||
-          options.signature.documentId !== batchId
-        ) {
-          throw new Error('Chữ ký điện tử không khớp với Lô sản xuất đang từ chối.');
+        if (options.signature.documentId !== batchId) {
+          throw new Error('Chữ ký điện tử không khớp với Lô sản xuất đang thao tác.');
         }
         const isValid = await signatureService.verifySignatureIntegrity(options.signature);
         if (!isValid) {
@@ -304,41 +329,75 @@ export class BatchWorkflowHandlers {
     }
 
     const newVersion = nextVersion(currentBatch.version ?? 1);
+    const now = new Date().toISOString();
     const cleanBatch: Batch = {
       ...currentBatch,
-      status,
+      status: calculatedNextState,
       version: newVersion,
-      updatedAt: new Date().toISOString(),
-      ...(status === 'RELEASED'
+      updatedAt: now,
+      ...(actionId === 'BATCH_RELEASE_APPROVE'
         ? {
-            releasedAt: new Date().toISOString(),
+            releasedAt: now,
             releasedBy: currentUser?.email || 'unknown',
             releaseDecisionSnapshot: releaseDecision,
           }
         : {}),
-      ...(status === 'REJECTED' ? { rejectReason: effectiveReason } : {}),
+      ...(actionId === 'BATCH_REJECT'
+        ? {
+            rejectReason: effectiveReason,
+            rejectedAt: now,
+            rejectedBy: currentUser?.email || 'unknown',
+          }
+        : {}),
+      ...(actionId === 'BATCH_HOLD'
+        ? {
+            holdReason: effectiveReason,
+            heldAt: now,
+            heldBy: currentUser?.email || 'unknown',
+          }
+        : {}),
+      ...(actionId === 'BATCH_RESUME'
+        ? {
+            resumeReason: effectiveReason,
+            resumedAt: now,
+            resumedBy: currentUser?.email || 'unknown',
+          }
+        : {}),
+      ...(actionId === 'BATCH_RECALL'
+        ? {
+            recallReason: effectiveReason,
+            recalledAt: now,
+            recalledBy: currentUser?.email || 'unknown',
+          }
+        : {}),
+    };
+
+    const repoMetadata: Partial<Batch> & { expectedVersion?: number } = {
+      expectedVersion: options?.expectedVersion ?? currentBatch.version ?? 1,
+      releasedAt: cleanBatch.releasedAt,
+      releasedBy: cleanBatch.releasedBy,
+      rejectReason: cleanBatch.rejectReason,
+      rejectedAt: cleanBatch.rejectedAt,
+      rejectedBy: cleanBatch.rejectedBy,
+      holdReason: cleanBatch.holdReason,
+      heldAt: cleanBatch.heldAt,
+      heldBy: cleanBatch.heldBy,
+      resumeReason: cleanBatch.resumeReason,
+      resumedAt: cleanBatch.resumedAt,
+      resumedBy: cleanBatch.resumedBy,
+      recallReason: cleanBatch.recallReason,
+      recalledAt: cleanBatch.recalledAt,
+      recalledBy: cleanBatch.recalledBy,
+      releaseDecisionSnapshot: cleanBatch.releaseDecisionSnapshot,
     };
 
     if (!flags.enableBatchWorkflowFacade) {
       if (typeof this.repo.updateStatus === 'function') {
-        await this.repo.updateStatus(batchId, status, effectiveReason, {
-          expectedVersion: options?.expectedVersion ?? currentBatch.version ?? 1,
-          releasedAt: cleanBatch.releasedAt,
-          releasedBy: cleanBatch.releasedBy,
-          rejectReason: cleanBatch.rejectReason,
-          releaseDecisionSnapshot: status === 'RELEASED' ? releaseDecision : undefined,
-        });
+        await this.repo.updateStatus(batchId, calculatedNextState, effectiveReason, repoMetadata);
       } else {
         await this.repo.update(cleanBatch);
       }
       return cleanBatch;
-    }
-
-    let actionId: WorkflowActionId = 'BATCH_DISPATCH_TESTING';
-    if (status === 'RELEASED') actionId = 'BATCH_RELEASE_APPROVE';
-    else if (status === 'REJECTED') actionId = 'BATCH_REJECT';
-    else if (status === 'BLOCKED') {
-      actionId = currentStatus === 'RELEASED' ? 'BATCH_RECALL' : 'BATCH_HOLD';
     }
 
     const execution = await WorkflowFacade.dispatch(
@@ -352,23 +411,18 @@ export class BatchWorkflowHandlers {
         signature: options?.signature,
         expectedVersion: options?.expectedVersion ?? currentBatch.version,
         currentState: currentStatus,
+        idempotencyKey: options?.idempotencyKey,
       },
       async () => {
         if (typeof this.repo.updateStatus === 'function') {
-          await this.repo.updateStatus(batchId, status, effectiveReason, {
-            expectedVersion: options?.expectedVersion ?? currentBatch.version ?? 1,
-            releasedAt: cleanBatch.releasedAt,
-            releasedBy: cleanBatch.releasedBy,
-            rejectReason: cleanBatch.rejectReason,
-            releaseDecisionSnapshot: status === 'RELEASED' ? releaseDecision : undefined,
-          });
+          await this.repo.updateStatus(batchId, calculatedNextState, effectiveReason, repoMetadata);
         } else {
           await this.repo.update(cleanBatch);
         }
         return cleanBatch;
       },
       undefined,
-      () => ({ nextState: status })
+      () => ({ nextState: calculatedNextState })
     );
 
     if (!execution.success) {
@@ -376,11 +430,154 @@ export class BatchWorkflowHandlers {
       throw new Error(
         execution.failureReason
           ? `${prefix}${execution.failureReason}`
-          : `Lỗi chuyển trạng thái Lô sang ${status} qua Workflow.`
+          : `Lỗi chuyển trạng thái Lô sang ${calculatedNextState} qua Workflow.`
       );
     }
 
     return execution.data!;
+  }
+
+  /**
+   * Intent API 1: Dispatch Testing
+   */
+  async dispatchTesting(
+    batchId: string,
+    currentUser: any,
+    options?: { expectedVersion?: number; idempotencyKey?: string }
+  ): Promise<Batch> {
+    return this.executeBatchAction('BATCH_DISPATCH_TESTING', batchId, currentUser, options);
+  }
+
+  /**
+   * Intent API 2: Approve Release
+   */
+  async approveRelease(
+    batchId: string,
+    currentUser: any,
+    options?: {
+      reason?: string;
+      batchTestResults?: TestResult[];
+      signature?: ElectronicSignature;
+      expectedVersion?: number;
+      idempotencyKey?: string;
+    }
+  ): Promise<Batch> {
+    return this.executeBatchAction('BATCH_RELEASE_APPROVE', batchId, currentUser, options);
+  }
+
+  /**
+   * Intent API 3: Reject Batch
+   */
+  async rejectBatch(
+    batchId: string,
+    reason: string,
+    currentUser: any,
+    options?: {
+      signature?: ElectronicSignature;
+      requireSignature?: boolean;
+      expectedVersion?: number;
+      idempotencyKey?: string;
+    }
+  ): Promise<Batch> {
+    return this.executeBatchAction('BATCH_REJECT', batchId, currentUser, {
+      ...options,
+      reason,
+    });
+  }
+
+  /**
+   * Intent API 4: Hold Batch
+   */
+  async holdBatch(
+    batchId: string,
+    reason: string,
+    currentUser: any,
+    options?: {
+      signature?: ElectronicSignature;
+      expectedVersion?: number;
+      idempotencyKey?: string;
+    }
+  ): Promise<Batch> {
+    return this.executeBatchAction('BATCH_HOLD', batchId, currentUser, {
+      ...options,
+      reason,
+    });
+  }
+
+  /**
+   * Intent API 5: Resume Batch
+   */
+  async resumeBatch(
+    batchId: string,
+    reason: string,
+    currentUser: any,
+    options?: {
+      expectedVersion?: number;
+      idempotencyKey?: string;
+    }
+  ): Promise<Batch> {
+    return this.executeBatchAction('BATCH_RESUME', batchId, currentUser, {
+      ...options,
+      reason,
+    });
+  }
+
+  /**
+   * Intent API 6: Recall Batch
+   */
+  async recallBatch(
+    batchId: string,
+    reason: string,
+    currentUser: any,
+    options?: {
+      signature?: ElectronicSignature;
+      requireSignature?: boolean;
+      expectedVersion?: number;
+      idempotencyKey?: string;
+    }
+  ): Promise<Batch> {
+    return this.executeBatchAction('BATCH_RECALL', batchId, currentUser, {
+      ...options,
+      reason,
+    });
+  }
+
+  /**
+   * Tương thích ngược: Chuyển trạng thái Lô sản xuất qua Workflow Kernel
+   * Tự động ánh xạ trạng thái sang Intent Action tương ứng
+   */
+  async handleStatusTransition(
+    batchId: string,
+    status: Batch['status'],
+    currentUser: any,
+    options?: {
+      reason?: string;
+      currentBatch?: Batch;
+      batchTestResults?: TestResult[];
+      signature?: ElectronicSignature;
+      requireSignature?: boolean;
+      expectedVersion?: number;
+      idempotencyKey?: string;
+    }
+  ): Promise<Batch> {
+    let currentBatch = options?.currentBatch || (await this.repo.findById(batchId));
+    const currentStatus = currentBatch?.status || 'PENDING';
+
+    let actionId: WorkflowActionId = 'BATCH_DISPATCH_TESTING';
+    if (status === 'RELEASED') {
+      actionId = 'BATCH_RELEASE_APPROVE';
+    } else if (status === 'REJECTED') {
+      actionId = 'BATCH_REJECT';
+    } else if (status === 'BLOCKED') {
+      actionId = currentStatus === 'RELEASED' ? 'BATCH_RECALL' : 'BATCH_HOLD';
+    } else if (status === 'TESTING') {
+      actionId = currentStatus === 'BLOCKED' ? 'BATCH_RESUME' : 'BATCH_DISPATCH_TESTING';
+    }
+
+    return this.executeBatchAction(actionId, batchId, currentUser, {
+      ...options,
+      currentBatch,
+    });
   }
 
   /**
