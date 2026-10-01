@@ -24,6 +24,7 @@ import { BprStateMachine, BprReviewStatus } from '../../domain/workflow/bprState
 import { WorkflowFacade } from '../WorkflowFacade';
 import { WorkflowActor, WorkflowActionId } from '../contracts/actions';
 import { getWorkflowFeatureFlags } from '../contracts/featureFlags';
+import { BatchReleaseWorkflowSynchronizer } from '../../domain/batch/BatchReleaseWorkflowSynchronizer';
 
 export interface BatchCreationContext {
   activeTCCS?: TCCS;
@@ -33,7 +34,11 @@ export interface BatchCreationContext {
 }
 
 export class BatchWorkflowHandlers {
-  constructor(private repo: IBatchRepository = defaultRepo) {}
+  private synchronizer: BatchReleaseWorkflowSynchronizer;
+
+  constructor(private repo: IBatchRepository = defaultRepo) {
+    this.synchronizer = new BatchReleaseWorkflowSynchronizer(repo);
+  }
 
   private toActor(currentUser: any): WorkflowActor {
     const rawRole = (currentUser?.role || (currentUser?.isAdmin ? 'ADMIN' : 'USER')).toUpperCase();
@@ -452,17 +457,27 @@ export class BatchWorkflowHandlers {
 
   /**
    * Intent API 1: Dispatch Testing
+   * Sau khi dispatch thành công → sync release progress (gate 1-6 được tính lại)
    */
   async dispatchTesting(
     batchId: string,
     currentUser: any,
     options?: { expectedVersion?: number; idempotencyKey?: string }
   ): Promise<Batch> {
-    return this.executeBatchAction('BATCH_DISPATCH_TESTING', batchId, currentUser, options);
+    const result = await this.executeBatchAction(
+      'BATCH_DISPATCH_TESTING',
+      batchId,
+      currentUser,
+      options
+    );
+    // Fire-and-forget: sync tiến trình 7 Gate sau khi batch bắt đầu testing
+    this.synchronizer.syncSilently({ batchId, batch: result });
+    return result;
   }
 
   /**
    * Intent API 2: Approve Release
+   * Sau khi RELEASED thành công → sync stage = RELEASED
    */
   async approveRelease(
     batchId: string,
@@ -475,7 +490,15 @@ export class BatchWorkflowHandlers {
       idempotencyKey?: string;
     }
   ): Promise<Batch> {
-    return this.executeBatchAction('BATCH_RELEASE_APPROVE', batchId, currentUser, options);
+    const result = await this.executeBatchAction(
+      'BATCH_RELEASE_APPROVE',
+      batchId,
+      currentUser,
+      options
+    );
+    // Fire-and-forget: cập nhật releaseStage = RELEASED sau khi xuất xưởng thành công
+    this.synchronizer.syncSilently({ batchId, batch: result });
+    return result;
   }
 
   /**
@@ -710,7 +733,11 @@ export class BatchWorkflowHandlers {
       throw new Error(execution.failureReason || 'Lỗi xử lý BPR qua Workflow.');
     }
 
-    return execution.data!;
+    const resultBatch = execution.data!;
+    // Fire-and-forget: sync tiến trình 7 Gate sau khi BPR status thay đổi
+    // (Gate 6 pass/fail thay đổi khi BPR_APPROVE / BPR_REJECT)
+    this.synchronizer.syncSilently({ batchId, batch: resultBatch });
+    return resultBatch;
   }
 
   async submitBpr(

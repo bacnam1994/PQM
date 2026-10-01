@@ -57,6 +57,7 @@ describe('BatchAppService', () => {
           bprReviewStatus: bprStatus,
           ...meta,
         })),
+      updateReleaseProgress: vi.fn().mockResolvedValue(undefined),
     };
     service = new BatchAppService(mockRepo);
   });

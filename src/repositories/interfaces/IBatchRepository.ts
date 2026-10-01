@@ -2,7 +2,7 @@
  * PQM REBUILD - BATCH REPOSITORY INTERFACE
  */
 
-import { Batch } from '../../types';
+import { Batch, BatchReleaseStage, BatchReleaseGateProgress } from '../../types';
 import { IRepository } from '../types';
 
 export interface IBatchRepository extends IRepository<Batch> {
@@ -26,4 +26,13 @@ export interface IBatchRepository extends IRepository<Batch> {
       expectedVersion?: number;
     }
   ): Promise<Batch>;
+  /**
+   * Cập nhật tiến trình 7 Release Gates vào Firebase (atomic update, không cần OCC).
+   * Được gọi bởi BatchReleaseWorkflowSynchronizer sau mỗi sự kiện nghiệp vụ.
+   */
+  updateReleaseProgress(
+    batchId: string,
+    releaseStage: BatchReleaseStage,
+    releaseGateProgress: BatchReleaseGateProgress
+  ): Promise<void>;
 }

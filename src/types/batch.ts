@@ -13,6 +13,43 @@ import { ProductFormula } from './product';
  */
 export type BatchWorkflowStatus = 'PENDING' | 'TESTING' | 'RELEASED' | 'REJECTED' | 'BLOCKED';
 
+/**
+ * Tiến trình 7 Release Gates (tách biệt hoàn toàn với Batch Workflow Status).
+ * - Batch.status = vòng đời workflow (PENDING, TESTING, RELEASED, ...)
+ * - BatchReleaseStage = tiến trình hoàn thành từng Gate (GATE_1 → READY_TO_RELEASE)
+ *
+ * TUYỆT ĐỐI KHÔNG biến 7 Gate thành Batch.status.
+ * Gate FAIL → release bị blocked, không phải Batch REJECTED.
+ * Chỉ BATCH_RELEASE_APPROVE mới chuyển TESTING → RELEASED qua StateMachine.
+ */
+export type BatchReleaseStage =
+  | 'NOT_STARTED'
+  | 'GATE_1'
+  | 'GATE_2'
+  | 'GATE_3'
+  | 'GATE_4'
+  | 'GATE_5'
+  | 'GATE_6'
+  | 'GATE_7'
+  | 'READY_TO_RELEASE'
+  | 'RELEASED'
+  | 'BLOCKED'
+  | 'REJECTED';
+
+/** Tiến độ số lượng Gate hoàn thành (tuần tự, first-fail rule) */
+export interface BatchReleaseGateProgress {
+  /** Số Gate đã hoàn thành tuần tự (first blocking gate = stop, không cộng các gate phía sau dù PASS) */
+  completed: number;
+  /** Tổng số Gate (luôn là 7) */
+  total: 7;
+  /** Gate hiện tại đang chờ (1-7); 0 nếu chưa bắt đầu; 8 nếu tất cả 7/7 xong */
+  currentGate: number;
+  /** Phần trăm tiến độ (0-100), tính theo completed/total */
+  percentage: number;
+  /** Thời điểm tính toán (ISO string) */
+  evaluatedAt: string;
+}
+
 export interface Batch {
   id: string;
   productId: string;
@@ -59,6 +96,18 @@ export interface Batch {
   evaluationSnapshot?: import('./testResult').EvaluationSnapshot;
   /** Mã băm SHA-256 niêm phong kết quả thẩm định */
   evaluationHash?: string;
+  /**
+   * Giai đoạn 7 Release Gates hiện tại (tách biệt với Batch.status).
+   * Được tính và persist bởi BatchReleaseWorkflowSynchronizer.
+   * UI chỉ đọc – KHÔNG tự tính.
+   */
+  releaseStage?: BatchReleaseStage;
+  /**
+   * Tiến độ số lượng Gate hoàn thành (first-fail sequential rule).
+   * Được tính và persist bởi BatchReleaseWorkflowSynchronizer.
+   * UI chỉ đọc – KHÔNG tự tính.
+   */
+  releaseGateProgress?: BatchReleaseGateProgress;
   /** Snapshot quyết định xuất xưởng 7 Release Gates (ALCOA+ Release Decision Snapshot) */
   releaseDecisionSnapshot?: any;
   /** Chữ ký điện tử 21 CFR Part 11 phê duyệt xuất xưởng */

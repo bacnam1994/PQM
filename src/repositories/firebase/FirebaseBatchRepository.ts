@@ -6,7 +6,7 @@
 
 import { ref, update, get, runTransaction } from 'firebase/database';
 import { db } from '../../firebase';
-import { Batch } from '../../types';
+import { Batch, BatchReleaseStage, BatchReleaseGateProgress } from '../../types';
 import { IBatchRepository } from '../BatchRepository';
 import { BaseFirebaseRepository } from './BaseFirebaseRepository';
 import { deleteBatchService } from '../../services/databaseService';
@@ -315,6 +315,21 @@ export class FirebaseBatchRepository
       }
       throw new Error(`MOCK_TRANSACTION_FAILED: Không tìm thấy snapshot cho Lô (${batchId}).`);
     }
+  }
+
+  async updateReleaseProgress(
+    batchId: string,
+    releaseStage: BatchReleaseStage,
+    releaseGateProgress: BatchReleaseGateProgress
+  ): Promise<void> {
+    if (!batchId) throw new Error('Yêu cầu ID lô sản xuất');
+    const targetPath = `${this.collectionPath}/${batchId}`;
+    // Atomic update không cần OCC vì đây là computed state (idempotent)
+    await update(ref(db, targetPath), {
+      releaseStage,
+      releaseGateProgress,
+      updatedAt: new Date().toISOString(),
+    });
   }
 
   async delete(id: string): Promise<void> {

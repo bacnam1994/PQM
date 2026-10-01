@@ -110,6 +110,56 @@ const BatchDetailPage = () => {
     return releaseDecision.gates.filter((g) => g.gateIndex <= 6).every((g) => g.passed);
   }, [releaseDecision]);
 
+  /**
+   * Canonical Release Stage – ưu tiên giá trị được sync từ server (Synchronizer).
+   * Fallback sang tính toán phía client nếu server chưa sync.
+   * UI CHỈ ĐỌC – không tự thay đổi giá trị này.
+   */
+  const canonicalReleaseStage = useMemo(() => {
+    // Ưu tiên canonical state từ server (đã sync bởi BatchReleaseWorkflowSynchronizer)
+    if (batch?.releaseStage) return batch.releaseStage;
+    // Fallback: tính từ releaseDecision tại thời điểm hiện tại (preview mode)
+    if (!releaseDecision) return 'NOT_STARTED';
+    const gates = releaseDecision.gates;
+    let completed = 0;
+    for (const gate of gates) {
+      if (gate.passed) completed++;
+      else break;
+    }
+    if (batch?.status === 'RELEASED') return 'RELEASED';
+    if (batch?.status === 'REJECTED') return 'REJECTED';
+    if (completed === 7) return 'READY_TO_RELEASE';
+    if (completed === 0) return gates.length > 0 ? 'GATE_1' : 'NOT_STARTED';
+    const stageMap: Record<number, string> = {
+      2: 'GATE_2',
+      3: 'GATE_3',
+      4: 'GATE_4',
+      5: 'GATE_5',
+      6: 'GATE_6',
+      7: 'GATE_7',
+    };
+    return stageMap[completed + 1] ?? 'GATE_1';
+  }, [batch, releaseDecision]);
+
+  /** Canonical Gate Progress – ưu tiên server-synced, fallback local */
+  const canonicalGateProgress = useMemo(() => {
+    if (batch?.releaseGateProgress) return batch.releaseGateProgress;
+    if (!releaseDecision) return null;
+    const gates = releaseDecision.gates;
+    let completed = 0;
+    for (const gate of gates) {
+      if (gate.passed) completed++;
+      else break;
+    }
+    return {
+      completed,
+      total: 7 as const,
+      currentGate: completed === 7 ? 8 : completed + 1,
+      percentage: Math.round((completed / 7) * 100),
+      evaluatedAt: new Date().toISOString(),
+    };
+  }, [batch, releaseDecision]);
+
   const handleOpenSignRelease = () => {
     if (!batch || !releaseDecision) return;
 
@@ -718,6 +768,61 @@ const BatchDetailPage = () => {
                     : `${releaseDecision.blockers.length} RÀO CẢN`}
                 </span>
               </div>
+
+              {/* Tiến trình 7 Cổng & Giai đoạn Xuất Xưởng (Canonical Release Progress) */}
+              {canonicalGateProgress && (
+                <div className="p-2.5 rounded-lg bg-surface-2/60 border border-border/80 space-y-2">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[11px] font-semibold text-ink">Tiến trình:</span>
+                      <span className="text-[11px] font-bold text-primary">
+                        {canonicalGateProgress.completed}/7 Cổng
+                      </span>
+                      <span className="text-[10px] text-ink-muted">
+                        ({canonicalGateProgress.percentage}%)
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[10px] text-ink-muted">Giai đoạn:</span>
+                      <span
+                        className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                          canonicalReleaseStage === 'RELEASED'
+                            ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20'
+                            : canonicalReleaseStage === 'READY_TO_RELEASE'
+                              ? 'bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-500/20'
+                              : canonicalReleaseStage === 'REJECTED'
+                                ? 'bg-rose-500/10 text-rose-700 dark:text-rose-400 border-rose-500/20'
+                                : 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20'
+                        }`}
+                      >
+                        {canonicalReleaseStage === 'NOT_STARTED' && 'Chưa bắt đầu'}
+                        {canonicalReleaseStage === 'GATE_1' && 'Đang đợi Cổng 1'}
+                        {canonicalReleaseStage === 'GATE_2' && 'Đang đợi Cổng 2'}
+                        {canonicalReleaseStage === 'GATE_3' && 'Đang đợi Cổng 3'}
+                        {canonicalReleaseStage === 'GATE_4' && 'Đang đợi Cổng 4'}
+                        {canonicalReleaseStage === 'GATE_5' && 'Đang đợi Cổng 5'}
+                        {canonicalReleaseStage === 'GATE_6' && 'Đang đợi Cổng 6 (BPR)'}
+                        {canonicalReleaseStage === 'GATE_7' && 'Đang đợi Cổng 7 (Ký QA)'}
+                        {canonicalReleaseStage === 'READY_TO_RELEASE' && 'Sẵn sàng duyệt ký'}
+                        {canonicalReleaseStage === 'RELEASED' && 'Đã xuất xưởng'}
+                        {canonicalReleaseStage === 'REJECTED' && 'Bị từ chối'}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="w-full bg-border/80 rounded-full h-1.5 overflow-hidden">
+                    <div
+                      className={`h-full transition-all duration-300 ${
+                        canonicalGateProgress.completed === 7
+                          ? 'bg-emerald-500'
+                          : canonicalGateProgress.completed >= 4
+                            ? 'bg-primary'
+                            : 'bg-amber-500'
+                      }`}
+                      style={{ width: `${canonicalGateProgress.percentage}%` }}
+                    />
+                  </div>
+                </div>
+              )}
 
               {/* Cảnh báo quan hệ dữ liệu (Legacy Match / Partial Snapshot) */}
               {releaseDecision.warnings.length > 0 && (
