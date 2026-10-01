@@ -21,6 +21,9 @@ export interface OutboxAuditEvent {
     role: string;
     email?: string;
   };
+  fromState?: string;
+  toState?: string;
+  version?: number;
   details: string;
   timestamp: string;
   correlationId?: string;
@@ -28,15 +31,21 @@ export interface OutboxAuditEvent {
 
 export class OutboxAuditQueue {
   private static inMemoryQueue: OutboxAuditEvent[] = [];
+  private static committedEventIds = new Set<string>();
 
   /**
    * Đẩy và thực thi ghi nhận sự kiện kiểm toán đồng bộ (Awaited).
-   * Có cơ chế thử lại lũy tiến (Exponential Backoff Retry).
+   * Có cơ chế chống trùng lặp (Idempotent) và thử lại lũy tiến (Exponential Backoff Retry).
    */
   public static async dispatchAudit(
     event: OutboxAuditEvent,
-    maxRetries = 2
+    maxRetries = 3
   ): Promise<{ success: boolean; error?: string }> {
+    // 1. Chống trùng lặp audit log khi retry (Idempotency)
+    if (this.committedEventIds.has(event.eventId)) {
+      return { success: true };
+    }
+
     this.inMemoryQueue.push(event);
 
     let attempt = 0;
@@ -52,12 +61,13 @@ export class OutboxAuditQueue {
           performedBy: event.actor.email || event.actor.name || event.actor.id,
         });
 
+        this.committedEventIds.add(event.eventId);
         return { success: true };
       } catch (err: any) {
         lastError = err;
         attempt++;
         if (attempt <= maxRetries) {
-          // Delay nhỏ trước khi thử lại
+          // Delay nhỏ lũy tiến trước khi thử lại
           await new Promise((resolve) => setTimeout(resolve, 50 * attempt));
         }
       }
@@ -67,6 +77,10 @@ export class OutboxAuditQueue {
       success: false,
       error: lastError?.message || 'Outbox audit write failed after retries',
     };
+  }
+
+  public static isCommitted(eventId: string): boolean {
+    return this.committedEventIds.has(eventId);
   }
 
   /**
@@ -81,5 +95,6 @@ export class OutboxAuditQueue {
    */
   public static clear(): void {
     this.inMemoryQueue = [];
+    this.committedEventIds.clear();
   }
 }

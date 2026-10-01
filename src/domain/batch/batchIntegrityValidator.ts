@@ -16,7 +16,11 @@
  */
 
 import { Batch, TestResult, TCCS } from '../../types';
-import { BatchTestResolutionResult, resolveTestResultsForBatch } from './batchTestResultResolver';
+import {
+  BatchTestResolutionResult,
+  resolveTestResultsForBatch,
+  resolveBatchTestRelationship,
+} from './batchTestResultResolver';
 import { calculateOverallStatus } from '../../utils/evaluation';
 import {
   resolveTestResultStatus,
@@ -101,10 +105,10 @@ export function isValidTestResultForBatch(testResult: TestResult, batch?: Batch)
   const hasOverall = Boolean(testResult.overallStatus || (testResult as any).qualityStatus);
   if (!hasResults && !hasOverall) return false;
 
-  // 4. Nếu có truyền batch, đối chiếu ID kỹ thuật
+  // 4. Nếu có truyền batch, đối chiếu qua Canonical Relationship Resolver
   if (batch) {
-    const rawBatchId = (testResult.batchId || '').trim();
-    if (!rawBatchId || rawBatchId !== batch.id) {
+    const relationship = resolveBatchTestRelationship(batch, testResult);
+    if (!relationship.isMatch) {
       return false;
     }
   }

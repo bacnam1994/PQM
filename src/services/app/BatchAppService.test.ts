@@ -211,11 +211,25 @@ describe('BatchAppService', () => {
         createdAt: '2026-01-10T00:00:00Z',
       };
 
+      const validSig: any = {
+        id: 'sig-01',
+        documentType: 'BATCH_RELEASE',
+        documentId: 'batch-001',
+        signerEmail: 'qa@pqm.com',
+        checksum: 'valid-checksum',
+      };
+
       await service.updateStatus('batch-001', 'RELEASED', qaUser, {
         currentBatch: testingBatch,
         batchTestResults: [passedTestResult],
+        signature: validSig,
       });
-      expect(mockRepo.updateStatus).toHaveBeenCalledWith('batch-001', 'RELEASED', undefined);
+      expect(mockRepo.updateStatus).toHaveBeenCalledWith(
+        'batch-001',
+        'RELEASED',
+        undefined,
+        expect.any(Object)
+      );
     });
 
     it('should reject release when requireSignature is true but signature is missing', async () => {
@@ -268,7 +282,12 @@ describe('BatchAppService', () => {
         signature: validSig,
       });
 
-      expect(mockRepo.updateStatus).toHaveBeenCalledWith('batch-001', 'RELEASED', undefined);
+      expect(mockRepo.updateStatus).toHaveBeenCalledWith(
+        'batch-001',
+        'RELEASED',
+        undefined,
+        expect.any(Object)
+      );
     });
   });
 

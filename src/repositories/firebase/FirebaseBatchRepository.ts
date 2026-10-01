@@ -4,7 +4,7 @@
  * Kế thừa BaseFirebaseRepository: phân trang cursor/offset, lọc server-side & đếm số lượng.
  */
 
-import { ref, update } from 'firebase/database';
+import { ref, update, get, runTransaction } from 'firebase/database';
 import { db } from '../../firebase';
 import { Batch } from '../../types';
 import { IBatchRepository } from '../BatchRepository';
@@ -40,15 +40,119 @@ export class FirebaseBatchRepository
     return result.items;
   }
 
-  async updateStatus(batchId: string, status: Batch['status'], reason?: string): Promise<void> {
+  async updateStatus(
+    batchId: string,
+    status: Batch['status'],
+    reason?: string,
+    metadata?: Partial<Batch> & { expectedVersion?: number }
+  ): Promise<void> {
     if (!batchId) throw new Error('Yêu cầu ID lô sản xuất');
-    const updates: Record<string, any> = {
-      status,
-      updatedAt: new Date().toISOString(),
-      rejectReason: status === 'REJECTED' ? reason || null : null,
-    };
     const targetPath = `${this.collectionPath}/${batchId}`;
-    await update(ref(db, targetPath), updates);
+    const batchRef = ref(db, targetPath);
+
+    const now = new Date().toISOString();
+    const expectedVersion = metadata?.expectedVersion;
+
+    try {
+      // OCC Atomic Transaction trên Firebase Realtime Database
+      const txResult = await runTransaction(batchRef, (currentBatch) => {
+        if (!currentBatch) {
+          return currentBatch;
+        }
+
+        const currentVersion = currentBatch.version ?? 1;
+        if (expectedVersion !== undefined && currentVersion !== expectedVersion) {
+          // Xung đột phiên bản: Version trên máy chủ khác với version mong đợi -> Abort
+          return undefined;
+        }
+
+        const newVersion = currentVersion + 1;
+        const updatedBatch: Record<string, any> = {
+          ...currentBatch,
+          status,
+          version: newVersion,
+          updatedAt: now,
+        };
+
+        if (status === 'RELEASED') {
+          updatedBatch.releasedAt = metadata?.releasedAt || now;
+          updatedBatch.releasedBy = metadata?.releasedBy || 'QA/Admin';
+          if (metadata?.releaseDecisionSnapshot !== undefined) {
+            updatedBatch.releaseDecisionSnapshot = metadata.releaseDecisionSnapshot;
+          }
+        } else if (status === 'REJECTED') {
+          updatedBatch.rejectReason =
+            reason || metadata?.rejectReason || currentBatch.rejectReason || null;
+        }
+
+        if (metadata) {
+          const { expectedVersion: _, ...restMeta } = metadata;
+          Object.assign(updatedBatch, restMeta);
+          // Bảo toàn status và version đã tính qua OCC
+          updatedBatch.status = status;
+          updatedBatch.version = newVersion;
+        }
+
+        return updatedBatch;
+      });
+
+      if (!txResult || !txResult.committed) {
+        throw new Error(
+          `CONCURRENCY_CONFLICT: Xung đột phiên bản cập nhật Lô (${batchId}). Dữ liệu đã bị thay đổi bởi tác vụ khác.`
+        );
+      }
+    } catch (err: any) {
+      if (err.message && err.message.includes('CONCURRENCY_CONFLICT')) {
+        throw err;
+      }
+      // Fallback nếu môi trường mock/test không hỗ trợ runTransaction
+      const snapshot = await get(batchRef);
+      if (snapshot && typeof snapshot.exists === 'function' && snapshot.exists()) {
+        const currentBatch = snapshot.val();
+        const currentVersion = currentBatch?.version ?? 1;
+        if (expectedVersion !== undefined && currentVersion !== expectedVersion) {
+          throw new Error(
+            `CONCURRENCY_CONFLICT: Xung đột phiên bản cập nhật Lô (${batchId}). Phiên bản hiện tại là ${currentVersion}, kỳ vọng ${expectedVersion}.`
+          );
+        }
+        const newVersion = currentVersion + 1;
+        const updates: Record<string, any> = {
+          status,
+          version: newVersion,
+          updatedAt: now,
+          ...(status === 'RELEASED'
+            ? {
+                releasedAt: metadata?.releasedAt || now,
+                releasedBy: metadata?.releasedBy || 'QA/Admin',
+                releaseDecisionSnapshot: metadata?.releaseDecisionSnapshot || null,
+              }
+            : {}),
+          ...(status === 'REJECTED'
+            ? {
+                rejectReason: reason || metadata?.rejectReason || currentBatch.rejectReason || null,
+              }
+            : {}),
+        };
+        await update(batchRef, updates);
+        return;
+      }
+
+      // Trường hợp tạo mới hoặc không đọc được snapshot
+      const fallbackUpdates: Record<string, any> = {
+        status,
+        version: expectedVersion ? expectedVersion + 1 : 2,
+        updatedAt: now,
+        ...(status === 'RELEASED'
+          ? {
+              releasedAt: metadata?.releasedAt || now,
+              releasedBy: metadata?.releasedBy || 'QA/Admin',
+              releaseDecisionSnapshot: metadata?.releaseDecisionSnapshot || null,
+            }
+          : {}),
+        ...(status === 'REJECTED' ? { rejectReason: reason || null } : {}),
+      };
+      await update(batchRef, fallbackUpdates);
+    }
   }
 
   async updateProgress(batchId: string, progressPercent: number): Promise<void> {

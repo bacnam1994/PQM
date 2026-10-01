@@ -242,34 +242,12 @@ export function resolveCanonicalBatchQualityDecision(
     };
   }
 
-  // 5. Trường hợp chỉ có phiếu liên kết qua số lô (Legacy - sai khóa kỹ thuật)
-  if (primaryCandidates.length === 0 && legacyCandidates.length > 0) {
-    const isReleased = workflowStatus === 'RELEASED';
-    return {
-      batchId,
-      batchNo,
-      workflowStatus,
-      qualityStatus: 'INCOMPLETE',
-      integrityStatus: isReleased ? 'RELATIONSHIP_ERROR' : 'NOT_APPLICABLE',
-      shouldAlert: isReleased,
-      alertType: isReleased ? 'WARNING' : undefined,
-      candidateCount: legacyCandidates.length,
-      authoritativeCount: 0,
-      supersededTestResultIds: [],
-      failedCriteria: [],
-      pendingCriteria: [],
-      decisionReason: `Lô "${batchNo}" có ${legacyCandidates.length} phiếu liên kết qua số lô (Legacy) thay vì ID kỹ thuật.`,
-      resolverVersion: CANONICAL_DECISION_RESOLVER_VERSION,
-      authoritativeResults: [],
-      boundTccs: resolvedTccs,
-      criterionEvaluations: [],
-      completion: emptyCompletion,
-      blockers: ['Phiếu kiểm nghiệm liên kết sai khóa kỹ thuật.'],
-    };
-  }
+  // 5. Thống nhất danh sách ứng viên (Primary Candidates hoặc Legacy Candidates)
+  const isLegacyOnly = primaryCandidates.length === 0 && legacyCandidates.length > 0;
+  const candidates = primaryCandidates.length > 0 ? primaryCandidates : legacyCandidates;
 
-  // 6. Trường hợp có Primary Candidates: Chọn Canonical Supreme Test Result
-  const finalResolution = resolveFinalTestResultForBatch(batch, primaryCandidates, resolvedTccs);
+  // 6. Chọn Canonical Supreme Test Result từ tập candidates
+  const finalResolution = resolveFinalTestResultForBatch(batch, candidates, resolvedTccs);
   const supremeResult = finalResolution.finalTestResult;
 
   if (!supremeResult) {
@@ -279,21 +257,31 @@ export function resolveCanonicalBatchQualityDecision(
       batchNo,
       workflowStatus,
       qualityStatus: 'INCOMPLETE',
-      integrityStatus: isReleased ? 'TEST_RESULT_INVALID_STATUS' : 'NOT_APPLICABLE',
+      integrityStatus: isReleased
+        ? isLegacyOnly
+          ? 'RELATIONSHIP_ERROR'
+          : 'TEST_RESULT_INVALID_STATUS'
+        : 'NOT_APPLICABLE',
       shouldAlert: isReleased,
-      alertType: isReleased ? 'CRITICAL' : undefined,
-      candidateCount: primaryCandidates.length,
+      alertType: isReleased ? (isLegacyOnly ? 'WARNING' : 'CRITICAL') : undefined,
+      candidateCount: candidates.length,
       authoritativeCount: 0,
       supersededTestResultIds: [],
       failedCriteria: [],
       pendingCriteria: [],
-      decisionReason: `Không thể xác định phiếu kiểm nghiệm tối cao cho lô "${batchNo}".`,
+      decisionReason: isLegacyOnly
+        ? `Lô "${batchNo}" có ${legacyCandidates.length} phiếu liên kết qua số lô (Legacy) nhưng không thể xác định phiếu tối cao.`
+        : `Không thể xác định phiếu kiểm nghiệm tối cao cho lô "${batchNo}".`,
       resolverVersion: CANONICAL_DECISION_RESOLVER_VERSION,
       authoritativeResults: [],
       boundTccs: resolvedTccs,
       criterionEvaluations: [],
       completion: emptyCompletion,
-      blockers: ['Không thể phân giải phiếu kiểm nghiệm tối cao.'],
+      blockers: [
+        isLegacyOnly
+          ? 'Phiếu kiểm nghiệm liên kết sai khóa kỹ thuật.'
+          : 'Không thể phân giải phiếu kiểm nghiệm tối cao.',
+      ],
     };
   }
 
@@ -309,14 +297,14 @@ export function resolveCanonicalBatchQualityDecision(
   // 7. Lấy danh sách phiếu authoritative và loại bỏ các phiếu đã bị thay thế (superseded)
   const activeAuthoritative = resolveAuthoritativeTestResultsForBatch(
     batch,
-    primaryCandidates,
+    candidates,
     resolvedTccs
   );
   const authoritativeCount = activeAuthoritative.length > 0 ? activeAuthoritative.length : 1;
   const authoritativeIds = new Set(activeAuthoritative.map((r) => r.id));
   authoritativeIds.add(supremeResult.id);
 
-  const supersededTestResultIds = primaryCandidates
+  const supersededTestResultIds = candidates
     .filter((tr) => !authoritativeIds.has(tr.id))
     .map((tr) => tr.id);
 
@@ -539,7 +527,12 @@ export function resolveCanonicalBatchQualityDecision(
     shouldAlert = false;
     decisionReason = `Lô ở trạng thái ${workflowStatus}, không yêu cầu kiểm tra toàn vẹn xuất xưởng.`;
   } else {
-    if (qualityStatus === 'PASS') {
+    if (isLegacyOnly) {
+      integrityStatus = 'RELATIONSHIP_ERROR';
+      shouldAlert = true;
+      alertType = 'WARNING';
+      decisionReason = `Lô "${batchNo}" đã xuất xưởng và có hồ sơ kiểm nghiệm (${candidates.length} phiếu), nhưng liên kết qua số hiệu Lô (Legacy) thay vì ID kỹ thuật.`;
+    } else if (qualityStatus === 'PASS') {
       integrityStatus = 'PASS';
       shouldAlert = false;
       alertType = undefined;

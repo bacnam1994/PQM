@@ -203,24 +203,22 @@ export const auditDataConsistency = (data: SystemDataSnapshot): ConsistencyRepor
   const productMap = new Map(products.map((p) => [p.id, p]));
   const tccsMap = new Map(tccsList.map((t) => [t.id, t]));
   const batchMap = new Map(batches.map((b) => [b.id, b]));
-  const batchNoMap = new Map(batches.map((b) => [b.batchNo, b]));
+  const batchNoMap = new Map(
+    batches.filter((b) => b && b.batchNo).map((b) => [b.batchNo.trim().toLowerCase(), b])
+  );
   const materialMap = new Map(rawMaterials.map((m) => [m.id, m]));
   const materialNameMap = new Map<string, RawMaterial>();
 
-  // Xây dựng Snapshot Index O(1) chuẩn hóa quan hệ giữa Batches và TestResults
-  const testResultIndex = buildTestResultIndex(testResults, batches);
+  // Xây dựng Snapshot Index O(1) chuẩn hóa quan hệ giữa Batches và TestResults với Data Freshness
+  const testResultIndex = buildTestResultIndex(testResults, batches, data.dataFreshness);
 
-  // Hàm tra cứu Lô linh hoạt cho tương thích ngược
+  // Hàm tra cứu Lô linh hoạt cho tương thích ngược (Không dùng endsWith không tin cậy)
   const getBatchForTestResult = (batchId: string): Batch | undefined => {
     if (!batchId) return undefined;
-    if (batchMap.has(batchId)) return batchMap.get(batchId);
-    if (batchNoMap.has(batchId)) return batchNoMap.get(batchId);
-    return batches.find(
-      (b) =>
-        (b.id && batchId.endsWith(b.id)) ||
-        (batchId && b.id.endsWith(batchId)) ||
-        (b.batchNo && b.batchNo.toLowerCase() === batchId.toLowerCase())
-    );
+    const cleanId = batchId.trim();
+    if (batchMap.has(cleanId)) return batchMap.get(cleanId);
+    if (batchNoMap.has(cleanId.toLowerCase())) return batchNoMap.get(cleanId.toLowerCase());
+    return undefined;
   };
 
   rawMaterials.forEach((m) => {

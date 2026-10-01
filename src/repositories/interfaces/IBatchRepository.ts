@@ -9,6 +9,11 @@ export interface IBatchRepository extends IRepository<Batch> {
   findByBatchNo(batchNo: string): Promise<Batch | null>;
   findByProductId(productId: string): Promise<Batch[]>;
   findByStatus(status: Batch['status']): Promise<Batch[]>;
-  updateStatus(batchId: string, status: Batch['status'], reason?: string): Promise<void>;
+  updateStatus(
+    batchId: string,
+    status: Batch['status'],
+    reason?: string,
+    metadata?: Partial<Batch> & { expectedVersion?: number }
+  ): Promise<void>;
   updateProgress(batchId: string, progressPercent: number): Promise<void>;
 }

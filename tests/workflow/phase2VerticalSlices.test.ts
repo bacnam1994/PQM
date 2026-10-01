@@ -322,7 +322,8 @@ describe('Phase 2 Vertical Slices: Test Result & Batch Workflows', () => {
       expect(mockBatchRepo.updateStatus).toHaveBeenCalledWith(
         'batch_slice_002',
         'TESTING',
-        undefined
+        undefined,
+        expect.any(Object)
       );
     });
 

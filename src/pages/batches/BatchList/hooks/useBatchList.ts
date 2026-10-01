@@ -15,6 +15,8 @@ import {
 } from '../../../../utils';
 import { fetchTestResultsByBatchId } from '../../../../services/testResultService';
 import { ReleaseRules } from '../../../../domain/rules';
+import { BatchReleaseDecisionService } from '../../../../domain/batch/BatchReleaseDecisionService';
+import { resolveTestResultsForBatch } from '../../../../domain/batch/batchTestResultResolver';
 
 export function useBatchList() {
   const navigate = useNavigate();
@@ -218,18 +220,21 @@ export function useBatchList() {
       if (newStatus === 'RELEASED') {
         const targetBatch = hydratedBatches.find((b) => b.id === batchId);
         if (!targetBatch) return;
-        const batchTests = sourceResults.filter((r) => r.batchId === batchId);
-        const releaseEval = ReleaseRules.evaluateReleasePrerequisites({
+        const resolution = resolveTestResultsForBatch(targetBatch, sourceResults);
+        const releaseDecision = BatchReleaseDecisionService.resolveBatchReleaseDecision({
           batch: targetBatch,
-          testResults: batchTests,
+          testResults: resolution.allCandidateResults,
           userRole: user?.role,
           boundTccs: (targetBatch as any)?.tccs,
+          asOfDate: new Date(),
+          skipBprRequirementForTestingStatus: true,
         });
-        if (!releaseEval.isEligibleForRelease) {
+        if (!releaseDecision.eligible) {
           notify({
             type: 'ERROR',
             title: 'Quy chuẩn GMP & Release Guard',
-            message: releaseEval.blockers[0] || 'Không thể duyệt xuất xưởng lô chưa đạt chuẩn GMP.',
+            message:
+              releaseDecision.blockers[0] || 'Không thể duyệt xuất xưởng lô chưa đạt chuẩn GMP.',
           });
           return;
         }

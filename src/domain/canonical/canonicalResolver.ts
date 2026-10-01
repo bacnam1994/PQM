@@ -54,6 +54,7 @@ import {
   CanonicalTestStatus,
 } from '../test-result/testResultStatusResolver';
 import { isValidTestResultForBatch } from '../batch/batchIntegrityValidator';
+import { resolveBatchTestRelationship } from '../batch/batchTestResultResolver';
 import { resolveCanonicalBatchQualityDecision } from '../batch/canonicalBatchQualityDecision';
 import { CriterionEvaluator, isExemptValue } from '../evaluation/CriterionEvaluator';
 import { AlternateRuleEvaluator } from '../evaluation/AlternateRuleEvaluator';
@@ -316,9 +317,9 @@ export class CanonicalStatusResolver {
     const tccsResolution = this.resolveTccsForBatch(batch, boundTccs, allTccsList);
     const resolvedTccs = tccsResolution.tccs;
 
-    // 2. Lấy các phiếu hợp lệ
+    // 2. Lấy các phiếu hợp lệ qua Canonical Relationship Resolver
     const validTests = (testResults || []).filter(
-      (tr) => tr && tr.batchId === batch?.id && isValidTestResultForBatch(tr, batch)
+      (tr) => tr && isValidTestResultForBatch(tr, batch)
     );
 
     // 3. Chọn các phiếu authoritative

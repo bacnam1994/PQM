@@ -43,6 +43,10 @@ export interface Batch {
   evaluationSnapshot?: import('./testResult').EvaluationSnapshot;
   /** Mã băm SHA-256 niêm phong kết quả thẩm định */
   evaluationHash?: string;
+  /** Snapshot quyết định xuất xưởng 7 Release Gates (ALCOA+ Release Decision Snapshot) */
+  releaseDecisionSnapshot?: any;
+  /** Chữ ký điện tử 21 CFR Part 11 phê duyệt xuất xưởng */
+  releaseSignatures?: any[];
   createdAt: string;
   updatedAt?: string;
 }

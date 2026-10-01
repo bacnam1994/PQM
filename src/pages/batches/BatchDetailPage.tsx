@@ -17,6 +17,7 @@ import {
   ShieldCheckIcon,
   ChartBarSquareIcon,
   PencilSquareIcon,
+  LockClosedIcon,
 } from '@heroicons/react/24/outline';
 import { useDataGraph } from '../../hooks/useDataGraph';
 import { useAppStore } from '../../store/useAppStore';
@@ -37,6 +38,10 @@ import { useDeviationsByBatchQuery } from '../../hooks/queries/useDeviationQueri
 import { Surface, PageHeader, StatusBadge, ConfirmationModal } from '../../components/ui';
 import { BatchStatusSelect } from './BatchList/components/BatchStatusSelect';
 import { ReleaseRules } from '../../domain/rules';
+import {
+  BatchReleaseDecisionService,
+  BatchReleaseDecision,
+} from '../../domain/batch/BatchReleaseDecisionService';
 import {
   normalizeCriterionPassStatus,
   resolveTestResultStatus,
@@ -76,22 +81,25 @@ const BatchDetailPage = () => {
   const resolver = useCriteriaResolver((batch as any)?.tccs);
   const canSignRelease = isAdmin || role === 'ADMIN' || role === 'QA';
 
-  const handleOpenSignRelease = () => {
-    if (!batch) return;
-
-    const releaseEval = ReleaseRules.evaluateReleasePrerequisites({
+  const releaseDecision = useMemo<BatchReleaseDecision | null>(() => {
+    if (!batch) return null;
+    return BatchReleaseDecisionService.resolveBatchReleaseDecision({
       batch,
       testResults: viewBatchResults,
       deviations: batchDeviations,
       userRole: role,
       boundTccs: (batch as any)?.tccs,
     });
+  }, [batch, viewBatchResults, batchDeviations, role]);
 
-    if (!releaseEval.isEligibleForRelease) {
+  const handleOpenSignRelease = () => {
+    if (!batch || !releaseDecision) return;
+
+    if (!releaseDecision.eligible) {
       notify({
         type: 'ERROR',
         title: 'Quy chuẩn GMP & Release Guard',
-        message: releaseEval.blockers[0] || 'Lô chưa đủ điều kiện xuất xưởng.',
+        message: releaseDecision.blockers[0] || 'Lô chưa đủ điều kiện xuất xưởng.',
       });
       return;
     }
@@ -536,6 +544,93 @@ const BatchDetailPage = () => {
               </div>
             )}
           </Surface>
+
+          {/* Card: 7 Cổng Kiểm Soát Xuất Xưởng (7 Release Gates) */}
+          {releaseDecision && (
+            <Surface variant="flat" padding="md" className="space-y-3">
+              <div className="flex items-center justify-between pb-2 border-b border-border">
+                <div className="flex items-center gap-2">
+                  <ShieldCheckIcon
+                    className={`h-4 w-4 ${releaseDecision.eligible ? 'text-emerald-600' : 'text-amber-500'}`}
+                  />
+                  <h4 className="text-xs font-bold text-ink">7 Cổng Xuất Xưởng (GMP)</h4>
+                </div>
+                <span
+                  className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                    releaseDecision.eligible
+                      ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20'
+                      : 'bg-rose-500/10 text-rose-700 dark:text-rose-400 border border-rose-500/20'
+                  }`}
+                >
+                  {releaseDecision.eligible
+                    ? 'ĐỦ ĐIỀU KIỆN'
+                    : `${releaseDecision.blockers.length} RÀO CẢN`}
+                </span>
+              </div>
+
+              {/* Cảnh báo quan hệ dữ liệu (Legacy Match / Partial Snapshot) */}
+              {releaseDecision.warnings.length > 0 && (
+                <div className="p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-xs text-amber-800 dark:text-amber-300 space-y-1">
+                  <p className="font-semibold flex items-center gap-1">
+                    <ExclamationTriangleIcon className="h-3.5 w-3.5 text-amber-600" /> Cảnh báo liên
+                    kết:
+                  </p>
+                  {releaseDecision.warnings.map((w, idx) => (
+                    <p
+                      key={idx}
+                      className="text-[11px] leading-tight text-amber-700 dark:text-amber-400"
+                    >
+                      • {w}
+                    </p>
+                  ))}
+                </div>
+              )}
+
+              {/* Danh sách 7 Gates */}
+              <div className="space-y-1.5 pt-1">
+                {releaseDecision.gates.map((g) => (
+                  <div
+                    key={g.gateIndex}
+                    className={`p-2 rounded-lg border text-xs flex items-start gap-2.5 transition-colors ${
+                      g.passed
+                        ? 'bg-surface-2/40 border-border'
+                        : 'bg-rose-500/5 border-rose-500/20 text-rose-900 dark:text-rose-200'
+                    }`}
+                  >
+                    <div className="mt-0.5 shrink-0">
+                      {g.passed ? (
+                        <CheckCircleIcon className="h-3.5 w-3.5 text-emerald-600" />
+                      ) : (
+                        <XMarkIcon className="h-3.5 w-3.5 text-rose-600" />
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-1">
+                        <span className="font-medium text-[11px] truncate text-ink">
+                          {g.gateIndex}. {g.gateName}
+                        </span>
+                        <span
+                          className={`text-[9px] font-bold px-1.5 py-0.2 rounded shrink-0 ${
+                            g.passed
+                              ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400'
+                              : 'bg-rose-500/10 text-rose-700 dark:text-rose-400'
+                          }`}
+                        >
+                          {g.status}
+                        </span>
+                      </div>
+                      <p className="text-[10px] text-ink-muted truncate mt-0.5">{g.details}</p>
+                      {g.blockers.length > 0 && (
+                        <p className="text-[10px] text-rose-600 dark:text-rose-400 font-medium mt-0.5">
+                          {g.blockers[0]}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </Surface>
+          )}
         </div>
 
         <div className="xl:col-span-2 space-y-6">

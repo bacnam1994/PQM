@@ -18,6 +18,7 @@ import { batchRepository as defaultRepo } from '../../repositories/firebase/Fire
 import { validateOptimisticLock, nextVersion } from '../../utils/concurrency';
 import { signatureService } from '../../services/signatureService';
 import { BatchRules } from '../../domain/rules';
+import { BatchReleaseDecisionService } from '../../domain/batch/BatchReleaseDecisionService';
 import { BatchStateMachine } from '../../domain/workflow/stateMachine';
 import { WorkflowFacade } from '../WorkflowFacade';
 import { WorkflowActor, WorkflowActionId } from '../contracts/actions';
@@ -244,7 +245,7 @@ export class BatchWorkflowHandlers {
       }
     }
 
-    // Rào chắn State Machine FSM
+    // 1. Rào chắn State Machine FSM - Topology & User Permissions
     const currentStatus = currentBatch.status || 'PENDING';
     const transitionCheck = BatchStateMachine.canTransition(currentStatus, status, {
       actorRole: currentUser?.role,
@@ -256,7 +257,7 @@ export class BatchWorkflowHandlers {
       throw new Error(`Quy chuẩn State Machine: ${transitionCheck.reason}`);
     }
 
-    // Rào chắn Chữ ký số 21 CFR Part 11
+    // 2. Rào chắn Chữ ký số 21 CFR Part 11 (Xóa bỏ hoàn toàn sig_auto_*)
     if (status === 'RELEASED' || status === 'REJECTED') {
       if (options?.requireSignature || options?.signature) {
         if (!options?.signature) {
@@ -278,22 +279,27 @@ export class BatchWorkflowHandlers {
       }
     }
 
-    // Rào chắn kiểm tra Release Gates khi chuyển RELEASED (BatchRules / ReleaseRules)
+    // 3. Tính toán Canonical Release Decision nếu chuyển sang RELEASED
+    let releaseDecision: any = undefined;
     if (status === 'RELEASED') {
       let freshTestResults: TestResult[] = options?.batchTestResults || [];
       if (this.repo && typeof (this.repo as any).findTestResultsByBatchId === 'function') {
         freshTestResults = await (this.repo as any).findTestResultsByBatchId(batchId);
       }
 
-      const releaseDecision = BatchRules.canRelease(
-        currentBatch,
-        freshTestResults,
-        currentUser?.role,
-        currentBatch.tccsSnapshot || (currentBatch as any)?.tccs
-      );
-      if (!releaseDecision.allowed) {
+      releaseDecision = BatchReleaseDecisionService.resolveBatchReleaseDecision({
+        batch: currentBatch,
+        testResults: freshTestResults,
+        userRole: currentUser?.role,
+        userSignature: options?.signature,
+        asOfDate: new Date(),
+        boundTccs: currentBatch.tccsSnapshot || (currentBatch as any)?.tccs,
+        skipBprRequirementForTestingStatus: true,
+      });
+
+      if (!releaseDecision.eligible) {
         throw new Error(
-          `Quy chuẩn GMP & Release Guard: ${releaseDecision.reason || 'Lô không đủ điều kiện xuất xưởng.'}`
+          `Quy chuẩn GMP & Release Guard: ${releaseDecision.blockers[0] || 'Lô không đủ điều kiện xuất xưởng.'}`
         );
       }
     }
@@ -305,14 +311,24 @@ export class BatchWorkflowHandlers {
       version: newVersion,
       updatedAt: new Date().toISOString(),
       ...(status === 'RELEASED'
-        ? { releasedAt: new Date().toISOString(), releasedBy: currentUser?.email || 'unknown' }
+        ? {
+            releasedAt: new Date().toISOString(),
+            releasedBy: currentUser?.email || 'unknown',
+            releaseDecisionSnapshot: releaseDecision,
+          }
         : {}),
       ...(status === 'REJECTED' ? { rejectReason: effectiveReason } : {}),
     };
 
     if (!flags.enableBatchWorkflowFacade) {
       if (typeof this.repo.updateStatus === 'function') {
-        await this.repo.updateStatus(batchId, status, effectiveReason);
+        await this.repo.updateStatus(batchId, status, effectiveReason, {
+          expectedVersion: currentBatch.version ?? 1,
+          releasedAt: cleanBatch.releasedAt,
+          releasedBy: cleanBatch.releasedBy,
+          rejectReason: cleanBatch.rejectReason,
+          releaseDecisionSnapshot: status === 'RELEASED' ? releaseDecision : undefined,
+        });
       } else {
         await this.repo.update(cleanBatch);
       }
@@ -334,26 +350,18 @@ export class BatchWorkflowHandlers {
         actor,
         payload: cleanBatch,
         reason: effectiveReason,
-        signature:
-          options?.signature ||
-          (!options?.requireSignature && (status === 'RELEASED' || status === 'REJECTED')
-            ? {
-                id: `sig_auto_${Date.now()}`,
-                documentType: (status === 'RELEASED' ? 'BATCH_RELEASE' : 'BATCH') as any,
-                documentId: batchId,
-                signerUid: actor.id,
-                signerName: actor.name,
-                signerEmail: actor.email || 'qa@pqm.com',
-                role: actor.role as any,
-                signedAt: new Date().toISOString(),
-                checksum: 'valid-checksum',
-              }
-            : undefined),
+        signature: options?.signature,
         currentState: currentStatus,
       },
       async () => {
         if (typeof this.repo.updateStatus === 'function') {
-          await this.repo.updateStatus(batchId, status, effectiveReason);
+          await this.repo.updateStatus(batchId, status, effectiveReason, {
+            expectedVersion: currentBatch.version ?? 1,
+            releasedAt: cleanBatch.releasedAt,
+            releasedBy: cleanBatch.releasedBy,
+            rejectReason: cleanBatch.rejectReason,
+            releaseDecisionSnapshot: status === 'RELEASED' ? releaseDecision : undefined,
+          });
         } else {
           await this.repo.update(cleanBatch);
         }

@@ -6,6 +6,7 @@
 import { Batch, TestResult, TCCS, QualityDeviation as Deviation } from '../../types';
 import { Role } from '../../types/permissions';
 import { CanonicalStatusResolver } from '../canonical/canonicalResolver';
+import { BatchReleaseDecisionService } from '../batch/BatchReleaseDecisionService';
 
 export interface ReleasePrerequisiteEvaluation {
   isEligibleForRelease: boolean;
@@ -156,108 +157,25 @@ export class ReleaseRules {
     }>;
     blockers: string[];
   } {
-    const prereq = this.evaluateReleasePrerequisites(options);
-    const { batch, testResults, deviations = [], boundTccs } = options;
-    const qualityRes = CanonicalStatusResolver.resolveBatchQuality(batch, testResults, boundTccs);
-
-    const completionPct = qualityRes.completion?.percentage ?? 0;
-    const gate1Passed = completionPct === 100;
-    const gate2Passed = qualityRes.batchQualityStatus === 'PASS';
-    const gate3Passed = !batch.hasActiveOOS;
-    const gate4Passed = prereq.criteriaMet.noCriticalOpenDeviations;
-    const gate5Passed = true; // CAPA containment cleared
-    const bprApproved = (batch as any).bprReviewStatus
-      ? (batch as any).bprReviewStatus === 'APPROVED'
-      : batch.status === 'TESTING' || batch.status === 'PENDING';
-    const gate6Passed = bprApproved;
-    const gate7Passed =
-      (prereq.criteriaMet.isNotExpired ?? true) && prereq.criteriaMet.hasProperRole;
-
-    const gateBlockers: string[] = [...prereq.blockers];
-    if (!gate1Passed && !gateBlockers.some((b) => b.includes('ERR_TEST_INCOMPLETE'))) {
-      gateBlockers.push(
-        `ERR_TEST_INCOMPLETE: Chỉ tiêu kiểm nghiệm chưa hoàn tất 100% (${completionPct}%).`
-      );
-    }
-    if (!gate2Passed && !gateBlockers.some((b) => b.includes('ERR_QUALITY_NOT_PASS'))) {
-      gateBlockers.push(
-        `ERR_QUALITY_NOT_PASS: Đánh giá chất lượng Lô chưa đạt chuẩn PASS (${qualityRes.batchQualityStatus}).`
-      );
-    }
-    if (!gate3Passed && !gateBlockers.some((b) => b.includes('ERR_OOS_PENDING'))) {
-      gateBlockers.push('ERR_OOS_PENDING: Lô có hồ sơ điều tra OOS chưa được xử lý đóng (CLOSED).');
-    }
-    if (!gate4Passed && !gateBlockers.some((b) => b.includes('ERR_DEV_PENDING'))) {
-      gateBlockers.push('ERR_DEV_PENDING: Còn hồ sơ sai lệch nghiêm trọng (CRITICAL) chưa đóng.');
-    }
-    if (!gate5Passed && !gateBlockers.some((b) => b.includes('ERR_CAPA_BLOCKING'))) {
-      gateBlockers.push('ERR_CAPA_BLOCKING: Biện pháp CAPA khẩn cấp chưa hoàn thành.');
-    }
-    if (!gate6Passed && !gateBlockers.some((b) => b.includes('ERR_BPR_NOT_APPROVED'))) {
-      gateBlockers.push(
-        'ERR_BPR_NOT_APPROVED: Hồ sơ sản xuất (BPR Review) chưa được QA thẩm định phê duyệt.'
-      );
-    }
-    if (
-      !gate7Passed &&
-      !gateBlockers.some((b) => b.includes('ERR_SIGNATURE_MISSING') || b.includes('ERR_EXPIRED'))
-    ) {
-      gateBlockers.push(
-        'ERR_SIGNATURE_MISSING: Chưa đủ thẩm quyền xuất xưởng hoặc Lô đã hết hạn sử dụng.'
-      );
-    }
-
-    const gates = [
-      {
-        gateIndex: 1,
-        gateName: 'Tính đầy đủ của phép thử (100% Criteria)',
-        passed: gate1Passed,
-        details: `${completionPct}% hoàn thành`,
-      },
-      {
-        gateIndex: 2,
-        gateName: 'Đánh giá chất lượng chuẩn tắc (Canonical PASS)',
-        passed: gate2Passed,
-        details: qualityRes.batchQualityStatus,
-      },
-      {
-        gateIndex: 3,
-        gateName: 'Xử lý OOS (Không vướng OOS mở)',
-        passed: gate3Passed,
-        details: batch.hasActiveOOS ? 'Có OOS mở' : 'Đã đóng',
-      },
-      {
-        gateIndex: 4,
-        gateName: 'Xử lý Sai lệch (Không có Critical Deviation mở)',
-        passed: gate4Passed,
-        details: gate4Passed ? 'Không có sai lệch lớn' : 'Có sai lệch CRITICAL',
-      },
-      {
-        gateIndex: 5,
-        gateName: 'Biện pháp CAPA khẩn cấp',
-        passed: gate5Passed,
-        details: 'Đã hoàn thành',
-      },
-      {
-        gateIndex: 6,
-        gateName: 'Thẩm tra Hồ sơ sản xuất (BPR Review)',
-        passed: gate6Passed,
-        details: gate6Passed ? 'Đạt yêu cầu' : 'Chưa được QA duyệt (BPR_NOT_APPROVED)',
-      },
-      {
-        gateIndex: 7,
-        gateName: 'Pháp lý & Thẩm quyền ký số',
-        passed: gate7Passed,
-        details: gate7Passed ? 'Hợp lệ' : 'Chưa đủ thẩm quyền/Hết hạn',
-      },
-    ];
-
-    const allGatesPassed = gates.every((g) => g.passed);
+    const decision = BatchReleaseDecisionService.resolveBatchReleaseDecision({
+      batch: options.batch,
+      testResults: options.testResults,
+      deviations: options.deviations,
+      boundTccs: options.boundTccs,
+      userRole: options.userRole,
+      asOfDate: options.asOfDate,
+      skipBprRequirementForTestingStatus: true,
+    });
 
     return {
-      allGatesPassed,
-      gates,
-      blockers: gateBlockers,
+      allGatesPassed: decision.eligible,
+      gates: decision.gates.map((g) => ({
+        gateIndex: g.gateIndex,
+        gateName: g.gateName,
+        passed: g.passed,
+        details: g.details,
+      })),
+      blockers: decision.blockers,
     };
   }
 
