@@ -82,6 +82,14 @@ export class FirebaseBatchRepository
         if (status === 'RELEASED') {
           updatedBatch.releasedAt = metadata?.releasedAt || now;
           updatedBatch.releasedBy = metadata?.releasedBy || 'QA/Admin';
+          updatedBatch.releaseStage = 'RELEASED';
+          updatedBatch.releaseGateProgress = {
+            completed: 7,
+            total: 7,
+            currentGate: 8,
+            percentage: 100,
+            evaluatedAt: now,
+          };
           if (metadata?.releaseDecisionSnapshot !== undefined) {
             updatedBatch.releaseDecisionSnapshot = metadata.releaseDecisionSnapshot;
           }
@@ -90,6 +98,7 @@ export class FirebaseBatchRepository
             reason || metadata?.rejectReason || currentBatch.rejectReason || null;
           updatedBatch.rejectedAt = metadata?.rejectedAt || now;
           updatedBatch.rejectedBy = metadata?.rejectedBy || 'QA/Admin';
+          updatedBatch.releaseStage = 'REJECTED';
         } else if (status === 'BLOCKED') {
           if (currentBatch.status === 'RELEASED') {
             updatedBatch.recallReason =
@@ -167,6 +176,14 @@ export class FirebaseBatchRepository
                 releasedAt: metadata?.releasedAt || now,
                 releasedBy: metadata?.releasedBy || 'QA/Admin',
                 releaseDecisionSnapshot: metadata?.releaseDecisionSnapshot || null,
+                releaseStage: 'RELEASED',
+                releaseGateProgress: {
+                  completed: 7,
+                  total: 7,
+                  currentGate: 8,
+                  percentage: 100,
+                  evaluatedAt: now,
+                },
               }
             : {}),
           ...(status === 'REJECTED'
@@ -174,6 +191,7 @@ export class FirebaseBatchRepository
                 rejectReason: reason || metadata?.rejectReason || currentBatch.rejectReason || null,
                 rejectedAt: metadata?.rejectedAt || now,
                 rejectedBy: metadata?.rejectedBy || 'QA/Admin',
+                releaseStage: 'REJECTED',
               }
             : {}),
           ...(status === 'BLOCKED'
@@ -325,16 +343,109 @@ export class FirebaseBatchRepository
   async updateReleaseProgress(
     batchId: string,
     releaseStage: BatchReleaseStage,
-    releaseGateProgress: BatchReleaseGateProgress
-  ): Promise<void> {
+    releaseGateProgress: BatchReleaseGateProgress,
+    options?: { expectedVersion?: number }
+  ): Promise<Batch> {
     if (!batchId) throw new Error('Yêu cầu ID lô sản xuất');
-    const targetPath = `${this.collectionPath}/${batchId}`;
-    // Atomic update không cần OCC vì đây là computed state (idempotent)
-    await update(ref(db, targetPath), {
-      releaseStage,
-      releaseGateProgress,
-      updatedAt: new Date().toISOString(),
-    });
+    const batchRef = ref(db, `${this.collectionPath}/${batchId}`);
+    const now = new Date().toISOString();
+    let updatedBatchResult: Batch | null = null;
+
+    try {
+      const txResult = await runTransaction(batchRef, (currentBatch) => {
+        if (!currentBatch) return currentBatch;
+
+        // P0-2: Không cho phép progress writer ghi đè trạng thái RELEASED / REJECTED
+        if (currentBatch.status === 'RELEASED' || currentBatch.releaseStage === 'RELEASED') {
+          if (releaseStage !== 'RELEASED') {
+            // Đã xuất xưởng -> Chặn đứng stale write (ví dụ 6/7 hoặc GATE_6 chạy sau)
+            return; // Abort transaction
+          }
+        }
+
+        if (currentBatch.status === 'REJECTED' || currentBatch.releaseStage === 'REJECTED') {
+          if (releaseStage !== 'REJECTED') {
+            return; // Abort transaction
+          }
+        }
+
+        const currentVersion = currentBatch.version ?? 1;
+        if (options?.expectedVersion !== undefined && currentVersion !== options.expectedVersion) {
+          return; // Abort on version mismatch
+        }
+
+        // P0-1: Tăng version khi cập nhật releaseGateProgress để bảo toàn OCC
+        const newVersion = currentVersion + 1;
+        const updatedBatch: Batch = {
+          ...currentBatch,
+          releaseStage,
+          releaseGateProgress,
+          version: newVersion,
+          updatedAt: now,
+        };
+        updatedBatchResult = updatedBatch;
+        return updatedBatch;
+      });
+
+      if (!txResult || !txResult.committed) {
+        // Kiểm tra xem có phải do lô đã RELEASED không
+        const currentSnap = await get(batchRef);
+        const latest = currentSnap.exists() ? currentSnap.val() : null;
+        if (latest && (latest.status === 'RELEASED' || latest.releaseStage === 'RELEASED')) {
+          return latest as Batch;
+        }
+        throw new Error(
+          `CONCURRENCY_CONFLICT: Xung đột phiên bản cập nhật tiến trình Lô (${batchId}).`
+        );
+      }
+
+      return updatedBatchResult || (txResult.snapshot.val() as Batch);
+    } catch (err: any) {
+      if (err.message && err.message.includes('CONCURRENCY_CONFLICT')) {
+        throw err;
+      }
+
+      const isExplicitMockEnv =
+        (typeof process !== 'undefined' &&
+          (process.env?.NODE_ENV === 'test' || Boolean(process.env?.VITEST))) ||
+        (typeof window !== 'undefined' &&
+          Boolean((window as any).__PQM_TEST_MOCK_NO_TRANSACTION__));
+
+      const isTransactionUnsupported =
+        typeof runTransaction !== 'function' ||
+        (err?.message &&
+          (err.message.includes('not a function') || err.message.includes('not implemented')));
+
+      if (!isExplicitMockEnv || !isTransactionUnsupported) {
+        throw err;
+      }
+
+      // Explicit mock environment fallback
+      const snapshot = await get(batchRef);
+      if (snapshot && typeof snapshot.exists === 'function' && snapshot.exists()) {
+        const currentBatch = snapshot.val();
+        if (currentBatch.status === 'RELEASED' || currentBatch.releaseStage === 'RELEASED') {
+          if (releaseStage !== 'RELEASED') {
+            return currentBatch;
+          }
+        }
+        const currentVersion = currentBatch?.version ?? 1;
+        if (options?.expectedVersion !== undefined && currentVersion !== options.expectedVersion) {
+          throw new Error(`CONCURRENCY_CONFLICT: Xung đột phiên bản (${batchId}).`);
+        }
+        const newVersion = currentVersion + 1;
+        const updatedBatch: Batch = {
+          ...currentBatch,
+          releaseStage,
+          releaseGateProgress,
+          version: newVersion,
+          updatedAt: now,
+        };
+        await update(batchRef, updatedBatch);
+        return updatedBatch;
+      }
+      throw new Error(`MOCK_TRANSACTION_FAILED: Không tìm thấy snapshot cho Lô (${batchId}).`);
+    }
   }
 
   async delete(id: string): Promise<void> {

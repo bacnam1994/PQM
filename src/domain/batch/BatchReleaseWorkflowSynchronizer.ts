@@ -116,13 +116,19 @@ export class BatchReleaseWorkflowSynchronizer {
         signatures,
       });
 
-      // Persist lên Firebase (atomic update)
+      // Persist lên Firebase (atomic transaction với OCC & terminal state guard)
       if (typeof this.repo.updateReleaseProgress === 'function') {
-        await this.repo.updateReleaseProgress(
+        const updated = await this.repo.updateReleaseProgress(
           batchId,
           progress.releaseStage,
-          progress.releaseGateProgress
+          progress.releaseGateProgress,
+          batch.version !== undefined ? { expectedVersion: batch.version } : undefined
         );
+        if (updated) {
+          batch.version = updated.version;
+          batch.releaseStage = updated.releaseStage;
+          batch.releaseGateProgress = updated.releaseGateProgress;
+        }
       }
 
       return progress;

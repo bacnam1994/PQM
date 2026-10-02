@@ -28,12 +28,13 @@ export interface IBatchRepository extends IRepository<Batch> {
     }
   ): Promise<Batch>;
   /**
-   * Cập nhật tiến trình 7 Release Gates vào Firebase (atomic update, không cần OCC).
-   * Được gọi bởi BatchReleaseWorkflowSynchronizer sau mỗi sự kiện nghiệp vụ.
+   * Cập nhật tiến trình 7 Release Gates vào Firebase (atomic transaction với OCC).
+   * Bảo vệ chống stale writes (không ghi đè Lô đã RELEASED) và tăng version nhất quán.
    */
   updateReleaseProgress(
     batchId: string,
     releaseStage: BatchReleaseStage,
-    releaseGateProgress: BatchReleaseGateProgress
-  ): Promise<void>;
+    releaseGateProgress: BatchReleaseGateProgress,
+    options?: { expectedVersion?: number }
+  ): Promise<Batch>;
 }

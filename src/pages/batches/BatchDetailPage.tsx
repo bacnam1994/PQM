@@ -162,20 +162,6 @@ const BatchDetailPage = () => {
     };
   }, [batch, releaseDecision]);
 
-  /** Tự động đồng bộ releaseGateProgress lên DB nếu chưa có */
-  useEffect(() => {
-    if (
-      batch?.id &&
-      !batch.releaseGateProgress &&
-      canonicalGateProgress &&
-      canonicalGateProgress.completed > 0
-    ) {
-      batchRepository
-        .updateReleaseProgress(batch.id, canonicalReleaseStage as any, canonicalGateProgress)
-        .catch(() => {});
-    }
-  }, [batch?.id, batch?.releaseGateProgress, canonicalGateProgress, canonicalReleaseStage]);
-
   const handleOpenSignRelease = async () => {
     if (!batch || !releaseDecision) return;
 

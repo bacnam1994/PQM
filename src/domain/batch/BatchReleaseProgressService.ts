@@ -38,7 +38,11 @@ export interface BatchReleaseProgress {
   releaseGateProgress: BatchReleaseGateProgress;
   /** Kết quả từng Gate (1–7) để UI render */
   gateResults: ReleaseGateResult[];
-  /** Đủ điều kiện kích hoạt BATCH_RELEASE_APPROVE (chỉ khi 6/7 gate đầu PASS – Gate 7 tính khi ký) */
+  /** Đủ điều kiện để mở bước ký QA (Cổng 1-6 PASS, Cổng 7 đang chờ ký) */
+  readyForSignature: boolean;
+  /** Đủ điều kiện xuất xưởng hoàn toàn (toàn bộ 7/7 Cổng đã PASS) */
+  readyForRelease: boolean;
+  /** @deprecated Dùng readyForSignature hoặc readyForRelease để phân định rõ ràng */
   readyForFinalApproval: boolean;
   /** Timestamp tính toán */
   evaluatedAt: string;
@@ -125,6 +129,8 @@ export class BatchReleaseProgressService {
         releaseStage: 'RELEASED',
         releaseGateProgress: progress,
         gateResults: [],
+        readyForSignature: false,
+        readyForRelease: true,
         readyForFinalApproval: false, // đã released
         evaluatedAt,
       };
@@ -142,6 +148,8 @@ export class BatchReleaseProgressService {
         releaseStage: 'REJECTED',
         releaseGateProgress: progress,
         gateResults: [],
+        readyForSignature: false,
+        readyForRelease: false,
         readyForFinalApproval: false,
         evaluatedAt,
       };
@@ -206,15 +214,22 @@ export class BatchReleaseProgressService {
 
     const releaseStage = stageFromCompleted(completed, batch.status, gates.length > 0);
 
-    // readyForFinalApproval = Gate 1–6 đã PASS (Gate 7 sẽ được xác thực với chữ ký thực khi approve)
-    // Không nghĩa là tất cả 7 PASS – Gate 7 preview không có chữ ký thực nên có thể false ở đây.
+    // Phân định rạch ròi giữa readyForSignature và readyForRelease
+    // 6/7: readyForSignature = true, readyForRelease = false
+    // 7/7: readyForSignature = false, readyForRelease = true
     const gate1to6AllPass = gates.slice(0, 6).every((g) => g.passed);
+    const all7Pass = completed === 7 && gates.every((g) => g.passed);
+
+    const readyForSignature = gate1to6AllPass && !all7Pass;
+    const readyForRelease = all7Pass;
 
     return {
       releaseStage,
       releaseGateProgress: progress,
       gateResults: gates,
-      readyForFinalApproval: gate1to6AllPass,
+      readyForSignature,
+      readyForRelease,
+      readyForFinalApproval: readyForSignature, // backward compatibility
       evaluatedAt,
     };
   }

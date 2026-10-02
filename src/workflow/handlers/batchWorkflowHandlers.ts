@@ -310,17 +310,7 @@ export class BatchWorkflowHandlers {
       throw new Error('Thu hồi lô (Recall) bắt buộc phải có lý do thu hồi rõ ràng.');
     }
 
-    // 3. Topology & Perms check từ BatchStateMachine
-    const transitionCheck = BatchStateMachine.canTransition(currentStatus, calculatedNextState, {
-      actorRole: currentUser?.role,
-      actorId: currentUser?.uid,
-      reason: effectiveReason,
-    });
-    if (!transitionCheck.allowed) {
-      throw new Error(`Quy chuẩn State Machine: ${transitionCheck.reason}`);
-    }
-
-    // 4. Release Decision bắt buộc đối với BATCH_RELEASE_APPROVE
+    // 3. Release Decision bắt buộc đối với BATCH_RELEASE_APPROVE
     let releaseDecision: any = undefined;
     if (actionId === 'BATCH_RELEASE_APPROVE') {
       let freshTestResults: TestResult[] = options?.batchTestResults || [];
@@ -342,6 +332,17 @@ export class BatchWorkflowHandlers {
           `Quy chuẩn GMP & Release Guard: ${releaseDecision.blockers[0] || 'Lô không đủ điều kiện xuất xưởng.'}`
         );
       }
+    }
+
+    // 4. Topology & Perms check từ BatchStateMachine (kết nối trực tiếp SSoT Release Decision qua conditionsMet)
+    const transitionCheck = BatchStateMachine.canTransition(currentStatus, calculatedNextState, {
+      actorRole: currentUser?.role,
+      actorId: currentUser?.uid,
+      reason: effectiveReason,
+      conditionsMet: releaseDecision ? releaseDecision.eligible : undefined,
+    });
+    if (!transitionCheck.allowed) {
+      throw new Error(`Quy chuẩn State Machine: ${transitionCheck.reason}`);
     }
 
     // 5. Chữ ký số 21 CFR Part 11 đối với BATCH_REJECT & BATCH_RECALL
@@ -794,18 +795,14 @@ export class BatchWorkflowHandlers {
     const resultBatch = execution.data!;
     // Phase 14 & 19: Sau khi BPR status thay đổi (đặc biệt BPR_APPROVE qua Gate 6),
     // đồng bộ hóa tiến trình 7 Gate. Không được nuốt lỗi (fire-and-forget).
-    try {
-      const progress = await this.synchronizer.syncBatchReleaseProgress({
-        batchId,
-        batch: resultBatch,
-        userRole: currentUser?.role,
-      });
-      if (progress) {
-        resultBatch.releaseStage = progress.releaseStage;
-        resultBatch.releaseGateProgress = progress.releaseGateProgress;
-      }
-    } catch (syncErr) {
-      console.error('[BatchWorkflowHandlers] Sync error after executeBprAction:', syncErr);
+    const progress = await this.synchronizer.syncBatchReleaseProgress({
+      batchId,
+      batch: resultBatch,
+      userRole: currentUser?.role,
+    });
+    if (progress) {
+      resultBatch.releaseStage = progress.releaseStage;
+      resultBatch.releaseGateProgress = progress.releaseGateProgress;
     }
     return resultBatch;
   }
