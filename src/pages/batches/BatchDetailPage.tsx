@@ -40,6 +40,7 @@ import { useDeviationsByBatchQuery } from '../../hooks/queries/useDeviationQueri
 import { Surface, PageHeader, StatusBadge, ConfirmationModal } from '../../components/ui';
 import { BatchStatusSelect } from './BatchList/components/BatchStatusSelect';
 import { ReleaseRules } from '../../domain/rules';
+import { batchRepository } from '../../repositories/firebase/FirebaseBatchRepository';
 import {
   BatchReleaseDecisionService,
   BatchReleaseDecision,
@@ -160,7 +161,7 @@ const BatchDetailPage = () => {
     };
   }, [batch, releaseDecision]);
 
-  const handleOpenSignRelease = () => {
+  const handleOpenSignRelease = async () => {
     if (!batch || !releaseDecision) return;
 
     // Phase 3: Gate 1-6 PASS + User có quyền QA/ADMIN -> Cho phép mở ESignatureModal
@@ -187,20 +188,37 @@ const BatchDetailPage = () => {
       return;
     }
 
+    // Nếu Lô vẫn đang ở trạng thái PENDING, tự động chuyển tiếp hợp lệ sang TESTING trước khi mở modal ký
+    if (batch.status === 'PENDING') {
+      try {
+        await updateBatchStatus(batch.id, 'TESTING');
+      } catch (err: any) {
+        notify({
+          type: 'ERROR',
+          title: 'Lỗi chuyển trạng thái kiểm nghiệm',
+          message: err.message || 'Không thể chuyển Lô sang trạng thái Đang kiểm nghiệm.',
+        });
+        return;
+      }
+    }
+
     setIsSignReleaseOpen(true);
   };
 
   const handleSignReleaseSuccess = async (signature: ElectronicSignature) => {
     if (!batch) return;
     try {
+      // Phase 9 & 11: FETCH FRESH BATCH trước khi release
+      const freshBatch = (await batchRepository.findById(batch.id)) || batch;
+
       // Phase 5: Re-evaluate 7 Gates với chữ ký thật
       const reEvaluatedDecision = BatchReleaseDecisionService.resolveBatchReleaseDecision({
-        batch,
+        batch: freshBatch,
         testResults: viewBatchResults,
         deviations: batchDeviations,
         userRole: role,
         userSignature: signature,
-        boundTccs: (batch as any)?.tccs,
+        boundTccs: (freshBatch as any)?.tccs || (batch as any)?.tccs,
       });
 
       if (!reEvaluatedDecision.eligible) {
@@ -214,11 +232,11 @@ const BatchDetailPage = () => {
       }
 
       // Phase 8: Chỉ gọi approveBatchRelease với BATCH_RELEASE_APPROVE
-      await approveBatchRelease(batch.id, signature);
+      await approveBatchRelease(freshBatch.id, signature);
       notify({
         type: 'SUCCESS',
         title: 'Xuất xưởng Lô thành công',
-        message: `Đã phê duyệt xuất xưởng Lô ${batch.batchNo} với chữ ký điện tử hợp lệ (FDA 21 CFR Part 11 - 7/7 Gates PASSED).`,
+        message: `Đã phê duyệt xuất xưởng Lô ${freshBatch.batchNo} với chữ ký điện tử hợp lệ (FDA 21 CFR Part 11 - 7/7 Gates PASSED).`,
       });
     } catch (error: any) {
       console.error('Lỗi xuất xưởng Lô:', error);
@@ -528,15 +546,43 @@ const BatchDetailPage = () => {
                 <ShieldCheckIcon className="h-4 w-4" />
                 <span>Đã xuất xưởng</span>
               </div>
-            ) : canSignRelease ? (
-              <button
-                type="button"
-                onClick={handleOpenSignRelease}
-                className="flex items-center gap-1.5 px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white rounded-lg font-medium shadow-xs text-xs cursor-pointer transition-colors"
-              >
-                <ShieldCheckIcon className="h-4 w-4" /> Ký xuất xưởng
-              </button>
-            ) : null}
+            ) : (
+              <>
+                {batch.status === 'PENDING' && (
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      try {
+                        await updateBatchStatus(batch.id, 'TESTING');
+                        notify({
+                          type: 'SUCCESS',
+                          title: 'Bắt đầu kiểm nghiệm',
+                          message: `Lô ${batch.batchNo} đã chuyển sang trạng thái Đang kiểm nghiệm (TESTING).`,
+                        });
+                      } catch (err: any) {
+                        notify({
+                          type: 'ERROR',
+                          title: 'Lỗi bắt đầu kiểm nghiệm',
+                          message: err.message || 'Không thể chuyển Lô sang Đang kiểm nghiệm.',
+                        });
+                      }
+                    }}
+                    className="flex items-center gap-1.5 px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white rounded-lg font-medium shadow-xs text-xs cursor-pointer transition-colors"
+                  >
+                    <ArrowPathIcon className="h-4 w-4" /> Bắt đầu kiểm nghiệm
+                  </button>
+                )}
+                {canSignRelease && (
+                  <button
+                    type="button"
+                    onClick={handleOpenSignRelease}
+                    className="flex items-center gap-1.5 px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white rounded-lg font-medium shadow-xs text-xs cursor-pointer transition-colors"
+                  >
+                    <ShieldCheckIcon className="h-4 w-4" /> Ký xuất xưởng
+                  </button>
+                )}
+              </>
+            )}
             {(isAdmin || role === 'ADMIN') && (
               <button
                 type="button"

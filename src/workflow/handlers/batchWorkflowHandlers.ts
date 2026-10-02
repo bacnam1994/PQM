@@ -250,10 +250,26 @@ export class BatchWorkflowHandlers {
       }
     }
 
-    const currentStatus = currentBatch.status || 'PENDING';
+    let currentStatus = currentBatch.status || 'PENDING';
 
     // 1. Tự động tính toán nextState từ State Machine SSoT (Caller không được ép nextState)
-    const calculatedNextState = BatchStateMachine.resolveNextState(actionId, currentStatus);
+    let calculatedNextState = BatchStateMachine.resolveNextState(actionId, currentStatus);
+    if (!calculatedNextState) {
+      // Trường hợp an toàn: Lô đang ở PENDING nhưng được phê duyệt xuất xưởng (BATCH_RELEASE_APPROVE),
+      // tự động chuyển tiếp hợp lệ PENDING -> TESTING (BATCH_DISPATCH_TESTING) trước để tuân thủ 100% FSM.
+      if (actionId === 'BATCH_RELEASE_APPROVE' && currentStatus === 'PENDING') {
+        const dispatchResult = await this.executeBatchAction(
+          'BATCH_DISPATCH_TESTING',
+          batchId,
+          currentUser,
+          options
+        );
+        currentBatch = dispatchResult;
+        currentStatus = currentBatch.status || 'TESTING';
+        calculatedNextState = BatchStateMachine.resolveNextState(actionId, currentStatus);
+      }
+    }
+
     if (!calculatedNextState) {
       const targetState =
         actionId === 'BATCH_RELEASE_APPROVE'

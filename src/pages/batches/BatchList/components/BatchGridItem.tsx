@@ -175,7 +175,7 @@ export const BatchGridItem = memo<BatchGridItemProps>(
         </div>
 
         {/* Gate 7 Action / Blocker Banner (Phase 16) */}
-        {batch.status === 'TESTING' &&
+        {(batch.status === 'TESTING' || (batch.status === 'PENDING' && completedGates === 6)) &&
           currentGate === 7 &&
           (gate7BlockerMessage ? (
             <div className="p-2.5 rounded-lg bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 flex items-center justify-between gap-2 mt-1">

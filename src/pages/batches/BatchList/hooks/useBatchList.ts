@@ -275,6 +275,15 @@ export function useBatchList() {
             return;
           }
 
+          // NẾU LÔ ĐANG Ở PENDING: Chuyển tiếp hợp lệ PENDING -> TESTING trước khi mở modal ký
+          if (freshBatch.status === 'PENDING') {
+            await updateBatchStatus(freshBatch.id, 'TESTING');
+            const reFetched = await batchRepository.findById(batchId);
+            if (reFetched) {
+              freshBatch = reFetched;
+            }
+          }
+
           // Gate 1-6 PASS -> Mở ESignatureModal với freshBatch và freshBatch.version
           setESignatureTarget({ batchId, batch: freshBatch });
           return;
@@ -292,7 +301,7 @@ export function useBatchList() {
       setPendingStatusUpdate({ status: newStatus, batchId });
       setIsStatusConfirmOpen(true);
     },
-    [hydratedBatches, sourceResults, notify, user]
+    [hydratedBatches, sourceResults, notify, user, updateBatchStatus]
   );
 
   const handleESignatureSuccess = async (signature: ElectronicSignature) => {

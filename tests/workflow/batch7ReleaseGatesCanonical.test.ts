@@ -389,4 +389,49 @@ describe('Batch 7 Release Gates Canonical Tests (Phase 20 Requirements)', () => 
     expect(reloadedBatch!.releaseGateProgress?.currentGate).toBe(7);
     expect(reloadedBatch!.releaseGateProgress?.percentage).toBe(86);
   });
+
+  // CASE 9: PENDING BATCH -> Lô đang ở PENDING nhưng Gate 1-6 PASS -> BATCH_RELEASE_APPROVE tự động chuyển tiếp hợp lệ PENDING -> TESTING -> RELEASED
+  it('CASE 9: PENDING BATCH -> Lô đang ở PENDING nhưng Gate 1-6 PASS -> BATCH_RELEASE_APPROVE tự động chuyển PENDING -> TESTING -> RELEASED mà không gây lỗi State Machine', async () => {
+    // Thiết lập lô ở PENDING nhưng đã hoàn tất kiểm nghiệm và BPR
+    mockBatch = {
+      ...mockBatch,
+      status: 'PENDING',
+      version: 10,
+      bprReviewStatus: 'APPROVED',
+      releaseStage: 'GATE_7',
+      releaseGateProgress: {
+        completed: 6,
+        total: 7,
+        currentGate: 7,
+        percentage: 86,
+        evaluatedAt: new Date().toISOString(),
+      },
+    };
+
+    // Khi auto-promote từ PENDING -> TESTING, version tăng 10 -> 11
+    const validSig: ElectronicSignature = {
+      id: 'sig_pending_release_001',
+      documentType: 'BATCH_RELEASE',
+      documentId: mockBatch.id,
+      documentVersion: 11,
+      signerUid: qaUser.id,
+      signerName: qaUser.displayName,
+      signerEmail: qaUser.email,
+      role: 'QA',
+      meaning: 'Phê duyệt xuất xưởng lô',
+      signedAt: new Date().toISOString(),
+      checksum: '',
+    };
+    validSig.checksum = await computeSignatureChecksum(validSig);
+
+    const releasedBatch = await service.approveRelease(mockBatch.id, qaUser, {
+      signature: validSig,
+      batchTestResults: mockTestResults,
+    });
+
+    expect(releasedBatch.status).toBe('RELEASED');
+    expect(releasedBatch.releaseStage).toBe('RELEASED');
+    expect(releasedBatch.releaseGateProgress?.completed).toBe(7);
+    expect(releasedBatch.releaseGateProgress?.percentage).toBe(100);
+  });
 });
