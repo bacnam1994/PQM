@@ -265,4 +265,38 @@ describe('Batch Release Concurrency & OCC Hardening (P0-1 đến P1-4)', () => {
 
     expect(checkSuccess.allowed).toBe(true);
   });
+
+  // P1-5: Bộ lọc removeUndefined loại bỏ hoàn toàn các trường undefined trước khi ghi vào Firebase
+  it('P1-5: updateStatus loại bỏ toàn bộ trường undefined trước khi commit vào Firebase (removeUndefined sanitizer)', async () => {
+    mockDbState[`batches/${mockBatch.id}`] = {
+      ...mockBatch,
+      status: 'PENDING',
+      version: 2,
+    };
+
+    // Truyền metadata và reason có chứa trường undefined
+    await batchRepository.updateStatus(
+      mockBatch.id,
+      'TESTING',
+      undefined, // reason undefined
+      {
+        expectedVersion: 2,
+        releaseDecisionSnapshot: undefined,
+        releasedBy: undefined,
+        notes: undefined as any,
+      }
+    );
+
+    const savedBatch = mockDbState[`batches/${mockBatch.id}`];
+    expect(savedBatch).toBeDefined();
+    expect(savedBatch.status).toBe('TESTING');
+    expect(savedBatch.version).toBe(3);
+
+    // Kiểm tra không có bất kỳ key nào mang giá trị undefined trong object đã lưu
+    for (const [key, value] of Object.entries(savedBatch)) {
+      expect(value).not.toBeUndefined();
+    }
+    expect('releaseDecisionSnapshot' in savedBatch).toBe(false);
+    expect('notes' in savedBatch).toBe(false);
+  });
 });

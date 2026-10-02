@@ -10,6 +10,7 @@ import { Batch, BatchReleaseStage, BatchReleaseGateProgress } from '../../types'
 import { IBatchRepository } from '../BatchRepository';
 import { BaseFirebaseRepository } from './BaseFirebaseRepository';
 import { deleteBatchService } from '../../services/databaseService';
+import { removeUndefined } from '../../utils';
 
 export class FirebaseBatchRepository
   extends BaseFirebaseRepository<Batch>
@@ -126,7 +127,8 @@ export class FirebaseBatchRepository
           updatedBatch.version = newVersion;
         }
 
-        return updatedBatch;
+        // BỘ LỌC CHUẨN HÓA: Loại bỏ toàn bộ undefined trước khi commit transaction
+        return removeUndefined(updatedBatch);
       });
 
       if (!txResult || !txResult.committed) {
@@ -167,7 +169,7 @@ export class FirebaseBatchRepository
           );
         }
         const newVersion = currentVersion + 1;
-        const updates: Record<string, any> = {
+        const rawUpdates: Record<string, any> = {
           status,
           version: newVersion,
           updatedAt: now,
@@ -218,11 +220,12 @@ export class FirebaseBatchRepository
         };
         if (metadata) {
           const { expectedVersion: _, ...rest } = metadata;
-          Object.assign(updates, rest);
-          updates.status = status;
-          updates.version = newVersion;
+          Object.assign(rawUpdates, rest);
+          rawUpdates.status = status;
+          rawUpdates.version = newVersion;
         }
-        await update(batchRef, updates);
+        const cleanUpdates = removeUndefined(rawUpdates);
+        await update(batchRef, cleanUpdates);
         return;
       }
 
@@ -235,9 +238,10 @@ export class FirebaseBatchRepository
 
   async updateProgress(batchId: string, progressPercent: number): Promise<void> {
     if (!batchId) throw new Error('Yêu cầu ID lô sản xuất');
-    const updates = { progressPercent };
+    const rawUpdates = { progressPercent };
+    const cleanUpdates = removeUndefined(rawUpdates);
     const targetPath = `${this.collectionPath}/${batchId}`;
-    await update(ref(db, targetPath), updates);
+    await update(ref(db, targetPath), cleanUpdates);
   }
 
   async updateBprReview(
@@ -278,11 +282,12 @@ export class FirebaseBatchRepository
         if (metadata?.bprReviewedAt) updatedBatch.bprReviewedAt = metadata.bprReviewedAt;
         if (metadata?.bprReviewedBy) updatedBatch.bprReviewedBy = metadata.bprReviewedBy;
         if (metadata?.bprReviewComment !== undefined) {
-          updatedBatch.bprReviewComment = metadata.bprReviewComment;
+          updatedBatch.bprReviewComment = metadata.bprReviewComment || null;
         }
 
-        updatedBatchResult = updatedBatch as Batch;
-        return updatedBatch;
+        const cleanBatch = removeUndefined(updatedBatch);
+        updatedBatchResult = cleanBatch as Batch;
+        return cleanBatch;
       });
 
       if (!txResult || !txResult.committed) {
@@ -330,11 +335,12 @@ export class FirebaseBatchRepository
           ...(metadata?.bprReviewedAt ? { bprReviewedAt: metadata.bprReviewedAt } : {}),
           ...(metadata?.bprReviewedBy ? { bprReviewedBy: metadata.bprReviewedBy } : {}),
           ...(metadata?.bprReviewComment !== undefined
-            ? { bprReviewComment: metadata.bprReviewComment }
+            ? { bprReviewComment: metadata.bprReviewComment || null }
             : {}),
         };
-        await update(batchRef, updatedBatch);
-        return updatedBatch;
+        const cleanBatch = removeUndefined(updatedBatch);
+        await update(batchRef, cleanBatch);
+        return cleanBatch;
       }
       throw new Error(`MOCK_TRANSACTION_FAILED: Không tìm thấy snapshot cho Lô (${batchId}).`);
     }
@@ -383,8 +389,9 @@ export class FirebaseBatchRepository
           version: newVersion,
           updatedAt: now,
         };
-        updatedBatchResult = updatedBatch;
-        return updatedBatch;
+        const cleanBatch = removeUndefined(updatedBatch);
+        updatedBatchResult = cleanBatch;
+        return cleanBatch;
       });
 
       if (!txResult || !txResult.committed) {
@@ -441,8 +448,9 @@ export class FirebaseBatchRepository
           version: newVersion,
           updatedAt: now,
         };
-        await update(batchRef, updatedBatch);
-        return updatedBatch;
+        const cleanBatch = removeUndefined(updatedBatch);
+        await update(batchRef, cleanBatch);
+        return cleanBatch;
       }
       throw new Error(`MOCK_TRANSACTION_FAILED: Không tìm thấy snapshot cho Lô (${batchId}).`);
     }
