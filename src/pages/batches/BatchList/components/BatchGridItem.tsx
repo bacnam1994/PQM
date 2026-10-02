@@ -137,6 +137,8 @@ export const BatchGridItem = memo<BatchGridItemProps>(
               isAdmin={isAdmin}
               batch={batch}
               testResults={testResults}
+              releaseGateProgress={batch.releaseGateProgress}
+              releaseStage={batch.releaseStage}
             />
           </div>
         </div>

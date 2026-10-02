@@ -8,9 +8,16 @@ import {
   LockClosedIcon,
 } from '@heroicons/react/24/outline';
 import { StatusBadge } from '../../../../components';
-import { Batch, TestResult, TCCS } from '../../../../types';
+import {
+  Batch,
+  TestResult,
+  TCCS,
+  BatchReleaseGateProgress,
+  BatchReleaseStage,
+} from '../../../../types';
 import { useAppStore } from '../../../../store/useAppStore';
 import { BatchStateMachine } from '../../../../domain/workflow/stateMachine';
+import { BatchReleaseProgressService } from '../../../../domain/batch/BatchReleaseProgressService';
 
 interface BatchStatusSelectProps {
   status: string;
@@ -20,6 +27,8 @@ interface BatchStatusSelectProps {
   batch?: Batch;
   testResults?: TestResult[];
   tccs?: TCCS | null;
+  releaseGateProgress?: BatchReleaseGateProgress | null;
+  releaseStage?: BatchReleaseStage | string | null;
 }
 
 export const BatchStatusSelect: React.FC<BatchStatusSelectProps> = ({
@@ -28,6 +37,10 @@ export const BatchStatusSelect: React.FC<BatchStatusSelectProps> = ({
   onUpdate,
   isAdmin,
   batch,
+  testResults,
+  tccs,
+  releaseGateProgress: propReleaseGateProgress,
+  releaseStage: propReleaseStage,
 }) => {
   const storeBatches = useAppStore((state) => state.batches);
   const effectiveBatch = batch || storeBatches.find((b) => b.id === batchId);
@@ -70,8 +83,43 @@ export const BatchStatusSelect: React.FC<BatchStatusSelectProps> = ({
     isAdmin ? 'ADMIN' : 'QA'
   );
 
-  const gateProgress = effectiveBatch?.releaseGateProgress;
-  const releaseStage = effectiveBatch?.releaseStage;
+  // Dynamic Canonical Gate Progress:
+  // 1. Ưu tiên props truyền vào (e.g. từ BatchDetailPage với canonicalGateProgress)
+  // 2. Tiếp theo từ effectiveBatch.releaseGateProgress (đã sync DB)
+  // 3. Fallback tính toán tại chỗ qua BatchReleaseProgressService nếu có testResults
+  const resolvedProgress = useMemo(() => {
+    if (propReleaseGateProgress) {
+      return {
+        gateProgress: propReleaseGateProgress,
+        releaseStage: propReleaseStage ?? effectiveBatch?.releaseStage,
+      };
+    }
+    if (effectiveBatch?.releaseGateProgress) {
+      return {
+        gateProgress: effectiveBatch.releaseGateProgress,
+        releaseStage: effectiveBatch.releaseStage,
+      };
+    }
+    if (effectiveBatch && testResults && testResults.length > 0) {
+      try {
+        const res = BatchReleaseProgressService.resolveReleaseProgress({
+          batch: effectiveBatch,
+          testResults,
+          boundTccs: (effectiveBatch as any)?.tccsSnapshot || (effectiveBatch as any)?.tccs || tccs,
+        });
+        return {
+          gateProgress: res.releaseGateProgress,
+          releaseStage: res.releaseStage,
+        };
+      } catch {
+        return null;
+      }
+    }
+    return null;
+  }, [propReleaseGateProgress, propReleaseStage, effectiveBatch, testResults, tccs]);
+
+  const gateProgress = resolvedProgress?.gateProgress ?? effectiveBatch?.releaseGateProgress;
+  const releaseStage = resolvedProgress?.releaseStage ?? effectiveBatch?.releaseStage;
 
   // Phase 4 & 5: Hiển thị 2 tầng (Lifecycle + Release Gate Progress từ DB, không tự tính)
   const releaseProgressLabel = useMemo(() => {
@@ -85,10 +133,6 @@ export const BatchStatusSelect: React.FC<BatchStatusSelectProps> = ({
     if (status === 'BLOCKED') {
       return 'Tạm khóa';
     }
-    if (status === 'PENDING') {
-      return 'Chưa bắt đầu';
-    }
-
     const completed = gateProgress?.completed ?? 0;
     const current = gateProgress?.currentGate ?? completed + 1;
 
@@ -112,6 +156,9 @@ export const BatchStatusSelect: React.FC<BatchStatusSelectProps> = ({
     }
     if (current === 2 || completed === 1 || releaseStage === 'GATE_2') {
       return 'Gate 2/7 · Đánh giá chất lượng';
+    }
+    if (status === 'PENDING') {
+      return 'Chưa bắt đầu';
     }
     return 'Gate 1/7 · Đang kiểm nghiệm';
   }, [effectiveBatch, status, gateProgress, releaseStage]);

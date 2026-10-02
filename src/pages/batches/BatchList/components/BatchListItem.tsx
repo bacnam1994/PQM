@@ -49,6 +49,8 @@ export const BatchListItem = memo<BatchListItemProps>(
               isAdmin={isAdmin}
               batch={batch}
               testResults={testResults}
+              releaseGateProgress={batch.releaseGateProgress}
+              releaseStage={batch.releaseStage}
             />
             <div className="text-[11px] text-ink-muted flex items-center gap-1.5 justify-center">
               <span>Kiểm nghiệm: {progressPercent}%</span>

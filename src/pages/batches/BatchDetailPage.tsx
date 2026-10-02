@@ -27,7 +27,7 @@ import { formatDateStandard, ensureArray, parseNumberFromText } from '../../util
 import { resolveDeclaredBasis, calculateRelativePercentage } from '../../utils/basisCalculation';
 import { useCriteriaResolver } from '../../hooks/useCriteriaResolver';
 import { fetchTestResultsByBatchId } from '../../services/testResultService';
-import { TestResult, Criterion, FormulaIngredient } from '../../types';
+import { Batch, TestResult, Criterion, FormulaIngredient } from '../../types';
 import { CircularProgress, BatchCriteriaHistory, BatchTestingQABadge } from '../../components';
 
 import { OOSInvestigationModal } from '../../components/features/OOSInvestigationModal';
@@ -77,6 +77,7 @@ const BatchDetailPage = () => {
   const [deviationData, setDeviationData] = useState<any>(null);
   const [isGenealogyOpen, setIsGenealogyOpen] = useState(false);
   const [isSignReleaseOpen, setIsSignReleaseOpen] = useState(false);
+  const [signTargetBatch, setSignTargetBatch] = useState<Batch | null>(null);
   const [isStatusConfirmOpen, setIsStatusConfirmOpen] = useState(false);
   const [pendingStatusUpdate, setPendingStatusUpdate] = useState<{
     status: string;
@@ -161,6 +162,20 @@ const BatchDetailPage = () => {
     };
   }, [batch, releaseDecision]);
 
+  /** Tự động đồng bộ releaseGateProgress lên DB nếu chưa có */
+  useEffect(() => {
+    if (
+      batch?.id &&
+      !batch.releaseGateProgress &&
+      canonicalGateProgress &&
+      canonicalGateProgress.completed > 0
+    ) {
+      batchRepository
+        .updateReleaseProgress(batch.id, canonicalReleaseStage as any, canonicalGateProgress)
+        .catch(() => {});
+    }
+  }, [batch?.id, batch?.releaseGateProgress, canonicalGateProgress, canonicalReleaseStage]);
+
   const handleOpenSignRelease = async () => {
     if (!batch || !releaseDecision) return;
 
@@ -188,10 +203,21 @@ const BatchDetailPage = () => {
       return;
     }
 
+    let targetBatch = batch;
     // Nếu Lô vẫn đang ở trạng thái PENDING, tự động chuyển tiếp hợp lệ sang TESTING trước khi mở modal ký
     if (batch.status === 'PENDING') {
       try {
         await updateBatchStatus(batch.id, 'TESTING');
+        const fresh = await batchRepository.findById(batch.id);
+        if (fresh) {
+          targetBatch = fresh;
+        } else {
+          targetBatch = {
+            ...batch,
+            status: 'TESTING',
+            version: (batch.version ?? 1) + 1,
+          };
+        }
       } catch (err: any) {
         notify({
           type: 'ERROR',
@@ -200,8 +226,14 @@ const BatchDetailPage = () => {
         });
         return;
       }
+    } else {
+      const fresh = await batchRepository.findById(batch.id);
+      if (fresh) {
+        targetBatch = fresh;
+      }
     }
 
+    setSignTargetBatch(targetBatch);
     setIsSignReleaseOpen(true);
   };
 
@@ -209,7 +241,7 @@ const BatchDetailPage = () => {
     if (!batch) return;
     try {
       // Phase 9 & 11: FETCH FRESH BATCH trước khi release
-      const freshBatch = (await batchRepository.findById(batch.id)) || batch;
+      const freshBatch = (await batchRepository.findById(batch.id)) || signTargetBatch || batch;
 
       // Phase 5: Re-evaluate 7 Gates với chữ ký thật
       const reEvaluatedDecision = BatchReleaseDecisionService.resolveBatchReleaseDecision({
@@ -238,6 +270,7 @@ const BatchDetailPage = () => {
         title: 'Xuất xưởng Lô thành công',
         message: `Đã phê duyệt xuất xưởng Lô ${freshBatch.batchNo} với chữ ký điện tử hợp lệ (FDA 21 CFR Part 11 - 7/7 Gates PASSED).`,
       });
+      setSignTargetBatch(null);
     } catch (error: any) {
       console.error('Lỗi xuất xưởng Lô:', error);
       notify({
@@ -524,6 +557,8 @@ const BatchDetailPage = () => {
                 batch={batch}
                 testResults={viewBatchResults}
                 tccs={(batch as any)?.tccs}
+                releaseGateProgress={canonicalGateProgress}
+                releaseStage={canonicalReleaseStage}
               />
             </div>
           ) : (
@@ -1385,14 +1420,17 @@ const BatchDetailPage = () => {
       />
 
       {/* Modal Ký duyệt Điện tử (FDA 21 CFR Part 11) */}
-      {isSignReleaseOpen && batch && (
+      {isSignReleaseOpen && (signTargetBatch || batch) && (
         <ESignatureModal
           isOpen={isSignReleaseOpen}
-          onClose={() => setIsSignReleaseOpen(false)}
+          onClose={() => {
+            setIsSignReleaseOpen(false);
+            setSignTargetBatch(null);
+          }}
           documentType="BATCH_RELEASE"
           documentId={batch.id}
           documentTitle={`Lô sản xuất: ${batch.batchNo} - ${batch.product?.name || ''}`}
-          documentVersion={batch.version}
+          documentVersion={(signTargetBatch || batch).version}
           onSuccess={handleSignReleaseSuccess}
         />
       )}
