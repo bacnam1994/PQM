@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   ShieldCheckIcon,
   XMarkIcon,
@@ -7,7 +7,7 @@ import {
   ChevronUpDownIcon,
   LockClosedIcon,
 } from '@heroicons/react/24/outline';
-import { StatusBadge, BatchTestingQABadge } from '../../../../components';
+import { StatusBadge } from '../../../../components';
 import { Batch, TestResult, TCCS } from '../../../../types';
 import { useAppStore } from '../../../../store/useAppStore';
 import { BatchStateMachine } from '../../../../domain/workflow/stateMachine';
@@ -28,8 +28,6 @@ export const BatchStatusSelect: React.FC<BatchStatusSelectProps> = ({
   onUpdate,
   isAdmin,
   batch,
-  testResults,
-  tccs,
 }) => {
   const storeBatches = useAppStore((state) => state.batches);
   const effectiveBatch = batch || storeBatches.find((b) => b.id === batchId);
@@ -72,13 +70,83 @@ export const BatchStatusSelect: React.FC<BatchStatusSelectProps> = ({
     isAdmin ? 'ADMIN' : 'QA'
   );
 
+  const gateProgress = effectiveBatch?.releaseGateProgress;
+  const releaseStage = effectiveBatch?.releaseStage;
+
+  // Phase 4 & 5: Hiển thị 2 tầng (Lifecycle + Release Gate Progress từ DB, không tự tính)
+  const releaseProgressLabel = useMemo(() => {
+    if (!effectiveBatch) return null;
+    if (status === 'RELEASED') {
+      return '7/7 Gate · Đã xuất xưởng';
+    }
+    if (status === 'REJECTED') {
+      return 'Từ chối xuất xưởng';
+    }
+    if (status === 'BLOCKED') {
+      return 'Tạm khóa';
+    }
+    if (status === 'PENDING') {
+      return 'Chưa bắt đầu';
+    }
+
+    const completed = gateProgress?.completed ?? 0;
+    const current = gateProgress?.currentGate ?? completed + 1;
+
+    if (completed === 7 || releaseStage === 'READY_TO_RELEASE') {
+      return '7/7 Gate · Sẵn sàng xuất xưởng';
+    }
+    if (current === 7 || completed === 6 || releaseStage === 'GATE_7') {
+      return 'Gate 7/7 · Chờ ký xuất xưởng';
+    }
+    if (current === 6 || completed === 5 || releaseStage === 'GATE_6') {
+      return 'Gate 6/7 · Chờ BPR Review';
+    }
+    if (current === 5 || completed === 4 || releaseStage === 'GATE_5') {
+      return 'Gate 5/7 · Chờ CAPA';
+    }
+    if (current === 4 || completed === 3 || releaseStage === 'GATE_4') {
+      return 'Gate 4/7 · Có sai lệch';
+    }
+    if (current === 3 || completed === 2 || releaseStage === 'GATE_3') {
+      return 'Gate 3/7 · Có OOS';
+    }
+    if (current === 2 || completed === 1 || releaseStage === 'GATE_2') {
+      return 'Gate 2/7 · Đánh giá chất lượng';
+    }
+    return 'Gate 1/7 · Đang kiểm nghiệm';
+  }, [effectiveBatch, status, gateProgress, releaseStage]);
+
+  const renderReleaseBadge = () => {
+    if (!releaseProgressLabel) return null;
+    const completed = gateProgress?.completed ?? (status === 'RELEASED' ? 7 : 0);
+    const isReadyToSign = completed === 6 || releaseStage === 'GATE_7';
+    const isFullyApproved = completed === 7 || status === 'RELEASED';
+
+    return (
+      <span
+        className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-medium border shrink-0 transition-colors ${
+          status === 'RELEASED'
+            ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20'
+            : isReadyToSign
+              ? 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30 font-semibold'
+              : isFullyApproved
+                ? 'bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-500/30 font-semibold'
+                : 'bg-surface-2 text-ink-muted border-border'
+        }`}
+        title={`Tiến trình Release Gates: ${releaseProgressLabel}`}
+        data-testid="batch-release-gate-badge"
+      >
+        <ShieldCheckIcon className="w-3.5 h-3.5 shrink-0" />
+        <span>{releaseProgressLabel}</span>
+      </span>
+    );
+  };
+
   if (!isAdmin || availableActions.length === 0) {
     return (
       <div className="inline-flex items-center gap-1.5 flex-wrap">
         <StatusBadge type="BATCH" status={status} />
-        {effectiveBatch && status === 'TESTING' && (
-          <BatchTestingQABadge batch={effectiveBatch} testResults={testResults} tccs={tccs} />
-        )}
+        {renderReleaseBadge()}
       </div>
     );
   }
@@ -128,9 +196,7 @@ export const BatchStatusSelect: React.FC<BatchStatusSelectProps> = ({
           <ChevronUpDownIcon className="h-3 w-3" />
         </div>
       </div>
-      {effectiveBatch && status === 'TESTING' && (
-        <BatchTestingQABadge batch={effectiveBatch} testResults={testResults} tccs={tccs} />
-      )}
+      {renderReleaseBadge()}
     </div>
   );
 };

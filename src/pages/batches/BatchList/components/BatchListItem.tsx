@@ -50,7 +50,14 @@ export const BatchListItem = memo<BatchListItemProps>(
               batch={batch}
               testResults={testResults}
             />
-            <div className="text-xs font-medium text-ink-muted">Tiến độ: {progressPercent}%</div>
+            <div className="text-[11px] text-ink-muted flex items-center gap-1.5 justify-center">
+              <span>Kiểm nghiệm: {progressPercent}%</span>
+              <span>•</span>
+              <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+                Xuất xưởng:{' '}
+                {batch.releaseGateProgress?.completed ?? (batch.status === 'RELEASED' ? 7 : 0)}/7
+              </span>
+            </div>
           </div>
         </td>
         <td className="px-4 py-3 text-right">

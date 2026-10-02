@@ -17,6 +17,8 @@ import { fetchTestResultsByBatchId } from '../../../../services/testResultServic
 import { ReleaseRules } from '../../../../domain/rules';
 import { BatchReleaseDecisionService } from '../../../../domain/batch/BatchReleaseDecisionService';
 import { resolveTestResultsForBatch } from '../../../../domain/batch/batchTestResultResolver';
+import { batchRepository } from '../../../../repositories/firebase/FirebaseBatchRepository';
+import { testResultRepository } from '../../../../repositories/firebase/FirebaseTestResultRepository';
 
 export function useBatchList() {
   const navigate = useNavigate();
@@ -217,29 +219,74 @@ export function useBatchList() {
   }, [crud, deleteBatch, notify, user]);
 
   const handleUpdateBatchStatusClick = useCallback(
-    (newStatus: string, batchId: string) => {
+    async (newStatus: string, batchId: string) => {
       if (newStatus === 'RELEASED') {
-        const targetBatch = hydratedBatches.find((b) => b.id === batchId);
-        if (!targetBatch) return;
-        const resolution = resolveTestResultsForBatch(targetBatch, sourceResults);
-        const releaseDecision = BatchReleaseDecisionService.evaluateReleasePreview({
-          batch: targetBatch,
-          testResults: resolution.allCandidateResults,
-          userRole: user?.role,
-          boundTccs: (targetBatch as any)?.tccs,
-          asOfDate: new Date(),
-        });
-        if (!releaseDecision.eligible) {
+        try {
+          // 1. FETCH FRESH BATCH từ repository (Phase 9 & 11)
+          let freshBatch = await batchRepository.findById(batchId);
+          if (!freshBatch) {
+            freshBatch = hydratedBatches.find((b) => b.id === batchId) || null;
+          }
+          if (!freshBatch) {
+            notify({
+              type: 'ERROR',
+              title: 'Lỗi xuất xưởng',
+              message: `Không tìm thấy thông tin lô ${batchId}.`,
+            });
+            return;
+          }
+
+          // 2. FETCH FRESH TEST RESULTS
+          let freshTestResults = await testResultRepository.findByRelation('batchId', batchId);
+          if (!freshTestResults || freshTestResults.length === 0) {
+            const resolution = resolveTestResultsForBatch(freshBatch, sourceResults);
+            freshTestResults = resolution.allCandidateResults;
+          }
+
+          // 3. RELEASE DECISION - Đánh giá Gate 1-6
+          const releaseDecision = BatchReleaseDecisionService.resolveBatchReleaseDecision({
+            batch: freshBatch,
+            testResults: freshTestResults,
+            userRole: user?.role,
+            boundTccs: freshBatch.tccsSnapshot || (freshBatch as any)?.tccs,
+            asOfDate: new Date(),
+            isPreview: true,
+          });
+
+          // Check if Gate 1-6 PASS
+          const gates1to6 = releaseDecision.gates.filter(
+            (g) => g.gateIndex >= 1 && g.gateIndex <= 6
+          );
+          const gate1to6AllPass = gates1to6.length === 6 && gates1to6.every((g) => g.passed);
+
+          if (!gate1to6AllPass) {
+            const failingGate = gates1to6.find((g) => !g.passed);
+            const blockerMsg =
+              failingGate?.blockers?.[0] ||
+              failingGate?.details ||
+              releaseDecision.blockers[0] ||
+              'Lô chưa hoàn thành tất cả các cổng kiểm soát tiên quyết (Gate 1 - 6).';
+
+            notify({
+              type: 'ERROR',
+              title: 'Quy chuẩn GMP & Release Gates',
+              message: blockerMsg,
+            });
+            return;
+          }
+
+          // Gate 1-6 PASS -> Mở ESignatureModal với freshBatch và freshBatch.version
+          setESignatureTarget({ batchId, batch: freshBatch });
+          return;
+        } catch (err: any) {
+          console.error('Lỗi khi kiểm tra điều kiện xuất xưởng:', err);
           notify({
             type: 'ERROR',
-            title: 'Quy chuẩn GMP & Release Guard',
-            message:
-              releaseDecision.blockers[0] || 'Không thể duyệt xuất xưởng lô chưa đạt chuẩn GMP.',
+            title: 'Lỗi kiểm tra xuất xưởng',
+            message: err.message || 'Không thể kiểm tra điều kiện xuất xưởng.',
           });
           return;
         }
-        setESignatureTarget({ batchId, batch: targetBatch });
-        return;
       }
       setRejectReason('');
       setPendingStatusUpdate({ status: newStatus, batchId });
@@ -251,11 +298,28 @@ export function useBatchList() {
   const handleESignatureSuccess = async (signature: ElectronicSignature) => {
     if (!eSignatureTarget) return;
     try {
+      // Phase 9 & 11: FETCH FRESH BATCH trước khi release
+      const freshBatch = await batchRepository.findById(eSignatureTarget.batchId);
+      if (!freshBatch) {
+        throw new Error(`Không tìm thấy Lô ${eSignatureTarget.batchId} trong cơ sở dữ liệu.`);
+      }
+
+      // COMPARE documentVersion (Phase 9 & 11)
+      if (
+        signature.documentVersion !== undefined &&
+        freshBatch.version !== undefined &&
+        signature.documentVersion !== freshBatch.version
+      ) {
+        throw new Error(
+          `ERR_SIGNATURE_VERSION_MISMATCH: Lô đã thay đổi sau khi mở màn hình ký (v${signature.documentVersion} ➔ v${freshBatch.version}). Vui lòng tải lại và thực hiện ký lại.`
+        );
+      }
+
       await approveBatchRelease(eSignatureTarget.batchId, signature);
       notify({
         type: 'SUCCESS',
         title: 'Xuất xưởng Lô thành công',
-        message: `Đã phê duyệt xuất xưởng Lô ${eSignatureTarget.batch?.batchNo || eSignatureTarget.batchId} với chữ ký điện tử hợp lệ (21 CFR Part 11).`,
+        message: `Đã phê duyệt xuất xưởng Lô ${freshBatch.batchNo || eSignatureTarget.batchId} với chữ ký điện tử hợp lệ (21 CFR Part 11).`,
       });
     } catch (error: any) {
       console.error('Lỗi xuất xưởng Lô có chữ ký điện tử:', error);

@@ -358,6 +358,17 @@ export class BatchWorkflowHandlers {
             releasedAt: now,
             releasedBy: currentUser?.email || 'unknown',
             releaseDecisionSnapshot: releaseDecision,
+            releaseStage: 'RELEASED' as const,
+            releaseGateProgress: {
+              completed: 7,
+              total: 7 as const,
+              currentGate: 8,
+              percentage: 100,
+              evaluatedAt: now,
+            },
+            releaseSignatures: options?.signature
+              ? [options.signature]
+              : currentBatch.releaseSignatures,
           }
         : {}),
       ...(actionId === 'BATCH_REJECT'
@@ -365,6 +376,14 @@ export class BatchWorkflowHandlers {
             rejectReason: effectiveReason,
             rejectedAt: now,
             rejectedBy: currentUser?.email || 'unknown',
+            releaseStage: 'REJECTED' as const,
+            releaseGateProgress: {
+              completed: 0,
+              total: 7 as const,
+              currentGate: 0,
+              percentage: 0,
+              evaluatedAt: now,
+            },
           }
         : {}),
       ...(actionId === 'BATCH_HOLD'
@@ -386,6 +405,7 @@ export class BatchWorkflowHandlers {
             recallReason: effectiveReason,
             recalledAt: now,
             recalledBy: currentUser?.email || 'unknown',
+            releaseStage: 'BLOCKED' as const,
           }
         : {}),
     };
@@ -407,6 +427,9 @@ export class BatchWorkflowHandlers {
       recalledAt: cleanBatch.recalledAt,
       recalledBy: cleanBatch.recalledBy,
       releaseDecisionSnapshot: cleanBatch.releaseDecisionSnapshot,
+      releaseStage: cleanBatch.releaseStage,
+      releaseGateProgress: cleanBatch.releaseGateProgress,
+      releaseSignatures: cleanBatch.releaseSignatures,
     };
 
     if (!flags.enableBatchWorkflowFacade) {
@@ -470,8 +493,15 @@ export class BatchWorkflowHandlers {
       currentUser,
       options
     );
-    // Fire-and-forget: sync tiến trình 7 Gate sau khi batch bắt đầu testing
-    this.synchronizer.syncSilently({ batchId, batch: result });
+    try {
+      const progress = await this.synchronizer.syncBatchReleaseProgress({ batchId, batch: result });
+      if (progress) {
+        result.releaseStage = progress.releaseStage;
+        result.releaseGateProgress = progress.releaseGateProgress;
+      }
+    } catch (syncErr) {
+      console.error('[BatchWorkflowHandlers] Sync error after dispatchTesting:', syncErr);
+    }
     return result;
   }
 
@@ -496,8 +526,20 @@ export class BatchWorkflowHandlers {
       currentUser,
       options
     );
-    // Fire-and-forget: cập nhật releaseStage = RELEASED sau khi xuất xưởng thành công
-    this.synchronizer.syncSilently({ batchId, batch: result });
+    try {
+      const progress = await this.synchronizer.syncBatchReleaseProgress({
+        batchId,
+        batch: result,
+        userRole: currentUser?.role,
+        userSignature: options?.signature,
+      });
+      if (progress) {
+        result.releaseStage = progress.releaseStage;
+        result.releaseGateProgress = progress.releaseGateProgress;
+      }
+    } catch (syncErr) {
+      console.error('[BatchWorkflowHandlers] Sync error after approveRelease:', syncErr);
+    }
     return result;
   }
 
@@ -734,9 +776,21 @@ export class BatchWorkflowHandlers {
     }
 
     const resultBatch = execution.data!;
-    // Fire-and-forget: sync tiến trình 7 Gate sau khi BPR status thay đổi
-    // (Gate 6 pass/fail thay đổi khi BPR_APPROVE / BPR_REJECT)
-    this.synchronizer.syncSilently({ batchId, batch: resultBatch });
+    // Phase 14 & 19: Sau khi BPR status thay đổi (đặc biệt BPR_APPROVE qua Gate 6),
+    // đồng bộ hóa tiến trình 7 Gate. Không được nuốt lỗi (fire-and-forget).
+    try {
+      const progress = await this.synchronizer.syncBatchReleaseProgress({
+        batchId,
+        batch: resultBatch,
+        userRole: currentUser?.role,
+      });
+      if (progress) {
+        resultBatch.releaseStage = progress.releaseStage;
+        resultBatch.releaseGateProgress = progress.releaseGateProgress;
+      }
+    } catch (syncErr) {
+      console.error('[BatchWorkflowHandlers] Sync error after executeBprAction:', syncErr);
+    }
     return resultBatch;
   }
 

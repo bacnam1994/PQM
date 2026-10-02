@@ -15,6 +15,7 @@ import { Batch, BatchReleaseStage, BatchReleaseGateProgress } from '../../types/
 import { TestResult } from '../../types';
 import { QualityDeviation as Deviation } from '../../types';
 import { TCCS } from '../../types';
+import { ElectronicSignature } from '../../types/signature';
 import { BatchReleaseDecisionService, ReleaseGateResult } from './BatchReleaseDecisionService';
 import { DataFreshnessState } from './batchIntegrityValidator';
 
@@ -25,10 +26,9 @@ export interface ResolveBatchReleaseProgressParams {
   boundTccs?: TCCS | null;
   tccsList?: TCCS[];
   dataFreshness?: DataFreshnessState;
-  /**
-   * Không truyền userRole/signature vào đây – Gate 7 preview mode không cần chữ ký thực.
-   * Chữ ký chỉ cần tại thời điểm BATCH_RELEASE_APPROVE thực sự.
-   */
+  userRole?: string;
+  userSignature?: ElectronicSignature | null;
+  signatures?: ElectronicSignature[];
 }
 
 export interface BatchReleaseProgress {
@@ -105,6 +105,9 @@ export class BatchReleaseProgressService {
       boundTccs,
       tccsList = [],
       dataFreshness = {},
+      userRole,
+      userSignature,
+      signatures = [],
     } = params;
 
     const evaluatedAt = new Date().toISOString();
@@ -144,15 +147,32 @@ export class BatchReleaseProgressService {
       };
     }
 
-    // Chạy 7-Gate Decision ở PREVIEW mode (không cần chữ ký thực)
-    const decision = BatchReleaseDecisionService.evaluateReleasePreview({
+    // Phase 8: Xác định chữ ký canonical (documentType = BATCH_RELEASE, documentId = batch.id)
+    let effectiveSignature = userSignature || null;
+    if (!effectiveSignature) {
+      const candidateSigs: ElectronicSignature[] = [
+        ...(Array.isArray(signatures) ? signatures : []),
+        ...(Array.isArray(batch.releaseSignatures) ? batch.releaseSignatures : []),
+      ];
+      const releaseSig = candidateSigs
+        .filter((s) => s && s.documentType === 'BATCH_RELEASE' && s.documentId === batch.id)
+        .sort((a, b) => (b.signedAt || '').localeCompare(a.signedAt || ''))[0];
+      if (releaseSig) {
+        effectiveSignature = releaseSig;
+      }
+    }
+
+    // Chạy 7-Gate Decision
+    const decision = BatchReleaseDecisionService.resolveBatchReleaseDecision({
       batch,
       testResults,
       deviations,
       boundTccs,
       tccsList,
       dataFreshness,
-      // Không truyền userRole/signature: preview sẽ bỏ qua kiểm tra chữ ký Gate 7
+      userRole: userRole || effectiveSignature?.role,
+      userSignature: effectiveSignature,
+      isPreview: !effectiveSignature,
     });
 
     const gates = decision.gates; // ReleaseGateResult[], luôn 7 phần tử

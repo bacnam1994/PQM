@@ -40,7 +40,7 @@ export interface ReleaseGateResult {
   gateKey: ReleaseGateKey;
   gateName: string;
   passed: boolean;
-  status: 'PASS' | 'FAIL' | 'BLOCKED';
+  status: 'PASS' | 'FAIL' | 'BLOCKED' | 'WAITING';
   details: string;
   blockers?: string[];
 }
@@ -358,8 +358,14 @@ export class BatchReleaseDecisionService {
     });
 
     // GATE 7: Pháp lý, Thẩm quyền ký số & Chữ ký điện tử 21 CFR Part 11
-    const roleUpper = String(userRole || '').toUpperCase();
-    const hasProperRole = ['ADMIN', 'QA'].includes(roleUpper);
+    const effectiveRole = String(
+      userRole ||
+        userSignature?.role ||
+        (userSignature as any)?.signerRole ||
+        (userSignature as any)?.signer?.role ||
+        ''
+    ).toUpperCase();
+    const hasProperRole = effectiveRole ? ['ADMIN', 'QA'].includes(effectiveRole) : isPreview;
     let isNotExpired = true;
     if (batch.expDate) {
       const asOf = asOfDate ? new Date(asOfDate) : new Date();
@@ -370,11 +376,16 @@ export class BatchReleaseDecisionService {
     }
 
     const gate7Blockers: string[] = [];
-    if (!hasProperRole) {
-      const msg = `ERR_ROLE_UNAUTHORIZED: Vai trò ${userRole || 'UNKNOWN'} không có thẩm quyền ký xuất xưởng.`;
+    if (effectiveRole && !['ADMIN', 'QA'].includes(effectiveRole)) {
+      const msg = `ERR_ROLE_UNAUTHORIZED: Vai trò ${effectiveRole} không có thẩm quyền ký xuất xưởng.`;
+      gate7Blockers.push(msg);
+      blockers.push(msg);
+    } else if (!effectiveRole && !isPreview) {
+      const msg = 'ERR_ROLE_UNAUTHORIZED: Không xác định được vai trò người phê duyệt xuất xưởng.';
       gate7Blockers.push(msg);
       blockers.push(msg);
     }
+
     if (!isNotExpired) {
       const msg = `ERR_EXPIRED: Lô đã hết hạn sử dụng (${batch.expDate}).`;
       gate7Blockers.push(msg);
@@ -382,152 +393,162 @@ export class BatchReleaseDecisionService {
     }
 
     // Tự động xác thực chữ ký điện tử 21 CFR Part 11
-    let signaturePassed = true;
-    if (!isPreview) {
-      if (!userSignature) {
+    let signaturePassed = false;
+    if (!userSignature) {
+      signaturePassed = false;
+      const msg = isPreview
+        ? 'ERR_SIGNATURE_MISSING: Chưa có chữ ký điện tử 21 CFR Part 11 phê duyệt xuất xưởng.'
+        : 'ERR_SIGNATURE_MISSING: Thiếu chữ ký điện tử 21 CFR Part 11 của QA/Admin phê duyệt xuất xưởng.';
+      gate7Blockers.push(msg);
+      blockers.push(msg);
+    } else {
+      signaturePassed = true;
+      // a. Document Type check (Phase 6 & 8: Chỉ chấp nhận BATCH_RELEASE, từ chối BATCH, BATCH_REJECT, TEST_RESULT_APPROVAL, COA_ISSUE)
+      const docType = userSignature.documentType;
+      if (docType !== 'BATCH_RELEASE') {
+        signaturePassed = false;
+        const msg = `ERR_SIGNATURE_MISMATCH: Loại tài liệu ký '${docType}' không hợp lệ (yêu cầu BATCH_RELEASE). Không chấp nhận chữ ký từ loại tài liệu khác.`;
+        gate7Blockers.push(msg);
+        blockers.push(msg);
+      }
+
+      // b. Document ID check
+      if (!userSignature.documentId || userSignature.documentId !== batchId) {
+        signaturePassed = false;
+        const msg = `ERR_SIGNATURE_MISMATCH: ID tài liệu ký '${userSignature.documentId}' không khớp với ID lô '${batchId}'.`;
+        gate7Blockers.push(msg);
+        blockers.push(msg);
+      }
+
+      // c. Document Version check (Phase 9)
+      if (
+        userSignature.documentVersion !== undefined &&
+        batch.version !== undefined &&
+        userSignature.documentVersion !== batch.version
+      ) {
+        signaturePassed = false;
+        const msg = `ERR_SIGNATURE_VERSION_MISMATCH: Phiên bản tài liệu ký (v${userSignature.documentVersion}) không khớp với phiên bản lô (v${batch.version}). Lô đã thay đổi sau khi mở màn hình ký. Vui lòng tải lại và thực hiện ký lại.`;
+        gate7Blockers.push(msg);
+        blockers.push(msg);
+      }
+
+      // d. Signer identity check
+      const signerId = userSignature.signerEmail || userSignature.signerUid;
+      if (!signerId || signerId.trim().length === 0) {
         signaturePassed = false;
         const msg =
-          'ERR_SIGNATURE_MISSING: Thiếu chữ ký điện tử 21 CFR Part 11 của QA/Admin phê duyệt xuất xưởng.';
+          'ERR_SIGNATURE_INVALID: Chữ ký thiếu thông tin định danh người ký (signerEmail/signerUid).';
+        gate7Blockers.push(msg);
+        blockers.push(msg);
+      }
+
+      // d. Signer role check
+      const effectiveSigRole =
+        userSignature.role ||
+        (userSignature as any).signerRole ||
+        (userSignature as any).signer?.role ||
+        userRole;
+      const sigRole = String(effectiveSigRole || '').toUpperCase();
+      if (!['QA', 'ADMIN'].includes(sigRole)) {
+        signaturePassed = false;
+        const msg = `ERR_SIGNATURE_ROLE_UNAUTHORIZED: Người ký có vai trò '${effectiveSigRole}', không có thẩm quyền xuất xưởng.`;
+        gate7Blockers.push(msg);
+        blockers.push(msg);
+      }
+
+      // e. Timestamp check
+      if (!userSignature.signedAt || isNaN(new Date(userSignature.signedAt).getTime())) {
+        signaturePassed = false;
+        const msg = 'ERR_SIGNATURE_INVALID: Thời điểm ký điện tử không hợp lệ.';
         gate7Blockers.push(msg);
         blockers.push(msg);
       } else {
-        // a. Document Type check (Phase 6: Chỉ chấp nhận BATCH_RELEASE, từ chối BATCH, BATCH_REJECT, TEST_RESULT_APPROVAL, COA_ISSUE)
-        const docType = userSignature.documentType;
-        if (docType !== 'BATCH_RELEASE') {
+        const signedTime = new Date(userSignature.signedAt).getTime();
+        if (signedTime > Date.now() + 5 * 60 * 1000) {
           signaturePassed = false;
-          const msg = `ERR_SIGNATURE_MISMATCH: Loại tài liệu ký '${docType}' không hợp lệ (yêu cầu BATCH_RELEASE). Không chấp nhận chữ ký từ loại tài liệu khác.`;
+          const msg = 'ERR_SIGNATURE_INVALID: Thời điểm ký điện tử không được nằm trong tương lai.';
           gate7Blockers.push(msg);
           blockers.push(msg);
         }
+      }
 
-        // b. Document ID check
-        if (!userSignature.documentId || userSignature.documentId !== batchId) {
-          signaturePassed = false;
-          const msg = `ERR_SIGNATURE_MISMATCH: ID tài liệu ký '${userSignature.documentId}' không khớp với ID lô '${batchId}'.`;
-          gate7Blockers.push(msg);
-          blockers.push(msg);
+      // f. Checksum & Integrity check (chống mock/auto signature và replay)
+      const checksum = userSignature.checksum;
+      if (
+        !checksum ||
+        checksum.startsWith('sig_auto_') ||
+        checksum.includes('mock') ||
+        checksum === 'valid-checksum'
+      ) {
+        signaturePassed = false;
+        const msg =
+          'ERR_SIGNATURE_TAMPERED: Mã băm chữ ký (checksum) không hợp lệ hoặc chứa cờ giả lập.';
+        gate7Blockers.push(msg);
+        blockers.push(msg);
+      } else {
+        const payload = [
+          userSignature.documentType,
+          userSignature.documentId,
+          userSignature.documentVersion ?? '',
+          userSignature.signerUid,
+          userSignature.signerEmail,
+          userSignature.role,
+          userSignature.meaning,
+          userSignature.signedAt,
+        ].join('|');
+
+        const expectedSha256 = calculateSha256Sync(payload);
+        const expectedDocIdSha256 = calculateSha256Sync(userSignature.documentId);
+
+        // Fallback legacy hash nếu chữ ký được sinh từ môi trường test cũ
+        let hash = 0;
+        for (let i = 0; i < payload.length; i++) {
+          const char = payload.charCodeAt(i);
+          hash = (hash << 5) - hash + char;
+          hash |= 0;
         }
+        const expectedFallback = `sig-hash-${Math.abs(hash).toString(16)}-${payload.length}`;
+        const isHex64 =
+          typeof checksum === 'string' &&
+          checksum.length === 64 &&
+          /^[0-9a-fA-F]{64}$/.test(checksum);
 
-        // c. Document Version check
         if (
-          userSignature.documentVersion !== undefined &&
-          batch.version !== undefined &&
-          userSignature.documentVersion !== batch.version
-        ) {
-          signaturePassed = false;
-          const msg = `ERR_SIGNATURE_VERSION_MISMATCH: Phiên bản tài liệu ký (v${userSignature.documentVersion}) không khớp với phiên bản lô (v${batch.version}).`;
-          gate7Blockers.push(msg);
-          blockers.push(msg);
-        }
-
-        // d. Signer identity check
-        const signerId = userSignature.signerEmail || userSignature.signerUid;
-        if (!signerId || signerId.trim().length === 0) {
-          signaturePassed = false;
-          const msg =
-            'ERR_SIGNATURE_INVALID: Chữ ký thiếu thông tin định danh người ký (signerEmail/signerUid).';
-          gate7Blockers.push(msg);
-          blockers.push(msg);
-        }
-
-        // d. Signer role check
-        const effectiveSigRole =
-          userSignature.role ||
-          (userSignature as any).signerRole ||
-          (userSignature as any).signer?.role ||
-          userRole;
-        const sigRole = String(effectiveSigRole || '').toUpperCase();
-        if (!['QA', 'ADMIN'].includes(sigRole)) {
-          signaturePassed = false;
-          const msg = `ERR_SIGNATURE_ROLE_UNAUTHORIZED: Người ký có vai trò '${effectiveSigRole}', không có thẩm quyền xuất xưởng.`;
-          gate7Blockers.push(msg);
-          blockers.push(msg);
-        }
-
-        // e. Timestamp check
-        if (!userSignature.signedAt || isNaN(new Date(userSignature.signedAt).getTime())) {
-          signaturePassed = false;
-          const msg = 'ERR_SIGNATURE_INVALID: Thời điểm ký điện tử không hợp lệ.';
-          gate7Blockers.push(msg);
-          blockers.push(msg);
-        } else {
-          const signedTime = new Date(userSignature.signedAt).getTime();
-          if (signedTime > Date.now() + 5 * 60 * 1000) {
-            signaturePassed = false;
-            const msg =
-              'ERR_SIGNATURE_INVALID: Thời điểm ký điện tử không được nằm trong tương lai.';
-            gate7Blockers.push(msg);
-            blockers.push(msg);
-          }
-        }
-
-        // f. Checksum & Integrity check (chống mock/auto signature và replay)
-        const checksum = userSignature.checksum;
-        if (
-          !checksum ||
-          checksum.startsWith('sig_auto_') ||
-          checksum.includes('mock') ||
-          checksum === 'valid-checksum'
+          !isHex64 &&
+          checksum !== expectedSha256 &&
+          checksum !== expectedDocIdSha256 &&
+          checksum !== expectedFallback
         ) {
           signaturePassed = false;
           const msg =
-            'ERR_SIGNATURE_TAMPERED: Mã băm chữ ký (checksum) không hợp lệ hoặc chứa cờ giả lập.';
+            'ERR_SIGNATURE_TAMPERED: Mã băm chữ ký điện tử không khớp với nội dung ký (Signature Integrity Verification Failed).';
           gate7Blockers.push(msg);
           blockers.push(msg);
-        } else {
-          const payload = [
-            userSignature.documentType,
-            userSignature.documentId,
-            userSignature.documentVersion ?? '',
-            userSignature.signerUid,
-            userSignature.signerEmail,
-            userSignature.role,
-            userSignature.meaning,
-            userSignature.signedAt,
-          ].join('|');
-
-          const expectedSha256 = calculateSha256Sync(payload);
-          const expectedDocIdSha256 = calculateSha256Sync(userSignature.documentId);
-
-          // Fallback legacy hash nếu chữ ký được sinh từ môi trường test cũ
-          let hash = 0;
-          for (let i = 0; i < payload.length; i++) {
-            const char = payload.charCodeAt(i);
-            hash = (hash << 5) - hash + char;
-            hash |= 0;
-          }
-          const expectedFallback = `sig-hash-${Math.abs(hash).toString(16)}-${payload.length}`;
-          const isHex64 =
-            typeof checksum === 'string' &&
-            checksum.length === 64 &&
-            /^[0-9a-fA-F]{64}$/.test(checksum);
-
-          if (
-            !isHex64 &&
-            checksum !== expectedSha256 &&
-            checksum !== expectedDocIdSha256 &&
-            checksum !== expectedFallback
-          ) {
-            signaturePassed = false;
-            const msg =
-              'ERR_SIGNATURE_TAMPERED: Mã băm chữ ký điện tử không khớp với nội dung ký (Signature Integrity Verification Failed).';
-            gate7Blockers.push(msg);
-            blockers.push(msg);
-          }
         }
       }
     }
 
-    const gate7Passed = hasProperRole && isNotExpired && signaturePassed;
+    const gate7Passed = hasProperRole && isNotExpired && signaturePassed && !!userSignature;
+    let gate7Status: 'PASS' | 'FAIL' | 'BLOCKED' | 'WAITING' = 'FAIL';
+    if (gate7Passed) {
+      gate7Status = 'PASS';
+    } else if (isPreview && !userSignature) {
+      gate7Status = 'WAITING';
+    } else {
+      gate7Status = 'FAIL';
+    }
+
     gates.push({
       gateIndex: 7,
       gateKey: 'GATE_7_AUTHORITY_AND_SIGNATURE',
       gateName: 'Pháp lý, Thẩm quyền & Chữ ký 21 CFR Part 11',
       passed: gate7Passed,
-      status: gate7Passed ? 'PASS' : 'FAIL',
+      status: gate7Status,
       details: gate7Passed
         ? 'Thẩm quyền, hạn dùng và chữ ký điện tử hợp lệ'
-        : gate7Blockers.join('; '),
+        : gate7Status === 'WAITING'
+          ? 'Chờ ký điện tử xuất xưởng (21 CFR Part 11)'
+          : gate7Blockers.join('; '),
       blockers: gate7Blockers,
     });
 

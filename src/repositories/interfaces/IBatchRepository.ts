@@ -9,6 +9,7 @@ export interface IBatchRepository extends IRepository<Batch> {
   findByBatchNo(batchNo: string): Promise<Batch | null>;
   findByProductId(productId: string): Promise<Batch[]>;
   findByStatus(status: Batch['status']): Promise<Batch[]>;
+  findTestResultsByBatchId?(batchId: string): Promise<import('../../types').TestResult[]>;
   updateStatus(
     batchId: string,
     status: Batch['status'],

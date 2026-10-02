@@ -22,9 +22,9 @@
  * - BATCH_RELEASE_APPROVE thành công → Synchronizer set RELEASED
  */
 
-import { Batch, TestResult, TCCS } from '../../types';
+import { Batch, TestResult, TCCS, ElectronicSignature } from '../../types';
 import { QualityDeviation as Deviation } from '../../types';
-import { BatchReleaseProgressService } from './BatchReleaseProgressService';
+import { BatchReleaseProgressService, BatchReleaseProgress } from './BatchReleaseProgressService';
 import { IBatchRepository } from '../../repositories/BatchRepository';
 import { DataFreshnessState } from './batchIntegrityValidator';
 
@@ -37,7 +37,10 @@ export interface SyncReleaseProgressParams {
   boundTccs?: TCCS | null;
   tccsList?: TCCS[];
   dataFreshness?: DataFreshnessState;
-  /** Nếu true: Không throw khi lỗi, chỉ log (dùng cho fire-and-forget calls) */
+  userRole?: string;
+  userSignature?: ElectronicSignature | null;
+  signatures?: ElectronicSignature[];
+  /** Nếu true: Không throw khi lỗi, chỉ log (CHỈ dùng cho non-critical background fallback) */
   silent?: boolean;
 }
 
@@ -48,19 +51,22 @@ export class BatchReleaseWorkflowSynchronizer {
    * Tính toán và đồng bộ tiến trình 7 Release Gates vào Firebase.
    *
    * Gọi sau mọi sự kiện nghiệp vụ có thể ảnh hưởng đến Gate progression.
-   * Nếu silent=true, lỗi sẽ chỉ được log, không throw (fire-and-forget mode).
+   * MUST NOT silently fail on critical paths (BPR_APPROVE, BATCH_RELEASE_APPROVE, v.v.).
    *
-   * @returns Promise<void> – không trả về gì để caller không phụ thuộc vào kết quả
+   * @returns Promise<BatchReleaseProgress> – trả về canonical progress vừa tính toán và lưu
    */
-  async syncBatchReleaseProgress(params: SyncReleaseProgressParams): Promise<void> {
+  async syncBatchReleaseProgress(params: SyncReleaseProgressParams): Promise<BatchReleaseProgress> {
     const {
       batchId,
       batch: batchParam,
-      testResults = [],
+      testResults: testResultsParam = [],
       deviations = [],
       boundTccs,
       tccsList = [],
       dataFreshness = {},
+      userRole,
+      userSignature,
+      signatures = [],
       silent = false,
     } = params;
 
@@ -79,7 +85,25 @@ export class BatchReleaseWorkflowSynchronizer {
         batch = fetched;
       }
 
-      // Tính toán progress
+      // Lấy danh sách kết quả kiểm nghiệm nếu caller không cung cấp
+      let testResults = testResultsParam;
+      if (testResults.length === 0) {
+        if (typeof (this.repo as any).findTestResultsByBatchId === 'function') {
+          testResults = await (this.repo as any).findTestResultsByBatchId(batchId);
+        } else {
+          try {
+            const { testResultRepository } =
+              await import('../../repositories/firebase/FirebaseTestResultRepository');
+            if (testResultRepository && typeof testResultRepository.findByRelation === 'function') {
+              testResults = await testResultRepository.findByRelation('batchId', batchId);
+            }
+          } catch {
+            // Ignore if in isolated mock environment
+          }
+        }
+      }
+
+      // Tính toán progress (Canonical)
       const progress = BatchReleaseProgressService.resolveReleaseProgress({
         batch,
         testResults,
@@ -87,9 +111,12 @@ export class BatchReleaseWorkflowSynchronizer {
         boundTccs,
         tccsList,
         dataFreshness,
+        userRole,
+        userSignature,
+        signatures,
       });
 
-      // Persist lên Firebase (atomic update, không cần OCC)
+      // Persist lên Firebase (atomic update)
       if (typeof this.repo.updateReleaseProgress === 'function') {
         await this.repo.updateReleaseProgress(
           batchId,
@@ -97,29 +124,28 @@ export class BatchReleaseWorkflowSynchronizer {
           progress.releaseGateProgress
         );
       }
+
+      return progress;
     } catch (err) {
       if (silent) {
-        // Fire-and-forget: chỉ log, không throw
         console.warn(
-          `[BatchReleaseWorkflowSynchronizer] Sync failed for batch ${batchId}:`,
+          `[BatchReleaseWorkflowSynchronizer] Sync non-critical warning for batch ${batchId}:`,
           err instanceof Error ? err.message : err
         );
-      } else {
         throw err;
       }
+      throw err;
     }
   }
 
   /**
-   * Fire-and-forget wrapper: gọi syncBatchReleaseProgress với silent=true.
-   * Dùng sau các workflow actions (BPR_APPROVE, dispatchTesting, v.v.)
-   * để không block luồng chính khi có lỗi kết nối Firebase.
+   * Helper đồng bộ với retry/log (không nuốt lỗi trên các nghiệp vụ critical).
    */
-  syncSilently(params: Omit<SyncReleaseProgressParams, 'silent'>): void {
-    this.syncBatchReleaseProgress({ ...params, silent: true }).catch((err) => {
-      // Lỗi đã được handle bên trong syncBatchReleaseProgress với silent=true,
-      // catch này chỉ để phòng ngừa unhandled promise rejection
-      console.error('[BatchReleaseWorkflowSynchronizer] Unhandled sync error:', err);
-    });
+  async syncSilently(params: Omit<SyncReleaseProgressParams, 'silent'>): Promise<void> {
+    try {
+      await this.syncBatchReleaseProgress({ ...params, silent: false });
+    } catch (err) {
+      console.error('[BatchReleaseWorkflowSynchronizer] Sync failed during workflow:', err);
+    }
   }
 }

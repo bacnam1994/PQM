@@ -31,6 +31,11 @@ export class FirebaseBatchRepository
     return this.findByRelation('status', status);
   }
 
+  async findTestResultsByBatchId(batchId: string): Promise<import('../../types').TestResult[]> {
+    const { testResultRepository } = await import('./FirebaseTestResultRepository');
+    return testResultRepository.findByRelation('batchId', batchId);
+  }
+
   async findRecent(limitCount: number): Promise<Batch[]> {
     const result = await this.findPaginated({
       pageSize: limitCount,
