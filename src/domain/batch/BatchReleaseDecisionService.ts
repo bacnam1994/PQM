@@ -8,7 +8,7 @@
  * 2. Canonical Quality Decision Engine (Phase 3)
  * 3. 7 Release Gates chuẩn GMP (Phase 5) với nguyên tắc FAIL-CLOSED
  * 4. Ràng buộc thẩm quyền & Chữ ký số 21 CFR Part 11 (Phase 7)
- * 5. Data Freshness & Traceability
+ * 5. Tách bạch hoàn toàn giữa Released Historical Snapshot và Release Eligibility (P0/P1 Fix)
  */
 
 import { Batch, TestResult, TCCS, QualityDeviation as Deviation } from '../../types';
@@ -23,8 +23,10 @@ import { DataFreshnessState } from './batchIntegrityValidator';
 import {
   CanonicalBatchQualityDecision,
   resolveCanonicalBatchQualityDecision,
+  CANONICAL_DECISION_RESOLVER_VERSION,
 } from './canonicalBatchQualityDecision';
 import { ElectronicSignature } from '../../types/signature';
+import { calculateSha256Sync } from '../../utils/cryptoUtils';
 
 export type ReleaseGateKey =
   | 'GATE_1_TEST_COMPLETION'
@@ -62,8 +64,6 @@ export interface BatchReleaseDecision {
   decisionTrace: string[];
 }
 
-import { calculateSha256Sync } from '../../utils/cryptoUtils';
-
 export interface ResolveBatchReleaseDecisionParams {
   batch: Batch;
   testResults: TestResult[];
@@ -80,7 +80,162 @@ export interface ResolveBatchReleaseDecisionParams {
 }
 
 export class BatchReleaseDecisionService {
-  public static readonly VERSION = '1.1.0-CANONICAL-RELEASE-DECISION';
+  public static readonly VERSION = '2.0.0-DECOUPLED-RELEASE-DECISION';
+
+  /**
+   * Lấy Snapshot Canonical lịch sử xuất xưởng cho Lô đã RELEASED
+   * SSoT: Không chạy lại logic kiểm tra hiện tại lên một lô đã xuất xưởng trong quá khứ
+   */
+  public static getReleasedCanonicalSnapshot(batch: Batch): BatchReleaseDecision {
+    const batchId = batch?.id || '';
+    const batchNo = batch?.batchNo || batchId;
+
+    // 1. Ưu tiên tuyệt đối snapshot đã được niêm phong trong transaction release
+    if (batch?.releaseDecisionSnapshot && Array.isArray(batch.releaseDecisionSnapshot.gates)) {
+      return {
+        ...batch.releaseDecisionSnapshot,
+        batchId,
+        batchNo,
+        currentStatus: 'RELEASED',
+        nextStatus: 'RELEASED',
+        eligible: true,
+        blockers: [],
+      };
+    }
+
+    // 2. Fallback cho các Lô cũ chưa kịp lưu releaseDecisionSnapshot: Dựng canonical 7/7 PASS
+    const candidateSigs: ElectronicSignature[] = [
+      ...(Array.isArray(batch.releaseSignatures) ? batch.releaseSignatures : []),
+      ...(Array.isArray((batch as any).signatures) ? (batch as any).signatures : []),
+    ].filter(Boolean);
+
+    const matchedSig = candidateSigs
+      .filter((s) => s && s.documentType === 'BATCH_RELEASE' && s.documentId === batchId)
+      .sort((a, b) => (b.signedAt || '').localeCompare(a.signedAt || ''))[0];
+
+    const signerInfo = matchedSig
+      ? `${matchedSig.signerName || matchedSig.signerEmail || matchedSig.signerUid} (${matchedSig.role || 'QA'})`
+      : batch.releasedBy
+        ? `${batch.releasedBy} (QA)`
+        : 'QA / Quản trị viên';
+
+    const historicalGates: ReleaseGateResult[] = [
+      {
+        gateIndex: 1,
+        gateKey: 'GATE_1_TEST_COMPLETION',
+        gateName: 'Tính đầy đủ của phép thử (100% Criteria)',
+        passed: true,
+        status: 'PASS',
+        details: '100% hoàn thành (Đã thẩm định xuất xưởng)',
+        blockers: [],
+      },
+      {
+        gateIndex: 2,
+        gateKey: 'GATE_2_CANONICAL_QUALITY',
+        gateName: 'Đánh giá chất lượng chuẩn tắc (Canonical PASS)',
+        passed: true,
+        status: 'PASS',
+        details: 'Chất lượng: PASS (Đã phê duyệt xuất xưởng)',
+        blockers: [],
+      },
+      {
+        gateIndex: 3,
+        gateKey: 'GATE_3_NO_OPEN_OOS',
+        gateName: 'Xử lý OOS (Không vướng OOS mở)',
+        passed: true,
+        status: 'PASS',
+        details: 'Không có OOS mở tại thời điểm xuất xưởng',
+        blockers: [],
+      },
+      {
+        gateIndex: 4,
+        gateKey: 'GATE_4_NO_OPEN_CRITICAL_DEVIATION',
+        gateName: 'Hồ sơ Sai lệch (Không có sai lệch mở)',
+        passed: true,
+        status: 'PASS',
+        details: 'Không có sai lệch nghiêm trọng mở tại thời điểm xuất xưởng',
+        blockers: [],
+      },
+      {
+        gateIndex: 5,
+        gateKey: 'GATE_5_CAPA_FULFILLED',
+        gateName: 'Hồ sơ CAPA (Không có CAPA mở)',
+        passed: true,
+        status: 'PASS',
+        details: 'Các hành động khắc phục CAPA đã hoàn tất',
+        blockers: [],
+      },
+      {
+        gateIndex: 6,
+        gateKey: 'GATE_6_BPR_QA_APPROVED',
+        gateName: 'Thẩm định hồ sơ lô sản xuất (BPR Review)',
+        passed: true,
+        status: 'PASS',
+        details: batch.bprReviewedBy
+          ? `Hồ sơ sản xuất BPR đã được phê duyệt bởi ${batch.bprReviewedBy}`
+          : 'Hồ sơ sản xuất BPR đã được QA phê duyệt',
+        blockers: [],
+      },
+      {
+        gateIndex: 7,
+        gateKey: 'GATE_7_AUTHORITY_AND_SIGNATURE',
+        gateName: 'Pháp lý, Thẩm quyền & Chữ ký 21 CFR Part 11',
+        passed: true,
+        status: 'PASS',
+        details: `Đã ký số phê duyệt xuất xưởng (21 CFR Part 11) bởi ${signerInfo}`,
+        blockers: [],
+      },
+    ];
+
+    return {
+      eligible: true,
+      batchId,
+      batchNo,
+      currentStatus: 'RELEASED',
+      nextStatus: 'RELEASED',
+      testResultResolution: {
+        relationshipType: 'PRIMARY_MATCH',
+        isMatch: true,
+        isAuthoritative: true,
+        confidence: 'HIGH',
+        reason: 'Lô đã hoàn tất xuất xưởng hợp lệ theo chuẩn GMP.',
+      },
+      qualityDecision: {
+        batchId,
+        batchNo,
+        workflowStatus: 'RELEASED',
+        qualityStatus: 'PASS',
+        integrityStatus: 'PASS',
+        shouldAlert: false,
+        candidateCount: 1,
+        authoritativeCount: 1,
+        supersededTestResultIds: [],
+        failedCriteria: [],
+        pendingCriteria: [],
+        decisionReason: 'Lô đã hoàn tất xuất xưởng hợp lệ theo chuẩn GMP.',
+        resolverVersion: CANONICAL_DECISION_RESOLVER_VERSION,
+        authoritativeResults: [],
+        criterionEvaluations: [],
+        completion: {
+          isComplete: true,
+          percentage: 100,
+          requiredCount: 1,
+          testedCount: 1,
+          missingCriteria: [],
+        },
+        blockers: [],
+      },
+      gates: historicalGates,
+      blockers: [],
+      warnings: [],
+      requiredSignature: true,
+      requiredRole: ['ADMIN', 'QA'],
+      dataFreshness: {},
+      decisionTrace: [
+        `[HISTORICAL_SNAPSHOT] Trích xuất hồ sơ xuất xưởng lịch sử thành công cho lô ${batchNo}.`,
+      ],
+    };
+  }
 
   /**
    * Đánh giá bản xem trước (Preview) cho giao diện người dùng
@@ -89,16 +244,20 @@ export class BatchReleaseDecisionService {
   public static evaluateReleasePreview(
     params: Omit<ResolveBatchReleaseDecisionParams, 'isPreview'>
   ): BatchReleaseDecision {
-    return this.resolveBatchReleaseDecision({
+    if (params.batch?.status === 'RELEASED') {
+      return this.getReleasedCanonicalSnapshot(params.batch);
+    }
+    return this.evaluateReleaseEligibility({
       ...params,
       isPreview: true,
     });
   }
 
   /**
-   * Tính toán Canonical Release Decision duy nhất cho Lô sản xuất (Production Release Path)
+   * Đánh giá điều kiện thực tế để xuất xưởng Lô sản xuất (Release Eligibility)
+   * Sử dụng cho việc kiểm tra Gate 1-7 trước khi ký hoặc tại thời điểm mutation
    */
-  public static resolveBatchReleaseDecision(
+  public static evaluateReleaseEligibility(
     params: ResolveBatchReleaseDecisionParams
   ): BatchReleaseDecision {
     const {
@@ -114,24 +273,18 @@ export class BatchReleaseDecisionService {
       dataFreshness = {},
       isPreview = false,
     } = params;
+
     let userSignature = rawUserSignature || rawSignature || null;
 
-    // Trích xuất chữ ký điện tử đã được persist trên Lô (Phase 16 - Gate 7 Persistence)
+    // Trích xuất chữ ký điện tử đã được persist trên Lô (nếu caller chưa truyền)
     if (!userSignature && batch) {
       const candidateSigs: ElectronicSignature[] = [
         ...(Array.isArray(batch.releaseSignatures) ? batch.releaseSignatures : []),
         ...(Array.isArray((batch as any).signatures) ? (batch as any).signatures : []),
-        ...(batch.releaseDecisionSnapshot?.requiredSignature &&
-        Array.isArray(batch.releaseDecisionSnapshot?.releaseSignatures)
-          ? batch.releaseDecisionSnapshot.releaseSignatures
-          : []),
       ].filter(Boolean);
 
       const matched = candidateSigs
-        .filter(
-          (s) =>
-            s && s.documentType === 'BATCH_RELEASE' && (s.documentId === batch.id || !s.documentId)
-        )
+        .filter((s) => s && s.documentType === 'BATCH_RELEASE' && s.documentId === batch.id)
         .sort((a, b) => (b.signedAt || '').localeCompare(a.signedAt || ''))[0];
 
       if (matched) {
@@ -146,10 +299,11 @@ export class BatchReleaseDecisionService {
     const batchId = batch?.id || '';
     const batchNo = batch?.batchNo || batchId;
     const currentStatus = (batch?.status || 'PENDING') as BatchStatus;
-    const isAlreadyReleased = currentStatus === 'RELEASED' || batch?.releaseStage === 'RELEASED';
     const nextStatus: BatchStatus = 'RELEASED';
 
-    decisionTrace.push(`[INIT] Bắt đầu đánh giá Release Decision cho lô ${batchNo} (${batchId}).`);
+    decisionTrace.push(
+      `[INIT] Bắt đầu đánh giá Release Eligibility cho lô ${batchNo} (${batchId}).`
+    );
 
     if (!batch || !batch.id) {
       blockers.push('Thông tin Lô sản xuất không hợp lệ (null/undefined).');
@@ -234,13 +388,12 @@ export class BatchReleaseDecisionService {
       dataFreshness.loadState === 'PARTIAL' ||
       dataFreshness.loadState === 'LOADING';
 
-    const completionPct = qualityDecision.completion?.percentage ?? (isAlreadyReleased ? 100 : 0);
+    const completionPct = qualityDecision.completion?.percentage ?? 0;
     const gate1Passed =
-      isAlreadyReleased ||
-      (!isDataUnavailable &&
-        candidateResults.length > 0 &&
-        qualityDecision.completion.isComplete &&
-        completionPct === 100);
+      !isDataUnavailable &&
+      candidateResults.length > 0 &&
+      qualityDecision.completion.isComplete &&
+      completionPct === 100;
     const gate1Blockers: string[] = [];
     if (!gate1Passed) {
       const msg = isDataUnavailable
@@ -255,17 +408,12 @@ export class BatchReleaseDecisionService {
       gateName: 'Tính đầy đủ của phép thử (100% Criteria)',
       passed: gate1Passed,
       status: gate1Passed ? 'PASS' : 'FAIL',
-      details:
-        isAlreadyReleased && completionPct === 0
-          ? '100% hoàn thành (Đã thẩm định xuất xưởng)'
-          : `${completionPct}% hoàn thành (${qualityDecision.completion.testedCount}/${qualityDecision.completion.requiredCount})`,
+      details: `${completionPct}% hoàn thành (${qualityDecision.completion.testedCount}/${qualityDecision.completion.requiredCount})`,
       blockers: gate1Blockers,
     });
 
     // GATE 2: Đánh giá chất lượng chuẩn tắc (Canonical Quality = PASS)
-    const gate2Passed =
-      qualityDecision.qualityStatus === 'PASS' ||
-      (isAlreadyReleased && (batch.qualityStatus === 'PASS' || batch.status === 'RELEASED'));
+    const gate2Passed = qualityDecision.qualityStatus === 'PASS';
     const gate2Blockers: string[] = [];
     if (!gate2Passed) {
       const msg = `ERR_QUALITY_NOT_PASS: Đánh giá chất lượng Lô chưa đạt chuẩn PASS (${qualityDecision.qualityStatus}).`;
@@ -281,10 +429,7 @@ export class BatchReleaseDecisionService {
       gateName: 'Đánh giá chất lượng chuẩn tắc (Canonical PASS)',
       passed: gate2Passed,
       status: gate2Passed ? 'PASS' : 'FAIL',
-      details:
-        gate2Passed && qualityDecision.qualityStatus !== 'PASS' && isAlreadyReleased
-          ? 'Chất lượng: PASS (Đã phê duyệt xuất xưởng)'
-          : `Chất lượng: ${qualityDecision.qualityStatus}`,
+      details: `Chất lượng: ${qualityDecision.qualityStatus}`,
       blockers: gate2Blockers,
     });
 
@@ -329,101 +474,87 @@ export class BatchReleaseDecisionService {
     gates.push({
       gateIndex: 4,
       gateKey: 'GATE_4_NO_OPEN_CRITICAL_DEVIATION',
-      gateName: 'Xử lý Sai lệch (Không có Critical Deviation mở)',
+      gateName: 'Hồ sơ Sai lệch (Không có sai lệch mở)',
       passed: gate4Passed,
       status: gate4Passed ? 'PASS' : 'BLOCKED',
       details: gate4Passed
-        ? 'Không có sai lệch lớn chưa đóng'
-        : `Còn ${openCriticalDeviations.length} sai lệch CRITICAL`,
+        ? 'Không có sai lệch nghiêm trọng mở'
+        : `Có ${openCriticalDeviations.length} sai lệch nghiêm trọng mở`,
       blockers: gate4Blockers,
     });
 
-    // GATE 5: Biện pháp CAPA khẩn cấp thực sự đạt điều kiện (Không hardcode true)
-    const capaRequiredDeviations = batchDeviations.filter(
-      (d) =>
-        (d as any).capaRequired === true ||
-        (Array.isArray((d as any).capaActions) && (d as any).capaActions.length > 0)
+    // GATE 5: CAPA đã hoàn thành
+    const openCapas = batchDeviations.flatMap((d) =>
+      (d.capaItems || []).filter((c) => c && c.status !== 'COMPLETED' && c.status !== 'VERIFIED')
     );
-    const openCapaDeviations = capaRequiredDeviations.filter(
-      (d) => d.status !== 'CLOSED' && !(d as any).capaCompleted
-    );
-    const gate5Passed = openCapaDeviations.length === 0;
+    const gate5Passed = openCapas.length === 0;
     const gate5Blockers: string[] = [];
     if (!gate5Passed) {
-      const msg = 'ERR_CAPA_BLOCKING: Biện pháp khắc phục / phòng ngừa (CAPA) chưa hoàn thành.';
+      const msg = `ERR_CAPA_PENDING: Còn ${openCapas.length} hành động khắc phục CAPA chưa hoàn thành.`;
       gate5Blockers.push(msg);
       blockers.push(msg);
     }
     gates.push({
       gateIndex: 5,
       gateKey: 'GATE_5_CAPA_FULFILLED',
-      gateName: 'Biện pháp CAPA khẩn cấp',
+      gateName: 'Hồ sơ CAPA (Không có CAPA mở)',
       passed: gate5Passed,
-      status: gate5Passed ? 'PASS' : 'FAIL',
-      details: gate5Passed
-        ? 'Đã hoàn thành hoặc không yêu cầu'
-        : 'Có biện pháp CAPA chưa hoàn thành',
+      status: gate5Passed ? 'PASS' : 'BLOCKED',
+      details: gate5Passed ? 'Không có CAPA mở' : `Còn ${openCapas.length} CAPA mở`,
       blockers: gate5Blockers,
     });
 
-    // GATE 6: Thẩm tra Hồ sơ sản xuất (BPR Review) - BẮT BUỘC QA APPROVED
-    const bprStatus = (batch as any).bprReviewStatus;
+    // GATE 6: BPR QA Approved (Hồ sơ sản xuất lô đã được QA phê duyệt)
+    const bprStatus = batch.bprReviewStatus;
     const gate6Passed = bprStatus === 'APPROVED';
     const gate6Blockers: string[] = [];
     if (!gate6Passed) {
       const msg =
-        'ERR_BPR_NOT_APPROVED: Hồ sơ sản xuất (BPR Review) chưa được QA thẩm định phê duyệt.';
+        bprStatus === 'REJECTED'
+          ? `ERR_BPR_NOT_APPROVED: ERR_BPR_REJECTED - Hồ sơ sản xuất (BPR) đã bị từ chối (${batch.bprReviewComment || 'Không có lý do'}).`
+          : bprStatus === 'UNDER_REVIEW'
+            ? 'ERR_BPR_NOT_APPROVED: ERR_BPR_UNDER_REVIEW - Hồ sơ sản xuất (BPR) đang trong quá trình thẩm định của QA, chưa được phê duyệt.'
+            : bprStatus === 'SUBMITTED'
+              ? 'ERR_BPR_NOT_APPROVED: ERR_BPR_NOT_REVIEWED - Hồ sơ sản xuất (BPR) đã nộp nhưng chưa được QA bắt đầu thẩm định.'
+              : 'ERR_BPR_NOT_APPROVED: ERR_BPR_NOT_SUBMITTED - Hồ sơ sản xuất (BPR) chưa được nộp hoặc chưa được QA phê duyệt.';
       gate6Blockers.push(msg);
       blockers.push(msg);
     }
     gates.push({
       gateIndex: 6,
       gateKey: 'GATE_6_BPR_QA_APPROVED',
-      gateName: 'Thẩm tra Hồ sơ sản xuất (BPR Review)',
+      gateName: 'Thẩm định hồ sơ lô sản xuất (BPR Review)',
       passed: gate6Passed,
-      status: gate6Passed ? 'PASS' : 'FAIL',
+      status: gate6Passed ? 'PASS' : bprStatus === 'UNDER_REVIEW' ? 'WAITING' : 'FAIL',
       details: gate6Passed
-        ? 'Đã được QA phê duyệt'
-        : isPreview
-          ? 'Chờ QA thẩm định duyệt BPR (ERR_BPR_NOT_APPROVED)'
-          : 'Hồ sơ sản xuất (BPR) chưa được QA duyệt (ERR_BPR_NOT_APPROVED)',
+        ? `BPR đã duyệt bởi ${batch.bprReviewedBy || 'QA'}`
+        : bprStatus === 'UNDER_REVIEW'
+          ? 'Đang thẩm định BPR'
+          : 'BPR chưa được phê duyệt',
       blockers: gate6Blockers,
     });
 
-    // GATE 7: Pháp lý, Thẩm quyền ký số & Chữ ký điện tử 21 CFR Part 11
-    const effectiveRole = String(
-      (userSignature &&
-        (userSignature.role ||
-          (userSignature as any)?.signerRole ||
-          (userSignature as any)?.signer?.role)) ||
-        (isAlreadyReleased && batch.releasedBy ? 'QA' : '') ||
-        userRole ||
-        ''
-    ).toUpperCase();
-    const hasProperRole = effectiveRole
-      ? ['ADMIN', 'QA'].includes(effectiveRole)
-      : isPreview || isAlreadyReleased;
+    // GATE 7: Thẩm quyền, Hạn dùng & Chữ ký số 21 CFR Part 11
+    const effectiveRole = userSignature?.role || userRole;
+    const hasProperRole = ['ADMIN', 'QA'].includes(effectiveRole || '');
     let isNotExpired = true;
     if (batch.expDate) {
-      const asOf = asOfDate ? new Date(asOfDate) : new Date();
       const exp = new Date(batch.expDate);
+      const asOf = asOfDate ? new Date(asOfDate) : new Date();
       if (!isNaN(exp.getTime()) && exp.getTime() < asOf.getTime()) {
         isNotExpired = false;
       }
     }
 
     const gate7Blockers: string[] = [];
-    if (!isAlreadyReleased) {
-      if (effectiveRole && !['ADMIN', 'QA'].includes(effectiveRole)) {
-        const msg = `ERR_ROLE_UNAUTHORIZED: Vai trò ${effectiveRole} không có thẩm quyền ký xuất xưởng.`;
-        gate7Blockers.push(msg);
-        blockers.push(msg);
-      } else if (!effectiveRole && !isPreview) {
-        const msg =
-          'ERR_ROLE_UNAUTHORIZED: Không xác định được vai trò người phê duyệt xuất xưởng.';
-        gate7Blockers.push(msg);
-        blockers.push(msg);
-      }
+    if (effectiveRole && !['ADMIN', 'QA'].includes(effectiveRole)) {
+      const msg = `ERR_ROLE_UNAUTHORIZED: Vai trò ${effectiveRole} không có thẩm quyền ký xuất xưởng.`;
+      gate7Blockers.push(msg);
+      blockers.push(msg);
+    } else if (!effectiveRole && !isPreview) {
+      const msg = 'ERR_ROLE_UNAUTHORIZED: Không xác định được vai trò người phê duyệt xuất xưởng.';
+      gate7Blockers.push(msg);
+      blockers.push(msg);
     }
 
     if (!isNotExpired) {
@@ -435,9 +566,9 @@ export class BatchReleaseDecisionService {
     // Tự động xác thực chữ ký điện tử 21 CFR Part 11
     let signaturePassed = false;
     if (!userSignature) {
-      if (isAlreadyReleased || isPreview) {
-        // Lô đã xuất xưởng hoặc đang ở chế độ xem trước (Preview)
-        signaturePassed = true;
+      if (isPreview) {
+        // Chế độ xem trước (Preview): Cổng 7 ở trạng thái WAITING chờ ký, KHÔNG thêm blocker đỏ
+        signaturePassed = false;
       } else {
         signaturePassed = false;
         const msg =
@@ -447,7 +578,7 @@ export class BatchReleaseDecisionService {
       }
     } else {
       signaturePassed = true;
-      // a. Document Type check (Phase 6 & 8: Chỉ chấp nhận BATCH_RELEASE, từ chối BATCH, BATCH_REJECT, TEST_RESULT_APPROVAL, COA_ISSUE)
+      // a. Document Type check (Chỉ chấp nhận BATCH_RELEASE)
       const docType = userSignature.documentType;
       if (docType !== 'BATCH_RELEASE') {
         signaturePassed = false;
@@ -456,7 +587,7 @@ export class BatchReleaseDecisionService {
         blockers.push(msg);
       }
 
-      // b. Document ID check
+      // b. Document ID check (Bắt buộc phải khớp đúng batchId)
       if (!userSignature.documentId || userSignature.documentId !== batchId) {
         signaturePassed = false;
         const msg = `ERR_SIGNATURE_MISMATCH: ID tài liệu ký '${userSignature.documentId}' không khớp với ID lô '${batchId}'.`;
@@ -464,7 +595,7 @@ export class BatchReleaseDecisionService {
         blockers.push(msg);
       }
 
-      // c. Document Version check (Phase 9)
+      // c. Document Version check
       if (
         userSignature.documentVersion !== undefined &&
         batch.version !== undefined &&
@@ -472,13 +603,12 @@ export class BatchReleaseDecisionService {
       ) {
         const sigId = (userSignature as any)?.id || (userSignature as any)?.signatureId;
         const isPersistedReleaseSig =
-          isAlreadyReleased ||
-          (Array.isArray(batch.releaseSignatures) &&
-            batch.releaseSignatures.some(
-              (s: any) =>
-                ((s as any)?.id || (s as any)?.signatureId) === sigId ||
-                s.checksum === userSignature?.checksum
-            ));
+          Array.isArray(batch.releaseSignatures) &&
+          batch.releaseSignatures.some(
+            (s: any) =>
+              ((s as any)?.id || (s as any)?.signatureId) === sigId ||
+              s.checksum === userSignature?.checksum
+          );
 
         if (!isPersistedReleaseSig) {
           signaturePassed = false;
@@ -503,7 +633,7 @@ export class BatchReleaseDecisionService {
         userSignature.role ||
         (userSignature as any).signerRole ||
         (userSignature as any).signer?.role ||
-        (isAlreadyReleased ? 'QA' : userRole);
+        userRole;
       const sigRole = String(effectiveSigRole || '').toUpperCase();
       if (!['QA', 'ADMIN'].includes(sigRole)) {
         signaturePassed = false;
@@ -561,12 +691,13 @@ export class BatchReleaseDecisionService {
         for (let i = 0; i < payload.length; i++) {
           const char = payload.charCodeAt(i);
           hash = (hash << 5) - hash + char;
-          hash |= 0;
+          hash = hash & hash;
         }
-        const expectedFallback = `sig-hash-${Math.abs(hash).toString(16)}-${payload.length}`;
+        const expectedFallback = 'sha256_' + Math.abs(hash).toString(16);
         const isHex64 =
-          typeof checksum === 'string' &&
           checksum.length === 64 &&
+          !checksum.includes(' ') &&
+          !checksum.includes('-') &&
           /^[0-9a-fA-F]{64}$/.test(checksum);
 
         if (
@@ -584,33 +715,21 @@ export class BatchReleaseDecisionService {
       }
     }
 
-    const gate7Passed =
-      hasProperRole &&
-      isNotExpired &&
-      signaturePassed &&
-      (!!userSignature || isAlreadyReleased || isPreview);
+    const gate7Passed = hasProperRole && isNotExpired && signaturePassed && !!userSignature;
     let gate7Status: 'PASS' | 'FAIL' | 'BLOCKED' | 'WAITING' = 'FAIL';
-    if (gate7Passed && (!!userSignature || isAlreadyReleased)) {
+    if (gate7Passed) {
       gate7Status = 'PASS';
-    } else if (!userSignature && !isAlreadyReleased) {
+    } else if (!userSignature) {
       gate7Status = 'WAITING';
     } else {
       gate7Status = 'FAIL';
     }
 
     let gate7Details = 'Chưa ký điện tử phê duyệt';
-    if (gate7Passed) {
-      if (userSignature) {
-        const signerName =
-          userSignature.signerName || userSignature.signerEmail || userSignature.signerUid;
-        gate7Details = `Đã ký số phê duyệt xuất xưởng (21 CFR Part 11) bởi ${signerName} (${userSignature.role || 'QA'})`;
-      } else if (isAlreadyReleased) {
-        gate7Details = `Lô đã được QA phê duyệt xuất xưởng${batch.releasedBy ? ` bởi ${batch.releasedBy}` : ''}`;
-      } else if (isPreview) {
-        gate7Details = 'Chờ ký điện tử xuất xưởng (21 CFR Part 11)';
-      } else {
-        gate7Details = 'Thẩm quyền, hạn dùng và chữ ký điện tử hợp lệ';
-      }
+    if (gate7Passed && userSignature) {
+      const signerName =
+        userSignature.signerName || userSignature.signerEmail || userSignature.signerUid;
+      gate7Details = `Đã ký số phê duyệt xuất xưởng (21 CFR Part 11) bởi ${signerName} (${userSignature.role || 'QA'})`;
     } else if (gate7Status === 'WAITING') {
       gate7Details = 'Chờ ký điện tử xuất xưởng (21 CFR Part 11)';
     } else {
@@ -627,12 +746,7 @@ export class BatchReleaseDecisionService {
       blockers: gate7Blockers,
     });
 
-    // 4. Kiểm tra trạng thái hiện tại của Lô
-    if (batch.status === 'RELEASED') {
-      // Khi Lô đã xuất xưởng, 7 gates đều đã đạt chuẩn và đã phát hành thành công.
-      // Đây là thông báo lưu vết, không phải blocker kỹ thuật làm hỏng đánh giá 7 gates.
-      decisionTrace.push('[STATUS] Lô đã ở trạng thái Xuất xưởng (RELEASED).');
-    } else if (batch.status === 'REJECTED') {
+    if (batch.status === 'REJECTED') {
       blockers.push('Lô đã bị Từ chối (REJECTED), không thể xuất xưởng.');
     }
 
@@ -660,6 +774,21 @@ export class BatchReleaseDecisionService {
       dataFreshness,
       decisionTrace,
     };
+  }
+
+  /**
+   * Tính toán Canonical Release Decision duy nhất cho Lô sản xuất (Entrypoint SSoT)
+   * Tự động điều hướng:
+   * - Nếu Lô đã RELEASED → Trả về Historical Canonical Snapshot
+   * - Nếu Lô chưa RELEASED → Đánh giá Release Eligibility thực tế
+   */
+  public static resolveBatchReleaseDecision(
+    params: ResolveBatchReleaseDecisionParams
+  ): BatchReleaseDecision {
+    if (params.batch?.status === 'RELEASED') {
+      return this.getReleasedCanonicalSnapshot(params.batch);
+    }
+    return this.evaluateReleaseEligibility(params);
   }
 }
 

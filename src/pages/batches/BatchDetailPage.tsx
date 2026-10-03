@@ -98,7 +98,10 @@ const BatchDetailPage = () => {
 
   const releaseDecision = useMemo<BatchReleaseDecision | null>(() => {
     if (!batch) return null;
-    return BatchReleaseDecisionService.resolveBatchReleaseDecision({
+    if (batch.status === 'RELEASED') {
+      return BatchReleaseDecisionService.getReleasedCanonicalSnapshot(batch);
+    }
+    return BatchReleaseDecisionService.evaluateReleasePreview({
       batch,
       testResults: viewBatchResults,
       deviations: batchDeviations,
@@ -189,34 +192,21 @@ const BatchDetailPage = () => {
       return;
     }
 
-    let targetBatch = batch;
-    // Nếu Lô vẫn đang ở trạng thái PENDING, tự động chuyển tiếp hợp lệ sang TESTING trước khi mở modal ký
+    // Nếu Lô vẫn đang ở trạng thái PENDING, yêu cầu người dùng chuyển sang TESTING trước theo đúng FSM
     if (batch.status === 'PENDING') {
-      try {
-        await updateBatchStatus(batch.id, 'TESTING');
-        const fresh = await batchAppService.getBatchById(batch.id);
-        if (fresh) {
-          targetBatch = fresh;
-        } else {
-          targetBatch = {
-            ...batch,
-            status: 'TESTING',
-            version: (batch.version ?? 1) + 1,
-          };
-        }
-      } catch (err: any) {
-        notify({
-          type: 'ERROR',
-          title: 'Lỗi chuyển trạng thái kiểm nghiệm',
-          message: err.message || 'Không thể chuyển Lô sang trạng thái Đang kiểm nghiệm.',
-        });
-        return;
-      }
-    } else {
-      const fresh = await batchAppService.getBatchById(batch.id);
-      if (fresh) {
-        targetBatch = fresh;
-      }
+      notify({
+        type: 'ERROR',
+        title: 'Chưa đủ điều kiện xuất xưởng',
+        message:
+          'Lô sản xuất đang ở trạng thái Chờ xử lý (PENDING). Vui lòng chuyển Lô sang Đang kiểm nghiệm (TESTING) trước khi thực hiện ký duyệt xuất xưởng.',
+      });
+      return;
+    }
+
+    let targetBatch = batch;
+    const fresh = await batchAppService.getBatchById(batch.id);
+    if (fresh) {
+      targetBatch = fresh;
     }
 
     setSignTargetBatch(targetBatch);

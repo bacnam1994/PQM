@@ -131,19 +131,9 @@ export class BatchReleaseProgressService {
       }
     }
 
-    // Batch đã released → bảo toàn trạng thái 7/7 Gates và trả về gateResults đầy đủ
+    // Batch đã released → dùng Historical Canonical Snapshot và semantic readyForRelease: false
     if (batch.status === 'RELEASED') {
-      const decision = BatchReleaseDecisionService.resolveBatchReleaseDecision({
-        batch,
-        testResults,
-        deviations,
-        boundTccs,
-        tccsList,
-        dataFreshness,
-        userRole: userRole || effectiveSignature?.role,
-        userSignature: effectiveSignature,
-        isPreview: false,
-      });
+      const decision = BatchReleaseDecisionService.getReleasedCanonicalSnapshot(batch);
 
       const progress: BatchReleaseGateProgress = {
         completed: 7,
@@ -157,7 +147,7 @@ export class BatchReleaseProgressService {
         releaseGateProgress: progress,
         gateResults: decision.gates,
         readyForSignature: false,
-        readyForRelease: true,
+        readyForRelease: false, // Lô đã RELEASED thì KHÔNG còn readyForRelease
         readyForFinalApproval: false, // đã released
         evaluatedAt,
       };

@@ -390,8 +390,8 @@ describe('Batch 7 Release Gates Canonical Tests (Phase 20 Requirements)', () => 
     expect(reloadedBatch!.releaseGateProgress?.percentage).toBe(86);
   });
 
-  // CASE 9: PENDING BATCH -> Lô đang ở PENDING nhưng Gate 1-6 PASS -> BATCH_RELEASE_APPROVE tự động chuyển tiếp hợp lệ PENDING -> TESTING -> RELEASED
-  it('CASE 9: PENDING BATCH -> Lô đang ở PENDING nhưng Gate 1-6 PASS -> BATCH_RELEASE_APPROVE tự động chuyển PENDING -> TESTING -> RELEASED mà không gây lỗi State Machine', async () => {
+  // CASE 9: PENDING BATCH -> BATCH_RELEASE_APPROVE từ chối khi PENDING, bắt buộc qua BATCH_DISPATCH_TESTING -> TESTING -> RELEASED
+  it('CASE 9: PENDING BATCH -> BATCH_RELEASE_APPROVE từ chối khi PENDING, bắt buộc qua BATCH_DISPATCH_TESTING -> TESTING -> RELEASED', async () => {
     // Thiết lập lô ở PENDING nhưng đã hoàn tất kiểm nghiệm và BPR
     mockBatch = {
       ...mockBatch,
@@ -408,7 +408,6 @@ describe('Batch 7 Release Gates Canonical Tests (Phase 20 Requirements)', () => 
       },
     };
 
-    // Khi auto-promote từ PENDING -> TESTING, version tăng 10 -> 11
     const validSig: ElectronicSignature = {
       id: 'sig_pending_release_001',
       documentType: 'BATCH_RELEASE',
@@ -424,6 +423,20 @@ describe('Batch 7 Release Gates Canonical Tests (Phase 20 Requirements)', () => 
     };
     validSig.checksum = await computeSignatureChecksum(validSig);
 
+    // 1. Thử release trực tiếp khi PENDING -> Bắt buộc bị từ chối
+    await expect(
+      service.approveRelease(mockBatch.id, qaUser, {
+        signature: validSig,
+        batchTestResults: mockTestResults,
+      })
+    ).rejects.toThrow(/State Machine Violation|Không thể chuyển từ PENDING/);
+
+    // 2. Chuyển Lô sang TESTING hợp lệ bằng dispatchTesting
+    const testingBatch = await service.dispatchTesting(mockBatch.id, qaUser);
+    expect(testingBatch.status).toBe('TESTING');
+    expect(testingBatch.version).toBe(11);
+
+    // 3. Thực hiện xuất xưởng từ TESTING -> Thành công 100%
     const releasedBatch = await service.approveRelease(mockBatch.id, qaUser, {
       signature: validSig,
       batchTestResults: mockTestResults,

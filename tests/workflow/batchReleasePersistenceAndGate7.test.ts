@@ -217,7 +217,7 @@ describe('Batch Release Persistence & Gate 7 Evaluation Test Suite', () => {
       expect(progress.releaseGateProgress.completed).toBe(7);
       expect(progress.releaseGateProgress.total).toBe(7);
       expect(progress.releaseGateProgress.percentage).toBe(100);
-      expect(progress.readyForRelease).toBe(true);
+      expect(progress.readyForRelease).toBe(false); // Lô đã RELEASED -> readyForRelease = false
       expect(progress.readyForSignature).toBe(false);
 
       // KHÔNG ĐƯỢC RỖNG: gateResults phải có đủ 7 gates
@@ -226,6 +226,69 @@ describe('Batch Release Persistence & Gate 7 Evaluation Test Suite', () => {
       const gate7 = progress.gateResults.find((g) => g.gateIndex === 7);
       expect(gate7!.passed).toBe(true);
       expect(gate7!.status).toBe('PASS');
+    });
+
+    it('evaluateReleasePreview: Gate 7 ở trạng thái WAITING và KHÔNG ném blocker ERR_SIGNATURE_MISSING làm đỏ giao diện', () => {
+      const previewDecision = BatchReleaseDecisionService.evaluateReleasePreview({
+        batch: mockBatch,
+        testResults: mockTestResults,
+        userRole: 'QA',
+      });
+
+      const gate7 = previewDecision.gates.find((g) => g.gateIndex === 7);
+      expect(gate7).toBeDefined();
+      expect(gate7!.status).toBe('WAITING');
+      expect(gate7!.passed).toBe(false);
+      expect(gate7!.details).toContain('Chờ ký điện tử xuất xưởng');
+      // Không được chứa blocker đỏ ERR_SIGNATURE_MISSING trên preview
+      expect(gate7!.blockers || []).toHaveLength(0);
+    });
+
+    it('Chữ ký thiếu documentId hoặc documentId không khớp: Gate 7 bắt buộc FAIL với ERR_SIGNATURE_MISMATCH', () => {
+      const invalidDocIdSig = {
+        ...validReleaseSignature,
+        documentId: '', // Thiếu documentId
+      };
+
+      const decision = BatchReleaseDecisionService.evaluateReleaseEligibility({
+        batch: mockBatch,
+        testResults: mockTestResults,
+        userRole: 'QA',
+        userSignature: invalidDocIdSig as any,
+      });
+
+      expect(decision.eligible).toBe(false);
+      const gate7 = decision.gates.find((g) => g.gateIndex === 7);
+      expect(gate7!.passed).toBe(false);
+      expect(gate7!.blockers?.some((b) => b.includes('ERR_SIGNATURE_MISMATCH'))).toBe(true);
+    });
+
+    it('getReleasedCanonicalSnapshot: bảo toàn 100% 7/7 PASS lịch sử kể cả khi dữ liệu hiện tại có thay đổi sau release', () => {
+      const releasedBatch: Batch = {
+        ...mockBatch,
+        status: 'RELEASED',
+        version: 5,
+        releasedAt: new Date().toISOString(),
+        releasedBy: 'qa_lead@company.com',
+        releaseSignatures: [validReleaseSignature],
+      };
+
+      // Dữ liệu giả lập có deviation mở phát sinh sau release
+      const currentDeviations = [
+        {
+          id: 'dev_post_release',
+          batchId: mockBatch.id,
+          severity: 'CRITICAL',
+          status: 'OPEN',
+        },
+      ];
+
+      const snapshot = BatchReleaseDecisionService.getReleasedCanonicalSnapshot(releasedBatch);
+      expect(snapshot.eligible).toBe(true);
+      expect(snapshot.gates).toHaveLength(7);
+      expect(snapshot.gates.every((g) => g.passed)).toBe(true);
+      expect(snapshot.currentStatus).toBe('RELEASED');
+      expect(snapshot.blockers).toHaveLength(0);
     });
 
     it('BatchReleaseWorkflowSynchronizer: sync background trên Lô RELEASED không bị thụt lùi xuống 6/7 hoặc GATE_7', async () => {
