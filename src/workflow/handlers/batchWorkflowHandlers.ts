@@ -258,6 +258,11 @@ export class BatchWorkflowHandlers {
       // Trường hợp an toàn: Lô đang ở PENDING nhưng được phê duyệt xuất xưởng (BATCH_RELEASE_APPROVE),
       // tự động chuyển tiếp hợp lệ PENDING -> TESTING (BATCH_DISPATCH_TESTING) trước để tuân thủ 100% FSM.
       if (actionId === 'BATCH_RELEASE_APPROVE' && currentStatus === 'PENDING') {
+        if (!options?.signature) {
+          throw new Error(
+            `Quy chuẩn State Machine: Không thể chuyển từ PENDING sang RELEASED. Lô cần phải được kiểm nghiệm trước.`
+          );
+        }
         const dispatchResult = await this.executeBatchAction(
           'BATCH_DISPATCH_TESTING',
           batchId,
@@ -310,7 +315,18 @@ export class BatchWorkflowHandlers {
       throw new Error('Thu hồi lô (Recall) bắt buộc phải có lý do thu hồi rõ ràng.');
     }
 
-    // 3. Release Decision bắt buộc đối với BATCH_RELEASE_APPROVE
+    // 3. Topology & Perms check từ BatchStateMachine (Rào chắn đồ thị trạng thái đầu tiên)
+    const transitionCheck = BatchStateMachine.canTransition(currentStatus, calculatedNextState, {
+      actorRole: currentUser?.role,
+      actorId: currentUser?.uid,
+      reason: effectiveReason,
+      conditionsMet: actionId === 'BATCH_RELEASE_APPROVE' ? true : undefined,
+    });
+    if (!transitionCheck.allowed) {
+      throw new Error(`Quy chuẩn State Machine: ${transitionCheck.reason}`);
+    }
+
+    // 4. Release Decision bắt buộc đối với BATCH_RELEASE_APPROVE
     let releaseDecision: any = undefined;
     if (actionId === 'BATCH_RELEASE_APPROVE') {
       let freshTestResults: TestResult[] = options?.batchTestResults || [];
@@ -332,17 +348,6 @@ export class BatchWorkflowHandlers {
           `Quy chuẩn GMP & Release Guard: ${releaseDecision.blockers[0] || 'Lô không đủ điều kiện xuất xưởng.'}`
         );
       }
-    }
-
-    // 4. Topology & Perms check từ BatchStateMachine (kết nối trực tiếp SSoT Release Decision qua conditionsMet)
-    const transitionCheck = BatchStateMachine.canTransition(currentStatus, calculatedNextState, {
-      actorRole: currentUser?.role,
-      actorId: currentUser?.uid,
-      reason: effectiveReason,
-      conditionsMet: releaseDecision ? releaseDecision.eligible : undefined,
-    });
-    if (!transitionCheck.allowed) {
-      throw new Error(`Quy chuẩn State Machine: ${transitionCheck.reason}`);
     }
 
     // 5. Chữ ký số 21 CFR Part 11 đối với BATCH_REJECT & BATCH_RECALL
@@ -384,7 +389,17 @@ export class BatchWorkflowHandlers {
               evaluatedAt: now,
             },
             releaseSignatures: options?.signature
-              ? [options.signature]
+              ? [
+                  options.signature,
+                  ...(Array.isArray(currentBatch.releaseSignatures)
+                    ? currentBatch.releaseSignatures.filter(
+                        (s: any) =>
+                          ((s as any)?.id || (s as any)?.signatureId) !==
+                          ((options.signature as any)?.id ||
+                            (options.signature as any)?.signatureId)
+                      )
+                    : []),
+                ]
               : currentBatch.releaseSignatures,
           }
         : {}),

@@ -40,7 +40,7 @@ import { useDeviationsByBatchQuery } from '../../hooks/queries/useDeviationQueri
 import { Surface, PageHeader, StatusBadge, ConfirmationModal } from '../../components/ui';
 import { BatchStatusSelect } from './BatchList/components/BatchStatusSelect';
 import { ReleaseRules } from '../../domain/rules';
-import { batchRepository } from '../../repositories/firebase/FirebaseBatchRepository';
+import { batchAppService } from '../../services/app/BatchAppService';
 import {
   BatchReleaseDecisionService,
   BatchReleaseDecision,
@@ -194,7 +194,7 @@ const BatchDetailPage = () => {
     if (batch.status === 'PENDING') {
       try {
         await updateBatchStatus(batch.id, 'TESTING');
-        const fresh = await batchRepository.findById(batch.id);
+        const fresh = await batchAppService.getBatchById(batch.id);
         if (fresh) {
           targetBatch = fresh;
         } else {
@@ -213,7 +213,7 @@ const BatchDetailPage = () => {
         return;
       }
     } else {
-      const fresh = await batchRepository.findById(batch.id);
+      const fresh = await batchAppService.getBatchById(batch.id);
       if (fresh) {
         targetBatch = fresh;
       }
@@ -227,7 +227,7 @@ const BatchDetailPage = () => {
     if (!batch) return;
     try {
       // Phase 9 & 11: FETCH FRESH BATCH trước khi release
-      const freshBatch = (await batchRepository.findById(batch.id)) || signTargetBatch || batch;
+      const freshBatch = (await batchAppService.getBatchById(batch.id)) || signTargetBatch || batch;
 
       // Phase 5: Re-evaluate 7 Gates với chữ ký thật
       const reEvaluatedDecision = BatchReleaseDecisionService.resolveBatchReleaseDecision({
@@ -1100,17 +1100,34 @@ const BatchDetailPage = () => {
                         )}
                       </div>
                     )}
+
+                    {g.gateIndex === 7 && g.passed && (
+                      <div className="pt-1.5 border-t border-border/60 flex items-center justify-between flex-wrap gap-1.5 pl-6 text-[9px] text-emerald-600 dark:text-emerald-400">
+                        <span className="flex items-center gap-1 font-semibold">
+                          <ShieldCheckIcon className="h-3.5 w-3.5 text-emerald-600" />
+                          Signature: ĐÃ KÝ (21 CFR Part 11)
+                          {batch.releasedBy ? ` · ${batch.releasedBy}` : ''}
+                        </span>
+                        {batch.releasedAt && (
+                          <span className="text-ink-muted">
+                            {new Date(batch.releasedAt).toLocaleString('vi-VN')}
+                          </span>
+                        )}
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
 
               {/* Action Projection Panel: Hướng dẫn & Nút hành động trực tiếp (Phase 7) */}
               <div className="pt-3 border-t border-border mt-3 space-y-2">
-                {releaseDecision.eligible ? (
+                {releaseDecision.eligible || batch.status === 'RELEASED' ? (
                   <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-800 dark:text-emerald-300 text-xs font-semibold flex items-center justify-between">
                     <span className="flex items-center gap-1.5">
-                      <CheckCircleIcon className="h-4 w-4 text-emerald-600" /> 7/7 Cổng đạt chuẩn
-                      GMP
+                      <CheckCircleIcon className="h-4 w-4 text-emerald-600" />
+                      {batch.status === 'RELEASED'
+                        ? 'LÔ ĐÃ XUẤT XƯỞNG · 7/7 Cổng đạt chuẩn GMP'
+                        : '7/7 Cổng đạt chuẩn GMP'}
                     </span>
                     {canSignRelease && batch.status !== 'RELEASED' && (
                       <button

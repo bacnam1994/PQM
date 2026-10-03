@@ -103,6 +103,21 @@ export class BatchReleaseWorkflowSynchronizer {
         }
       }
 
+      // Trích xuất signature nếu caller không truyền (Gate 7 Persistence Guard)
+      let effectiveUserSignature = userSignature;
+      if (!effectiveUserSignature && batch) {
+        const candidateSigs: ElectronicSignature[] = [
+          ...(Array.isArray(signatures) ? signatures : []),
+          ...(Array.isArray(batch.releaseSignatures) ? batch.releaseSignatures : []),
+        ];
+        const releaseSig = candidateSigs
+          .filter((s) => s && s.documentType === 'BATCH_RELEASE' && s.documentId === batch?.id)
+          .sort((a, b) => (b.signedAt || '').localeCompare(a.signedAt || ''))[0];
+        if (releaseSig) {
+          effectiveUserSignature = releaseSig;
+        }
+      }
+
       // Tính toán progress (Canonical)
       const progress = BatchReleaseProgressService.resolveReleaseProgress({
         batch,
@@ -112,9 +127,21 @@ export class BatchReleaseWorkflowSynchronizer {
         tccsList,
         dataFreshness,
         userRole,
-        userSignature,
+        userSignature: effectiveUserSignature,
         signatures,
       });
+
+      // BẢO VỆ TUYỆT ĐỐI: Lô đã RELEASED không được phép bị thụt lùi do background sync
+      if (batch.status === 'RELEASED' || batch.releaseStage === 'RELEASED') {
+        progress.releaseStage = 'RELEASED';
+        progress.releaseGateProgress = {
+          completed: 7,
+          total: 7,
+          currentGate: 8,
+          percentage: 100,
+          evaluatedAt: new Date().toISOString(),
+        };
+      }
 
       // Persist lên Firebase (atomic transaction với OCC & terminal state guard)
       if (typeof this.repo.updateReleaseProgress === 'function') {

@@ -17,8 +17,7 @@ import { fetchTestResultsByBatchId } from '../../../../services/testResultServic
 import { ReleaseRules } from '../../../../domain/rules';
 import { BatchReleaseDecisionService } from '../../../../domain/batch/BatchReleaseDecisionService';
 import { resolveTestResultsForBatch } from '../../../../domain/batch/batchTestResultResolver';
-import { batchRepository } from '../../../../repositories/firebase/FirebaseBatchRepository';
-import { testResultRepository } from '../../../../repositories/firebase/FirebaseTestResultRepository';
+import { batchAppService } from '../../../../services/app/BatchAppService';
 
 export function useBatchList() {
   const navigate = useNavigate();
@@ -222,8 +221,8 @@ export function useBatchList() {
     async (newStatus: string, batchId: string) => {
       if (newStatus === 'RELEASED') {
         try {
-          // 1. FETCH FRESH BATCH từ repository (Phase 9 & 11)
-          let freshBatch = await batchRepository.findById(batchId);
+          // 1. FETCH FRESH BATCH từ service (Phase 9 & 11)
+          let freshBatch = await batchAppService.getBatchById(batchId);
           if (!freshBatch) {
             freshBatch = hydratedBatches.find((b) => b.id === batchId) || null;
           }
@@ -237,7 +236,7 @@ export function useBatchList() {
           }
 
           // 2. FETCH FRESH TEST RESULTS
-          let freshTestResults = await testResultRepository.findByRelation('batchId', batchId);
+          let freshTestResults = await fetchTestResultsByBatchId(batchId);
           if (!freshTestResults || freshTestResults.length === 0) {
             const resolution = resolveTestResultsForBatch(freshBatch, sourceResults);
             freshTestResults = resolution.allCandidateResults;
@@ -278,7 +277,7 @@ export function useBatchList() {
           // NẾU LÔ ĐANG Ở PENDING: Chuyển tiếp hợp lệ PENDING -> TESTING trước khi mở modal ký
           if (freshBatch.status === 'PENDING') {
             await updateBatchStatus(freshBatch.id, 'TESTING');
-            const reFetched = await batchRepository.findById(batchId);
+            const reFetched = await batchAppService.getBatchById(batchId);
             if (reFetched) {
               freshBatch = reFetched;
             }
@@ -308,7 +307,7 @@ export function useBatchList() {
     if (!eSignatureTarget) return;
     try {
       // Phase 9 & 11: FETCH FRESH BATCH trước khi release
-      const freshBatch = await batchRepository.findById(eSignatureTarget.batchId);
+      const freshBatch = await batchAppService.getBatchById(eSignatureTarget.batchId);
       if (!freshBatch) {
         throw new Error(`Không tìm thấy Lô ${eSignatureTarget.batchId} trong cơ sở dữ liệu.`);
       }

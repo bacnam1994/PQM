@@ -8,6 +8,7 @@
     "build": "node -e \"fs.rmSync('dist', { recursive: true, force: true })\" && tsc && vite build --emptyOutDir",
     "preview": "vite preview",
     "test": "vitest",
+    "test:run": "vitest run",
     "test:ui": "vitest --ui",
     "test:e2e": "playwright test",
     "test:e2e-ui": "playwright test --ui",

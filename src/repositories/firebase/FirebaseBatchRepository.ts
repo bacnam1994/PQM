@@ -94,6 +94,9 @@ export class FirebaseBatchRepository
           if (metadata?.releaseDecisionSnapshot !== undefined) {
             updatedBatch.releaseDecisionSnapshot = metadata.releaseDecisionSnapshot;
           }
+          if (metadata?.releaseSignatures !== undefined) {
+            updatedBatch.releaseSignatures = metadata.releaseSignatures;
+          }
         } else if (status === 'REJECTED') {
           updatedBatch.rejectReason =
             reason || metadata?.rejectReason || currentBatch.rejectReason || null;
@@ -186,6 +189,8 @@ export class FirebaseBatchRepository
                   percentage: 100,
                   evaluatedAt: now,
                 },
+                releaseSignatures:
+                  metadata?.releaseSignatures || currentBatch.releaseSignatures || null,
               }
             : {}),
           ...(status === 'REJECTED'

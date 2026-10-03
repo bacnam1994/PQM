@@ -509,7 +509,7 @@ describe('Batch BPR Workflow & 7 Release Gates Test Suite', () => {
         service.approveRelease(mockBatch.id, regularUser, {
           batchTestResults: mockTestResults,
         })
-      ).rejects.toThrow(/Từ chối quyền|không được phép/i);
+      ).rejects.toThrow(/Từ chối quyền|không được phép|ERR_ROLE_UNAUTHORIZED|không có thẩm quyền/i);
     });
 
     it('Cấm direct status mutation gọi updateBatchStatusService', async () => {

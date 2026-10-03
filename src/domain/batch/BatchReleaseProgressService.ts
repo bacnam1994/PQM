@@ -116,8 +116,35 @@ export class BatchReleaseProgressService {
 
     const evaluatedAt = new Date().toISOString();
 
-    // Batch đã released → shortcut
+    // Phase 8: Xác định chữ ký canonical (documentType = BATCH_RELEASE, documentId = batch.id)
+    let effectiveSignature = userSignature || null;
+    if (!effectiveSignature) {
+      const candidateSigs: ElectronicSignature[] = [
+        ...(Array.isArray(signatures) ? signatures : []),
+        ...(Array.isArray(batch.releaseSignatures) ? batch.releaseSignatures : []),
+      ];
+      const releaseSig = candidateSigs
+        .filter((s) => s && s.documentType === 'BATCH_RELEASE' && s.documentId === batch.id)
+        .sort((a, b) => (b.signedAt || '').localeCompare(a.signedAt || ''))[0];
+      if (releaseSig) {
+        effectiveSignature = releaseSig;
+      }
+    }
+
+    // Batch đã released → bảo toàn trạng thái 7/7 Gates và trả về gateResults đầy đủ
     if (batch.status === 'RELEASED') {
+      const decision = BatchReleaseDecisionService.resolveBatchReleaseDecision({
+        batch,
+        testResults,
+        deviations,
+        boundTccs,
+        tccsList,
+        dataFreshness,
+        userRole: userRole || effectiveSignature?.role,
+        userSignature: effectiveSignature,
+        isPreview: false,
+      });
+
       const progress: BatchReleaseGateProgress = {
         completed: 7,
         total: 7,
@@ -128,7 +155,7 @@ export class BatchReleaseProgressService {
       return {
         releaseStage: 'RELEASED',
         releaseGateProgress: progress,
-        gateResults: [],
+        gateResults: decision.gates,
         readyForSignature: false,
         readyForRelease: true,
         readyForFinalApproval: false, // đã released
@@ -155,21 +182,6 @@ export class BatchReleaseProgressService {
       };
     }
 
-    // Phase 8: Xác định chữ ký canonical (documentType = BATCH_RELEASE, documentId = batch.id)
-    let effectiveSignature = userSignature || null;
-    if (!effectiveSignature) {
-      const candidateSigs: ElectronicSignature[] = [
-        ...(Array.isArray(signatures) ? signatures : []),
-        ...(Array.isArray(batch.releaseSignatures) ? batch.releaseSignatures : []),
-      ];
-      const releaseSig = candidateSigs
-        .filter((s) => s && s.documentType === 'BATCH_RELEASE' && s.documentId === batch.id)
-        .sort((a, b) => (b.signedAt || '').localeCompare(a.signedAt || ''))[0];
-      if (releaseSig) {
-        effectiveSignature = releaseSig;
-      }
-    }
-
     // Chạy 7-Gate Decision
     const decision = BatchReleaseDecisionService.resolveBatchReleaseDecision({
       batch,
@@ -180,7 +192,7 @@ export class BatchReleaseProgressService {
       dataFreshness,
       userRole: userRole || effectiveSignature?.role,
       userSignature: effectiveSignature,
-      isPreview: !effectiveSignature,
+      isPreview: false,
     });
 
     const gates = decision.gates; // ReleaseGateResult[], luôn 7 phần tử

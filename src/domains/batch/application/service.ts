@@ -23,6 +23,13 @@ export class BatchAppService {
   }
 
   /**
+   * Lấy chi tiết Lô sản xuất theo ID
+   */
+  async getBatchById(id: string): Promise<Batch | null> {
+    return this.repo.findById(id);
+  }
+
+  /**
    * Tạo mới Lô sản xuất có chụp phiên bản Schema Snapshotting (TCCS & Formula)
    */
   async createBatch(
