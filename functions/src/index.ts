@@ -46,7 +46,7 @@ export const autoHealConsistencyCron = onSchedule(
   {
     schedule: '0 2 * * *',
     timeZone: 'Asia/Ho_Chi_Minh',
-    retryCount: 1
+    retryCount: 1,
   },
   async (event) => {
     console.log('[autoHealConsistencyCron] Starting daily data auto-healing at 02:00 AM...');
@@ -59,21 +59,27 @@ export const autoHealConsistencyCron = onSchedule(
 /**
  * 3. Callable Function: Tạo Báo cáo Excel Chất lượng đa sheet bằng SheetJS và lưu Storage
  */
-export const generateQualityReport = onCall({ cors: true, timeoutSeconds: 120 }, async (request) => {
-  // Chỉ cho phép người dùng đã xác thực
-  if (!request.auth) {
-    throw new HttpsError('unauthenticated', 'Chỉ người dùng đã đăng nhập mới có quyền xuất báo cáo.');
-  }
+export const generateQualityReport = onCall(
+  { cors: true, timeoutSeconds: 120 },
+  async (request) => {
+    // Chỉ cho phép người dùng đã xác thực
+    if (!request.auth) {
+      throw new HttpsError(
+        'unauthenticated',
+        'Chỉ người dùng đã đăng nhập mới có quyền xuất báo cáo.'
+      );
+    }
 
-  const data = request.data as QualityReportRequest;
-  try {
-    const result = await generateQualityReportBackend(data, storage, db);
-    return result;
-  } catch (err: any) {
-    console.error('[generateQualityReport] Error:', err);
-    throw new HttpsError('internal', err?.message || 'Lỗi tạo file báo cáo Excel');
+    const data = request.data as QualityReportRequest;
+    try {
+      const result = await generateQualityReportBackend(data, storage, db);
+      return result;
+    } catch (err: any) {
+      console.error('[generateQualityReport] Error:', err);
+      throw new HttpsError('internal', err?.message || 'Lỗi tạo file báo cáo Excel');
+    }
   }
-});
+);
 
 /**
  * 4. Database Trigger: Đồng bộ Custom Claims khi quyền người dùng thay đổi tại /users/{uid}
@@ -81,7 +87,7 @@ export const generateQualityReport = onCall({ cors: true, timeoutSeconds: 120 },
 export const onUserRoleChanged = onValueWritten(
   {
     ref: '/users/{uid}',
-    instance: '*'
+    instance: '*',
   },
   async (event) => {
     const uid = event.params.uid;
@@ -95,3 +101,13 @@ export const onUserRoleChanged = onValueWritten(
     await syncUserCustomClaims(uid, afterData, auth);
   }
 );
+
+import { handleApproveBatchRelease, ApproveBatchReleaseRequest } from './batchReleaseFunction';
+
+/**
+ * 5. Callable Function (P0-2): Canonical Server-Side Batch Release Command
+ * Thẩm tra Gate 1→7, chữ ký số 21 CFR Part 11 thật và thực thi Atomic Release Transaction.
+ */
+export const approveBatchRelease = onCall({ cors: true, timeoutSeconds: 60 }, async (request) => {
+  return handleApproveBatchRelease(request as any, db);
+});

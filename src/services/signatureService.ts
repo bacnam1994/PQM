@@ -3,21 +3,22 @@
  * Dịch vụ ký duyệt điện tử tuân thủ tiêu chuẩn FDA 21 CFR Part 11 và GMP-WHO Annex 11
  */
 
-import { ref, get, set } from 'firebase/database';
+import { ref, get, set, update, query, orderByChild, equalTo } from 'firebase/database';
 import { getAuth, reauthenticateWithCredential, EmailAuthProvider } from 'firebase/auth';
 import { db } from '../firebase';
-import { 
-  ElectronicSignature, 
-  CreateSignatureInput, 
+import {
+  ElectronicSignature,
+  CreateSignatureInput,
   SIGNATURE_MEANINGS,
-  SignatureDocumentType 
+  SignatureDocumentType,
+  SignatureStatus,
 } from '../types/signature';
 import { can, normalizeUser } from './permissionService';
 import { logAuditAction } from './auditService';
 import { removeUndefined } from '../utils';
 
 /**
- * Tính toán mã băm checksum SHA-256 bảo đảm tính bất biến của chữ ký
+ * Tính toán mã băm checksum SHA-256 bảo đảm tính bất biến của chữ ký (integrity fingerprint)
  */
 export async function computeSignatureChecksum(
   data: Omit<ElectronicSignature, 'id' | 'checksum'>
@@ -30,7 +31,7 @@ export async function computeSignatureChecksum(
     data.signerEmail,
     data.role,
     data.meaning,
-    data.signedAt
+    data.signedAt,
   ].join('|');
 
   if (typeof crypto !== 'undefined' && crypto.subtle) {
@@ -38,7 +39,7 @@ export async function computeSignatureChecksum(
       const msgUint8 = new TextEncoder().encode(payload);
       const hashBuffer = await crypto.subtle.digest('SHA-256', msgUint8);
       const hashArray = Array.from(new Uint8Array(hashBuffer));
-      return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+      return hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
     } catch {
       // Fallback
     }
@@ -48,7 +49,7 @@ export async function computeSignatureChecksum(
   let hash = 0;
   for (let i = 0; i < payload.length; i++) {
     const char = payload.charCodeAt(i);
-    hash = ((hash << 5) - hash) + char;
+    hash = (hash << 5) - hash + char;
     hash |= 0;
   }
   return `sig-hash-${Math.abs(hash).toString(16)}-${payload.length}`;
@@ -79,7 +80,9 @@ export class SignatureService {
     // 1. Kiểm tra thẩm quyền theo vai trò (RBAC Check)
     if (input.documentType === 'BATCH_RELEASE' || input.documentType === 'COA_ISSUE') {
       if (!can(identity, 'batch:release')) {
-        throw new Error('Từ chối quyền: Chỉ bộ phận QA hoặc Quản trị viên mới có thẩm quyền ký xuất xưởng Lô / Ban hành CoA.');
+        throw new Error(
+          'Từ chối quyền: Chỉ bộ phận QA hoặc Quản trị viên mới có thẩm quyền ký xuất xưởng Lô / Ban hành CoA.'
+        );
       }
     } else if (input.documentType === 'TEST_RESULT_APPROVAL') {
       if (!can(identity, 'test_result:approve')) {
@@ -101,13 +104,16 @@ export class SignatureService {
           await reauthenticateWithCredential(firebaseUser, credential);
         }
       } catch (err: any) {
-        throw new Error(`Xác thực chữ ký điện tử thất bại: ${err.message || 'Mật khẩu không đúng'}`);
+        throw new Error(
+          `Xác thực chữ ký điện tử thất bại: ${err.message || 'Mật khẩu không đúng'}`
+        );
       }
     }
 
     // 3. Khởi tạo đối tượng chữ ký điện tử
     const signedAt = new Date().toISOString();
-    const meaning = input.meaning || SIGNATURE_MEANINGS[input.documentType] || 'Xác nhận phê duyệt điện tử.';
+    const meaning =
+      input.meaning || SIGNATURE_MEANINGS[input.documentType] || 'Xác nhận phê duyệt điện tử.';
     const id = `sig_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
 
     const unsignedData: Omit<ElectronicSignature, 'id' | 'checksum'> = {
@@ -120,7 +126,8 @@ export class SignatureService {
       role: identity.role,
       meaning: meaning,
       signedAt: signedAt,
-      comments: input.comments
+      comments: input.comments,
+      status: 'CREATED',
     };
 
     const checksum = await computeSignatureChecksum(unsignedData);
@@ -128,7 +135,7 @@ export class SignatureService {
     const signature: ElectronicSignature = {
       id,
       ...unsignedData,
-      checksum
+      checksum,
     };
 
     // 4. Lưu trữ chữ ký bất biến vào cơ sở dữ liệu
@@ -141,26 +148,58 @@ export class SignatureService {
       collection: 'SYSTEM',
       documentId: signature.id,
       details: `Ký điện tử 21 CFR Part 11: [${signature.documentType}] id=${signature.documentId} bởi ${signature.signerEmail} (${signature.role})`,
-      performedBy: identity.email || 'unknown'
+      performedBy: identity.email || 'unknown',
     });
 
     return signature;
   }
 
   /**
-   * Lấy danh sách chữ ký điện tử gắn liền với một tài liệu cụ thể
+   * Lấy danh sách chữ ký điện tử gắn liền với một tài liệu cụ thể (P1-3 Query Isolation)
    */
   async getSignaturesForDocument(
     documentType: SignatureDocumentType,
     documentId: string
   ): Promise<ElectronicSignature[]> {
-    const snapshot = await get(ref(db, this.collectionPath));
-    if (!snapshot.exists()) return [];
+    try {
+      const q = query(
+        ref(db, this.collectionPath),
+        orderByChild('documentId'),
+        equalTo(documentId)
+      );
+      const snapshot = await get(q);
+      if (!snapshot.exists()) return [];
 
-    const allSigs = Object.values(snapshot.val()) as ElectronicSignature[];
-    return allSigs
-      .filter(s => s.documentType === documentType && s.documentId === documentId)
-      .sort((a, b) => b.signedAt.localeCompare(a.signedAt));
+      const sigsMap = snapshot.val();
+      const allSigs = Object.values(sigsMap) as ElectronicSignature[];
+      return allSigs
+        .filter((s) => s.documentType === documentType)
+        .sort((a, b) => b.signedAt.localeCompare(a.signedAt));
+    } catch {
+      // Fallback an toàn nếu index chưa sẵn sàng
+      const snapshot = await get(ref(db, this.collectionPath));
+      if (!snapshot.exists()) return [];
+
+      const allSigs = Object.values(snapshot.val()) as ElectronicSignature[];
+      return allSigs
+        .filter((s) => s.documentType === documentType && s.documentId === documentId)
+        .sort((a, b) => b.signedAt.localeCompare(a.signedAt));
+    }
+  }
+
+  /**
+   * Cập nhật trạng thái vòng đời của chữ ký điện tử (P1-1 Signature Lifecycle)
+   */
+  async updateSignatureStatus(
+    signatureId: string,
+    status: SignatureStatus,
+    extra?: { consumedAt?: string; releaseAttemptId?: string; releasedBatchId?: string }
+  ): Promise<void> {
+    const updateData = removeUndefined({
+      status,
+      ...extra,
+    });
+    await update(ref(db, `${this.collectionPath}/${signatureId}`), updateData);
   }
 
   /**

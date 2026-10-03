@@ -40,7 +40,7 @@ describe('Model 13: Integration / Security Gate Suite', () => {
       expect(result.reason).toContain('Chỉ QA mới có thẩm quyền Phê duyệt');
     });
 
-    it('cho phép QA thực hiện phê duyệt phiếu kiểm nghiệm và xuất xưởng lô', () => {
+    it('chặn client QA ghi trực tiếp status=RELEASED (P0-1) nhưng cho phép phê duyệt phiếu kiểm nghiệm', () => {
       const batchRes = SecurityRulesValidator.evaluate(
         qaUser,
         'UPDATE',
@@ -48,7 +48,9 @@ describe('Model 13: Integration / Security Gate Suite', () => {
         { status: 'RELEASED' },
         { status: 'TESTING' }
       );
-      expect(batchRes.allowed).toBe(true);
+      // P0-1: Client direct write status=RELEASED bị chặn 100%
+      expect(batchRes.allowed).toBe(false);
+      expect(batchRes.reason).toContain('Server Release Command');
 
       const trRes = SecurityRulesValidator.evaluate(
         qaUser,

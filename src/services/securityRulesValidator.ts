@@ -45,7 +45,7 @@ export class SecurityRulesValidator {
           reason: 'ALCOA+ Violation: Nhật ký kiểm toán là bất biến, không thể sửa đổi hoặc xóa.',
         };
       }
-      // Ngoại lệ 2 (GAP-07): ADMIN không thể chuyển status = RELEASED nếu qualityStatus !== PASS
+      // Ngoại lệ 2 (GAP-07 & P0-1): Khóa client ghi trực tiếp status = RELEASED
       if (resourcePath.startsWith('batches') && (action === 'UPDATE' || action === 'CREATE')) {
         if (payload?.status === 'RELEASED') {
           const qStatus = payload?.qualityStatus ?? currentData?.qualityStatus;
@@ -56,6 +56,11 @@ export class SecurityRulesValidator {
                 'Database Guard Violation (GAP-07): Lô không thể chuyển sang RELEASED khi kết quả kiểm nghiệm chưa ĐẠT (PASS).',
             };
           }
+          return {
+            allowed: false,
+            reason:
+              'Database Guard Violation (P0-1): Client bị cấm ghi trực tiếp status=RELEASED. Xuất xưởng bắt buộc đi qua Server Release Command.',
+          };
         }
       }
       return { allowed: true };
@@ -163,6 +168,7 @@ export class SecurityRulesValidator {
                 'Chỉ QA mới có thẩm quyền Phê duyệt xuất xưởng (RELEASED) hoặc Từ chối (REJECTED) lô sản xuất.',
             };
           }
+
           if (payload?.status === 'RELEASED') {
             const qStatus = payload?.qualityStatus ?? currentData?.qualityStatus;
             if (qStatus && qStatus !== 'PASS') {
@@ -172,6 +178,13 @@ export class SecurityRulesValidator {
                   'Database Guard Violation (GAP-07): Lô không thể chuyển sang RELEASED khi kết quả kiểm nghiệm chưa ĐẠT (PASS).',
               };
             }
+
+            // Chặn client trực tiếp ghi RELEASED (P0-1 Security Rule)
+            return {
+              allowed: false,
+              reason:
+                'Database Guard Violation (P0-1): Client bị cấm ghi trực tiếp status=RELEASED. Xuất xưởng bắt buộc đi qua Server Release Command.',
+            };
           }
         }
 

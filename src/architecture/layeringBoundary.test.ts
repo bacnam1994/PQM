@@ -111,10 +111,10 @@ describe('Phase 8: Architecture Layering Boundary & Reliability', () => {
     expect(typeof deleteStorageFileByUrl).toBe('function');
   });
 
-  it('Xác nhận tính toàn vẹn chữ ký điện tử (ESignature & Audit Trail)', async () => {
+  it('Xác nhận tính toàn vẹn chữ ký điện tử (ESignature & Audit Trail & P0-1 Lock)', async () => {
     const { SecurityRulesValidator } = await import('../services/securityRulesValidator');
-    const qaUser = { uid: 'u-qa', email: 'qa@pqm.com', role: 'QA' as const, isAdmin: false };
-    const qcUser = { uid: 'u-qc', email: 'qc@pqm.com', role: 'QC' as const, isAdmin: false };
+    const qaUser = { uid: 'u-qa', email: 'qa@qa.com', role: 'QA' as const, isAdmin: false };
+    const qcUser = { uid: 'u-qc', email: 'qc@qc.com', role: 'QC' as const, isAdmin: false };
 
     // QC không được duyệt xuất xưởng lô
     const qcRelease = SecurityRulesValidator.evaluate(qcUser, 'UPDATE', 'batches/b1', {
@@ -122,11 +122,12 @@ describe('Phase 8: Architecture Layering Boundary & Reliability', () => {
     });
     expect(qcRelease.allowed).toBe(false);
 
-    // QA được duyệt xuất xưởng lô
+    // P0-1: Client trực tiếp ghi status = RELEASED bị khóa hoàn toàn (kể cả QA), bắt buộc qua Server Release Command
     const qaRelease = SecurityRulesValidator.evaluate(qaUser, 'UPDATE', 'batches/b1', {
       status: 'RELEASED',
     });
-    expect(qaRelease.allowed).toBe(true);
+    expect(qaRelease.allowed).toBe(false);
+    expect(qaRelease.reason).toContain('Server Release Command');
   });
 
   it('UI Components & Pages KHÔNG ĐƯỢC tự tính toán xuất xưởng bằng cú pháp thô (!entry.isPass)', () => {
