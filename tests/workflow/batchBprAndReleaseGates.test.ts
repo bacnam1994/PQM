@@ -126,6 +126,18 @@ describe('Batch BPR Workflow & 7 Release Gates Test Suite', () => {
 
     handlers = new BatchWorkflowHandlers(mockRepo);
     service = new BatchAppService(mockRepo);
+    const serverExecutor = async ({ currentUser }: any) => {
+      mockBatch = {
+        ...mockBatch,
+        status: 'RELEASED',
+        releasedAt: new Date().toISOString(),
+        releasedBy: currentUser?.email,
+        version: (mockBatch.version ?? 1) + 1,
+      };
+      return { success: true, batch: mockBatch };
+    };
+    handlers.setServerReleaseExecutor(serverExecutor);
+    service.setServerReleaseExecutor(serverExecutor);
   });
 
   // =========================================================================

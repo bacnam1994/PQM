@@ -21,6 +21,36 @@ import { IBatchRepository } from '../../src/repositories/BatchRepository';
 import { Batch, TestResult, ElectronicSignature } from '../../src/types';
 import { computeSignatureChecksum } from '../../src/services/signatureService';
 
+const { mockBatchHolder } = vi.hoisted(() => ({
+  mockBatchHolder: { current: null as any },
+}));
+
+vi.mock('firebase/functions', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('firebase/functions')>();
+  return {
+    ...actual,
+    httpsCallable: vi.fn(() => async () => {
+      // Simulate Server-Side Release Command execution
+      const b = mockBatchHolder.current;
+      if (b) {
+        b.status = 'RELEASED';
+        b.releaseStage = 'RELEASED';
+        b.version = (b.version ?? 1) + 1;
+        b.releasedAt = new Date().toISOString();
+        b.releasedBy = 'qa@vbiotech.com';
+        b.releaseGateProgress = {
+          completed: 7,
+          total: 7,
+          currentGate: 8,
+          percentage: 100,
+          evaluatedAt: new Date().toISOString(),
+        };
+      }
+      return { data: { success: true } };
+    }),
+  };
+});
+
 describe('Batch 7 Release Gates Canonical Tests (Phase 20 Requirements)', () => {
   const qaUser = {
     id: 'usr_qa',
@@ -86,26 +116,34 @@ describe('Batch 7 Release Gates Canonical Tests (Phase 20 Requirements)', () => 
 
     mockRepo = {
       findAll: vi.fn(async () => [mockBatch]),
-      findById: vi.fn(async (id: string) => (id === mockBatch.id ? mockBatch : null)),
-      findByBatchNo: vi.fn(async (no: string) => (no === mockBatch.batchNo ? mockBatch : null)),
-      findByProductId: vi.fn(async () => [mockBatch]),
-      findByStatus: vi.fn(async () => [mockBatch]),
+      findById: vi.fn(async (id: string) =>
+        id === mockBatchHolder.current?.id ? mockBatchHolder.current : null
+      ),
+      findByBatchNo: vi.fn(async (no: string) =>
+        no === mockBatchHolder.current?.batchNo ? mockBatchHolder.current : null
+      ),
+      findByProductId: vi.fn(async () => [mockBatchHolder.current]),
+      findByStatus: vi.fn(async () => [mockBatchHolder.current]),
       findTestResultsByBatchId: vi.fn(async (id: string) =>
         mockTestResults.filter((r) => r.batchId === id)
       ),
-      save: vi.fn(async (b: Batch) => b),
+      save: vi.fn(async (b: Batch) => {
+        mockBatchHolder.current = { ...b };
+        return mockBatchHolder.current;
+      }),
       update: vi.fn(async (b: Batch) => {
-        mockBatch = { ...b };
-        return mockBatch;
+        mockBatchHolder.current = { ...b };
+        return mockBatchHolder.current;
       }),
       delete: vi.fn(async () => {}),
       updateStatus: vi.fn(async (_id, status, _reason, meta) => {
-        mockBatch = {
-          ...mockBatch,
+        mockBatchHolder.current = {
+          ...mockBatchHolder.current,
           status: status as any,
-          version: (meta?.expectedVersion ?? mockBatch.version ?? 1) + 1,
+          version: (meta?.expectedVersion ?? mockBatchHolder.current?.version ?? 1) + 1,
           ...meta,
         };
+        mockBatch = mockBatchHolder.current;
       }),
       updateProgress: vi.fn(async () => {}),
       updateBprReview: vi.fn(async (_id, status, meta) => {
@@ -115,6 +153,7 @@ describe('Batch 7 Release Gates Canonical Tests (Phase 20 Requirements)', () => 
           version: (mockBatch.version ?? 1) + 1,
           ...meta,
         };
+        mockBatchHolder.current = mockBatch;
         return mockBatch;
       }),
       updateReleaseProgress: vi.fn(async (_id, stage, progress) => {
@@ -123,11 +162,13 @@ describe('Batch 7 Release Gates Canonical Tests (Phase 20 Requirements)', () => 
           releaseStage: stage,
           releaseGateProgress: progress,
         };
+        mockBatchHolder.current = mockBatch;
       }),
     };
 
     handlers = new BatchWorkflowHandlers(mockRepo);
     service = new BatchAppService(mockRepo);
+    mockBatchHolder.current = mockBatch;
   });
 
   // CASE 1: Gate 1-5 PASS, Gate 6 FAIL, Gate 7 FAIL
@@ -407,6 +448,7 @@ describe('Batch 7 Release Gates Canonical Tests (Phase 20 Requirements)', () => 
         evaluatedAt: new Date().toISOString(),
       },
     };
+    mockBatchHolder.current = mockBatch;
 
     const validSig: ElectronicSignature = {
       id: 'sig_pending_release_001',

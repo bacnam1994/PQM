@@ -344,6 +344,19 @@ describe('FINAL STATE TRANSITION AUDIT & HARDENING – BATCH WORKFLOW', () => {
 
     it('approveRelease: TESTING -> RELEASED thành công khi 7 gates pass, tăng version và lưu snapshot', async () => {
       memoryDb[baseBatch.id] = { ...baseBatch, status: 'TESTING', version: 2 };
+      handlers.setServerReleaseExecutor(async ({ batchId, currentUser }) => {
+        const cur = memoryDb[batchId];
+        const next = {
+          ...cur,
+          status: 'RELEASED' as const,
+          version: (cur.version || 1) + 1,
+          releasedBy: currentUser.email,
+          releasedAt: new Date().toISOString(),
+          releaseDecisionSnapshot: { eligible: true },
+        };
+        memoryDb[batchId] = next;
+        return { success: true, batch: next };
+      });
       const signature = await createTestSignature(baseBatch.id, 'BATCH_RELEASE');
       const res = await handlers.approveRelease(baseBatch.id, qaUser, {
         reason: 'Đạt toàn diện 7 Release Gates',

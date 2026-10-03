@@ -46,6 +46,27 @@ export class FirebaseBatchRepository
     return result.items;
   }
 
+  override async save(batch: Batch): Promise<void> {
+    if (batch.status === 'RELEASED') {
+      throw new Error(
+        'ERR_DIRECT_RELEASE_FORBIDDEN: Không được phép tạo Lô trực tiếp ở trạng thái RELEASED từ client repository. Lô mới phải khởi tạo ở PENDING.'
+      );
+    }
+    await super.save(batch);
+  }
+
+  override async update(batch: Batch): Promise<void> {
+    if (batch.status === 'RELEASED') {
+      const existing = await this.findById(batch.id);
+      if (existing && existing.status !== 'RELEASED') {
+        throw new Error(
+          'ERR_DIRECT_RELEASE_FORBIDDEN: Không được phép chuyển status sang RELEASED trực tiếp qua client repository update(). Xuất xưởng bắt buộc thực thi qua Cloud Function approveBatchRelease.'
+        );
+      }
+    }
+    await super.update(batch);
+  }
+
   async updateStatus(
     batchId: string,
     status: Batch['status'],
@@ -53,6 +74,11 @@ export class FirebaseBatchRepository
     metadata?: Partial<Batch> & { expectedVersion?: number }
   ): Promise<void> {
     if (!batchId) throw new Error('Yêu cầu ID lô sản xuất');
+    if (status === 'RELEASED') {
+      throw new Error(
+        'ERR_DIRECT_RELEASE_FORBIDDEN: Không được phép cập nhật status=RELEASED trực tiếp qua client repository updateStatus(). Xuất xưởng bắt buộc thực thi qua Cloud Function approveBatchRelease.'
+      );
+    }
     const targetPath = `${this.collectionPath}/${batchId}`;
     const batchRef = ref(db, targetPath);
 
@@ -80,24 +106,7 @@ export class FirebaseBatchRepository
           updatedAt: now,
         };
 
-        if (status === 'RELEASED') {
-          updatedBatch.releasedAt = metadata?.releasedAt || now;
-          updatedBatch.releasedBy = metadata?.releasedBy || 'QA/Admin';
-          updatedBatch.releaseStage = 'RELEASED';
-          updatedBatch.releaseGateProgress = {
-            completed: 7,
-            total: 7,
-            currentGate: 8,
-            percentage: 100,
-            evaluatedAt: now,
-          };
-          if (metadata?.releaseDecisionSnapshot !== undefined) {
-            updatedBatch.releaseDecisionSnapshot = metadata.releaseDecisionSnapshot;
-          }
-          if (metadata?.releaseSignatures !== undefined) {
-            updatedBatch.releaseSignatures = metadata.releaseSignatures;
-          }
-        } else if (status === 'REJECTED') {
+        if (status === 'REJECTED') {
           updatedBatch.rejectReason =
             reason || metadata?.rejectReason || currentBatch.rejectReason || null;
           updatedBatch.rejectedAt = metadata?.rejectedAt || now;
@@ -176,23 +185,6 @@ export class FirebaseBatchRepository
           status,
           version: newVersion,
           updatedAt: now,
-          ...(status === 'RELEASED'
-            ? {
-                releasedAt: metadata?.releasedAt || now,
-                releasedBy: metadata?.releasedBy || 'QA/Admin',
-                releaseDecisionSnapshot: metadata?.releaseDecisionSnapshot || null,
-                releaseStage: 'RELEASED',
-                releaseGateProgress: {
-                  completed: 7,
-                  total: 7,
-                  currentGate: 8,
-                  percentage: 100,
-                  evaluatedAt: now,
-                },
-                releaseSignatures:
-                  metadata?.releaseSignatures || currentBatch.releaseSignatures || null,
-              }
-            : {}),
           ...(status === 'REJECTED'
             ? {
                 rejectReason: reason || metadata?.rejectReason || currentBatch.rejectReason || null,

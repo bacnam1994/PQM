@@ -262,20 +262,29 @@ describe('Phase 14: Comprehensive 45-Test Matrix for Global Batch Workflow', () 
     });
 
     it('Test 12: Đủ 7 Gates và PASS test result -> ELIGIBLE: TRUE', () => {
-      const sigPayload = {
+      const validSig: any = {
+        id: 'sig_test_12',
         documentType: 'BATCH_RELEASE',
         documentId: baseBatch.id,
+        signerUid: 'usr_qa',
         signerEmail: 'qa@vbiotech.com',
-        signerRole: 'QA',
-        timestamp: new Date().toISOString(),
+        role: 'QA',
         meaning: 'APPROVE',
+        signedAt: new Date().toISOString(),
+        checksum: '',
       };
-      const validSig = {
-        id: 'sig_test_12',
-        ...sigPayload,
-        signedAt: sigPayload.timestamp,
-        checksum: calculateSha256Sync(JSON.stringify(sigPayload)),
-      };
+      validSig.checksum = calculateSha256Sync(
+        [
+          validSig.documentType,
+          validSig.documentId,
+          validSig.documentVersion ?? '',
+          validSig.signerUid,
+          validSig.signerEmail,
+          validSig.role,
+          validSig.meaning,
+          validSig.signedAt,
+        ].join('|')
+      );
       const dec = resolveBatchReleaseDecision({
         batch: { ...baseBatch, bprReviewStatus: 'APPROVED' as any },
         testResults: [passingTestResult],
@@ -535,31 +544,35 @@ describe('Phase 14: Comprehensive 45-Test Matrix for Global Batch Workflow', () 
   describe('Nhóm D: Firebase Release Persistence (6 Tests)', () => {
     const repo = new FirebaseBatchRepository();
 
-    it('Test 31: status được persist chính xác', async () => {
+    it('Test 31: status được persist chính xác (BLOCKED) và chặn RELEASED trực tiếp', async () => {
       mockDbState['batches/b_01'] = { ...baseBatch, id: 'b_01' };
-      await repo.updateStatus('b_01', 'RELEASED', undefined, { expectedVersion: 1 });
-      expect(mockDbState['batches/b_01'].status).toBe('RELEASED');
+      await repo.updateStatus('b_01', 'BLOCKED', 'Tạm dừng để kiểm tra', { expectedVersion: 1 });
+      expect(mockDbState['batches/b_01'].status).toBe('BLOCKED');
+
+      await expect(
+        repo.updateStatus('b_01', 'RELEASED', undefined, { expectedVersion: 2 })
+      ).rejects.toThrow('ERR_DIRECT_RELEASE_FORBIDDEN');
     });
 
     it('Test 32: version increment được persist (OCC)', async () => {
       mockDbState['batches/b_02'] = { ...baseBatch, id: 'b_02', version: 1 };
-      await repo.updateStatus('b_02', 'RELEASED', undefined, { expectedVersion: 1 });
+      await repo.updateStatus('b_02', 'BLOCKED', 'Kiểm tra OCC', { expectedVersion: 1 });
       expect(mockDbState['batches/b_02'].version).toBe(2);
     });
 
-    it('Test 33: releasedAt được persist', async () => {
+    it('Test 33: heldAt được persist', async () => {
       mockDbState['batches/b_03'] = { ...baseBatch, id: 'b_03' };
       const now = new Date().toISOString();
-      await repo.updateStatus('b_03', 'RELEASED', undefined, { releasedAt: now });
-      expect(mockDbState['batches/b_03'].releasedAt).toBe(now);
+      await repo.updateStatus('b_03', 'BLOCKED', 'Hold test', { heldAt: now });
+      expect(mockDbState['batches/b_03'].heldAt).toBe(now);
     });
 
-    it('Test 34: releasedBy được persist', async () => {
+    it('Test 34: heldBy được persist', async () => {
       mockDbState['batches/b_04'] = { ...baseBatch, id: 'b_04' };
-      await repo.updateStatus('b_04', 'RELEASED', undefined, {
-        releasedBy: 'qa_manager@vbiotech.com',
+      await repo.updateStatus('b_04', 'BLOCKED', 'Hold test', {
+        heldBy: 'qa_manager@vbiotech.com',
       });
-      expect(mockDbState['batches/b_04'].releasedBy).toBe('qa_manager@vbiotech.com');
+      expect(mockDbState['batches/b_04'].heldBy).toBe('qa_manager@vbiotech.com');
     });
 
     it('Test 35: rejectReason được persist khi REJECTED', async () => {
@@ -568,16 +581,16 @@ describe('Phase 14: Comprehensive 45-Test Matrix for Global Batch Workflow', () 
       expect(mockDbState['batches/b_05'].rejectReason).toBe('Chỉ tiêu độ rã vi phạm tiêu chuẩn');
     });
 
-    it('Test 36: Reload sau khi release cho kết quả 100% đồng nhất', async () => {
+    it('Test 36: Reload sau khi update cho kết quả 100% đồng nhất', async () => {
       mockDbState['batches/b_06'] = { ...baseBatch, id: 'b_06', version: 5 };
-      await repo.updateStatus('b_06', 'RELEASED', undefined, {
+      await repo.updateStatus('b_06', 'BLOCKED', 'Hold test', {
         expectedVersion: 5,
-        releasedBy: 'qa@vbiotech.com',
+        heldBy: 'qa@vbiotech.com',
       });
       const reloaded = mockDbState['batches/b_06'];
-      expect(reloaded.status).toBe('RELEASED');
+      expect(reloaded.status).toBe('BLOCKED');
       expect(reloaded.version).toBe(6);
-      expect(reloaded.releasedBy).toBe('qa@vbiotech.com');
+      expect(reloaded.heldBy).toBe('qa@vbiotech.com');
     });
   });
 
@@ -591,25 +604,25 @@ describe('Phase 14: Comprehensive 45-Test Matrix for Global Batch Workflow', () 
       mockDbState['batches/b_occ_1'] = { ...baseBatch, id: 'b_occ_1', version: 2 };
       // User 2 gửi expectedVersion = 1 (cũ)
       await expect(
-        repo.updateStatus('b_occ_1', 'RELEASED', undefined, { expectedVersion: 1 })
+        repo.updateStatus('b_occ_1', 'BLOCKED', 'Hold test', { expectedVersion: 1 })
       ).rejects.toThrow('CONCURRENCY_CONFLICT');
     });
 
-    it('Test 38: Simultaneous release từ 2 actors -> 1 thành công, 1 bị conflict', async () => {
+    it('Test 38: Simultaneous update từ 2 actors -> 1 thành công, 1 bị conflict', async () => {
       mockDbState['batches/b_occ_2'] = { ...baseBatch, id: 'b_occ_2', version: 1 };
 
       // Actor 1 submit
-      await repo.updateStatus('b_occ_2', 'RELEASED', undefined, {
+      await repo.updateStatus('b_occ_2', 'BLOCKED', 'Hold test 1', {
         expectedVersion: 1,
-        releasedBy: 'actor_1@pqm.com',
+        heldBy: 'actor_1@pqm.com',
       });
       expect(mockDbState['batches/b_occ_2'].version).toBe(2);
 
       // Actor 2 submit đồng thời (vẫn mang expectedVersion: 1)
       await expect(
-        repo.updateStatus('b_occ_2', 'RELEASED', undefined, {
+        repo.updateStatus('b_occ_2', 'BLOCKED', 'Hold test 2', {
           expectedVersion: 1,
-          releasedBy: 'actor_2@pqm.com',
+          heldBy: 'actor_2@pqm.com',
         })
       ).rejects.toThrow('CONCURRENCY_CONFLICT');
     });
@@ -619,18 +632,18 @@ describe('Phase 14: Comprehensive 45-Test Matrix for Global Batch Workflow', () 
       await repo.updateStatus('b_occ_3', 'TESTING', undefined, { expectedVersion: 1 });
       expect(mockDbState['batches/b_occ_3'].version).toBe(2);
 
-      await repo.updateStatus('b_occ_3', 'RELEASED', undefined, { expectedVersion: 2 });
+      await repo.updateStatus('b_occ_3', 'BLOCKED', undefined, { expectedVersion: 2 });
       expect(mockDbState['batches/b_occ_3'].version).toBe(3);
     });
 
     it('Test 40: Double-click release protection -> Lượt click thứ 2 bị chặn', async () => {
       mockDbState['batches/b_occ_4'] = { ...baseBatch, id: 'b_occ_4', version: 1 };
-      const click1 = repo.updateStatus('b_occ_4', 'RELEASED', undefined, { expectedVersion: 1 });
+      const click1 = repo.updateStatus('b_occ_4', 'BLOCKED', undefined, { expectedVersion: 1 });
       await click1;
 
       // Click thứ 2 dùng cùng expectedVersion: 1
       await expect(
-        repo.updateStatus('b_occ_4', 'RELEASED', undefined, { expectedVersion: 1 })
+        repo.updateStatus('b_occ_4', 'BLOCKED', undefined, { expectedVersion: 1 })
       ).rejects.toThrow('CONCURRENCY_CONFLICT');
     });
   });

@@ -288,11 +288,26 @@ describe('Phase 15: End-to-End Batch Lifecycle & Data Integrity Verification', (
       id: 'sig-valid-qa-001',
       ...sigPayload,
       documentType: 'BATCH_RELEASE' as any,
+      documentVersion: 2,
+      signerUid: qaUser.id,
       signerName: 'Nguyen Van QA',
+      signerEmail: qaUser.email,
       role: 'QA',
       signedAt: sigPayload.timestamp,
-      checksum: calculateSha256Sync(JSON.stringify(sigPayload)),
+      checksum: '',
     };
+    validQASig.checksum = calculateSha256Sync(
+      [
+        validQASig.documentType,
+        validQASig.documentId,
+        validQASig.documentVersion ?? '',
+        validQASig.signerUid,
+        validQASig.signerEmail,
+        validQASig.role,
+        validQASig.meaning,
+        validQASig.signedAt,
+      ].join('|')
+    );
 
     await handlers.handleStatusTransition('batch-e2e-2026', 'RELEASED', qaUser, {
       currentBatch: { ...testingBatch, bprReviewStatus: 'APPROVED' as any },

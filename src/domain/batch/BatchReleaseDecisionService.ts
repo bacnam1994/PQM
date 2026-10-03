@@ -656,6 +656,30 @@ export class BatchReleaseDecisionService {
         blockers.push(msg);
       }
 
+      // e2. Status check: Không cho phép tái sử dụng chữ ký đã CONSUMED
+      const isAlreadyConsumed =
+        Array.isArray(batch.releaseSignatures) &&
+        batch.releaseSignatures.some(
+          (s: any) =>
+            ((s as any)?.id || (s as any)?.signatureId) === userSignature.id &&
+            s.status === 'CONSUMED'
+        );
+
+      if (!isAlreadyConsumed) {
+        if (userSignature.status === 'CONSUMED') {
+          signaturePassed = false;
+          const msg =
+            'ERR_SIGNATURE_ALREADY_USED: Chữ ký điện tử đã được sử dụng trước đó (CONSUMED), không thể tái sử dụng.';
+          gate7Blockers.push(msg);
+          blockers.push(msg);
+        } else if (userSignature.status === 'REVOKED' || userSignature.status === 'REJECTED') {
+          signaturePassed = false;
+          const msg = `ERR_SIGNATURE_INVALID: Chữ ký điện tử đã bị thu hồi hoặc từ chối (trạng thái: ${userSignature.status}).`;
+          gate7Blockers.push(msg);
+          blockers.push(msg);
+        }
+      }
+
       // f. Timestamp check
       if (!userSignature.signedAt || isNaN(new Date(userSignature.signedAt).getTime())) {
         signaturePassed = false;
@@ -714,12 +738,12 @@ export class BatchReleaseDecisionService {
           !checksum.includes('-') &&
           /^[0-9a-fA-F]{64}$/.test(checksum);
 
-        if (
-          !isHex64 &&
-          checksum !== expectedSha256 &&
-          checksum !== expectedDocIdSha256 &&
-          checksum !== expectedFallback
-        ) {
+        const isExactMatch =
+          checksum === expectedSha256 ||
+          checksum === expectedDocIdSha256 ||
+          checksum === expectedFallback;
+
+        if (!isHex64 || !isExactMatch) {
           signaturePassed = false;
           const msg =
             'ERR_SIGNATURE_TAMPERED: Mã băm chữ ký điện tử không khớp với nội dung ký (Signature Integrity Verification Failed).';

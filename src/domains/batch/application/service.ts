@@ -22,6 +22,14 @@ export class BatchAppService {
     this.workflowHandlers = new BatchWorkflowHandlers(this.repo);
   }
 
+  getWorkflowHandlers(): BatchWorkflowHandlers {
+    return this.workflowHandlers;
+  }
+
+  setServerReleaseExecutor(executor: any): void {
+    this.workflowHandlers.setServerReleaseExecutor(executor);
+  }
+
   /**
    * Lấy chi tiết Lô sản xuất theo ID
    */
@@ -84,7 +92,7 @@ export class BatchAppService {
       expectedVersion?: number;
       idempotencyKey?: string;
     }
-  ): Promise<void> {
+  ): Promise<Batch> {
     let currentBatch = await this.repo.findById(batchId);
     if (!currentBatch && options?.currentBatch) {
       currentBatch = options.currentBatch;
@@ -118,7 +126,7 @@ export class BatchAppService {
       }
     }
 
-    await this.workflowHandlers.handleStatusTransition(batchId, status, currentUser, {
+    return await this.workflowHandlers.handleStatusTransition(batchId, status, currentUser, {
       ...options,
       currentBatch,
     });

@@ -230,17 +230,13 @@ describe('BatchAppService', () => {
     });
 
     it('should allow QA to release when all test results pass', async () => {
-      await service.updateStatus('batch-001', 'RELEASED', qaUser, {
+      const res = await service.updateStatus('batch-001', 'RELEASED', qaUser, {
         currentBatch: testingBatch,
         batchTestResults: [passedTestResult],
         signature: validSig,
       });
-      expect(mockRepo.updateStatus).toHaveBeenCalledWith(
-        'batch-001',
-        'RELEASED',
-        undefined,
-        expect.any(Object)
-      );
+      expect(res.status).toBe('RELEASED');
+      expect(mockRepo.updateStatus).not.toHaveBeenCalled();
     });
 
     it('should reject release when requireSignature is true but signature is missing', async () => {
@@ -274,18 +270,14 @@ describe('BatchAppService', () => {
     });
 
     it('should allow release when valid electronic signature is provided', async () => {
-      await service.updateStatus('batch-001', 'RELEASED', qaUser, {
+      const res = await service.updateStatus('batch-001', 'RELEASED', qaUser, {
         currentBatch: testingBatch,
         batchTestResults: [passedTestResult],
         signature: validSig,
       });
 
-      expect(mockRepo.updateStatus).toHaveBeenCalledWith(
-        'batch-001',
-        'RELEASED',
-        undefined,
-        expect.any(Object)
-      );
+      expect(res.status).toBe('RELEASED');
+      expect(mockRepo.updateStatus).not.toHaveBeenCalled();
     });
   });
 

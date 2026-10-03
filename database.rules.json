@@ -1,12 +1,12 @@
 {
   "rules": {
     ".read": "auth != null && (auth.token.isAdmin === true || auth.token.role === 'ADMIN' || root.child('users/admins/' + auth.uid).exists() || root.child('users/' + auth.uid + '/role').val() === 'ADMIN')",
-    ".write": "auth != null && (auth.token.isAdmin === true || auth.token.role === 'ADMIN' || root.child('users/admins/' + auth.uid).exists() || root.child('users/' + auth.uid + '/role').val() === 'ADMIN')",
 
     "users": {
       "admins": {
         "$uid": {
-          ".read": "auth != null && (auth.uid === $uid || auth.token.isAdmin === true || auth.token.role === 'ADMIN' || root.child('users/admins/' + auth.uid).exists() || root.child('users/' + auth.uid + '/role').val() === 'ADMIN')"
+          ".read": "auth != null && (auth.uid === $uid || auth.token.isAdmin === true || auth.token.role === 'ADMIN' || root.child('users/admins/' + auth.uid).exists() || root.child('users/' + auth.uid + '/role').val() === 'ADMIN')",
+          ".write": "auth != null && (auth.token.isAdmin === true || auth.token.role === 'ADMIN' || root.child('users/admins/' + auth.uid).exists() || root.child('users/' + auth.uid + '/role').val() === 'ADMIN')"
         }
       },
       "$uid": {
@@ -146,6 +146,11 @@
       "$task_id": {
         ".write": "auth != null && (auth.token.isAdmin === true || auth.token.role === 'ADMIN' || auth.token.role === 'QA' || auth.token.role === 'QC' || root.child('users/admins/' + auth.uid).exists() || root.child('users/' + auth.uid + '/role').val() === 'ADMIN' || root.child('users/' + auth.uid + '/role').val() === 'QA' || root.child('users/' + auth.uid + '/role').val() === 'QC')"
       }
+    },
+
+    "release_commands": {
+      ".read": "auth != null",
+      ".write": false
     }
   }
 }

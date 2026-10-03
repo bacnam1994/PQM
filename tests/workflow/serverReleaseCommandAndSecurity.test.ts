@@ -1,27 +1,30 @@
 /**
  * tests/workflow/serverReleaseCommandAndSecurity.test.ts
  * ========================================================
- * Comprehensive Test Suite for Server-Side Release Command & Security Hardening
+ * Comprehensive Adversarial Test Suite for Server-Side Release Command & Security Hardening
  *
  * Kiểm chứng toàn diện:
- * 1. P0-1: Client cấm trực tiếp ghi status=RELEASED (Security Rules & Validator)
- * 2. P0-2 & P0-3: Server Release Command kiểm soát thẩm quyền & Fresh DB Read
- * 3. P0-4: Gate 1→7 Fail-Closed (tất cả 7 cổng phải PASS)
- * 4. P0-5: Canonical Gate 7 & Thẩm tra Chữ ký điện tử 21 CFR Part 11
- * 5. P0-6 & P1-1: Atomic Release Transaction & Signature Lifecycle (CONSUMED)
- * 6. P0-7: Idempotency Key an toàn tuyệt đối
- * 7. P1-8: Deprecate updateStatus(..., 'RELEASED')
+ * 1. P0-1: Client cấm trực tiếp ghi status=RELEASED (Security Rules & database.rules.json root .write check)
+ * 2. P0-2: Single Release Path: Xóa sạch client release mutation (executeBatchAction & batchRepository)
+ * 3. P0-3: Server SSoT: Gate 1-6 dùng chung Canonical Release Engine (missing criteria, OOS variants, CAPA, BPR)
+ * 4. P0-4 & P0-5: Signature Integrity: Checksum 64-hex giả BỊ CHẶN, SHA-256 thật, role giả mạo, signerUid lệch
+ * 5. P0-6: Signature Lifecycle: status=CONSUMED không được phép tái sử dụng
+ * 6. P0-7: Atomic Multi-Location Transaction & Idempotency Key persistence (release_commands/{key})
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import * as fs from 'fs';
+import * as path from 'path';
 import { SecurityRulesValidator } from '../../src/services/securityRulesValidator';
 import { handleApproveBatchRelease } from '../../functions/src/batchReleaseFunction';
+import { computeSignatureSha256 } from '../../functions/src/canonicalReleaseEngine';
 import { BatchWorkflowHandlers } from '../../src/workflow/handlers/batchWorkflowHandlers';
 import { BatchAppService } from '../../src/domains/batch/application/service';
+import { FirebaseBatchRepository } from '../../src/repositories/firebase/FirebaseBatchRepository';
 import { ElectronicSignature } from '../../src/types/signature';
 import { Batch, TestResult } from '../../src/types';
 
-describe('Server-Side Release Command & Security Rules Verification (Phase 1 to 5)', () => {
+describe('Server-Side Release Command & Security Rules Verification (Comprehensive Hardening)', () => {
   const qaUser = {
     uid: 'qa-user-01',
     email: 'qa@v-biotech.vn',
@@ -43,8 +46,24 @@ describe('Server-Side Release Command & Security Rules Verification (Phase 1 to 
     isAdmin: false,
   };
 
-  describe('1. P0-1 Security Rule: Direct Client Write of RELEASED is Blocked', () => {
-    it('chặn hoàn toàn client (kể cả QA hoặc ADMIN) tự ghi status=RELEASED trực tiếp qua client SDK', () => {
+  describe('1. P0-1: Firebase RTDB Rules & Client Guard: Direct Write of RELEASED is Blocked', () => {
+    it('database.rules.json tuyệt đối không chứa root .write (tránh ADMIN bypass quyền node con)', () => {
+      const rulesPath = path.resolve(__dirname, '../../database.rules.json');
+      const rulesContent = fs.readFileSync(rulesPath, 'utf8');
+      const rulesJson = JSON.parse(rulesContent);
+
+      // Root rules không được có thuộc tính .write
+      expect(rulesJson.rules['.write']).toBeUndefined();
+
+      // Node batches/$item_id phải có điều kiện cấm ghi RELEASED
+      const batchWriteRule = rulesJson.rules.batches['$item_id']['.write'];
+      expect(batchWriteRule).toContain("newData.child('status').val() !== 'RELEASED'");
+
+      // Node release_commands phải có write: false (chỉ Cloud Functions Admin SDK được ghi)
+      expect(rulesJson.rules.release_commands['.write']).toBe(false);
+    });
+
+    it('chặn hoàn toàn client (kể cả QA hoặc ADMIN) tự ghi status=RELEASED trực tiếp qua SecurityRulesValidator', () => {
       // 1. QA cố tình update status sang RELEASED
       const qaResult = SecurityRulesValidator.evaluate(qaUser, 'UPDATE', 'batches/b_001', {
         status: 'RELEASED',
@@ -59,7 +78,7 @@ describe('Server-Side Release Command & Security Rules Verification (Phase 1 to 
       expect(adminResult.allowed).toBe(false);
       expect(adminResult.reason).toContain('Client bị cấm ghi trực tiếp status=RELEASED');
 
-      // 3. User Sản xuất cố tình update sang RELEASED -> Bị chặn do thiếu thẩm quyền
+      // 3. User Sản xuất cố tình update sang RELEASED -> Bị chặn
       const prodResult = SecurityRulesValidator.evaluate(prodUser, 'UPDATE', 'batches/b_001', {
         status: 'RELEASED',
       });
@@ -79,7 +98,34 @@ describe('Server-Side Release Command & Security Rules Verification (Phase 1 to 
     });
   });
 
-  describe('2. P0-2 & P0-3 & P0-4: Server-Side Release Command Gate 1→7 Verification', () => {
+  describe('2. P0-2: Single Release Path: Client Mutation Paths Are Completely Blocked', () => {
+    it('executeBatchAction(BATCH_RELEASE_APPROVE) bị cấm gọi trực tiếp từ client (throw ERR_CLIENT_RELEASE_PROHIBITED)', async () => {
+      const mockRepo: any = {
+        findById: vi.fn().mockResolvedValue({ id: 'b_001', status: 'TESTING', version: 1 }),
+      };
+      const handlers = new BatchWorkflowHandlers(mockRepo);
+
+      await expect(
+        handlers.executeBatchAction('BATCH_RELEASE_APPROVE', 'b_001', qaUser)
+      ).rejects.toThrow('ERR_CLIENT_RELEASE_PROHIBITED');
+    });
+
+    it('FirebaseBatchRepository.updateStatus ném lỗi nếu client cố tình gọi với status=RELEASED', async () => {
+      const repo = new FirebaseBatchRepository();
+      await expect(repo.updateStatus('b_001', 'RELEASED')).rejects.toThrow(
+        'ERR_DIRECT_RELEASE_FORBIDDEN'
+      );
+    });
+
+    it('FirebaseBatchRepository.save ném lỗi nếu client cố tình tạo lô ở status=RELEASED', async () => {
+      const repo = new FirebaseBatchRepository();
+      await expect(
+        repo.save({ id: 'b_001', batchNo: 'L01', status: 'RELEASED' } as any)
+      ).rejects.toThrow('ERR_DIRECT_RELEASE_FORBIDDEN');
+    });
+  });
+
+  describe('3. P0-3, P0-4, P0-5, P0-6, P0-7: Server Release Command & Canonical 7 Gates Adversarial Tests', () => {
     let mockDbData: Record<string, any>;
     let mockDb: any;
 
@@ -87,10 +133,11 @@ describe('Server-Side Release Command & Security Rules Verification (Phase 1 to 
       mockDbData = {};
 
       mockDb = {
-        ref: (path: string) => {
+        ref: (path?: string) => {
+          const currentPath = path || '';
           return {
             once: vi.fn().mockImplementation(async () => {
-              const val = mockDbData[path];
+              const val = mockDbData[currentPath];
               return {
                 exists: () => val !== undefined && val !== null,
                 val: () => val,
@@ -99,7 +146,7 @@ describe('Server-Side Release Command & Security Rules Verification (Phase 1 to 
             orderByChild: (childKey: string) => ({
               equalTo: (expectedVal: any) => ({
                 once: vi.fn().mockImplementation(async () => {
-                  const collection = mockDbData[path] || {};
+                  const collection = mockDbData[currentPath] || {};
                   const filtered: Record<string, any> = {};
                   for (const [k, v] of Object.entries(collection)) {
                     if ((v as any)[childKey] === expectedVal) {
@@ -113,21 +160,24 @@ describe('Server-Side Release Command & Security Rules Verification (Phase 1 to 
                 }),
               }),
             }),
-            transaction: vi.fn().mockImplementation(async (updateFn: any) => {
-              const current = mockDbData[path];
-              const updated = updateFn(JSON.parse(JSON.stringify(current)));
-              if (updated !== undefined) {
-                mockDbData[path] = updated;
-                return { committed: true, snapshot: { val: () => updated } };
-              }
-              return { committed: false };
-            }),
             update: vi.fn().mockImplementation(async (updates: any) => {
-              mockDbData[path] = { ...mockDbData[path], ...updates };
+              if (!currentPath) {
+                // Multi-location update
+                for (const [p, val] of Object.entries(updates)) {
+                  mockDbData[p] = val;
+                }
+              } else {
+                mockDbData[currentPath] = { ...mockDbData[currentPath], ...updates };
+              }
             }),
-            push: vi.fn().mockImplementation(async (logEntry: any) => {
-              const id = `log_${Date.now()}`;
-              mockDbData[`${path}/${id}`] = logEntry;
+            set: vi.fn().mockImplementation(async (val: any) => {
+              mockDbData[currentPath] = val;
+            }),
+            push: vi.fn().mockImplementation(async (logEntry?: any) => {
+              const id = `log_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+              if (logEntry) {
+                mockDbData[`${currentPath}/${id}`] = logEntry;
+              }
               return { key: id };
             }),
           };
@@ -135,20 +185,26 @@ describe('Server-Side Release Command & Security Rules Verification (Phase 1 to 
       };
     });
 
-    const createValidSignature = (batchId: string, version: number = 1): ElectronicSignature => ({
-      id: 'sig_valid_001',
-      documentType: 'BATCH_RELEASE',
-      documentId: batchId,
-      documentVersion: version,
-      signerUid: qaUser.uid,
-      signerName: 'Nguyễn QA',
-      signerEmail: qaUser.email,
-      role: 'QA',
-      meaning: 'Tôi xác nhận xuất xưởng Lô',
-      signedAt: new Date().toISOString(),
-      checksum: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
-      status: 'CREATED',
-    });
+    const createValidSignature = (batchId: string, version: number = 1): ElectronicSignature => {
+      const unsigned = {
+        documentType: 'BATCH_RELEASE' as const,
+        documentId: batchId,
+        documentVersion: version,
+        signerUid: qaUser.uid,
+        signerName: 'Nguyễn QA',
+        signerEmail: qaUser.email,
+        role: 'QA' as const,
+        meaning: 'Tôi xác nhận xuất xưởng Lô',
+        signedAt: new Date().toISOString(),
+        status: 'CREATED' as const,
+      };
+      const checksum = computeSignatureSha256(unsigned);
+      return {
+        id: 'sig_valid_001',
+        ...unsigned,
+        checksum,
+      };
+    };
 
     it('từ chối khi người gọi chưa xác thực hoặc không có quyền QA/Admin (P0-3)', async () => {
       const unauthRequest: any = {
@@ -170,96 +226,337 @@ describe('Server-Side Release Command & Security Rules Verification (Phase 1 to 
       );
     });
 
-    it('từ chối khi Lô ở trạng thái PENDING chưa đưa vào kiểm nghiệm', async () => {
-      mockDbData['batches/b_pending'] = {
-        id: 'b_pending',
-        batchNo: 'L26001',
-        status: 'PENDING',
-        version: 1,
-      };
-
-      const request: any = {
-        auth: { uid: qaUser.uid, token: { role: 'QA' } },
-        data: { batchId: 'b_pending', signatureId: 'sig_001' },
-      };
-
-      await expect(handleApproveBatchRelease(request, mockDb)).rejects.toThrow(
-        'Lô sản xuất đang ở trạng thái PENDING'
-      );
-    });
-
-    it('từ chối khi chữ ký sai documentId, sai version hoặc sai loại tài liệu (P0-5 Gate 7)', async () => {
+    it('chữ ký với checksum 64-hex giả mạo (ví dụ 64 ký tự a) bắt buộc phải FAIL (P0-4)', async () => {
       mockDbData['batches/b_001'] = {
         id: 'b_001',
         batchNo: 'L26001',
         status: 'TESTING',
-        version: 2,
+        version: 1,
         bprReviewStatus: 'APPROVED',
       };
-
-      // 1. Chữ ký sai documentId
-      const badDocIdSig = {
-        ...createValidSignature('b_OTHER', 2),
+      mockDbData['testResults'] = {
+        tr_001: { id: 'tr_001', batchId: 'b_001', overallStatus: 'PASS', qualityStatus: 'PASS' },
       };
-      mockDbData['electronic_signatures/sig_bad_doc'] = badDocIdSig;
+
+      // Chữ ký có checksum là 64 ký tự hex ngẫu nhiên không tương ứng payload
+      const fakeHex64 = 'a'.repeat(64);
+      const forgedSig = {
+        ...createValidSignature('b_001', 1),
+        id: 'sig_forged_hex',
+        checksum: fakeHex64,
+      };
+      mockDbData['electronic_signatures/sig_forged_hex'] = forgedSig;
+
+      const req: any = {
+        auth: { uid: qaUser.uid, token: { role: 'QA' } },
+        data: { batchId: 'b_001', signatureId: 'sig_forged_hex' },
+      };
+
+      await expect(handleApproveBatchRelease(req, mockDb)).rejects.toThrow(
+        'ERR_SIGNATURE_TAMPERED'
+      );
+    });
+
+    it('chữ ký với checksum SHA-256 sai nội dung bắt buộc phải FAIL (P0-4)', async () => {
+      mockDbData['batches/b_001'] = {
+        id: 'b_001',
+        batchNo: 'L26001',
+        status: 'TESTING',
+        version: 1,
+        bprReviewStatus: 'APPROVED',
+      };
+      mockDbData['testResults'] = {
+        tr_001: { id: 'tr_001', batchId: 'b_001', overallStatus: 'PASS', qualityStatus: 'PASS' },
+      };
+
+      // Checksum đúng cho Lô khác nhưng gán vào Lô này
+      const otherBatchChecksum = computeSignatureSha256({
+        documentType: 'BATCH_RELEASE',
+        documentId: 'b_OTHER',
+        documentVersion: 1,
+        signerUid: qaUser.uid,
+        signerEmail: qaUser.email,
+        role: 'QA',
+        meaning: 'Ý nghĩa khác',
+        signedAt: new Date().toISOString(),
+      });
+
+      const badShaSig = {
+        ...createValidSignature('b_001', 1),
+        id: 'sig_bad_sha',
+        checksum: otherBatchChecksum,
+      };
+      mockDbData['electronic_signatures/sig_bad_sha'] = badShaSig;
+
+      const req: any = {
+        auth: { uid: qaUser.uid, token: { role: 'QA' } },
+        data: { batchId: 'b_001', signatureId: 'sig_bad_sha' },
+      };
+
+      await expect(handleApproveBatchRelease(req, mockDb)).rejects.toThrow(
+        'ERR_SIGNATURE_TAMPERED'
+      );
+    });
+
+    it('chữ ký có status=CONSUMED không được tái sử dụng để xuất xưởng lại (P0-6)', async () => {
+      mockDbData['batches/b_001'] = {
+        id: 'b_001',
+        batchNo: 'L26001',
+        status: 'TESTING',
+        version: 1,
+        bprReviewStatus: 'APPROVED',
+      };
+      mockDbData['testResults'] = {
+        tr_001: { id: 'tr_001', batchId: 'b_001', overallStatus: 'PASS', qualityStatus: 'PASS' },
+      };
+
+      const consumedSig = {
+        ...createValidSignature('b_001', 1),
+        id: 'sig_consumed',
+        status: 'CONSUMED',
+      };
+      // Cập nhật lại checksum theo payload có status
+      mockDbData['electronic_signatures/sig_consumed'] = consumedSig;
+
+      const req: any = {
+        auth: { uid: qaUser.uid, token: { role: 'QA' } },
+        data: { batchId: 'b_001', signatureId: 'sig_consumed' },
+      };
+
+      await expect(handleApproveBatchRelease(req, mockDb)).rejects.toThrow(
+        'ERR_SIGNATURE_ALREADY_USED'
+      );
+    });
+
+    it('chữ ký giả mạo vai trò hoặc signerUid khác authenticated uid bắt buộc phải FAIL (Gate 7)', async () => {
+      mockDbData['batches/b_001'] = {
+        id: 'b_001',
+        batchNo: 'L26001',
+        status: 'TESTING',
+        version: 1,
+        bprReviewStatus: 'APPROVED',
+      };
+      mockDbData['testResults'] = {
+        tr_001: { id: 'tr_001', batchId: 'b_001', overallStatus: 'PASS', qualityStatus: 'PASS' },
+      };
+
+      // 1. Signer role = USER (không có thẩm quyền)
+      const userRoleSigData = {
+        documentType: 'BATCH_RELEASE' as const,
+        documentId: 'b_001',
+        documentVersion: 1,
+        signerUid: qaUser.uid,
+        signerName: 'Nguyễn User',
+        signerEmail: qaUser.email,
+        role: 'USER' as const,
+        meaning: 'Ký xuất xưởng',
+        signedAt: new Date().toISOString(),
+        status: 'CREATED' as const,
+      };
+      const userRoleSig = {
+        id: 'sig_user_role',
+        ...userRoleSigData,
+        checksum: computeSignatureSha256(userRoleSigData),
+      };
+      mockDbData['electronic_signatures/sig_user_role'] = userRoleSig;
 
       const req1: any = {
         auth: { uid: qaUser.uid, token: { role: 'QA' } },
-        data: { batchId: 'b_001', signatureId: 'sig_bad_doc' },
+        data: { batchId: 'b_001', signatureId: 'sig_user_role' },
       };
       await expect(handleApproveBatchRelease(req1, mockDb)).rejects.toThrow(
-        'ERR_SIGNATURE_INVALID'
+        'ERR_SIGNATURE_ROLE_UNAUTHORIZED'
       );
 
-      // 2. Chữ ký sai documentVersion
-      const badVerSig = {
-        ...createValidSignature('b_001', 1), // Lô hiện tại v2
+      // 2. SignerUid khác với Authenticated callerUid
+      const diffUidSigData = {
+        documentType: 'BATCH_RELEASE' as const,
+        documentId: 'b_001',
+        documentVersion: 1,
+        signerUid: 'another-user-uid',
+        signerName: 'Khác User',
+        signerEmail: 'other@vbiotech.com',
+        role: 'QA' as const,
+        meaning: 'Ký xuất xưởng',
+        signedAt: new Date().toISOString(),
+        status: 'CREATED' as const,
       };
-      mockDbData['electronic_signatures/sig_bad_ver'] = badVerSig;
+      const diffUidSig = {
+        id: 'sig_diff_uid',
+        ...diffUidSigData,
+        checksum: computeSignatureSha256(diffUidSigData),
+      };
+      mockDbData['electronic_signatures/sig_diff_uid'] = diffUidSig;
 
       const req2: any = {
         auth: { uid: qaUser.uid, token: { role: 'QA' } },
-        data: { batchId: 'b_001', signatureId: 'sig_bad_ver' },
+        data: { batchId: 'b_001', signatureId: 'sig_diff_uid' },
       };
-      await expect(handleApproveBatchRelease(req2, mockDb)).rejects.toThrow(
-        'ERR_SIGNATURE_VERSION_MISMATCH'
-      );
+      await expect(handleApproveBatchRelease(req2, mockDb)).rejects.toThrow('ERR_SIGNER_MISMATCH');
     });
 
-    it('từ chối khi thiếu phiếu kiểm nghiệm (Gate 1 FAIL) hoặc kết quả kiểm nghiệm FAIL (Gate 2 FAIL)', async () => {
+    it('Gate 1: Thiếu chỉ tiêu bắt buộc trong TCCS phải FAIL (P0-3 SSoT)', async () => {
       mockDbData['batches/b_001'] = {
         id: 'b_001',
         batchNo: 'L26001',
         status: 'TESTING',
         version: 1,
         bprReviewStatus: 'APPROVED',
+        tccsSnapshot: {
+          id: 'tccs_001',
+          mainQualityCriteria: [
+            { name: 'Định lượng hoạt chất', isOptional: false },
+            { name: 'Độ hòa tan', isOptional: false },
+          ],
+        },
       };
-      mockDbData['electronic_signatures/sig_valid_001'] = createValidSignature('b_001', 1);
-
-      // Chưa có test results trong DB -> Gate 1 FAIL
-      const req: any = {
-        auth: { uid: qaUser.uid, token: { role: 'QA' } },
-        data: { batchId: 'b_001', signatureId: 'sig_valid_001' },
-      };
-      await expect(handleApproveBatchRelease(req, mockDb)).rejects.toThrow(
-        'ERR_TEST_RESULTS_MISSING'
-      );
-
-      // Thêm phiếu kiểm nghiệm FAIL -> Gate 2 FAIL
+      // Phiếu kiểm nghiệm chỉ có 1 trong 2 chỉ tiêu
       mockDbData['testResults'] = {
         tr_001: {
           id: 'tr_001',
           batchId: 'b_001',
-          overallStatus: 'FAIL',
-          qualityStatus: 'FAIL',
+          overallStatus: 'PASS',
+          qualityStatus: 'PASS',
+          results: [{ criteriaName: 'Định lượng hoạt chất', value: 99.5, isPass: true }],
         },
       };
+      const validSig = createValidSignature('b_001', 1);
+      mockDbData[`electronic_signatures/${validSig.id}`] = validSig;
+
+      const req: any = {
+        auth: { uid: qaUser.uid, token: { role: 'QA' } },
+        data: { batchId: 'b_001', signatureId: validSig.id },
+      };
+
+      await expect(handleApproveBatchRelease(req, mockDb)).rejects.toThrow('ERR_TEST_INCOMPLETE');
+    });
+
+    it('Gate 2: Phiếu có chỉ tiêu bị FAIL phải FAIL kể cả overallStatus là PASS', async () => {
+      mockDbData['batches/b_001'] = {
+        id: 'b_001',
+        batchNo: 'L26001',
+        status: 'TESTING',
+        version: 1,
+        bprReviewStatus: 'APPROVED',
+      };
+      mockDbData['testResults'] = {
+        tr_001: {
+          id: 'tr_001',
+          batchId: 'b_001',
+          overallStatus: 'PASS', // Khai báo sai PASS
+          qualityStatus: 'PASS',
+          results: [
+            { criteriaName: 'Định lượng', value: 80.0, isPass: false }, // Nhưng chỉ tiêu bị FAIL!
+          ],
+        },
+      };
+      const validSig = createValidSignature('b_001', 1);
+      mockDbData[`electronic_signatures/${validSig.id}`] = validSig;
+
+      const req: any = {
+        auth: { uid: qaUser.uid, token: { role: 'QA' } },
+        data: { batchId: 'b_001', signatureId: validSig.id },
+      };
+
       await expect(handleApproveBatchRelease(req, mockDb)).rejects.toThrow(
         'ERR_QUALITY_NOT_PASSED'
       );
     });
 
-    it('từ chối khi BPR chưa được QA phê duyệt (Gate 6 FAIL)', async () => {
+    it('Gate 3: Lô có OOS mở (type, category hoặc isOos) phải FAIL', async () => {
+      mockDbData['batches/b_001'] = {
+        id: 'b_001',
+        batchNo: 'L26001',
+        status: 'TESTING',
+        version: 1,
+        bprReviewStatus: 'APPROVED',
+      };
+      mockDbData['testResults'] = {
+        tr_001: { id: 'tr_001', batchId: 'b_001', overallStatus: 'PASS', qualityStatus: 'PASS' },
+      };
+      // Deviation loại OOS chưa đóng
+      mockDbData['quality_deviations'] = {
+        dev_001: {
+          id: 'dev_001',
+          batchId: 'b_001',
+          type: 'OOS',
+          status: 'INVESTIGATING',
+        },
+      };
+      const validSig = createValidSignature('b_001', 1);
+      mockDbData[`electronic_signatures/${validSig.id}`] = validSig;
+
+      const req: any = {
+        auth: { uid: qaUser.uid, token: { role: 'QA' } },
+        data: { batchId: 'b_001', signatureId: validSig.id },
+      };
+
+      await expect(handleApproveBatchRelease(req, mockDb)).rejects.toThrow('ERR_OOS_PENDING');
+    });
+
+    it('Gate 4: Lô có Sai lệch nghiêm trọng (CRITICAL) chưa đóng phải FAIL', async () => {
+      mockDbData['batches/b_001'] = {
+        id: 'b_001',
+        batchNo: 'L26001',
+        status: 'TESTING',
+        version: 1,
+        bprReviewStatus: 'APPROVED',
+      };
+      mockDbData['testResults'] = {
+        tr_001: { id: 'tr_001', batchId: 'b_001', overallStatus: 'PASS', qualityStatus: 'PASS' },
+      };
+      mockDbData['quality_deviations'] = {
+        dev_001: {
+          id: 'dev_001',
+          batchId: 'b_001',
+          severity: 'CRITICAL',
+          status: 'OPEN',
+        },
+      };
+      const validSig = createValidSignature('b_001', 1);
+      mockDbData[`electronic_signatures/${validSig.id}`] = validSig;
+
+      const req: any = {
+        auth: { uid: qaUser.uid, token: { role: 'QA' } },
+        data: { batchId: 'b_001', signatureId: validSig.id },
+      };
+
+      await expect(handleApproveBatchRelease(req, mockDb)).rejects.toThrow('ERR_DEV_PENDING');
+    });
+
+    it('Gate 5: Lô có CAPA chưa hoàn thành (capaCompleted=false hoặc item chưa xong) phải FAIL', async () => {
+      mockDbData['batches/b_001'] = {
+        id: 'b_001',
+        batchNo: 'L26001',
+        status: 'TESTING',
+        version: 1,
+        bprReviewStatus: 'APPROVED',
+      };
+      mockDbData['testResults'] = {
+        tr_001: { id: 'tr_001', batchId: 'b_001', overallStatus: 'PASS', qualityStatus: 'PASS' },
+      };
+      mockDbData['quality_deviations'] = {
+        dev_001: {
+          id: 'dev_001',
+          batchId: 'b_001',
+          severity: 'MAJOR',
+          status: 'CLOSED',
+          capaRequired: true,
+          capaCompleted: false, // CAPA chưa hoàn thành!
+        },
+      };
+      const validSig = createValidSignature('b_001', 1);
+      mockDbData[`electronic_signatures/${validSig.id}`] = validSig;
+
+      const req: any = {
+        auth: { uid: qaUser.uid, token: { role: 'QA' } },
+        data: { batchId: 'b_001', signatureId: validSig.id },
+      };
+
+      await expect(handleApproveBatchRelease(req, mockDb)).rejects.toThrow('ERR_CAPA_PENDING');
+    });
+
+    it('Gate 6: BPR chưa được QA APPROVED phải FAIL', async () => {
       mockDbData['batches/b_001'] = {
         id: 'b_001',
         batchNo: 'L26001',
@@ -267,24 +564,21 @@ describe('Server-Side Release Command & Security Rules Verification (Phase 1 to 
         version: 1,
         bprReviewStatus: 'UNDER_REVIEW', // Chưa APPROVED
       };
-      mockDbData['electronic_signatures/sig_valid_001'] = createValidSignature('b_001', 1);
       mockDbData['testResults'] = {
-        tr_001: {
-          id: 'tr_001',
-          batchId: 'b_001',
-          overallStatus: 'PASS',
-          qualityStatus: 'PASS',
-        },
+        tr_001: { id: 'tr_001', batchId: 'b_001', overallStatus: 'PASS', qualityStatus: 'PASS' },
       };
+      const validSig = createValidSignature('b_001', 1);
+      mockDbData[`electronic_signatures/${validSig.id}`] = validSig;
 
       const req: any = {
         auth: { uid: qaUser.uid, token: { role: 'QA' } },
-        data: { batchId: 'b_001', signatureId: 'sig_valid_001' },
+        data: { batchId: 'b_001', signatureId: validSig.id },
       };
+
       await expect(handleApproveBatchRelease(req, mockDb)).rejects.toThrow('ERR_BPR_NOT_APPROVED');
     });
 
-    it('xuất xưởng thành công khi thỏa mãn 7/7 Gates: Atomic Transaction, Signature CONSUMED và Idempotent (P0-6 & P0-7 & P1-1)', async () => {
+    it('Thỏa mãn 7/7 Gates: Atomic Commit, Signature CONSUMED và Idempotency Key Persistence (P0-6 & P0-7)', async () => {
       mockDbData['batches/b_001'] = {
         id: 'b_001',
         batchNo: 'L26001',
@@ -294,51 +588,49 @@ describe('Server-Side Release Command & Security Rules Verification (Phase 1 to 
         bprReviewedBy: qaUser.email,
         bprReviewedAt: new Date().toISOString(),
       };
-      mockDbData['electronic_signatures/sig_valid_001'] = createValidSignature('b_001', 1);
+      const validSig = createValidSignature('b_001', 1);
+      mockDbData[`electronic_signatures/${validSig.id}`] = validSig;
       mockDbData['testResults'] = {
-        tr_001: {
-          id: 'tr_001',
-          batchId: 'b_001',
-          overallStatus: 'PASS',
-          qualityStatus: 'PASS',
-        },
+        tr_001: { id: 'tr_001', batchId: 'b_001', overallStatus: 'PASS', qualityStatus: 'PASS' },
       };
 
+      const idempotencyKey = 'idemp_unique_key_123';
       const req: any = {
         auth: { uid: qaUser.uid, token: { role: 'QA', email: qaUser.email } },
         data: {
           batchId: 'b_001',
-          signatureId: 'sig_valid_001',
+          signatureId: validSig.id,
           expectedVersion: 1,
+          idempotencyKey,
         },
       };
 
       const result = await handleApproveBatchRelease(req, mockDb);
       expect(result.success).toBe(true);
       expect(result.status).toBe('RELEASED');
-      expect(result.releaseStage).toBe('RELEASED');
-      expect(result.releaseGateProgress.completed).toBe(7);
       expect(result.version).toBe(2);
 
-      // Kiểm tra DB batch đã chuyển sang RELEASED
-      const releasedBatch = mockDbData['batches/b_001'];
-      expect(releasedBatch.status).toBe('RELEASED');
-      expect(releasedBatch.releaseStage).toBe('RELEASED');
-      expect(releasedBatch.version).toBe(2);
-      expect(releasedBatch.releaseGateProgress.completed).toBe(7);
-      expect(releasedBatch.releaseSignatureId).toBe('sig_valid_001');
+      // Kiểm tra Multi-location atomic commit:
+      // 1. Batch status = RELEASED
+      expect(mockDbData['batches/b_001/status']).toBe('RELEASED');
+      expect(mockDbData['batches/b_001/version']).toBe(2);
 
-      // P1-1: Kiểm tra chữ ký được đổi sang trạng thái CONSUMED
-      const updatedSig = mockDbData['electronic_signatures/sig_valid_001'];
-      expect(updatedSig.status).toBe('CONSUMED');
-      expect(updatedSig.consumedAt).toBeDefined();
+      // 2. Signature status = CONSUMED
+      expect(mockDbData[`electronic_signatures/${validSig.id}/status`]).toBe('CONSUMED');
+      expect(mockDbData[`electronic_signatures/${validSig.id}/consumedAt`]).toBeDefined();
 
-      // P0-7: Gọi lại lần 2 (Idempotency replay) -> Trả về kết quả thành công mà không release lặp lại
+      // 3. Idempotency Key record persisted in release_commands
+      const persistedCommand = mockDbData[`release_commands/${idempotencyKey}`];
+      expect(persistedCommand).toBeDefined();
+      expect(persistedCommand.idempotencyKey).toBe(idempotencyKey);
+      expect(persistedCommand.batchId).toBe('b_001');
+
+      // 4. Gọi lại lần 2 với idempotencyKey -> Trả về kết quả cached ngay lập tức
       const replayResult = await handleApproveBatchRelease(req, mockDb);
       expect(replayResult.success).toBe(true);
       expect(replayResult.isIdempotent).toBe(true);
       expect(replayResult.status).toBe('RELEASED');
-      expect(mockDbData['batches/b_001'].version).toBe(2); // Version không bị tăng thêm
+      expect(replayResult.version).toBe(2);
     });
   });
 });

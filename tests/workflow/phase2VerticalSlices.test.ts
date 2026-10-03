@@ -356,6 +356,17 @@ describe('Phase 2 Vertical Slices: Test Result & Batch Workflows', () => {
       };
       mockBatchRepo.findById.mockResolvedValue(testingBatch);
 
+      batchHandlers.setServerReleaseExecutor(async ({ currentUser }) => {
+        const releasedBatch = {
+          ...testingBatch,
+          status: 'RELEASED' as const,
+          releasedBy: currentUser.email,
+          releasedAt: new Date().toISOString(),
+        };
+        mockBatchRepo.findById.mockResolvedValue(releasedBatch);
+        return { success: true, batch: releasedBatch };
+      });
+
       const passedTR: TestResult = {
         id: 'tr_pass',
         batchId: 'batch_slice_002',
@@ -367,10 +378,10 @@ describe('Phase 2 Vertical Slices: Test Result & Batch Workflows', () => {
       };
 
       const sigPayload = {
-        documentType: 'BATCH_RELEASE',
+        documentType: 'BATCH_RELEASE' as const,
         documentId: 'batch_slice_002',
         signerEmail: qaActor.email,
-        signerRole: 'QA',
+        signerRole: 'QA' as const,
         timestamp: new Date().toISOString(),
         meaning: 'Phê duyệt xuất xưởng Lô sản phẩm',
       };
@@ -378,14 +389,27 @@ describe('Phase 2 Vertical Slices: Test Result & Batch Workflows', () => {
         id: 'sig_rel_01',
         documentType: 'BATCH_RELEASE',
         documentId: 'batch_slice_002',
+        documentVersion: 1,
         signerUid: qaActor.id,
         signerName: qaActor.name,
         signerEmail: qaActor.email,
         role: 'QA',
         meaning: sigPayload.meaning,
         signedAt: sigPayload.timestamp,
-        checksum: calculateSha256Sync(JSON.stringify(sigPayload)),
+        checksum: '',
       };
+      validSig.checksum = calculateSha256Sync(
+        [
+          validSig.documentType,
+          validSig.documentId,
+          validSig.documentVersion ?? '',
+          validSig.signerUid,
+          validSig.signerEmail,
+          validSig.role,
+          validSig.meaning,
+          validSig.signedAt,
+        ].join('|')
+      );
 
       const released = await batchHandlers.handleStatusTransition(
         'batch_slice_002',

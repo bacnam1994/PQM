@@ -16,6 +16,7 @@ import {
 import { can, normalizeUser } from './permissionService';
 import { logAuditAction } from './auditService';
 import { removeUndefined } from '../utils';
+import { calculateSha256Sync } from '../utils/cryptoUtils';
 
 /**
  * Tính toán mã băm checksum SHA-256 bảo đảm tính bất biến của chữ ký (integrity fingerprint)
@@ -34,25 +35,7 @@ export async function computeSignatureChecksum(
     data.signedAt,
   ].join('|');
 
-  if (typeof crypto !== 'undefined' && crypto.subtle) {
-    try {
-      const msgUint8 = new TextEncoder().encode(payload);
-      const hashBuffer = await crypto.subtle.digest('SHA-256', msgUint8);
-      const hashArray = Array.from(new Uint8Array(hashBuffer));
-      return hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
-    } catch {
-      // Fallback
-    }
-  }
-
-  // Fallback hashing cho môi trường test/legacy
-  let hash = 0;
-  for (let i = 0; i < payload.length; i++) {
-    const char = payload.charCodeAt(i);
-    hash = (hash << 5) - hash + char;
-    hash |= 0;
-  }
-  return `sig-hash-${Math.abs(hash).toString(16)}-${payload.length}`;
+  return calculateSha256Sync(payload);
 }
 
 export class SignatureService {

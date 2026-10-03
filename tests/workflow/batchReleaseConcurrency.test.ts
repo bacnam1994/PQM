@@ -149,30 +149,20 @@ describe('Batch Release Concurrency & OCC Hardening (P0-1 đến P1-4)', () => {
     expect(result.releaseGateProgress?.completed).toBe(7);
   });
 
-  // P0-3: updateStatus('RELEASED') thiết lập nguyên tử status=RELEASED và releaseStage=RELEASED (7/7)
-  it('P0-3: Atomic Release Transition trong updateStatus đồng thời cập nhật status=RELEASED và 7/7 Gates', async () => {
+  // P0-3: batchRepository.updateStatus('RELEASED') bị chặn tuyệt đối từ client repository
+  it('P0-3: Chặn client updateStatus(RELEASED) trực tiếp với ERR_DIRECT_RELEASE_FORBIDDEN', async () => {
     mockDbState[`batches/${mockBatch.id}`] = {
       ...mockBatch,
       status: 'TESTING',
       version: 5,
     };
 
-    await batchRepository.updateStatus(
-      mockBatch.id,
-      'RELEASED',
-      'Phê duyệt xuất xưởng chính thức',
-      {
+    await expect(
+      batchRepository.updateStatus(mockBatch.id, 'RELEASED', 'Phê duyệt xuất xưởng chính thức', {
         expectedVersion: 5,
         releasedBy: 'qa@vbiotech.vn',
-      }
-    );
-
-    const fresh = await batchRepository.findById(mockBatch.id);
-    expect(fresh).toBeDefined();
-    expect(fresh!.status).toBe('RELEASED');
-    expect(fresh!.releaseStage).toBe('RELEASED');
-    expect(fresh!.releaseGateProgress?.completed).toBe(7);
-    expect(fresh!.releaseGateProgress?.percentage).toBe(100);
+      })
+    ).rejects.toThrow('ERR_DIRECT_RELEASE_FORBIDDEN');
   });
 
   // P1-2: Phân định rạch ròi readyForSignature vs readyForRelease
