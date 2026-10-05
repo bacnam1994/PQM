@@ -28,6 +28,7 @@ export type SignatureDocumentType =
   | 'BATCH'
   | 'BATCH_RELEASE'
   | 'BATCH_REJECT'
+  | 'TEST_RESULT'
   | 'TEST_RESULT_APPROVAL'
   | 'COA_ISSUE'
   | 'TCCS'

@@ -9,6 +9,7 @@ export type SignatureDocumentType =
   | 'BATCH'
   | 'BATCH_RELEASE'
   | 'BATCH_REJECT'
+  | 'TEST_RESULT'
   | 'TEST_RESULT_APPROVAL'
   | 'COA_ISSUE'
   | 'TCCS'
@@ -21,6 +22,8 @@ export const SIGNATURE_MEANINGS: Record<SignatureDocumentType, string> = {
     'Tôi xác nhận và phê duyệt xuất xưởng Lô sản xuất này theo đúng tiêu chuẩn chất lượng và hồ sơ lô.',
   BATCH_REJECT:
     'Tôi xác nhận từ chối và loại bỏ Lô sản xuất này do không đạt tiêu chuẩn chất lượng quy định.',
+  TEST_RESULT:
+    'Tôi xác nhận đã soát xét và phê duyệt kết quả phân tích kiểm nghiệm này theo đúng phương pháp thử nghiệm.',
   TEST_RESULT_APPROVAL:
     'Tôi xác nhận đã soát xét và phê duyệt kết quả phân tích kiểm nghiệm này theo đúng phương pháp thử nghiệm.',
   COA_ISSUE:

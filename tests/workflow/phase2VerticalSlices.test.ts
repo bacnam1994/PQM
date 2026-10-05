@@ -95,6 +95,12 @@ describe('Phase 2 Vertical Slices: Test Result & Batch Workflows', () => {
       tccsId: 'tccs_ginkgo_v1',
       status: 'TESTING',
       version: 1,
+      mfgDate: '2026-01-01',
+      expDate: '2028-01-01',
+      theoreticalYield: 1000,
+      actualYield: 980,
+      yieldUnit: 'Hộp',
+      createdAt: '2026-01-01T00:00:00Z',
     };
 
     const validTestResult: TestResult = {
@@ -103,8 +109,10 @@ describe('Phase 2 Vertical Slices: Test Result & Batch Workflows', () => {
       tccsId: 'tccs_ginkgo_v1',
       labName: 'Phòng Lab Vi sinh - Hóa lý',
       testDate: '2026-02-15',
+      overallStatus: 'PASS',
       workflowStatus: 'DRAFT',
       version: 1,
+      createdAt: '2026-02-15T00:00:00Z',
       results: [
         { criteriaName: 'Độ ẩm', value: '5.2', isPass: true, limit: '<= 9.0%' },
         {
@@ -277,6 +285,7 @@ describe('Phase 2 Vertical Slices: Test Result & Batch Workflows', () => {
       theoreticalYield: 5000,
       actualYield: 4950,
       yieldUnit: 'Chai',
+      createdAt: '2026-01-01T00:00:00Z',
     };
 
     it('BATCH_CREATE: Khởi tạo Lô luôn ở trạng thái PENDING và đóng băng Snapshot', async () => {
@@ -338,6 +347,7 @@ describe('Phase 2 Vertical Slices: Test Result & Batch Workflows', () => {
         testDate: '2026-02-01',
         overallStatus: 'FAIL',
         version: 1,
+        createdAt: '2026-02-01T00:00:00Z',
         results: [{ criteriaName: 'Độ tinh khiết', value: '88%', isPass: false }],
       };
 
@@ -364,6 +374,7 @@ describe('Phase 2 Vertical Slices: Test Result & Batch Workflows', () => {
         testDate: '2026-02-01',
         overallStatus: 'PASS',
         version: 1,
+        createdAt: '2026-02-01T00:00:00Z',
         results: [{ criteriaName: 'Độ tinh khiết', value: '99.5%', isPass: true }],
       };
 
@@ -434,15 +445,18 @@ describe('Phase 2 Vertical Slices: Test Result & Batch Workflows', () => {
     });
 
     it('BATCH_DELETE: Bắt buộc chuỗi xác nhận CONFIRM-DELETE-BATCH đối với thao tác phá hủy', async () => {
-      const execution = await WorkflowFacade.dispatch({
-        actionId: 'BATCH_DELETE',
-        entityType: 'BATCH',
-        entityId: 'batch_slice_002',
-        actor: adminActor,
-        payload: { batchId: 'batch_slice_002' },
-        reason: 'Xóa lô thử nghiệm',
-        confirmationToken: 'WRONG-TOKEN',
-      });
+      const execution = await WorkflowFacade.dispatch(
+        {
+          actionId: 'BATCH_DELETE',
+          entityType: 'BATCH',
+          entityId: 'batch_slice_002',
+          actor: adminActor,
+          payload: { batchId: 'batch_slice_002' },
+          reason: 'Xóa lô thử nghiệm',
+          confirmationToken: 'WRONG-TOKEN',
+        },
+        async () => null
+      );
 
       expect(execution.success).toBe(false);
       expect(execution.failureCode).toBe('INVALID_CONFIRMATION_TOKEN');
@@ -476,6 +490,7 @@ describe('Phase 2 Vertical Slices: Test Result & Batch Workflows', () => {
         labName: 'Lab A',
         testDate: '2026-02-01',
         overallStatus: 'PASS',
+        createdAt: '2026-02-01T00:00:00Z',
         results: [{ criteriaName: 'pH', value: '6.5', isPass: true }],
       };
 
@@ -493,6 +508,7 @@ describe('Phase 2 Vertical Slices: Test Result & Batch Workflows', () => {
           labName: 'Lab QC',
           testDate: '2026-02-01',
           overallStatus: 'PASS',
+          createdAt: '2026-02-01T00:00:00Z',
           results: [{ criteriaName: 'Độ ẩm', value: '4.5', isPass: true }],
         },
         qcActor
