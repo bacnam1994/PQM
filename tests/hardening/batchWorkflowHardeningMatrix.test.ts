@@ -26,6 +26,7 @@ import { FirebaseBatchRepository } from '../../src/repositories/firebase/Firebas
 import { OutboxAuditQueue } from '../../src/workflow/events/outboxAuditQueue';
 import { signatureService } from '../../src/services/signatureService';
 import { calculateSha256Sync } from '../../src/utils/cryptoUtils';
+import { createTestCanonicalSignature } from '../helpers/canonicalTestSignature';
 
 // Mock dependencies
 vi.mock('../../src/firebase', () => ({
@@ -262,20 +263,13 @@ describe('Phase 14: Comprehensive 45-Test Matrix for Global Batch Workflow', () 
     });
 
     it('Test 12: Đủ 7 Gates và PASS test result -> ELIGIBLE: TRUE', () => {
-      const sigPayload = {
-        documentType: 'BATCH_RELEASE',
-        documentId: baseBatch.id,
-        signerEmail: 'qa@vbiotech.com',
-        signerRole: 'QA',
-        timestamp: new Date().toISOString(),
-        meaning: 'APPROVE',
-      };
-      const validSig = {
+      const validSig = createTestCanonicalSignature({
         id: 'sig_test_12',
-        ...sigPayload,
-        signedAt: sigPayload.timestamp,
-        checksum: calculateSha256Sync(JSON.stringify(sigPayload)),
-      };
+        documentId: baseBatch.id,
+        documentVersion: baseBatch.version,
+        signerEmail: 'qa@vbiotech.com',
+        role: 'QA',
+      });
       const dec = resolveBatchReleaseDecision({
         batch: { ...baseBatch, bprReviewStatus: 'APPROVED' as any },
         testResults: [passingTestResult],

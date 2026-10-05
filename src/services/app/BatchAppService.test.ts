@@ -4,6 +4,7 @@ import { IBatchRepository } from '../../repositories/BatchRepository';
 import { createBaseMockRepository } from '../../repositories/mockRepositoryHelper';
 import { Batch, TestResult } from '../../types';
 import { calculateSha256Sync } from '../../utils/cryptoUtils';
+import { createTestCanonicalSignature } from '../../../tests/helpers/canonicalTestSignature';
 
 vi.mock('../auditService', () => ({
   logAuditAction: vi.fn(),
@@ -185,15 +186,13 @@ describe('BatchAppService', () => {
       createdAt: '2026-01-10T00:00:00Z',
     };
 
-    const validSig: any = {
+    const validSig = createTestCanonicalSignature({
       id: 'sig-01',
       documentType: 'BATCH_RELEASE',
       documentId: 'batch-001',
       signerEmail: 'qa@pqm.com',
-      signerRole: 'QA',
-      signedAt: new Date().toISOString(),
-      checksum: calculateSha256Sync('batch-001'),
-    };
+      role: 'QA',
+    });
 
     it('should block jumping status from PENDING directly to RELEASED (State Machine Guard)', async () => {
       await expect(
@@ -254,15 +253,13 @@ describe('BatchAppService', () => {
     });
 
     it('should reject release when signature documentId does not match batchId', async () => {
-      const mismatchSig: any = {
+      const mismatchSig = createTestCanonicalSignature({
         id: 'sig-01',
         documentType: 'BATCH_RELEASE',
         documentId: 'batch-999', // Mismatched ID
         signerEmail: 'qa@pqm.com',
-        signerRole: 'QA',
-        signedAt: new Date().toISOString(),
-        checksum: calculateSha256Sync('batch-999'),
-      };
+        role: 'QA',
+      });
 
       await expect(
         service.updateStatus('batch-001', 'RELEASED', qaUser, {

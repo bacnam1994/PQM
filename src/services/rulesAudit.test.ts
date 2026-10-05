@@ -19,8 +19,8 @@ describe('Security Rules Static Audit - PQM 3.0', () => {
 
       expect(userWriteRule).toBeDefined();
       // Phải chặn tự gán role hoặc isAdmin nếu không phải admin
-      expect(userWriteRule).toContain('!newData.hasChild(\'role\')');
-      expect(userWriteRule).toContain('!newData.hasChild(\'isAdmin\')');
+      expect(userWriteRule).toContain("!newData.hasChild('role')");
+      expect(userWriteRule).toContain("!newData.hasChild('isAdmin')");
     });
 
     it('should enforce QA/Admin constraint when changing batch status to RELEASED', () => {
@@ -32,18 +32,15 @@ describe('Security Rules Static Audit - PQM 3.0', () => {
       // Phải kiểm tra role QA hoặc ADMIN cho RELEASED
       expect(batchWriteRule).toContain('RELEASED');
       expect(batchWriteRule).toContain('QA');
-      expect(batchWriteRule).toContain('newData.child(\'status\').val() !== \'RELEASED\'');
+      expect(batchWriteRule).toContain("newData.child('status').val() !== 'RELEASED'");
     });
 
-    it('should enforce actor verification and timestamp on audit_logs', () => {
+    it('should enforce server-only write protection on audit_logs (Phase 2.2)', () => {
       const content = fs.readFileSync(dbRulesPath, 'utf8');
       const rules = JSON.parse(content).rules;
       const auditWriteRule = rules.audit_logs['$log_id']['.write'];
 
-      expect(auditWriteRule).toBeDefined();
-      expect(auditWriteRule).toContain('!data.exists() && newData.exists()');
-      expect(auditWriteRule).toContain('actorId');
-      expect(auditWriteRule).toContain('timestamp');
+      expect(auditWriteRule).toBe(false);
     });
 
     it('should restrict testResults approval and locking from unauthorized alteration', () => {

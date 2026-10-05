@@ -28,6 +28,7 @@ import {
 import { resolveCanonicalBatchQualityDecision } from '../../src/domain/batch/canonicalBatchQualityDecision';
 import { Batch, TestResult, TCCS } from '../../src/types';
 import { calculateSha256Sync } from '../../src/utils/cryptoUtils';
+import { createTestCanonicalSignature } from '../helpers/canonicalTestSignature';
 import * as auditService from '../../src/services/auditService';
 
 vi.mock('../../src/services/auditService', () => ({
@@ -164,14 +165,12 @@ describe('P0/P1 Closure Audit - Global Batch Workflow Suite', () => {
     expect(decMock.blockers.some((b) => b.includes('ERR_SIGNATURE_TAMPERED'))).toBe(true);
 
     // 3b. Mismatched Document ID (chữ ký của batch khác)
-    const mismatchSig: any = {
+    const mismatchSig = createTestCanonicalSignature({
       documentType: 'BATCH_RELEASE',
       documentId: 'batch-OTHER-999',
       signerEmail: 'qa@pqm.com',
-      signerRole: 'QA',
-      signedAt: new Date().toISOString(),
-      checksum: calculateSha256Sync('batch-OTHER-999'),
-    };
+      role: 'QA',
+    });
     const decMismatch = BatchReleaseDecisionService.resolveBatchReleaseDecision({
       batch: batchWithBpr,
       testResults: [passingTestResult],
@@ -198,14 +197,12 @@ describe('P0/P1 Closure Audit - Global Batch Workflow Suite', () => {
       createdAt: '2026-01-01',
     };
 
-    const validSig: any = {
+    const validSig = createTestCanonicalSignature({
       documentType: 'BATCH_RELEASE',
       documentId: 'batch-001',
       signerEmail: 'qa@pqm.com',
-      signerRole: 'QA',
-      signedAt: new Date().toISOString(),
-      checksum: calculateSha256Sync('batch-001'),
-    };
+      role: 'QA',
+    });
 
     const decision = BatchReleaseDecisionService.resolveBatchReleaseDecision({
       batch: batchWithBpr,
@@ -251,15 +248,13 @@ describe('P0/P1 Closure Audit - Global Batch Workflow Suite', () => {
 
     const handlers = new BatchWorkflowHandlers(mockRepo);
 
-    const validSig = {
+    const validSig = createTestCanonicalSignature({
       id: 'sig-01',
       documentType: 'BATCH_RELEASE',
       documentId: 'batch-occ',
       signerEmail: 'qa@pqm.com',
-      signerRole: 'QA',
-      signedAt: new Date().toISOString(),
-      checksum: calculateSha256Sync('batch-occ'),
-    };
+      role: 'QA',
+    });
 
     // Release A (version 1 -> version 2)
     await handlers.handleStatusTransition('batch-occ', 'RELEASED', validQaActor as any, {
@@ -303,15 +298,13 @@ describe('P0/P1 Closure Audit - Global Batch Workflow Suite', () => {
 
     const handlers = new BatchWorkflowHandlers(mockRepo);
 
-    const validSig = {
+    const validSig = createTestCanonicalSignature({
       id: 'sig-01',
       documentType: 'BATCH_RELEASE',
       documentId: 'batch-001',
       signerEmail: 'qa@pqm.com',
-      signerRole: 'QA',
-      signedAt: new Date().toISOString(),
-      checksum: calculateSha256Sync('batch-001'),
-    };
+      role: 'QA',
+    });
 
     await expect(
       handlers.handleStatusTransition('batch-001', 'RELEASED', validQaActor as any, {

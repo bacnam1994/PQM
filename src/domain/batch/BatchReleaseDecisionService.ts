@@ -27,6 +27,7 @@ import {
 } from './canonicalBatchQualityDecision';
 import { ElectronicSignature } from '../../types/signature';
 import { calculateSha256Sync } from '../../utils/cryptoUtils';
+import { verifyCanonicalSignatureChecksum } from '@pqm/release-engine';
 
 export type ReleaseGateKey =
   | 'GATE_1_TEST_COMPLETION'
@@ -686,40 +687,8 @@ export class BatchReleaseDecisionService {
         gate7Blockers.push(msg);
         blockers.push(msg);
       } else {
-        const payload = [
-          userSignature.documentType,
-          userSignature.documentId,
-          userSignature.documentVersion ?? '',
-          userSignature.signerUid,
-          userSignature.signerEmail,
-          userSignature.role,
-          userSignature.meaning,
-          userSignature.signedAt,
-        ].join('|');
-
-        const expectedSha256 = calculateSha256Sync(payload);
-        const expectedDocIdSha256 = calculateSha256Sync(userSignature.documentId);
-
-        // Fallback legacy hash nếu chữ ký được sinh từ môi trường test cũ
-        let hash = 0;
-        for (let i = 0; i < payload.length; i++) {
-          const char = payload.charCodeAt(i);
-          hash = (hash << 5) - hash + char;
-          hash = hash & hash;
-        }
-        const expectedFallback = 'sha256_' + Math.abs(hash).toString(16);
-        const isHex64 =
-          checksum.length === 64 &&
-          !checksum.includes(' ') &&
-          !checksum.includes('-') &&
-          /^[0-9a-fA-F]{64}$/.test(checksum);
-
-        if (
-          !isHex64 &&
-          checksum !== expectedSha256 &&
-          checksum !== expectedDocIdSha256 &&
-          checksum !== expectedFallback
-        ) {
+        const isChecksumValid = verifyCanonicalSignatureChecksum(userSignature as any);
+        if (!isChecksumValid) {
           signaturePassed = false;
           const msg =
             'ERR_SIGNATURE_TAMPERED: Mã băm chữ ký điện tử không khớp với nội dung ký (Signature Integrity Verification Failed).';

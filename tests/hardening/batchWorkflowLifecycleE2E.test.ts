@@ -27,6 +27,7 @@ import { WorkflowExecutor } from '../../src/workflow/kernel/workflowExecutor';
 import { WorkflowContext } from '../../src/workflow/contracts/actions';
 
 import { calculateSha256Sync } from '../../src/utils/cryptoUtils';
+import { createTestCanonicalSignature } from '../helpers/canonicalTestSignature';
 
 vi.mock('../../src/services/signatureService', () => ({
   signatureService: {
@@ -276,23 +277,15 @@ describe('Phase 15: End-to-End Batch Lifecycle & Data Integrity Verification', (
     // -------------------------------------------------------------
     // Bước 8: Xuất xưởng HỢP LỆ với đầy đủ 7 Release Gates và Chữ ký QA chuẩn
     // -------------------------------------------------------------
-    const sigPayload = {
-      documentType: 'BATCH_RELEASE',
-      documentId: 'batch-e2e-2026',
-      signerEmail: 'qa@pqm.com',
-      signerRole: 'QA',
-      timestamp: '2026-01-06T15:30:00Z',
-      meaning: 'APPROVE',
-    };
-    const validQASig = {
+    const validQASig = createTestCanonicalSignature({
       id: 'sig-valid-qa-001',
-      ...sigPayload,
-      documentType: 'BATCH_RELEASE' as any,
+      documentId: 'batch-e2e-2026',
+      documentVersion: testingBatch.version,
+      signerEmail: 'qa@pqm.com',
       signerName: 'Nguyen Van QA',
       role: 'QA',
-      signedAt: sigPayload.timestamp,
-      checksum: calculateSha256Sync(JSON.stringify(sigPayload)),
-    };
+      signedAt: '2026-01-06T15:30:00Z',
+    });
 
     await handlers.handleStatusTransition('batch-e2e-2026', 'RELEASED', qaUser, {
       currentBatch: { ...testingBatch, bprReviewStatus: 'APPROVED' as any },

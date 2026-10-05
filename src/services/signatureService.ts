@@ -12,46 +12,22 @@ import {
   SIGNATURE_MEANINGS,
   SignatureDocumentType,
 } from '../types/signature';
+import {
+  calculateCanonicalSignatureChecksum,
+  verifyCanonicalSignatureChecksum,
+} from '@pqm/release-engine';
 import { can, normalizeUser } from './permissionService';
 import { logAuditAction } from './auditService';
 import { removeUndefined } from '../utils';
 
 /**
- * Tính toán mã băm checksum SHA-256 bảo đảm tính bất biến của chữ ký
+ * Tính toán mã băm checksum SHA-256 canonical bảo đảm tính bất biến của chữ ký
+ * Không sử dụng fallback hash hay mock checksum (Strict Mode)
  */
 export async function computeSignatureChecksum(
   data: Omit<ElectronicSignature, 'id' | 'checksum'>
 ): Promise<string> {
-  const payload = [
-    data.documentType,
-    data.documentId,
-    data.documentVersion ?? '',
-    data.signerUid,
-    data.signerEmail,
-    data.role,
-    data.meaning,
-    data.signedAt,
-  ].join('|');
-
-  if (typeof crypto !== 'undefined' && crypto.subtle) {
-    try {
-      const msgUint8 = new TextEncoder().encode(payload);
-      const hashBuffer = await crypto.subtle.digest('SHA-256', msgUint8);
-      const hashArray = Array.from(new Uint8Array(hashBuffer));
-      return hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
-    } catch {
-      // Fallback
-    }
-  }
-
-  // Fallback hashing cho môi trường test/legacy
-  let hash = 0;
-  for (let i = 0; i < payload.length; i++) {
-    const char = payload.charCodeAt(i);
-    hash = (hash << 5) - hash + char;
-    hash |= 0;
-  }
-  return `sig-hash-${Math.abs(hash).toString(16)}-${payload.length}`;
+  return calculateCanonicalSignatureChecksum(data as any);
 }
 
 export class SignatureService {
@@ -134,6 +110,7 @@ export class SignatureService {
       id,
       ...unsignedData,
       checksum,
+      status: 'CREATED',
     };
 
     // 4. Lưu trữ chữ ký bất biến vào cơ sở dữ liệu
@@ -169,13 +146,11 @@ export class SignatureService {
   }
 
   /**
-   * Thẩm định tính toàn vẹn của chữ ký điện tử (chống giả mạo / can thiệp)
+   * Thẩm định tính toàn vẹn của chữ ký điện tử - CHỈ CHẤP NHẬN EXACT MATCH SHA-256
    */
   async verifySignatureIntegrity(signature: ElectronicSignature): Promise<boolean> {
     if (!signature || !signature.checksum) return false;
-    const { id: _id, checksum, ...dataToHash } = signature;
-    const computed = await computeSignatureChecksum(dataToHash);
-    return computed === checksum;
+    return verifyCanonicalSignatureChecksum(signature as any);
   }
 }
 

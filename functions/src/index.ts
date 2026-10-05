@@ -12,6 +12,7 @@ import { executeSPCCalculation, SPCMetricsRequest } from './spcFunction';
 import { runAutoHealDatabase } from './autoHealCron';
 import { generateQualityReportBackend, QualityReportRequest } from './reportFunction';
 import { syncUserCustomClaims } from './customClaimsTrigger';
+import { executeBatchReleaseBackend, BatchReleaseCommandRequest } from './releaseFunction';
 
 // Khởi tạo Firebase Admin App
 if (!admin.apps.length) {
@@ -101,3 +102,20 @@ export const onUserRoleChanged = onValueWritten(
     await syncUserCustomClaims(uid, afterData, auth);
   }
 );
+
+/**
+ * 5. Callable Function: Phê duyệt Xuất xưởng Lô sản phẩm (Canonical Server Release Command)
+ *
+ * Single release authority in cloud functions with atomicity, idempotency, OCC, and audit.
+ */
+export const approveBatchRelease = onCall({ cors: true, timeoutSeconds: 60 }, async (request) => {
+  if (!request.auth) {
+    throw new HttpsError(
+      'unauthenticated',
+      'Yêu cầu xác thực tài khoản để thực hiện lệnh xuất xưởng.'
+    );
+  }
+
+  const data = request.data as BatchReleaseCommandRequest;
+  return executeBatchReleaseBackend(data, request.auth, db);
+});

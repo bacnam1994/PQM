@@ -1,7 +1,7 @@
 {
   "rules": {
     ".read": "auth != null && (auth.token.isAdmin === true || auth.token.role === 'ADMIN' || root.child('users/admins/' + auth.uid).exists() || root.child('users/' + auth.uid + '/role').val() === 'ADMIN')",
-    ".write": "auth != null && (auth.token.isAdmin === true || auth.token.role === 'ADMIN' || root.child('users/admins/' + auth.uid).exists() || root.child('users/' + auth.uid + '/role').val() === 'ADMIN')",
+    ".write": false,
 
     "users": {
       "admins": {
@@ -16,9 +16,17 @@
     },
 
     "audit_logs": {
+      ".read": "auth != null && (auth.token.isAdmin === true || auth.token.role === 'ADMIN' || auth.token.role === 'QA' || auth.token.role === 'QC' || root.child('users/admins/' + auth.uid).exists() || root.child('users/' + auth.uid + '/role').val() === 'ADMIN' || root.child('users/' + auth.uid + '/role').val() === 'QA' || root.child('users/' + auth.uid + '/role').val() === 'QC')",
+      ".indexOn": ["timestamp", "collection", "action"],
       "$log_id": {
-        ".write": "auth != null && !data.exists() && newData.exists() && (newData.hasChild('timestamp') || newData.hasChild('createdAt')) && (newData.child('actorId').val() === auth.uid || newData.child('performedBy').val() === auth.token.email || auth.token.isAdmin === true || auth.token.role === 'ADMIN' || root.child('users/admins/' + auth.uid).exists() || root.child('users/' + auth.uid + '/role').val() === 'ADMIN')"
+        ".write": false
       }
+    },
+
+    "release_commands": {
+      ".read": "auth != null && (auth.token.isAdmin === true || auth.token.role === 'ADMIN' || auth.token.role === 'QA' || root.child('users/admins/' + auth.uid).exists() || root.child('users/' + auth.uid + '/role').val() === 'ADMIN' || root.child('users/' + auth.uid + '/role').val() === 'QA')",
+      ".indexOn": ["batchId", "status", "createdAt"],
+      ".write": false
     },
 
     "products": {
@@ -33,7 +41,7 @@
       ".read": "auth != null",
       ".indexOn": ["createdAt", "status", "productId", "batchNo", "mfgDate"],
       "$item_id": {
-        ".write": "auth != null && (newData.child('status').val() !== 'RELEASED' || (newData.hasChild('releaseSignatures') && (newData.child('qualityStatus').val() === 'PASS' || data.child('qualityStatus').val() === 'PASS'))) && (auth.token.isAdmin === true || auth.token.role === 'ADMIN' || root.child('users/admins/' + auth.uid).exists() || root.child('users/' + auth.uid + '/role').val() === 'ADMIN' || (auth.token.role === 'QA' || root.child('users/' + auth.uid + '/role').val() === 'QA' ? ((!data.exists() && (!newData.hasChild('status') || newData.child('status').val() === 'PENDING')) || (data.exists() && (!newData.hasChild('status') || newData.child('status').val() === data.child('status').val() || (data.child('status').val() === 'PENDING' && (newData.child('status').val() === 'TESTING' || newData.child('status').val() === 'REJECTED')) || (data.child('status').val() === 'TESTING' && (newData.child('status').val() === 'RELEASED' || newData.child('status').val() === 'REJECTED' || newData.child('status').val() === 'BLOCKED')) || (data.child('status').val() === 'BLOCKED' && (newData.child('status').val() === 'TESTING' || newData.child('status').val() === 'REJECTED')) || (data.child('status').val() === 'REJECTED' && newData.child('status').val() === 'PENDING') || (data.child('status').val() === 'RELEASED' && newData.child('status').val() === 'BLOCKED')))) : ((auth.token.role === 'USER' || auth.token.role === 'PRODUCTION' || auth.token.role === 'LAB' || auth.token.role === 'QC' || root.child('users/' + auth.uid + '/role').val() === 'USER' || root.child('users/' + auth.uid + '/role').val() === 'PRODUCTION' || root.child('users/' + auth.uid + '/role').val() === 'LAB' || root.child('users/' + auth.uid + '/role').val() === 'QC') && newData.exists() && (!data.exists() ? (!newData.hasChild('status') || newData.child('status').val() === 'PENDING') : (data.child('status').val() !== 'RELEASED' && data.child('status').val() !== 'REJECTED' && data.child('status').val() !== 'BLOCKED' && newData.child('status').val() !== 'RELEASED' && newData.child('status').val() !== 'REJECTED' && (!newData.hasChild('status') || newData.child('status').val() === data.child('status').val() || (data.child('status').val() === 'PENDING' && newData.child('status').val() === 'TESTING')))))))"
+        ".write": "auth != null && newData.child('status').val() !== 'RELEASED' && (auth.token.isAdmin === true || auth.token.role === 'ADMIN' || root.child('users/admins/' + auth.uid).exists() || root.child('users/' + auth.uid + '/role').val() === 'ADMIN' || (auth.token.role === 'QA' || root.child('users/' + auth.uid + '/role').val() === 'QA' ? ((!data.exists() && (!newData.hasChild('status') || newData.child('status').val() === 'PENDING')) || (data.exists() && (!newData.hasChild('status') || newData.child('status').val() === data.child('status').val() || (data.child('status').val() === 'PENDING' && (newData.child('status').val() === 'TESTING' || newData.child('status').val() === 'REJECTED')) || (data.child('status').val() === 'TESTING' && (newData.child('status').val() === 'REJECTED' || newData.child('status').val() === 'BLOCKED')) || (data.child('status').val() === 'BLOCKED' && (newData.child('status').val() === 'TESTING' || newData.child('status').val() === 'REJECTED')) || (data.child('status').val() === 'REJECTED' && newData.child('status').val() === 'PENDING') || (data.child('status').val() === 'RELEASED' && newData.child('status').val() === 'BLOCKED')))) : ((auth.token.role === 'USER' || auth.token.role === 'PRODUCTION' || auth.token.role === 'LAB' || auth.token.role === 'QC' || root.child('users/' + auth.uid + '/role').val() === 'USER' || root.child('users/' + auth.uid + '/role').val() === 'PRODUCTION' || root.child('users/' + auth.uid + '/role').val() === 'LAB' || root.child('users/' + auth.uid + '/role').val() === 'QC') && newData.exists() && (!data.exists() ? (!newData.hasChild('status') || newData.child('status').val() === 'PENDING') : (data.child('status').val() !== 'RELEASED' && data.child('status').val() !== 'REJECTED' && data.child('status').val() !== 'BLOCKED' && newData.child('status').val() !== 'RELEASED' && newData.child('status').val() !== 'REJECTED' && (!newData.hasChild('status') || newData.child('status').val() === data.child('status').val() || (data.child('status').val() === 'PENDING' && newData.child('status').val() === 'TESTING')))))))"
       }
     },
 
@@ -110,9 +118,9 @@
 
     "electronic_signatures": {
       ".read": "auth != null && (auth.token.isAdmin === true || auth.token.role === 'ADMIN' || auth.token.role === 'QA' || auth.token.role === 'QC' || auth.token.role === 'USER' || root.child('users/admins/' + auth.uid).exists() || root.child('users/' + auth.uid + '/role').val() === 'ADMIN' || root.child('users/' + auth.uid + '/role').val() === 'QA' || root.child('users/' + auth.uid + '/role').val() === 'QC' || root.child('users/' + auth.uid + '/role').val() === 'USER')",
-      ".indexOn": ["documentId", "documentType", "signedAt"],
+      ".indexOn": ["documentId", "documentType", "signedAt", "status"],
       "$sig_id": {
-        ".write": "auth != null && !data.exists() && newData.exists() && (newData.child('signerUid').val() === auth.uid || newData.child('signerId').val() === auth.uid || newData.child('signerEmail').val() === auth.token.email || auth.token.isAdmin === true || auth.token.role === 'ADMIN' || root.child('users/admins/' + auth.uid).exists() || root.child('users/' + auth.uid + '/role').val() === 'ADMIN')"
+        ".write": "auth != null && !data.exists() && newData.exists() && (!newData.hasChild('status') || newData.child('status').val() === 'CREATED') && (newData.child('signerUid').val() === auth.uid || newData.child('signerId').val() === auth.uid || newData.child('signerEmail').val() === auth.token.email || auth.token.isAdmin === true || auth.token.role === 'ADMIN' || root.child('users/admins/' + auth.uid).exists() || root.child('users/' + auth.uid + '/role').val() === 'ADMIN') && newData.hasChild('documentId') && newData.hasChild('documentType') && newData.hasChild('checksum')"
       }
     },
 
