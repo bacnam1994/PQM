@@ -84,5 +84,11 @@ export default defineConfig({
     command: 'npm run dev',
     url: 'http://localhost:5173',
     reuseExistingServer: !process.env.CI,
+    timeout: 120000,
+    env: {
+      VITE_E2E: 'true',
+      VITE_FIREBASE_API_KEY:
+        process.env.VITE_FIREBASE_API_KEY || 'AIzaSyTestSafeMockApiKeyForVitest001',
+    },
   },
 });

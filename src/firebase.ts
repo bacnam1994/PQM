@@ -5,12 +5,19 @@ import { getStorage, connectStorageEmulator } from 'firebase/storage';
 
 const isTestEnv =
   import.meta.env.MODE === 'test' ||
+  import.meta.env.VITE_E2E === 'true' ||
+  Boolean(import.meta.env.VITE_MOCK_AUTH) ||
+  (typeof window !== 'undefined' &&
+    (Boolean((window as any).__PLAYWRIGHT_TEST__) ||
+      Boolean(localStorage.getItem('pqm_dev_mock_auth')))) ||
   (typeof process !== 'undefined' &&
-    (process.env.NODE_ENV === 'test' || Boolean(process.env.VITEST)));
+    (process.env.NODE_ENV === 'test' || Boolean(process.env.VITEST) || Boolean(process.env.CI)));
 
-const apiKey = import.meta.env.VITE_FIREBASE_API_KEY;
+const apiKey =
+  import.meta.env.VITE_FIREBASE_API_KEY ||
+  (isTestEnv || import.meta.env.DEV ? 'AIzaSyTestSafeMockApiKeyForVitest001' : '');
 
-if (!apiKey && !isTestEnv) {
+if (!apiKey && import.meta.env.PROD) {
   throw new Error(
     'Firebase initialization failed: VITE_FIREBASE_API_KEY is not defined. ' +
       'Please check your .env configuration or environment variables.'
@@ -21,20 +28,20 @@ const firebaseConfig = {
   apiKey: apiKey || (isTestEnv ? 'AIzaSyTestSafeMockApiKeyForVitest001' : ''),
   authDomain:
     import.meta.env.VITE_FIREBASE_AUTH_DOMAIN ||
-    (isTestEnv ? 'v-biotech-test.firebaseapp.com' : ''),
+    (isTestEnv ? 'v-biotech-test.firebaseapp.com' : 'v-biotech.firebaseapp.com'),
   databaseURL:
     import.meta.env.VITE_FIREBASE_DATABASE_URL ||
-    (isTestEnv ? 'https://v-biotech-test-default-rtdb.firebaseio.com' : ''),
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || (isTestEnv ? 'v-biotech-test' : ''),
+    (isTestEnv
+      ? 'https://v-biotech-test-default-rtdb.firebaseio.com'
+      : 'https://v-biotech-default-rtdb.firebaseio.com'),
+  projectId:
+    import.meta.env.VITE_FIREBASE_PROJECT_ID || (isTestEnv ? 'v-biotech-test' : 'v-biotech'),
   storageBucket:
     import.meta.env.VITE_FIREBASE_STORAGE_BUCKET ||
-    (isTestEnv ? 'v-biotech-test.firebasestorage.app' : ''),
-  messagingSenderId:
-    import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || (isTestEnv ? '1089547502816' : ''),
-  appId:
-    import.meta.env.VITE_FIREBASE_APP_ID ||
-    (isTestEnv ? '1:1089547502816:web:testmockappid0001' : ''),
-  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || (isTestEnv ? 'G-BP6DWC5QP1' : ''),
+    (isTestEnv ? 'v-biotech-test.firebasestorage.app' : 'v-biotech.firebasestorage.app'),
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || '1089547502816',
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || '1:1089547502816:web:testmockappid0001',
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || 'G-BP6DWC5QP1',
 };
 
 // Khởi tạo Firebase App (tái sử dụng nếu đã khởi tạo)

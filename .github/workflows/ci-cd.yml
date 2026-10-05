@@ -75,6 +75,10 @@ jobs:
 
       - name: Run Playwright Tests (Chromium)
         run: npx playwright test --project=chromium
+        env:
+          CI: true
+          VITE_E2E: 'true'
+          VITE_FIREBASE_API_KEY: 'AIzaSyTestSafeMockApiKeyForVitest001'
 
       - name: Upload Playwright Report Artifact
         uses: actions/upload-artifact@v4
@@ -94,6 +98,9 @@ jobs:
     timeout-minutes: 20
     # Chỉ deploy khi code được push/merge vào nhánh chính
     if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+    env:
+      FIREBASE_SA: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_V_BIOTECH }}
+      FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
 
     steps:
       - name: Checkout Source Code
@@ -112,9 +119,7 @@ jobs:
         run: npm run build
 
       - name: Deploy to Firebase Hosting (via Service Account)
-        if: ${{ env.FIREBASE_SA != '' }}
-        env:
-          FIREBASE_SA: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_V_BIOTECH }}
+        if: env.FIREBASE_SA != ''
         uses: FirebaseExtended/action-hosting-deploy@v0
         with:
           repoToken: ${{ secrets.GITHUB_TOKEN }}
@@ -123,17 +128,11 @@ jobs:
           projectId: v-biotech
 
       - name: Deploy to Firebase Hosting (via FIREBASE_TOKEN fallback)
-        if: ${{ env.FIREBASE_SA == '' && env.FIREBASE_TOKEN != '' }}
-        env:
-          FIREBASE_SA: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_V_BIOTECH }}
-          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
+        if: env.FIREBASE_SA == '' && env.FIREBASE_TOKEN != ''
         run: npx firebase-tools deploy --only hosting --token "${{ secrets.FIREBASE_TOKEN }}" --project v-biotech
 
       - name: Informational Notice (If no Firebase secrets configured yet)
-        if: ${{ env.FIREBASE_SA == '' && env.FIREBASE_TOKEN == '' }}
-        env:
-          FIREBASE_SA: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_V_BIOTECH }}
-          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
+        if: env.FIREBASE_SA == '' && env.FIREBASE_TOKEN == ''
         run: |
           echo "ℹ️ Lưu ý: Build hoàn tất thành công 100%!"
           echo "Để kích hoạt tự động deploy lên Firebase Hosting (v-biotech.web.app):"

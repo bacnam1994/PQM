@@ -10,6 +10,7 @@ export async function setupTestPage(page: Page): Promise<void> {
   // 1. Tự động set cookie, consent và mock auth để không bị banner che khuất UI
   await page.addInitScript(() => {
     try {
+      (window as any).__PLAYWRIGHT_TEST__ = true;
       document.cookie = 'pqm_cookie_consent=ACCEPTED;path=/;max-age=31536000';
       localStorage.setItem('pqm_cookie_consent', 'ACCEPTED');
       localStorage.setItem('pqm_dev_mock_auth', 'admin@example.com');
@@ -20,6 +21,12 @@ export async function setupTestPage(page: Page): Promise<void> {
 
   // 2. Điều hướng tới ứng dụng
   await page.goto('/');
+
+  // Đợi app-loader biến mất nếu có
+  await page
+    .locator('#app-loader')
+    .waitFor({ state: 'detached', timeout: 15000 })
+    .catch(() => {});
 
   // Đóng cookie banner nếu vẫn hiện
   const acceptCookieBtn = page.getByRole('button', { name: /Chấp nhận tất cả/i });

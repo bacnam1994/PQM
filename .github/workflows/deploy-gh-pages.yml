@@ -1,7 +1,0 @@
-## Quy trình sao lưu code lên GitHub
-# Workflow này chỉ để tham khảo – KHÔNG deploy.
-# Hosting thực tế dùng Firebase: firebase deploy --only hosting
-#
-# Để deploy thủ công:
-#   npm run build
-#   firebase deploy --only hosting

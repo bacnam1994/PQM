@@ -6,7 +6,7 @@ import {
   updatePassword,
   reauthenticateWithCredential,
   EmailAuthProvider,
-  sendPasswordResetEmail
+  sendPasswordResetEmail,
 } from 'firebase/auth';
 import { ref, set as firebaseSet } from 'firebase/database';
 import { db } from '../../firebase';
@@ -16,27 +16,27 @@ export const createAuthSlice: StoreSlice<AuthSlice> = (set, get) => ({
   // --- INITIAL AUTH STATE ---
   user:
     typeof window !== 'undefined' &&
-    import.meta.env.DEV &&
+    (import.meta.env.DEV || import.meta.env.VITE_E2E === 'true') &&
     localStorage.getItem('pqm_dev_mock_auth') === 'admin@example.com'
       ? ({
           uid: 'e2e-test-admin',
           email: 'admin@example.com',
-          displayName: 'Admin Test'
+          displayName: 'Admin Test',
         } as any)
       : null,
   isAdmin:
     typeof window !== 'undefined' &&
-    import.meta.env.DEV &&
+    (import.meta.env.DEV || import.meta.env.VITE_E2E === 'true') &&
     localStorage.getItem('pqm_dev_mock_auth') === 'admin@example.com',
   role:
     typeof window !== 'undefined' &&
-    import.meta.env.DEV &&
+    (import.meta.env.DEV || import.meta.env.VITE_E2E === 'true') &&
     localStorage.getItem('pqm_dev_mock_auth') === 'admin@example.com'
       ? 'ADMIN'
       : null,
   authLoading:
     typeof window !== 'undefined' &&
-    import.meta.env.DEV &&
+    (import.meta.env.DEV || import.meta.env.VITE_E2E === 'true') &&
     localStorage.getItem('pqm_dev_mock_auth') === 'admin@example.com'
       ? false
       : true,
@@ -48,7 +48,7 @@ export const createAuthSlice: StoreSlice<AuthSlice> = (set, get) => ({
         if (!user) return { user: null };
         const u = user as any;
         const role = u.role || state.role || (state.isAdmin ? 'ADMIN' : null);
-        const isAdmin = u.isAdmin !== undefined ? u.isAdmin : (state.isAdmin || role === 'ADMIN');
+        const isAdmin = u.isAdmin !== undefined ? u.isAdmin : state.isAdmin || role === 'ADMIN';
         return {
           user: {
             ...user,
@@ -68,7 +68,7 @@ export const createAuthSlice: StoreSlice<AuthSlice> = (set, get) => ({
           ? {
               ...state.user,
               isAdmin,
-              role: isAdmin ? 'ADMIN' : (state.user.role || state.role || 'GUEST'),
+              role: isAdmin ? 'ADMIN' : state.user.role || state.role || 'GUEST',
             }
           : null,
       }),
@@ -101,7 +101,10 @@ export const createAuthSlice: StoreSlice<AuthSlice> = (set, get) => ({
       await signInWithEmailAndPassword(getAuth(), email, password);
     } catch (err: any) {
       // Hỗ trợ kiểm thử E2E Playwright trên môi trường DEV cục bộ và CI
-      if (import.meta.env.DEV && email === 'admin@example.com') {
+      if (
+        (import.meta.env.DEV || import.meta.env.VITE_E2E === 'true') &&
+        email === 'admin@example.com'
+      ) {
         if (typeof window !== 'undefined') {
           localStorage.setItem('pqm_dev_mock_auth', 'admin@example.com');
         }
@@ -109,7 +112,7 @@ export const createAuthSlice: StoreSlice<AuthSlice> = (set, get) => ({
           uid: 'e2e-test-admin',
           email: 'admin@example.com',
           displayName: 'Admin Test',
-          photoURL: ''
+          photoURL: '',
         } as any;
         set(
           { user: mockUser, role: 'ADMIN', authLoading: false, isAdmin: true },
@@ -135,16 +138,12 @@ export const createAuthSlice: StoreSlice<AuthSlice> = (set, get) => ({
 
   signup: async (email, password) => {
     try {
-      const userCredential = await createUserWithEmailAndPassword(
-        getAuth(),
-        email,
-        password
-      );
+      const userCredential = await createUserWithEmailAndPassword(getAuth(), email, password);
       const user = userCredential.user;
       await firebaseSet(ref(db, `users/${user.uid}`), {
         email: user.email,
         role: 'GUEST',
-        createdAt: new Date().toISOString()
+        createdAt: new Date().toISOString(),
       });
       set({ user, role: 'GUEST', authLoading: false }, false, 'signup');
     } catch (error) {
@@ -159,11 +158,8 @@ export const createAuthSlice: StoreSlice<AuthSlice> = (set, get) => ({
     if (!currentUser || !currentUser.email) {
       throw new Error('Không tìm thấy thông tin người dùng đang đăng nhập.');
     }
-    const credential = EmailAuthProvider.credential(
-      currentUser.email,
-      currentPassword
-    );
+    const credential = EmailAuthProvider.credential(currentUser.email, currentPassword);
     await reauthenticateWithCredential(currentUser, credential);
     await updatePassword(currentUser, newPassword);
-  }
+  },
 });
