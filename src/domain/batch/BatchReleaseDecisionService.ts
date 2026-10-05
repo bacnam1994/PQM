@@ -62,6 +62,7 @@ export interface BatchReleaseDecision {
   requiredRole: UserRole[];
   dataFreshness: DataFreshnessState;
   decisionTrace: string[];
+  readyForSignature?: boolean;
 }
 
 export interface ResolveBatchReleaseDecisionParams {
@@ -245,9 +246,9 @@ export class BatchReleaseDecisionService {
     params: Omit<ResolveBatchReleaseDecisionParams, 'isPreview'>
   ): BatchReleaseDecision {
     if (params.batch?.status === 'RELEASED') {
-      return this.getReleasedCanonicalSnapshot(params.batch);
+      return BatchReleaseDecisionService.getReleasedCanonicalSnapshot(params.batch);
     }
-    return this.evaluateReleaseEligibility({
+    return BatchReleaseDecisionService.evaluateReleaseEligibility({
       ...params,
       isPreview: true,
     });
@@ -484,13 +485,24 @@ export class BatchReleaseDecisionService {
     });
 
     // GATE 5: CAPA đã hoàn thành
+    const unfulfilledCapaDevs = batchDeviations.filter((d: any) => {
+      if (d.capaRequired && !d.capaCompleted) return true;
+      if (d.capaStatus && !['COMPLETED', 'VERIFIED', 'CLOSED'].includes(d.capaStatus)) return true;
+      const unclosedItems = (d.capaItems || []).filter(
+        (c: any) => c && c.status !== 'COMPLETED' && c.status !== 'VERIFIED'
+      );
+      return unclosedItems.length > 0;
+    });
+
     const openCapas = batchDeviations.flatMap((d) =>
       (d.capaItems || []).filter((c) => c && c.status !== 'COMPLETED' && c.status !== 'VERIFIED')
     );
-    const gate5Passed = openCapas.length === 0;
+    const hasUnfulfilledCapa = unfulfilledCapaDevs.length > 0 || openCapas.length > 0;
+    const gate5Passed = !hasUnfulfilledCapa;
     const gate5Blockers: string[] = [];
     if (!gate5Passed) {
-      const msg = `ERR_CAPA_PENDING: Còn ${openCapas.length} hành động khắc phục CAPA chưa hoàn thành.`;
+      const count = Math.max(unfulfilledCapaDevs.length, openCapas.length);
+      const msg = `ERR_CAPA_BLOCKING: ERR_CAPA_PENDING: Còn ${count} hành động khắc phục CAPA chưa hoàn thành hoặc chưa được nghiệm thu.`;
       gate5Blockers.push(msg);
       blockers.push(msg);
     }
@@ -500,7 +512,9 @@ export class BatchReleaseDecisionService {
       gateName: 'Hồ sơ CAPA (Không có CAPA mở)',
       passed: gate5Passed,
       status: gate5Passed ? 'PASS' : 'BLOCKED',
-      details: gate5Passed ? 'Không có CAPA mở' : `Còn ${openCapas.length} CAPA mở`,
+      details: gate5Passed
+        ? 'Không có CAPA mở'
+        : `Còn ${Math.max(unfulfilledCapaDevs.length, openCapas.length)} CAPA mở`,
       blockers: gate5Blockers,
     });
 
@@ -529,8 +543,8 @@ export class BatchReleaseDecisionService {
       details: gate6Passed
         ? `BPR đã duyệt bởi ${batch.bprReviewedBy || 'QA'}`
         : bprStatus === 'UNDER_REVIEW'
-          ? 'Đang thẩm định BPR'
-          : 'BPR chưa được phê duyệt',
+          ? 'Đang thẩm định BPR (ERR_BPR_UNDER_REVIEW)'
+          : 'BPR chưa được phê duyệt (ERR_BPR_NOT_APPROVED)',
       blockers: gate6Blockers,
     });
 
@@ -753,13 +767,17 @@ export class BatchReleaseDecisionService {
     // 5. Kết luận tính đủ điều kiện xuất xưởng (Eligible)
     const allGatesPassed = gates.every((g) => g.passed);
     const eligible = allGatesPassed && blockers.length === 0;
+    const gates1To6Passed = gates.slice(0, 6).every((g) => g.passed);
+    const readyForSignature =
+      gates1To6Passed && blockers.length === 0 && batch.status !== 'RELEASED';
 
     decisionTrace.push(
-      `[DECISION] Kết luận: ${eligible ? 'ĐỦ ĐIỀU KIỆN (ELIGIBLE)' : 'KHÔNG ĐỦ ĐIỀU KIỆN (BLOCKED)'}. Số rào cản: ${blockers.length}.`
+      `[DECISION] Kết luận: ${eligible ? 'ĐỦ ĐIỀU KIỆN (ELIGIBLE)' : 'KHÔNG ĐỦ ĐIỀU KIỆN (BLOCKED)'}. Số rào cản: ${blockers.length}. Sẵn sàng ký: ${readyForSignature}.`
     );
 
     return {
       eligible,
+      readyForSignature,
       batchId,
       batchNo,
       currentStatus,
@@ -786,10 +804,11 @@ export class BatchReleaseDecisionService {
     params: ResolveBatchReleaseDecisionParams
   ): BatchReleaseDecision {
     if (params.batch?.status === 'RELEASED') {
-      return this.getReleasedCanonicalSnapshot(params.batch);
+      return BatchReleaseDecisionService.getReleasedCanonicalSnapshot(params.batch);
     }
-    return this.evaluateReleaseEligibility(params);
+    return BatchReleaseDecisionService.evaluateReleaseEligibility(params);
   }
 }
 
-export const resolveBatchReleaseDecision = BatchReleaseDecisionService.resolveBatchReleaseDecision;
+export const resolveBatchReleaseDecision =
+  BatchReleaseDecisionService.resolveBatchReleaseDecision.bind(BatchReleaseDecisionService);
