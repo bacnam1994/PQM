@@ -18,7 +18,7 @@ import {
   buildEvaluationSnapshot,
   validateEvaluationSnapshot,
 } from '../../src/domain/evaluation/EvaluationSnapshotBuilder';
-import { BatchRules } from '../../src/domain/rules/batchRules';
+import { BatchRules } from '../../src/domain/rules/BatchRules';
 import { BatchStateMachine } from '../../src/domain/workflow/stateMachine';
 
 describe('End-to-End Business Scenarios (S-001 -> S-006)', () => {

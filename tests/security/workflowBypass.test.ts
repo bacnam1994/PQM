@@ -12,7 +12,7 @@ import { AutoHealingFramework, HealingPlan } from '../../src/domain/healing/auto
 import {
   buildEvaluationSnapshot,
   validateEvaluationSnapshot,
-} from '../../src/domain/evaluation/evaluationSnapshotBuilder';
+} from '../../src/domain/evaluation/EvaluationSnapshotBuilder';
 import { saveItem, updateBatchStatusService } from '../../src/services/databaseService';
 import { Batch } from '../../src/types/batch';
 import { TestResult } from '../../src/types/testResult';

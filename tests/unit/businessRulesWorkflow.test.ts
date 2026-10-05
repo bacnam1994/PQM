@@ -26,7 +26,7 @@ import {
 } from '../../src/domain/workflow/criterionStateMachine';
 import { OverallResultEvaluator } from '../../src/domain/evaluation/OverallResultEvaluator';
 import { buildEvaluationSnapshot } from '../../src/domain/evaluation/EvaluationSnapshotBuilder';
-import { BatchRules } from '../../src/domain/rules/batchRules';
+import { BatchRules } from '../../src/domain/rules/BatchRules';
 
 describe('BR-ALT-001: FAIL_RETRY Workflow Verification', () => {
   const failRetryRule: AlternateRule = {
