@@ -36,6 +36,18 @@ export class SecurityRulesValidator {
       return { allowed: false, reason: 'Chưa xác thực: Yêu cầu đăng nhập để truy cập tài nguyên.' };
     }
 
+    // 1.5. Tài khoản GUEST: chỉ được đọc /users/ chính mình, cấm đọc mọi dữ liệu chất lượng sản xuất
+    if (user.role === 'GUEST') {
+      const segments = resourcePath.split('/');
+      if (segments[0] === 'users' && segments[1] === user.uid && action === 'READ') {
+        return { allowed: true };
+      }
+      return {
+        allowed: false,
+        reason: 'Tài khoản GUEST chưa được phê duyệt quyền truy cập dữ liệu chất lượng sản xuất.',
+      };
+    }
+
     // 2. ADMIN có toàn quyền
     if (user.isAdmin || user.role === 'ADMIN') {
       // Ngoại lệ 1 của ADMIN: Không được UPDATE hoặc DELETE Audit Trail (Quy định ALCOA+ bất biến)
@@ -63,6 +75,17 @@ export class SecurityRulesValidator {
 
     const segments = resourcePath.split('/');
     const rootCollection = segments[0];
+
+    // Chốt chặn máy chủ (Server-Only Collections): Cấm client tự ý ghi
+    if (
+      (rootCollection === 'release_commands' || rootCollection === 'electronic_signatures') &&
+      action !== 'READ'
+    ) {
+      return {
+        allowed: false,
+        reason: `Server-Only Collection: Thao tác ghi trên '${rootCollection}' chỉ được thực hiện thông qua Cloud Function máy chủ.`,
+      };
+    }
 
     // 3. Ràng buộc Audit Trail
     if (rootCollection === 'audit_logs') {
@@ -108,16 +131,32 @@ export class SecurityRulesValidator {
     }
 
     // 5. Ràng buộc Sản phẩm & Danh mục Master Data
-    if (
-      rootCollection === 'products' ||
-      rootCollection === 'raw_materials' ||
-      rootCollection === 'product_formulas'
-    ) {
+    if (rootCollection === 'products' || rootCollection === 'raw_materials') {
       if (action === 'READ') return { allowed: true };
       if (user.role === 'QA') return { allowed: true };
       return {
         allowed: false,
         reason: 'Chỉ QA hoặc Admin mới có quyền sửa đổi dữ liệu sản phẩm / danh mục.',
+      };
+    }
+
+    // 5.1. Ràng buộc Công thức Sản phẩm (Bảo mật công nghệ/IP)
+    if (rootCollection === 'product_formulas') {
+      if (action === 'READ') {
+        const canReadFormula =
+          user.isAdmin || user.role === 'QA' || user.role === 'QC' || user.role === 'PRODUCTION';
+        if (!canReadFormula) {
+          return {
+            allowed: false,
+            reason: 'Chỉ QA, QC, Sản xuất hoặc Admin mới có quyền truy cập công thức sản phẩm.',
+          };
+        }
+        return { allowed: true };
+      }
+      if (user.role === 'QA') return { allowed: true };
+      return {
+        allowed: false,
+        reason: 'Chỉ QA hoặc Admin mới có quyền sửa đổi công thức sản phẩm.',
       };
     }
 
@@ -275,13 +314,6 @@ export class SecurityRulesValidator {
 
     // 9. Ràng buộc Cảnh báo chất lượng (Quality Alerts)
     if (rootCollection === 'quality_alerts') {
-      if (action === 'READ') return { allowed: true };
-      if (user.role === 'GUEST') {
-        return {
-          allowed: false,
-          reason: 'Tài khoản GUEST không có quyền tạo hoặc cập nhật cảnh báo chất lượng.',
-        };
-      }
       return { allowed: true };
     }
 

@@ -51,6 +51,32 @@ describe('Security Rules Static Audit - PQM 3.0', () => {
       expect(testResultWriteRule).toBeDefined();
       expect(testResultWriteRule).toContain('QA');
     });
+
+    it('should enforce server-only write protection on electronic_signatures (Phase 4 Hardening)', () => {
+      const content = fs.readFileSync(dbRulesPath, 'utf8');
+      const rules = JSON.parse(content).rules;
+      const sigWriteRule = rules.electronic_signatures['$sig_id']['.write'];
+
+      expect(sigWriteRule).toBe(false);
+    });
+
+    it('should enforce server-only write protection on release_commands', () => {
+      const content = fs.readFileSync(dbRulesPath, 'utf8');
+      const rules = JSON.parse(content).rules;
+      const cmdWriteRule = rules.release_commands['$cmd_id']['.write'];
+
+      expect(cmdWriteRule).toBe(false);
+    });
+
+    it('should restrict READ rules on batches and product_formulas to prevent GUEST / unauthorized access', () => {
+      const content = fs.readFileSync(dbRulesPath, 'utf8');
+      const rules = JSON.parse(content).rules;
+
+      expect(rules.batches['.read']).toContain('GUEST');
+      expect(rules.testResults['.read']).toContain('GUEST');
+      expect(rules.product_formulas['.read']).toContain('PRODUCTION');
+      expect(rules.quality_deviations['.read']).toContain('PRODUCTION');
+    });
   });
 
   describe('2. Firebase Storage Rules Validation', () => {

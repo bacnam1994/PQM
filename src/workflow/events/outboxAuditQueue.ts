@@ -41,6 +41,18 @@ export interface OutboxAuditEvent {
 
 const STORAGE_KEY = 'pqm_durable_audit_outbox_v1';
 
+const isTestEnv =
+  (typeof process !== 'undefined' &&
+    (process.env.NODE_ENV === 'test' || Boolean(process.env.VITEST))) ||
+  (typeof import.meta !== 'undefined' && (import.meta as any).env?.MODE === 'test');
+
+const hasDatabaseEmulator =
+  (typeof process !== 'undefined' && Boolean(process.env.FIREBASE_DATABASE_EMULATOR_HOST)) ||
+  (typeof import.meta !== 'undefined' &&
+    Boolean((import.meta as any).env?.VITE_FIREBASE_DATABASE_EMULATOR_HOST));
+
+const shouldPersistRemoteOutbox = !isTestEnv || hasDatabaseEmulator;
+
 export class OutboxAuditQueue {
   private static inMemoryQueue: OutboxAuditEvent[] = [];
   private static committedEventIds = new Set<string>();
@@ -133,7 +145,7 @@ export class OutboxAuditQueue {
 
     // Persist to Firebase RTDB outbox table if online
     try {
-      if (db && typeof ref === 'function') {
+      if (shouldPersistRemoteOutbox && db && typeof ref === 'function') {
         const outboxRef = ref(db, `audit_outbox/${event.eventId.replace(/[.#$[\]]/g, '_')}`);
         await set(outboxRef, eventWithState);
       }
@@ -154,7 +166,7 @@ export class OutboxAuditQueue {
       this.saveToStorage();
     }
     try {
-      if (db && typeof ref === 'function') {
+      if (shouldPersistRemoteOutbox && db && typeof ref === 'function') {
         const outboxRef = ref(db, `audit_outbox/${eventId.replace(/[.#$[\]]/g, '_')}`);
         await update(outboxRef, { state: 'FAILED', lastError: error });
       }
@@ -211,7 +223,7 @@ export class OutboxAuditQueue {
 
         // Update Firebase outbox status
         try {
-          if (db && typeof ref === 'function') {
+          if (shouldPersistRemoteOutbox && db && typeof ref === 'function') {
             const outboxRef = ref(db, `audit_outbox/${event.eventId.replace(/[.#$[\]]/g, '_')}`);
             await update(outboxRef, { state: 'COMMITTED' });
           }
@@ -237,7 +249,7 @@ export class OutboxAuditQueue {
     this.saveToStorage();
 
     try {
-      if (db && typeof ref === 'function') {
+      if (shouldPersistRemoteOutbox && db && typeof ref === 'function') {
         const outboxRef = ref(db, `audit_outbox/${event.eventId.replace(/[.#$[\]]/g, '_')}`);
         await update(outboxRef, {
           state: 'RETRYING',

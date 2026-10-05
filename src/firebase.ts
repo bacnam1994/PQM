@@ -1,7 +1,7 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
-import { getDatabase, goOnline, goOffline } from 'firebase/database';
-import { getStorage } from 'firebase/storage';
+import { getAuth, connectAuthEmulator } from 'firebase/auth';
+import { getDatabase, goOnline, goOffline, connectDatabaseEmulator } from 'firebase/database';
+import { getStorage, connectStorageEmulator } from 'firebase/storage';
 
 const isTestEnv =
   import.meta.env.MODE === 'test' ||
@@ -24,7 +24,7 @@ const firebaseConfig = {
     (isTestEnv ? 'v-biotech-test.firebaseapp.com' : ''),
   databaseURL:
     import.meta.env.VITE_FIREBASE_DATABASE_URL ||
-    (isTestEnv ? 'https://v-biotech-default-rtdb.asia-southeast1.firebasedatabase.app' : ''),
+    (isTestEnv ? 'https://v-biotech-test-default-rtdb.firebaseio.com' : ''),
   projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || (isTestEnv ? 'v-biotech-test' : ''),
   storageBucket:
     import.meta.env.VITE_FIREBASE_STORAGE_BUCKET ||
@@ -44,6 +44,44 @@ const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const db = getDatabase(app);
 export const storage = getStorage(app);
+
+// Cấu hình kết nối Emulator hoặc cách ly môi trường kiểm thử
+const rtdbHost =
+  (typeof process !== 'undefined' && process.env.FIREBASE_DATABASE_EMULATOR_HOST) ||
+  import.meta.env.VITE_FIREBASE_DATABASE_EMULATOR_HOST;
+const authHost =
+  (typeof process !== 'undefined' && process.env.FIREBASE_AUTH_EMULATOR_HOST) ||
+  import.meta.env.VITE_FIREBASE_AUTH_EMULATOR_HOST;
+const storageHost =
+  (typeof process !== 'undefined' && process.env.FIREBASE_STORAGE_EMULATOR_HOST) ||
+  import.meta.env.VITE_FIREBASE_STORAGE_EMULATOR_HOST;
+
+if (rtdbHost) {
+  const [host, port] = rtdbHost.split(':');
+  try {
+    connectDatabaseEmulator(db, host, Number(port) || 9000);
+  } catch {
+    // Emulator đã được gắn trước đó
+  }
+}
+
+if (authHost) {
+  try {
+    connectAuthEmulator(auth, `http://${authHost}`, { disableWarnings: true });
+  } catch {
+    // Emulator đã được gắn trước đó
+  }
+}
+
+if (storageHost) {
+  const [host, port] = storageHost.split(':');
+  try {
+    connectStorageEmulator(storage, host, Number(port) || 9199);
+  } catch {
+    // Emulator đã được gắn trước đó
+  }
+}
+
 export const reconnectDatabase = () => goOnline(db);
 export const disconnectDatabase = () => goOffline(db);
 export default app;

@@ -12,12 +12,12 @@ concurrency:
 
 jobs:
   # ─────────────────────────────────────────────────────────────
-  # JOB 1: Chạy toàn bộ Unit Tests với Vitest
+  # JOB 1: Typecheck, Functions Build, Security Rules & Unit Tests
   # ─────────────────────────────────────────────────────────────
-  unit-tests:
-    name: Unit Tests (Vitest)
+  quality-gate:
+    name: Quality Gate & Verification (Typecheck, Functions, Security Rules & Vitest)
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
 
     steps:
       - name: Checkout Source Code
@@ -29,10 +29,23 @@ jobs:
           node-version: 20
           cache: 'npm'
 
-      - name: Install Dependencies
+      - name: Install Root Dependencies
         run: npm ci
 
-      - name: Run Vitest Suite (116+ tests)
+      - name: TypeScript Typecheck (Frontend & Shared Engine)
+        run: npm run typecheck
+
+      - name: Build & Typecheck Cloud Functions
+        run: |
+          cd functions
+          npm ci
+          npm run build
+          cd ..
+
+      - name: Run Firebase Rules & Security Access Tests
+        run: npx vitest run src/services/rulesAudit.test.ts src/services/securityRulesValidator.test.ts tests/security/firebaseRulesSecurity.test.ts
+
+      - name: Run Full Vitest Suite (1889+ tests)
         run: npm run test -- --run
 
   # ─────────────────────────────────────────────────────────────
@@ -40,7 +53,7 @@ jobs:
   # ─────────────────────────────────────────────────────────────
   e2e-tests:
     name: End-to-End Tests (Playwright)
-    needs: unit-tests
+    needs: quality-gate
     runs-on: ubuntu-latest
     timeout-minutes: 25
 
@@ -76,7 +89,7 @@ jobs:
   # ─────────────────────────────────────────────────────────────
   build-and-deploy:
     name: Build & Deploy to Firebase Hosting
-    needs: [unit-tests, e2e-tests]
+    needs: [quality-gate, e2e-tests]
     runs-on: ubuntu-latest
     timeout-minutes: 20
     # Chỉ deploy khi code được push/merge vào nhánh chính

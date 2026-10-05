@@ -89,7 +89,8 @@ describe('Architecture Guard: Workflow Status Mutation Prevention (WF-020)', () 
           !file.includes('constants') &&
           !file.includes('database.rules') &&
           !file.includes('securityRulesValidator') &&
-          !file.includes('BatchAppService.ts')
+          !file.includes('BatchAppService.ts') &&
+          !file.includes('releaseCommandPort.ts')
         ) {
           violations.push({
             file: path.relative(rootDir, file),

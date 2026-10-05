@@ -13,6 +13,10 @@ import { runAutoHealDatabase } from './autoHealCron';
 import { generateQualityReportBackend, QualityReportRequest } from './reportFunction';
 import { syncUserCustomClaims } from './customClaimsTrigger';
 import { executeBatchReleaseBackend, BatchReleaseCommandRequest } from './releaseFunction';
+import {
+  executeCreateElectronicSignatureBackend,
+  CreateSignatureServerRequest,
+} from './signatureFunction';
 
 // Khởi tạo Firebase Admin App
 if (!admin.apps.length) {
@@ -119,3 +123,24 @@ export const approveBatchRelease = onCall({ cors: true, timeoutSeconds: 60 }, as
   const data = request.data as BatchReleaseCommandRequest;
   return executeBatchReleaseBackend(data, request.auth, db);
 });
+
+/**
+ * 6. Callable Function: Tạo Chữ ký Điện tử (Canonical Server-Side Electronic Signature)
+ *
+ * Implements technical controls aligned with FDA 21 CFR Part 11 & GMP-WHO Annex 11 principles.
+ * Verifies session freshness, enforces RBAC, computes NIST SHA-256 checksum, and writes to DB server-side.
+ */
+export const requestElectronicSignature = onCall(
+  { cors: true, timeoutSeconds: 30 },
+  async (request) => {
+    if (!request.auth) {
+      throw new HttpsError(
+        'unauthenticated',
+        'Yêu cầu đăng nhập để thực hiện ký điện tử có giá trị pháp lý.'
+      );
+    }
+
+    const data = request.data as CreateSignatureServerRequest;
+    return executeCreateElectronicSignatureBackend(data, request.auth, db);
+  }
+);

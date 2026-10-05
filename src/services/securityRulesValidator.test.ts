@@ -351,4 +351,88 @@ describe('TASK-005: Security Rules Verification Suite', () => {
       expect(adminResult.reason).toContain('GAP-07');
     });
   });
+
+  describe('8. Hardened Security Baseline — Role-Scoped READ & Server-Only Collections', () => {
+    it('chặn tài khoản GUEST đọc batches, testResults, products, quality_deviations', () => {
+      const collections = [
+        'batches/b1',
+        'testResults/tr1',
+        'products/p1',
+        'quality_deviations/dev1',
+        'quality_alerts/alert1',
+      ];
+      for (const col of collections) {
+        const result = SecurityRulesValidator.evaluate(guestUser, 'READ', col);
+        expect(result.allowed).toBe(false);
+        expect(result.reason).toContain('Tài khoản GUEST chưa được phê duyệt');
+      }
+    });
+
+    it('cho phép tài khoản GUEST chỉ đọc profile của chính mình (/users/$uid)', () => {
+      const selfResult = SecurityRulesValidator.evaluate(
+        guestUser,
+        'READ',
+        `users/${guestUser.uid}`
+      );
+      expect(selfResult.allowed).toBe(true);
+
+      const otherResult = SecurityRulesValidator.evaluate(guestUser, 'READ', 'users/other_user');
+      expect(otherResult.allowed).toBe(false);
+    });
+
+    it('chặn client tự ý ghi (CREATE/UPDATE) vào electronic_signatures (Server-Only)', () => {
+      const createRes = SecurityRulesValidator.evaluate(
+        qaUser,
+        'CREATE',
+        'electronic_signatures/sig_1',
+        {
+          documentType: 'BATCH_RELEASE',
+          documentId: 'batch-001',
+        }
+      );
+      expect(createRes.allowed).toBe(false);
+      expect(createRes.reason).toContain('Server-Only Collection');
+
+      const updateRes = SecurityRulesValidator.evaluate(
+        qaUser,
+        'UPDATE',
+        'electronic_signatures/sig_1',
+        {
+          status: 'CREATED',
+        }
+      );
+      expect(updateRes.allowed).toBe(false);
+      expect(updateRes.reason).toContain('Server-Only Collection');
+    });
+
+    it('chặn client tự ý ghi vào release_commands (Server-Only)', () => {
+      const res = SecurityRulesValidator.evaluate(qaUser, 'CREATE', 'release_commands/cmd_1', {
+        batchId: 'batch-001',
+      });
+      expect(res.allowed).toBe(false);
+      expect(res.reason).toContain('Server-Only Collection');
+    });
+
+    it('siết chặt READ product_formulas: chỉ cho phép QA, QC, PRODUCTION, ADMIN', () => {
+      expect(SecurityRulesValidator.evaluate(qaUser, 'READ', 'product_formulas/f1').allowed).toBe(
+        true
+      );
+      expect(SecurityRulesValidator.evaluate(qcUser, 'READ', 'product_formulas/f1').allowed).toBe(
+        true
+      );
+      expect(
+        SecurityRulesValidator.evaluate(adminUser, 'READ', 'product_formulas/f1').allowed
+      ).toBe(true);
+
+      const regularUser = {
+        uid: 'u_reg',
+        email: 'user@pqm.com',
+        role: 'USER' as const,
+        isAdmin: false,
+      };
+      const userRes = SecurityRulesValidator.evaluate(regularUser, 'READ', 'product_formulas/f1');
+      expect(userRes.allowed).toBe(false);
+      expect(userRes.reason).toContain('Chỉ QA, QC, Sản xuất hoặc Admin');
+    });
+  });
 });
