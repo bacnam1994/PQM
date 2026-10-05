@@ -116,4 +116,50 @@ describe('Firebase Rules & Security Integration Perimeter', () => {
       expect(firebaseJson.emulators.functions.port).toBe(5001);
     });
   });
+
+  describe('5. User-Mandated Critical Security Scenarios (Exact Cases)', () => {
+    // Case 1: GUEST → batches DENY
+    it('Case 1: GUEST → batches READ MUST be DENIED', () => {
+      const readRule = parsedRules.batches['.read'];
+      expect(readRule).toContain("root.child('users/' + auth.uid + '/role').val() !== 'GUEST'");
+    });
+
+    // Case 2: GUEST → testResults DENY
+    it('Case 2: GUEST → testResults READ MUST be DENIED', () => {
+      const readRule = parsedRules.testResults['.read'];
+      expect(readRule).toContain("root.child('users/' + auth.uid + '/role').val() !== 'GUEST'");
+    });
+
+    // Case 3: USER → electronic_signatures WRITE DENY
+    it('Case 3: USER → electronic_signatures WRITE MUST be DENIED (server-only)', () => {
+      const writeRule = parsedRules.electronic_signatures['$sig_id']['.write'];
+      expect(writeRule).toBe(false);
+    });
+
+    // Case 4: QA → audit_logs WRITE DENY
+    it('Case 4: QA → audit_logs WRITE MUST be DENIED (server-only / immutable)', () => {
+      const writeRule = parsedRules.audit_logs['$log_id']['.write'];
+      expect(writeRule).toBe(false);
+    });
+
+    // Case 5: USER → release_commands WRITE DENY
+    it('Case 5: USER → release_commands WRITE MUST be DENIED (server-only)', () => {
+      const writeRule = parsedRules.release_commands['$cmd_id']['.write'];
+      expect(writeRule).toBe(false);
+    });
+
+    // Case 6: USER → batches RELEASED DENY
+    it('Case 6: USER → batches RELEASED MUST be DENIED (status !== RELEASED enforced)', () => {
+      const writeRule = parsedRules.batches['$item_id']['.write'];
+      expect(writeRule).toContain("newData.child('status').val() !== 'RELEASED'");
+      expect(writeRule).not.toContain("role').val() == 'USER'");
+    });
+
+    // Case 7: QA → approve release server only
+    it('Case 7: QA → approve release server only (direct client write to RELEASED is blocked for everyone including QA)', () => {
+      const writeRule = parsedRules.batches['$item_id']['.write'];
+      // Even for QA, direct status: RELEASED write is blocked by newData.child('status').val() !== 'RELEASED'
+      expect(writeRule).toContain("newData.child('status').val() !== 'RELEASED'");
+    });
+  });
 });

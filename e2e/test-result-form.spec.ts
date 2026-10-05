@@ -6,7 +6,9 @@ test.beforeEach(async ({ page }) => {
 });
 
 test.describe('Test Result Form & Navigation Automation', () => {
-  test('Nên điều hướng đến trang Kết quả Lab và mở Form Nhập Phiếu Kiểm Nghiệm Mới', async ({ page }) => {
+  test('Nên điều hướng đến trang Kết quả Lab và mở Form Nhập Phiếu Kiểm Nghiệm Mới', async ({
+    page,
+  }) => {
     // 1. Điều hướng đến trang Danh sách Kết quả Lab
     await page.goto('/test-results');
     await expect(page.getByText('Kết quả Lab (QC)')).toBeVisible({ timeout: 15000 });
@@ -21,7 +23,7 @@ test.describe('Test Result Form & Navigation Automation', () => {
     await expect(page.getByText(/Nhập Phiếu Kiểm Nghiệm Mới/i)).toBeVisible();
 
     // 4. Kiểm tra các trường thông tin cơ bản trên Form
-    const labInput = page.getByPlaceholder('VD: Phòng QC, CASE...');
+    const labInput = page.getByPlaceholder(/Quatest 3, CASE, Phòng QC|Phòng QC, CASE/i);
     await expect(labInput).toBeVisible();
     await labInput.fill('Phòng QC (Nội bộ)');
 
@@ -29,7 +31,7 @@ test.describe('Test Result Form & Navigation Automation', () => {
     await expect(batchSearchInput).toBeVisible();
 
     // 5. Kiểm tra nút Lưu Phiếu kiểm nghiệm hiện diện
-    const submitBtn = page.getByRole('button', { name: /Lưu Kết quả Mới|Cập nhật Phiếu/i });
+    const submitBtn = page.getByRole('button', { name: /Lưu.*Phiếu|Cập nhật.*Phiếu/i });
     await expect(submitBtn).toBeVisible();
   });
 });

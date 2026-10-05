@@ -1,11 +1,13 @@
-/**
- * aiActionGuard.ts (Thin Adapter - VS-15 Rebuild)
- * ===============================================
- * Chuyển tiếp tới Canonical Implementation tại `src/domains/ai`.
- * Duy trì 100% khả năng tương thích ngược cho codebase hiện hữu.
- */
-
-import { aiActionGuard } from '../../domains/ai';
+import {
+  AIActionGuard,
+  aiActionGuard,
+  validateAIAction,
+  resolveToolPermission,
+  isRegulatedToolAction,
+  REGULATED_ACTIONS,
+} from '../../domains/ai/application/aiActionGuard';
+import { AIBoundaryRules } from '../../domains/ai/domain/rules';
+import type { AIActionProposal, GuardValidationResult } from '../../domains/ai/domain/types';
 
 export {
   AIActionGuard,
@@ -15,8 +17,8 @@ export {
   resolveToolPermission,
   isRegulatedToolAction,
   REGULATED_ACTIONS,
-} from '../../domains/ai';
+};
 
-export type { AIActionProposal, GuardValidationResult } from '../../domains/ai';
+export type { AIActionProposal, GuardValidationResult };
 
 export default aiActionGuard;

@@ -32,7 +32,9 @@ export async function setupTestPage(page: Page): Promise<void> {
   if (await emailInput.isVisible({ timeout: 2000 }).catch(() => false)) {
     await emailInput.fill('admin@example.com');
     await page.getByPlaceholder('••••••••').fill('password123');
-    await page.getByRole('button', { name: /ĐĂNG NHẬP HỆ THỐNG/i }).click();
-    await page.waitForURL(url => !url.pathname.includes('/login'), { timeout: 8000 }).catch(() => {});
+    await page.getByRole('button', { name: /Đăng nhập|ĐĂNG NHẬP/i }).click();
+    await page
+      .waitForURL((url) => !url.pathname.includes('/login'), { timeout: 8000 })
+      .catch(() => {});
   }
 }

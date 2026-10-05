@@ -42,9 +42,9 @@ export default defineConfig({
   projects: [
     {
       name: 'chromium',
-      use: { 
+      use: {
         ...devices['Desktop Chrome'],
-        channel: process.env.CI ? undefined : 'chrome'
+        channel: process.env.PLAYWRIGHT_CHROME_CHANNEL || undefined,
       },
     },
 
