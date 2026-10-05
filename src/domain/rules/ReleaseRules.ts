@@ -177,18 +177,12 @@ export class ReleaseRules {
           asOfDate: options.asOfDate,
         });
 
-    const isSigned = !!options.signature;
-    const allGatesPassed = isSigned
-      ? decision.eligible
-      : (decision.readyForSignature ??
-        (decision.gates.slice(0, 6).every((g) => g.passed) && decision.blockers.length === 0));
-
     return {
-      allGatesPassed,
+      allGatesPassed: decision.eligible,
       gates: decision.gates.map((g) => ({
         gateIndex: g.gateIndex,
         gateName: g.gateName,
-        passed: isSigned ? g.passed : g.gateIndex === 7 ? g.status !== 'FAIL' : g.passed,
+        passed: g.passed,
         details: g.details,
       })),
       blockers: decision.blockers,

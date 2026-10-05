@@ -101,13 +101,3 @@ export const onUserRoleChanged = onValueWritten(
     await syncUserCustomClaims(uid, afterData, auth);
   }
 );
-
-import { handleApproveBatchRelease, ApproveBatchReleaseRequest } from './batchReleaseFunction';
-
-/**
- * 5. Callable Function (P0-2): Canonical Server-Side Batch Release Command
- * Thẩm tra Gate 1→7, chữ ký số 21 CFR Part 11 thật và thực thi Atomic Release Transaction.
- */
-export const approveBatchRelease = onCall({ cors: true, timeoutSeconds: 60 }, async (request) => {
-  return handleApproveBatchRelease(request as any, db);
-});

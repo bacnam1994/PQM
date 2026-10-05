@@ -93,19 +93,11 @@ export class BatchAppService {
       throw new Error(`Không tìm thấy Lô sản xuất với mã: ${batchId}`);
     }
 
-    // 1. Phân quyền chuyển đổi trạng thái & P1-8 Deprecate updateStatus(..., 'RELEASED')
+    // 1. Phân quyền chuyển đổi trạng thái
     if (status === 'RELEASED') {
-      console.warn(
-        '[DEPRECATION WARNING] updateStatus(id, "RELEASED") is deprecated. Use approveRelease() instead.'
-      );
       if (!can(currentUser, 'batch:release', currentBatch)) {
         throw new Error(
-          'Từ chối quyền: Chỉ bộ phận QA hoặc Quản trị viên mới có thẩm quyền xuất xưởng lô.'
-        );
-      }
-      if (!options?.signature && !options?.batchTestResults && !options?.currentBatch) {
-        throw new Error(
-          'Deprecated API Violation (P1-8): Không được gọi trực tiếp updateStatus(..., "RELEASED"). Bắt buộc sử dụng canonical approveRelease() kèm chữ ký điện tử 21 CFR Part 11.'
+          'Từ chối quyền: Chỉ bộ phận QA hoặc Quản trị viên mới có thẩm quyền phê duyệt xuất xưởng (Release) lô.'
         );
       }
     } else if (status === 'REJECTED') {

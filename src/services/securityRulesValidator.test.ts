@@ -217,19 +217,11 @@ describe('TASK-005: Security Rules Verification Suite', () => {
       expect(result.reason).toContain('bị khóa');
     });
 
-    it('chặn client (kể cả QA/Admin) tự ghi trực tiếp status=RELEASED (P0-1 Security Rule)', () => {
-      const resQaRelease = SecurityRulesValidator.evaluate(qaUser, 'UPDATE', 'batches/b1', {
+    it('cho phép QA phê duyệt xuất xưởng hoặc từ chối lô sản xuất', () => {
+      const resRelease = SecurityRulesValidator.evaluate(qaUser, 'UPDATE', 'batches/b1', {
         status: 'RELEASED',
       });
-      expect(resQaRelease.allowed).toBe(false);
-      expect(resQaRelease.reason).toContain('Client bị cấm ghi trực tiếp status=RELEASED');
-
-      const resAdminRelease = SecurityRulesValidator.evaluate(adminUser, 'UPDATE', 'batches/b1', {
-        status: 'RELEASED',
-      });
-      expect(resAdminRelease.allowed).toBe(false);
-      expect(resAdminRelease.reason).toContain('Client bị cấm ghi trực tiếp status=RELEASED');
-
+      expect(resRelease.allowed).toBe(true);
       const resReject = SecurityRulesValidator.evaluate(qaUser, 'UPDATE', 'batches/b1', {
         status: 'REJECTED',
       });

@@ -534,66 +534,15 @@ export class BatchWorkflowHandlers {
       idempotencyKey?: string;
     }
   ): Promise<Batch> {
-    // 1. P0-2: Khi chạy trên client browser có chữ ký, ưu tiên gọi Server-Side Release Command
-    if (options?.signature?.id && typeof window !== 'undefined') {
-      try {
-        const { httpsCallable } = await import('firebase/functions');
-        const { functions } = await import('../../firebase');
-        const callable = httpsCallable(functions, 'approveBatchRelease');
-        const response: any = await callable({
-          batchId,
-          signatureId: options.signature.id,
-          expectedVersion: options.expectedVersion,
-          idempotencyKey: options.idempotencyKey,
-          reason: options.reason,
-        });
-
-        if (response?.data?.success) {
-          const freshBatch = await this.repo.findById(batchId);
-          if (freshBatch) {
-            return freshBatch;
-          }
-        }
-      } catch (cloudErr: any) {
-        // Ném lỗi nghiệp vụ từ server (P1-10: Fail-closed, không nuốt lỗi)
-        const serverMessage = cloudErr?.message || cloudErr?.details;
-        if (
-          serverMessage &&
-          (serverMessage.includes('ERR_') ||
-            serverMessage.includes('Không đủ điều kiện') ||
-            serverMessage.includes('thẩm quyền') ||
-            serverMessage.includes('PENDING') ||
-            serverMessage.includes('xung đột'))
-        ) {
-          throw new Error(serverMessage);
-        }
-        console.warn(
-          '[approveRelease] Server-side function unavailable or local dev, running local executor:',
-          cloudErr
-        );
-      }
-    }
-
-    // 2. Local Fallback / Test Suite Execution qua Kernel
+    // Phase 10: Atomic RELEASED transaction đã ghi nhận status=RELEASED, releaseStage=RELEASED,
+    // releaseGateProgress=7/7 và releaseSignatures cùng snapshot trong cùng một giao dịch nguyên tử.
+    // Trả về trực tiếp canonical result, không gọi synchronizer lặp lại và không nuốt lỗi.
     const result = await this.executeBatchAction(
       'BATCH_RELEASE_APPROVE',
       batchId,
       currentUser,
       options
     );
-
-    // P1-1: Cập nhật vòng đời chữ ký sang CONSUMED
-    if (options?.signature?.id && typeof signatureService?.updateSignatureStatus === 'function') {
-      try {
-        await signatureService.updateSignatureStatus(options.signature.id, 'CONSUMED', {
-          consumedAt: new Date().toISOString(),
-          releasedBatchId: batchId,
-        });
-      } catch (sigErr) {
-        console.warn('[approveRelease] Không thể cập nhật trạng thái chữ ký:', sigErr);
-      }
-    }
-
     return result;
   }
 

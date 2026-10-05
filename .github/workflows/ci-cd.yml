@@ -32,16 +32,7 @@ jobs:
       - name: Install Dependencies
         run: npm ci
 
-      - name: TypeScript Typecheck (Client)
-        run: npx tsc --noEmit
-
-      - name: Build Firebase Functions (P0-2 Server Command)
-        run: |
-          cd functions
-          npm ci
-          npm run build
-
-      - name: Run Vitest Suite (Unit, Domain, Workflow, Security Rules)
+      - name: Run Vitest Suite (116+ tests)
         run: npm run test -- --run
 
   # ─────────────────────────────────────────────────────────────

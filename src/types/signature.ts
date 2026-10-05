@@ -31,8 +31,6 @@ export const SIGNATURE_MEANINGS: Record<SignatureDocumentType, string> = {
   CHANGE_CONTROL: 'Tôi xác nhận phê duyệt kế hoạch thay đổi và đánh giá rủi ro theo chuẩn GMP-WHO.',
 };
 
-export type SignatureStatus = 'CREATED' | 'CONSUMED' | 'REJECTED' | 'SUPERSEDED' | 'REVOKED';
-
 export interface ElectronicSignature {
   id: string;
   documentType: SignatureDocumentType;
@@ -44,12 +42,8 @@ export interface ElectronicSignature {
   role: Role;
   meaning: string;
   signedAt: string; // ISO 8601 UTC
-  checksum: string; // SHA-256 integrity fingerprint
+  checksum: string; // SHA-256 HMAC / Hash fingerprint
   comments?: string;
-  status?: SignatureStatus;
-  consumedAt?: string;
-  releaseAttemptId?: string;
-  releasedBatchId?: string;
 }
 
 export interface CreateSignatureInput {

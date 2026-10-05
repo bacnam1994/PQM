@@ -102,7 +102,7 @@ export class WorkflowExplainabilityService {
     const transitionCheck = BatchStateMachine.canTransition(batch.status, 'RELEASED', {
       actorRole: user?.role,
       actorId: user?.uid,
-      conditionsMet: previewDecision.eligible || (previewDecision.readyForSignature ?? false),
+      conditionsMet: previewDecision.eligible,
     });
     reasons.push({
       id: 'STATE_TRANSITION',

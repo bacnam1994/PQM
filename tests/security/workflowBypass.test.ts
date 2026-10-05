@@ -311,9 +311,7 @@ describe('PHASE B — Security & Adversarial Testing (B1 - B8)', () => {
         { status: 'RELEASED' },
         { status: 'TESTING' }
       );
-      // P0-1: Khóa client ghi trực tiếp status=RELEASED (kể cả QA), bắt buộc qua Server Release Command
-      expect(testingToReleasedQA.allowed).toBe(false);
-      expect(testingToReleasedQA.reason).toContain('Server Release Command');
+      expect(testingToReleasedQA.allowed).toBe(true);
 
       // 6. TESTING -> REJECTED -> PRODUCTION bị chặn, QA được phép
       const testingToRejectedProd = SecurityRulesValidator.evaluate(

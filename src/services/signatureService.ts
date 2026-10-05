@@ -3,7 +3,7 @@
  * Dịch vụ ký duyệt điện tử tuân thủ tiêu chuẩn FDA 21 CFR Part 11 và GMP-WHO Annex 11
  */
 
-import { ref, get, set, update, query, orderByChild, equalTo } from 'firebase/database';
+import { ref, get, set } from 'firebase/database';
 import { getAuth, reauthenticateWithCredential, EmailAuthProvider } from 'firebase/auth';
 import { db } from '../firebase';
 import {
@@ -11,14 +11,13 @@ import {
   CreateSignatureInput,
   SIGNATURE_MEANINGS,
   SignatureDocumentType,
-  SignatureStatus,
 } from '../types/signature';
 import { can, normalizeUser } from './permissionService';
 import { logAuditAction } from './auditService';
 import { removeUndefined } from '../utils';
 
 /**
- * Tính toán mã băm checksum SHA-256 bảo đảm tính bất biến của chữ ký (integrity fingerprint)
+ * Tính toán mã băm checksum SHA-256 bảo đảm tính bất biến của chữ ký
  */
 export async function computeSignatureChecksum(
   data: Omit<ElectronicSignature, 'id' | 'checksum'>
@@ -127,7 +126,6 @@ export class SignatureService {
       meaning: meaning,
       signedAt: signedAt,
       comments: input.comments,
-      status: 'CREATED',
     };
 
     const checksum = await computeSignatureChecksum(unsignedData);
@@ -155,51 +153,19 @@ export class SignatureService {
   }
 
   /**
-   * Lấy danh sách chữ ký điện tử gắn liền với một tài liệu cụ thể (P1-3 Query Isolation)
+   * Lấy danh sách chữ ký điện tử gắn liền với một tài liệu cụ thể
    */
   async getSignaturesForDocument(
     documentType: SignatureDocumentType,
     documentId: string
   ): Promise<ElectronicSignature[]> {
-    try {
-      const q = query(
-        ref(db, this.collectionPath),
-        orderByChild('documentId'),
-        equalTo(documentId)
-      );
-      const snapshot = await get(q);
-      if (!snapshot.exists()) return [];
+    const snapshot = await get(ref(db, this.collectionPath));
+    if (!snapshot.exists()) return [];
 
-      const sigsMap = snapshot.val();
-      const allSigs = Object.values(sigsMap) as ElectronicSignature[];
-      return allSigs
-        .filter((s) => s.documentType === documentType)
-        .sort((a, b) => b.signedAt.localeCompare(a.signedAt));
-    } catch {
-      // Fallback an toàn nếu index chưa sẵn sàng
-      const snapshot = await get(ref(db, this.collectionPath));
-      if (!snapshot.exists()) return [];
-
-      const allSigs = Object.values(snapshot.val()) as ElectronicSignature[];
-      return allSigs
-        .filter((s) => s.documentType === documentType && s.documentId === documentId)
-        .sort((a, b) => b.signedAt.localeCompare(a.signedAt));
-    }
-  }
-
-  /**
-   * Cập nhật trạng thái vòng đời của chữ ký điện tử (P1-1 Signature Lifecycle)
-   */
-  async updateSignatureStatus(
-    signatureId: string,
-    status: SignatureStatus,
-    extra?: { consumedAt?: string; releaseAttemptId?: string; releasedBatchId?: string }
-  ): Promise<void> {
-    const updateData = removeUndefined({
-      status,
-      ...extra,
-    });
-    await update(ref(db, `${this.collectionPath}/${signatureId}`), updateData);
+    const allSigs = Object.values(snapshot.val()) as ElectronicSignature[];
+    return allSigs
+      .filter((s) => s.documentType === documentType && s.documentId === documentId)
+      .sort((a, b) => b.signedAt.localeCompare(a.signedAt));
   }
 
   /**
