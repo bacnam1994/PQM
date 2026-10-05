@@ -21,6 +21,12 @@
    - **Không được thay đổi hoặc diễn giải khác với các nguyên tắc và workflow đã định nghĩa trong thư mục [`docs/workflow/`](file:///D:/26%20Kiem%20nghiem/PQM/docs/workflow/README.md) (đặc biệt là [`docs/workflow/PQM_SYSTEM_WORKFLOW_MASTER.md`](file:///D:/26%20Kiem%20nghiem/PQM/docs/workflow/PQM_SYSTEM_WORKFLOW_MASTER.md)); nếu source code hiện tại mâu thuẫn với Master Workflow, phải báo cáo mâu thuẫn trước khi sửa.**
    - Mọi thay đổi logic nghiệp vụ, quy trình phê duyệt, giải quyết trạng thái (Status Resolver), rào chắn an ninh (Security Guard / Firebase Rules) đều phải đối chiếu với các nguyên tắc kiến trúc đã phê duyệt trước khi triển khai.
 
+5. **KIỂM TRA & GỌI OMNIROUTER VÀ CLAUDE-MEM TRƯỚC PHIÊN LÀM VIỆC (BẮT BUỘC)**:
+   - Trước khi bắt đầu phiên làm việc hoặc thực hiện bất kỳ yêu cầu nào của người dùng, AI **BẮT BUỘC PHẢI KIỂM TRA** xem **OmniRoute** và **Claude-Mem** có đang hoạt động hay không:
+     - **Claude-Mem**: Kiểm tra bằng `npx claude-mem status`. Nếu worker chưa chạy, gọi lệnh `npx claude-mem start` để khởi động service (mặc định tại `http://localhost:37777`).
+     - **OmniRoute (Omnirouter)**: Kiểm tra bằng `omniroute health`. Nếu server chưa chạy, gọi lệnh `omniroute serve --daemon` để khởi động service nền (mặc định tại `http://localhost:20128`).
+   - Phải bảo đảm cả hai dịch vụ đều đã được gọi lên và trong trạng thái hoạt động (healthy/running) trước khi tiến hành phiên làm việc.
+
 ---
 
 ## Kiến trúc triển khai (QUAN TRỌNG)
