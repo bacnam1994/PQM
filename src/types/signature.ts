@@ -64,4 +64,5 @@ export interface CreateSignatureInput {
   meaning?: string;
   comments?: string;
   password?: string;
+  correlationId?: string;
 }

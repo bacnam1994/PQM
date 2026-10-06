@@ -35,11 +35,12 @@ jobs:
       - name: TypeScript Typecheck (Frontend & Shared Engine)
         run: npm run typecheck
 
-      - name: Build & Typecheck Cloud Functions
+      - name: Build & Test External Backend
         run: |
-          cd functions
+          cd backend
           npm ci
           npm run build
+          npm test
           cd ..
 
       - name: Run Firebase Rules & Security Access Tests
@@ -118,31 +119,23 @@ jobs:
       - name: Build Production Bundle (Vite)
         run: npm run build
 
-      - name: Build Cloud Functions
+      - name: Build External Backend
         run: |
-          cd functions
+          cd backend
           npm ci
           npm run build
           cd ..
 
-      - name: Deploy to Firebase (Functions & Hosting via Service Account)
+      - name: Deploy to Firebase Hosting (via Service Account)
         if: env.FIREBASE_SA != ''
         run: |
           echo '${{ env.FIREBASE_SA }}' > $RUNNER_TEMP/firebase_sa.json
-          GOOGLE_APPLICATION_CREDENTIALS=$RUNNER_TEMP/firebase_sa.json npx firebase-tools deploy --only functions,hosting --project v-biotech
+          GOOGLE_APPLICATION_CREDENTIALS=$RUNNER_TEMP/firebase_sa.json npx firebase-tools deploy --only hosting --project v-biotech
           rm -f $RUNNER_TEMP/firebase_sa.json
 
-      - name: Deploy to Firebase (Functions & Hosting via FIREBASE_TOKEN fallback)
+      - name: Deploy to Firebase Hosting (via FIREBASE_TOKEN fallback)
         if: env.FIREBASE_SA == '' && env.FIREBASE_TOKEN != ''
-        run: npx firebase-tools deploy --only functions,hosting --token "${{ env.FIREBASE_TOKEN }}" --project v-biotech
-
-      - name: Verify Cloud Functions Deployment
-        if: env.FIREBASE_SA != '' || env.FIREBASE_TOKEN != ''
-        run: |
-          echo "🔍 Verifying deployed Cloud Functions..."
-          if [ -n "${{ env.FIREBASE_TOKEN }}" ]; then
-            npx firebase-tools functions:list --token "${{ env.FIREBASE_TOKEN }}" --project v-biotech
-          fi
+        run: npx firebase-tools deploy --only hosting --token "${{ env.FIREBASE_TOKEN }}" --project v-biotech
 
       - name: Informational Notice (If no Firebase secrets configured yet)
         if: env.FIREBASE_SA == '' && env.FIREBASE_TOKEN == ''

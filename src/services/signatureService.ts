@@ -2,12 +2,16 @@
  * PQM 3.0 - Electronic Signature Service
  * Dịch vụ ký duyệt điện tử triển khai các kiểm soát kỹ thuật tương thích với nguyên tắc FDA 21 CFR Part 11 và GMP-WHO Annex 11
  * (Technical controls aligned with FDA 21 CFR Part 11 & GMP-WHO Annex 11 principles)
+ *
+ * SERVER-AUTHORITATIVE ARCHITECTURE:
+ * - Không cho phép Client tự tạo hay ghi trực tiếp chữ ký vào RTDB.
+ * - Mọi chữ ký đều phải qua External Backend Authority (POST /api/signatures) với Firebase ID Token.
+ * - Loại bỏ hoàn toàn fallback client-side để giữ vững tính toàn vẹn ALCOA+.
  */
 
-import { ref, get, set } from 'firebase/database';
+import { ref, get, query, orderByChild, equalTo } from 'firebase/database';
 import { getAuth, reauthenticateWithCredential, EmailAuthProvider } from 'firebase/auth';
-import { getFunctions, httpsCallable } from 'firebase/functions';
-import app, { db } from '../firebase';
+import { db } from '../firebase';
 import {
   ElectronicSignature,
   CreateSignatureInput,
@@ -19,8 +23,6 @@ import {
   verifyCanonicalSignatureChecksum,
 } from '@pqm/release-engine';
 import { can, normalizeUser } from './permissionService';
-import { logAuditAction } from './auditService';
-import { removeUndefined } from '../utils';
 
 /**
  * Tính toán mã băm checksum SHA-256 canonical bảo đảm tính bất biến của chữ ký
@@ -32,8 +34,18 @@ export async function computeSignatureChecksum(
   return calculateCanonicalSignatureChecksum(data as any);
 }
 
+const BACKEND_API_URL =
+  (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_BACKEND_API_URL) ||
+  (typeof process !== 'undefined' && process.env?.VITE_BACKEND_API_URL) ||
+  'http://localhost:4000';
+
 export class SignatureService {
   private readonly collectionPath = 'electronic_signatures';
+  private apiUrl: string = BACKEND_API_URL;
+
+  public setApiUrl(url: string): void {
+    this.apiUrl = url;
+  }
 
   /**
    * Tạo chữ ký điện tử hợp lệ với kiểm soát kỹ thuật tương thích 21 CFR Part 11
@@ -54,7 +66,7 @@ export class SignatureService {
       throw new Error('Loại tài liệu ký duyệt (Document Type) không được để trống.');
     }
 
-    // 1. Kiểm tra thẩm quyền theo vai trò (RBAC Check)
+    // 1. Kiểm tra thẩm quyền theo vai trò (RBAC Pre-Check phía client)
     if (input.documentType === 'BATCH_RELEASE' || input.documentType === 'COA_ISSUE') {
       if (!can(identity, 'batch:release')) {
         throw new Error(
@@ -81,110 +93,79 @@ export class SignatureService {
       throw new Error('Mật khẩu xác thực là bắt buộc đối với chữ ký điện tử.');
     }
 
-    if (input.password && identity.email) {
-      try {
-        const auth = getAuth();
-        const firebaseUser = auth.currentUser;
-        if (firebaseUser && firebaseUser.email === identity.email) {
+    let idToken = '';
+    const auth = getAuth();
+    const firebaseUser = auth.currentUser;
+
+    if (firebaseUser) {
+      if (input.password && identity.email) {
+        try {
           const credential = EmailAuthProvider.credential(firebaseUser.email, input.password);
           await reauthenticateWithCredential(firebaseUser, credential);
+        } catch (err: any) {
+          throw new Error(
+            `Xác thực chữ ký điện tử thất bại: ${err.message || 'Mật khẩu không đúng'}`
+          );
         }
-      } catch (err: any) {
-        throw new Error(
-          `Xác thực chữ ký điện tử thất bại: ${err.message || 'Mật khẩu không đúng'}`
-        );
       }
+      try {
+        idToken = await firebaseUser.getIdToken(true);
+      } catch (err: any) {
+        throw new Error(`Không thể lấy token xác thực: ${err.message}`);
+      }
+    } else if (isTestEnv) {
+      // In test sandbox: create simulated test token if auth not initialized
+      idToken = JSON.stringify({
+        uid: identity.uid,
+        email: identity.email,
+        role: identity.role,
+        auth_time: Math.floor(Date.now() / 1000) - 10,
+      });
+    } else {
+      throw new Error('Yêu cầu người dùng đăng nhập để thực hiện ký điện tử.');
     }
 
     const meaning =
       input.meaning || SIGNATURE_MEANINGS[input.documentType] || 'Xác nhận phê duyệt điện tử.';
 
-    // 3. Ủy quyền tạo chữ ký qua Cloud Function trên Server (Server-Side Authority)
-    try {
-      if (!isTestEnv) {
-        const functions = getFunctions(app);
-        const callable = httpsCallable<any, { success: boolean; signature: ElectronicSignature }>(
-          functions,
-          'requestElectronicSignature'
-        );
-        const payload: Record<string, any> = {
-          documentType: input.documentType,
-          documentId: input.documentId,
-          meaning: meaning,
-        };
-        if (input.documentVersion !== undefined && input.documentVersion !== null) {
-          payload.documentVersion = input.documentVersion;
-        }
-        if (input.comments && input.comments.trim()) {
-          payload.comments = input.comments.trim();
-        }
+    // 3. Ủy quyền tạo chữ ký qua Server Authority (POST /api/signatures)
+    const correlationId =
+      input.correlationId ||
+      `SIG-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.random().toString(36).substring(2, 9)}`;
 
-        const response = await callable(payload);
-
-        if (response.data?.signature) {
-          return response.data.signature;
-        }
-      }
-    } catch (serverErr: any) {
-      const errCode = serverErr?.code;
-      const errMsg = serverErr?.message || '';
-
-      // Nếu lỗi là do vi phạm nghiệp vụ xác thực hoặc quyền hạn từ Cloud Function thì ném lỗi
-      if (errCode === 'functions/permission-denied' || errCode === 'functions/unauthenticated') {
-        throw new Error(errMsg || 'Lỗi xác thực hoặc quyền hạn ký điện tử.');
-      }
-
-      // Khi Cloud Functions không khả dụng trên môi trường máy chủ (gói Spark không deploy Functions, lỗi internal/not-found),
-      // kích hoạt cơ chế dự phòng an toàn (Resilient Fallback) theo Master Workflow:
-      // Tính toán mã băm Canonical SHA-256 nội bộ với cùng chuẩn mật mã @pqm/release-engine
-      console.warn(
-        '[SignatureService] Cloud Function chưa khả dụng trên máy chủ (Spark plan / offline), kích hoạt động cơ ký điện tử Canonical SHA-256:',
-        errMsg
-      );
-    }
-
-    // Fallback cho môi trường test nội bộ (Unit test sandbox)
-    const signedAt = new Date().toISOString();
-    const id = `sig_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-
-    const unsignedData: Omit<ElectronicSignature, 'id' | 'checksum'> = {
+    const payload: Record<string, any> = {
       documentType: input.documentType,
       documentId: input.documentId,
-      signerUid: identity.uid,
-      signerName: identity.displayName || identity.email || 'Người dùng',
-      signerEmail: identity.email || 'unknown',
-      role: identity.role,
       meaning: meaning,
-      signedAt: signedAt,
-      ...(input.documentVersion !== undefined && input.documentVersion !== null
-        ? { documentVersion: input.documentVersion }
-        : {}),
-      ...(input.comments && input.comments.trim() ? { comments: input.comments.trim() } : {}),
+      correlationId,
     };
+    if (input.documentVersion !== undefined && input.documentVersion !== null) {
+      payload.documentVersion = input.documentVersion;
+    }
+    if (input.comments && input.comments.trim()) {
+      payload.comments = input.comments.trim();
+    }
 
-    const checksum = await computeSignatureChecksum(unsignedData);
-
-    const signature: ElectronicSignature = {
-      id,
-      ...unsignedData,
-      checksum,
-      status: 'CREATED',
-    };
-
-    // 4. Lưu trữ chữ ký vào cơ sở dữ liệu
-    const cleanSig = removeUndefined(signature);
-    await set(ref(db, `${this.collectionPath}/${signature.id}`), cleanSig);
-
-    // 5. Ghi nhận Audit Trail chuẩn ALCOA+
-    logAuditAction({
-      action: 'CREATE',
-      collection: 'SYSTEM',
-      documentId: signature.id,
-      details: `Ký điện tử 21 CFR Part 11: [${signature.documentType}] id=${signature.documentId} bởi ${signature.signerEmail} (${signature.role})`,
-      performedBy: identity.email || 'unknown',
+    const response = await fetch(`${this.apiUrl}/api/signatures`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${idToken}`,
+        'x-correlation-id': correlationId,
+      },
+      body: JSON.stringify(payload),
     });
 
-    return signature;
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok || !data.success || !data.signature) {
+      const errMsg =
+        data.error?.message ||
+        `Lỗi tạo chữ ký điện tử trên máy chủ (HTTP ${response.status}). Vui lòng thử lại.`;
+      throw new Error(errMsg);
+    }
+
+    return data.signature;
   }
 
   /**
@@ -194,12 +175,17 @@ export class SignatureService {
     documentType: SignatureDocumentType,
     documentId: string
   ): Promise<ElectronicSignature[]> {
-    const snapshot = await get(ref(db, this.collectionPath));
+    const sigQuery = query(
+      ref(db, this.collectionPath),
+      orderByChild('documentId'),
+      equalTo(documentId)
+    );
+    const snapshot = await get(sigQuery);
     if (!snapshot.exists()) return [];
 
     const allSigs = Object.values(snapshot.val()) as ElectronicSignature[];
     return allSigs
-      .filter((s) => s.documentType === documentType && s.documentId === documentId)
+      .filter((s) => s.documentType === documentType)
       .sort((a, b) => b.signedAt.localeCompare(a.signedAt));
   }
 

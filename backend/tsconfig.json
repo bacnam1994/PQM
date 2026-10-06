@@ -1,0 +1,18 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "CommonJS",
+    "moduleResolution": "node",
+    "rootDir": "..",
+    "outDir": "./dist",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "paths": {
+      "@pqm/release-engine": ["../packages/release-engine/src/index.ts"]
+    }
+  },
+  "include": ["src/**/*", "../packages/release-engine/src/**/*"],
+  "exclude": ["node_modules", "dist"]
+}

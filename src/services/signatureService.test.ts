@@ -1,29 +1,29 @@
+/**
+ * src/services/signatureService.test.ts
+ * Unit tests for client-side SignatureService
+ * Verifies HTTP dispatch to Server Authority and CRITICAL REGRESSION: No client fallback
+ */
+
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { SignatureService, computeSignatureChecksum } from './signatureService';
 import { ElectronicSignature } from '../types/signature';
+import { calculateCanonicalSignatureChecksum } from '@pqm/release-engine';
 
 vi.mock('../firebase', () => ({
   db: {},
 }));
 
+const { mockSet } = vi.hoisted(() => ({
+  mockSet: vi.fn(),
+}));
+
 vi.mock('firebase/database', () => ({
   ref: vi.fn(),
   get: vi.fn().mockResolvedValue({ exists: () => false, val: () => ({}) }),
-  set: vi.fn().mockImplementation((_ref, value) => {
-    // Strictly simulate Firebase Realtime Database SDK: reject any undefined property
-    const checkUndefined = (val: any, path = '') => {
-      if (val === undefined) {
-        throw new Error(`Firebase RTDB Error: set failed: contains undefined at ${path}`);
-      }
-      if (val !== null && typeof val === 'object') {
-        for (const [k, v] of Object.entries(val)) {
-          checkUndefined(v, path ? `${path}.${k}` : k);
-        }
-      }
-    };
-    checkUndefined(value);
-    return Promise.resolve(undefined);
-  }),
+  set: mockSet,
+  query: vi.fn((r) => r),
+  orderByChild: vi.fn(),
+  equalTo: vi.fn(),
 }));
 
 vi.mock('firebase/auth', () => ({
@@ -32,24 +32,33 @@ vi.mock('firebase/auth', () => ({
   reauthenticateWithCredential: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock('./auditService', () => ({
-  logAuditAction: vi.fn(),
-}));
-
-describe('SignatureService - FDA 21 CFR Part 11', () => {
+describe('SignatureService - Server-Authoritative (No Client Fallback)', () => {
   let service: SignatureService;
 
-  const qaUser = { uid: 'u_qa', email: 'qa@pqm.com', role: 'QA', displayName: 'Dược sĩ QA' };
+  const qaUser = {
+    uid: 'u_qa',
+    email: 'qa@pqm.com',
+    role: 'QA' as const,
+    displayName: 'Dược sĩ QA',
+  };
   const labUser = {
     uid: 'u_lab',
     email: 'lab@pqm.com',
-    role: 'LAB',
+    role: 'LAB' as const,
     displayName: 'Kiểm nghiệm viên',
   };
-  const adminUser = { uid: 'u_admin', email: 'admin@pqm.com', role: 'ADMIN', isAdmin: true };
+  const adminUser = {
+    uid: 'u_admin',
+    email: 'admin@pqm.com',
+    role: 'ADMIN' as const,
+    displayName: 'Admin',
+    isAdmin: true,
+  };
 
   beforeEach(() => {
     service = new SignatureService();
+    mockSet.mockClear();
+    vi.restoreAllMocks();
   });
 
   describe('createElectronicSignature', () => {
@@ -80,7 +89,34 @@ describe('SignatureService - FDA 21 CFR Part 11', () => {
       ).rejects.toThrow(/Chỉ bộ phận QA hoặc Quản trị viên/);
     });
 
-    it('should allow QA to successfully sign BATCH_RELEASE with documentVersion and comments', async () => {
+    it('should call external backend API and return server-created signature', async () => {
+      const mockServerSignature: ElectronicSignature = {
+        id: 'sig_srv_123',
+        documentType: 'BATCH_RELEASE',
+        documentId: 'batch-001',
+        documentVersion: 1,
+        signerUid: qaUser.uid,
+        signerName: qaUser.displayName,
+        signerEmail: qaUser.email,
+        role: qaUser.role,
+        meaning: 'Xác nhận phê duyệt điện tử.',
+        signedAt: '2026-10-06T12:00:00Z',
+        checksum: 'abc123canonicalhash64chars000000000000000000000000000000000000000000',
+        status: 'CREATED',
+        comments: 'Đã kiểm tra chất lượng đạt chuẩn',
+      };
+
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue({
+          ok: true,
+          json: async () => ({
+            success: true,
+            signature: mockServerSignature,
+          }),
+        })
+      );
+
       const sig = await service.createElectronicSignature(qaUser, {
         documentType: 'BATCH_RELEASE',
         documentId: 'batch-001',
@@ -88,73 +124,117 @@ describe('SignatureService - FDA 21 CFR Part 11', () => {
         comments: 'Đã kiểm tra chất lượng đạt chuẩn',
       });
 
-      expect(sig).toBeDefined();
-      expect(sig.id).toMatch(/^sig_/);
-      expect(sig.signerEmail).toBe('qa@pqm.com');
-      expect(sig.role).toBe('QA');
-      expect(sig.documentVersion).toBe(1);
-      expect(sig.comments).toBe('Đã kiểm tra chất lượng đạt chuẩn');
-      expect(sig.meaning).toContain('phê duyệt xuất xưởng');
-      expect(sig.checksum).toBeDefined();
+      expect(sig).toEqual(mockServerSignature);
+      // Ensure client NEVER writes to RTDB directly
+      expect(mockSet).not.toHaveBeenCalled();
     });
 
-    it('should successfully sign when documentVersion and comments are undefined (no RTDB undefined crash)', async () => {
-      const sig = await service.createElectronicSignature(qaUser, {
-        documentType: 'BATCH_RELEASE',
-        documentId: 'batch-002',
-        documentVersion: undefined,
-        comments: undefined,
-      });
+    it('CRITICAL REGRESSION: should throw error and NEVER create signature in RTDB when backend request fails', async () => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue({
+          ok: false,
+          status: 500,
+          json: async () => ({
+            success: false,
+            error: {
+              code: 'INTERNAL',
+              message: 'Lỗi máy chủ khi tạo chữ ký điện tử',
+            },
+          }),
+        })
+      );
 
-      expect(sig).toBeDefined();
-      expect(sig.documentType).toBe('BATCH_RELEASE');
-      expect(sig.documentId).toBe('batch-002');
-      expect(sig.signerEmail).toBe('qa@pqm.com');
-      expect(sig.role).toBe('QA');
-      expect(sig.status).toBe('CREATED');
-      expect(sig.checksum).toBeDefined();
+      await expect(
+        service.createElectronicSignature(qaUser, {
+          documentType: 'BATCH_RELEASE',
+          documentId: 'batch-001',
+        })
+      ).rejects.toThrow(/Lỗi máy chủ khi tạo chữ ký điện tử/);
 
-      // Ensure undefined properties are not present in the saved object
-      expect(Object.prototype.hasOwnProperty.call(sig, 'documentVersion')).toBe(false);
-      expect(Object.prototype.hasOwnProperty.call(sig, 'comments')).toBe(false);
-
-      // Checksum integrity check
-      const isValid = await service.verifySignatureIntegrity(sig);
-      expect(isValid).toBe(true);
+      // Absolutely ZERO writes to RTDB from client
+      expect(mockSet).not.toHaveBeenCalled();
     });
 
-    it('should allow ADMIN to sign COA_ISSUE', async () => {
+    it('should allow ADMIN to sign COA_ISSUE via backend', async () => {
+      const mockAdminSig: ElectronicSignature = {
+        id: 'sig_srv_admin',
+        documentType: 'COA_ISSUE',
+        documentId: 'coa-001',
+        signerUid: adminUser.uid,
+        signerName: adminUser.displayName || 'Admin',
+        signerEmail: adminUser.email,
+        role: 'ADMIN',
+        meaning: 'Ban hành chứng nhận phân tích CoA',
+        signedAt: '2026-10-06T12:00:00Z',
+        checksum: 'hash64chars00000000000000000000000000000000000000000000000000000000',
+        status: 'CREATED',
+      };
+
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue({
+          ok: true,
+          json: async () => ({
+            success: true,
+            signature: mockAdminSig,
+          }),
+        })
+      );
+
       const sig = await service.createElectronicSignature(adminUser, {
         documentType: 'COA_ISSUE',
-        documentId: 'coa-batch-001',
+        documentId: 'coa-001',
       });
 
       expect(sig.documentType).toBe('COA_ISSUE');
-      expect(sig.signerEmail).toBe('admin@pqm.com');
+      expect(sig.signerEmail).toBe(adminUser.email);
+      expect(mockSet).not.toHaveBeenCalled();
     });
   });
 
   describe('verifySignatureIntegrity', () => {
     it('should verify genuine signature as valid', async () => {
-      const sig = await service.createElectronicSignature(qaUser, {
-        documentType: 'BATCH_RELEASE',
+      const unsigned = {
+        documentType: 'BATCH_RELEASE' as const,
         documentId: 'batch-001',
-      });
+        signerUid: qaUser.uid,
+        signerName: qaUser.displayName,
+        signerEmail: qaUser.email,
+        role: qaUser.role,
+        meaning: 'Xác nhận phê duyệt điện tử.',
+        signedAt: '2026-10-06T12:00:00Z',
+      };
+      const checksum = calculateCanonicalSignatureChecksum(unsigned);
+      const sig: ElectronicSignature = {
+        id: 'sig-gen-01',
+        ...unsigned,
+        checksum,
+        status: 'CREATED',
+      };
 
       const isValid = await service.verifySignatureIntegrity(sig);
       expect(isValid).toBe(true);
     });
 
     it('should detect tampering if signature content was altered', async () => {
-      const sig = await service.createElectronicSignature(qaUser, {
-        documentType: 'BATCH_RELEASE',
+      const unsigned = {
+        documentType: 'BATCH_RELEASE' as const,
         documentId: 'batch-001',
-      });
-
-      // Tamper with meaning or signer
+        signerUid: qaUser.uid,
+        signerName: qaUser.displayName,
+        signerEmail: qaUser.email,
+        role: qaUser.role,
+        meaning: 'Xác nhận phê duyệt điện tử.',
+        signedAt: '2026-10-06T12:00:00Z',
+      };
+      const checksum = calculateCanonicalSignatureChecksum(unsigned);
       const tampered: ElectronicSignature = {
-        ...sig,
+        id: 'sig-gen-01',
+        ...unsigned,
         meaning: 'Ý nghĩa giả mạo bị chỉnh sửa trái phép',
+        checksum,
+        status: 'CREATED',
       };
 
       const isValid = await service.verifySignatureIntegrity(tampered);
