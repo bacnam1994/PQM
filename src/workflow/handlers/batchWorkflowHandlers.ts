@@ -387,6 +387,7 @@ export class BatchWorkflowHandlers {
                     : []),
                 ]
               : currentBatch.releaseSignatures,
+            qualityStatus: 'PASS' as const,
           }
         : {}),
       ...(actionId === 'BATCH_REJECT'
@@ -448,6 +449,7 @@ export class BatchWorkflowHandlers {
       releaseStage: cleanBatch.releaseStage,
       releaseGateProgress: cleanBatch.releaseGateProgress,
       releaseSignatures: cleanBatch.releaseSignatures,
+      qualityStatus: cleanBatch.qualityStatus,
     };
 
     if (!flags.enableBatchWorkflowFacade) {

@@ -97,6 +97,9 @@ export class FirebaseBatchRepository
           if (metadata?.releaseSignatures !== undefined) {
             updatedBatch.releaseSignatures = metadata.releaseSignatures;
           }
+          if (metadata?.qualityStatus !== undefined) {
+            updatedBatch.qualityStatus = metadata.qualityStatus;
+          }
         } else if (status === 'REJECTED') {
           updatedBatch.rejectReason =
             reason || metadata?.rejectReason || currentBatch.rejectReason || null;
