@@ -107,13 +107,19 @@ export class SignatureService {
           functions,
           'requestElectronicSignature'
         );
-        const response = await callable({
+        const payload: Record<string, any> = {
           documentType: input.documentType,
           documentId: input.documentId,
-          documentVersion: input.documentVersion,
           meaning: meaning,
-          comments: input.comments,
-        });
+        };
+        if (input.documentVersion !== undefined && input.documentVersion !== null) {
+          payload.documentVersion = input.documentVersion;
+        }
+        if (input.comments && input.comments.trim()) {
+          payload.comments = input.comments.trim();
+        }
+
+        const response = await callable(payload);
 
         if (response.data?.signature) {
           return response.data.signature;
@@ -132,14 +138,16 @@ export class SignatureService {
     const unsignedData: Omit<ElectronicSignature, 'id' | 'checksum'> = {
       documentType: input.documentType,
       documentId: input.documentId,
-      documentVersion: input.documentVersion,
       signerUid: identity.uid,
       signerName: identity.displayName || identity.email || 'Người dùng',
       signerEmail: identity.email || 'unknown',
       role: identity.role,
       meaning: meaning,
       signedAt: signedAt,
-      comments: input.comments,
+      ...(input.documentVersion !== undefined && input.documentVersion !== null
+        ? { documentVersion: input.documentVersion }
+        : {}),
+      ...(input.comments && input.comments.trim() ? { comments: input.comments.trim() } : {}),
     };
 
     const checksum = await computeSignatureChecksum(unsignedData);

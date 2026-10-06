@@ -141,6 +141,21 @@ export const requestElectronicSignature = onCall(
     }
 
     const data = request.data as CreateSignatureServerRequest;
-    return executeCreateElectronicSignatureBackend(data, request.auth, db);
+    const correlationId = data?.correlationId || `REQ-SIG-${Date.now()}`;
+
+    try {
+      return await executeCreateElectronicSignatureBackend(data, request.auth, db);
+    } catch (err: any) {
+      console.error(
+        `[requestElectronicSignature][${correlationId}] Error creating signature:`,
+        err?.message || err
+      );
+
+      if (err instanceof HttpsError) {
+        throw err;
+      }
+
+      throw new HttpsError('internal', 'Không thể tạo chữ ký điện tử trên máy chủ.');
+    }
   }
 );

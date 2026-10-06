@@ -8,6 +8,12 @@ export default defineConfig({
     alias: {
       '@': path.resolve(__dirname, './src'),
       '@pqm/release-engine': path.resolve(__dirname, './packages/release-engine/src/index.ts'),
+      'firebase-admin': path.resolve(__dirname, './functions/node_modules/firebase-admin'),
+      'firebase-functions/v2/https': path.resolve(
+        __dirname,
+        './functions/node_modules/firebase-functions/lib/v2/providers/https.js'
+      ),
+      'firebase-functions': path.resolve(__dirname, './functions/node_modules/firebase-functions'),
     },
   },
   test: {

@@ -23,7 +23,7 @@ export interface CreateSignatureServerRequest {
   documentType: SignatureDocumentType;
   documentId: string;
   documentVersion?: number;
-  meaning: string;
+  meaning?: string;
   comments?: string;
   correlationId?: string;
 }
@@ -32,6 +32,28 @@ export interface CreateSignatureServerResponse {
   success: boolean;
   signature: ElectronicSignature;
   durationMs: number;
+}
+
+/**
+ * Utility to strip undefined properties recursively so that Firebase RTDB Admin SDK set() never fails.
+ */
+export function removeUndefinedFields<T extends Record<string, any>>(obj: T): T {
+  const result: Record<string, any> = {};
+  for (const [key, val] of Object.entries(obj)) {
+    if (val !== undefined) {
+      if (
+        val !== null &&
+        typeof val === 'object' &&
+        !Array.isArray(val) &&
+        !(val instanceof Date)
+      ) {
+        result[key] = removeUndefinedFields(val);
+      } else {
+        result[key] = val;
+      }
+    }
+  }
+  return result as T;
 }
 
 export async function executeCreateElectronicSignatureBackend(
@@ -116,35 +138,47 @@ export async function executeCreateElectronicSignatureBackend(
 
   // 4. Construct Unsigned Data & Canonical Checksum
   const signedAt = new Date().toISOString();
-  const unsignedData = {
+  const resolvedMeaning =
+    meaning && typeof meaning === 'string' && meaning.trim() !== ''
+      ? meaning.trim()
+      : 'Xác nhận phê duyệt điện tử.';
+
+  const unsignedData: Omit<ElectronicSignature, 'id' | 'checksum' | 'status'> = {
     documentType,
     documentId,
-    documentVersion,
     signerUid: uid,
     signerName,
     signerEmail,
     role,
-    meaning,
+    meaning: resolvedMeaning,
     signedAt,
-    comments,
+    ...(documentVersion !== undefined && documentVersion !== null && !isNaN(Number(documentVersion))
+      ? { documentVersion: Number(documentVersion) }
+      : {}),
+    ...(comments !== undefined &&
+    comments !== null &&
+    typeof comments === 'string' &&
+    comments.trim() !== ''
+      ? { comments: comments.trim() }
+      : {}),
   };
 
   const checksum = calculateCanonicalSignatureChecksum(unsignedData as any);
   const sigId = `sig_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
 
-  const signature: ElectronicSignature = {
+  const signature: ElectronicSignature = removeUndefinedFields({
     id: sigId,
     ...unsignedData,
     checksum,
-    status: 'CREATED',
-  };
+    status: 'CREATED' as const,
+  });
 
   // 5. Server writes to electronic_signatures/
   await db.ref(`electronic_signatures/${sigId}`).set(signature);
 
   // 6. Server writes to audit_logs
   const auditId = `audit_sig_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
-  await db.ref(`audit_logs/${auditId}`).set({
+  const auditPayload = removeUndefinedFields({
     eventId: auditId,
     timestamp: signedAt,
     actorUid: uid,
@@ -158,6 +192,7 @@ export async function executeCreateElectronicSignatureBackend(
     details: `Electronic signature created [${documentType}] id=${documentId} by ${signerEmail} (${role})`,
     correlationId: correlationId || `CORR-SIG-${sigId}`,
   });
+  await db.ref(`audit_logs/${auditId}`).set(auditPayload);
 
   return {
     success: true,
