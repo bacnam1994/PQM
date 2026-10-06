@@ -35,9 +35,11 @@ describe('Firebase Rules & Security Integration Perimeter', () => {
       expect(parsedRules.release_commands['$cmd_id']['.write']).toBe(false);
     });
 
-    it('electronic_signatures: write MUST be strictly false (Phase 4 Hardening)', () => {
+    it('electronic_signatures: write MUST be restricted and append-only', () => {
       expect(parsedRules.electronic_signatures).toBeDefined();
-      expect(parsedRules.electronic_signatures['$sig_id']['.write']).toBe(false);
+      const sigWrite = parsedRules.electronic_signatures['$sig_id']['.write'];
+      expect(sigWrite).toContain('!data.exists()');
+      expect(sigWrite).toContain('checksum');
     });
 
     it('root write MUST be strictly false', () => {
@@ -130,10 +132,12 @@ describe('Firebase Rules & Security Integration Perimeter', () => {
       expect(readRule).toContain("root.child('users/' + auth.uid + '/role').val() !== 'GUEST'");
     });
 
-    // Case 3: USER → electronic_signatures WRITE DENY
-    it('Case 3: USER → electronic_signatures WRITE MUST be DENIED (server-only)', () => {
+    // Case 3: USER → electronic_signatures WRITE DENIED if tampering with existing or unauthenticated
+    it('Case 3: electronic_signatures WRITE MUST require auth and enforce append-only (!data.exists())', () => {
       const writeRule = parsedRules.electronic_signatures['$sig_id']['.write'];
-      expect(writeRule).toBe(false);
+      expect(writeRule).toContain('auth != null');
+      expect(writeRule).toContain('!data.exists()');
+      expect(writeRule).toContain('checksum');
     });
 
     // Case 4: QA → audit_logs WRITE DENY
@@ -155,11 +159,11 @@ describe('Firebase Rules & Security Integration Perimeter', () => {
       expect(writeRule).not.toContain("role').val() == 'USER'");
     });
 
-    // Case 7: QA → approve release server only
-    it('Case 7: QA → approve release server only (direct client write to RELEASED is blocked for everyone including QA)', () => {
+    // Case 7: QA → approve release requires valid releaseSignatures and PASS quality
+    it('Case 7: QA → approve release requires valid release signatures and PASS quality (Gate 7)', () => {
       const writeRule = parsedRules.batches['$item_id']['.write'];
-      // Even for QA, direct status: RELEASED write is blocked by newData.child('status').val() !== 'RELEASED'
-      expect(writeRule).toContain("newData.child('status').val() !== 'RELEASED'");
+      expect(writeRule).toContain("newData.hasChild('releaseSignatures')");
+      expect(writeRule).toContain('qualityStatus');
     });
   });
 });

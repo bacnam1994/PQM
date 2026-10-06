@@ -52,12 +52,13 @@ describe('Security Rules Static Audit - PQM 3.0', () => {
       expect(testResultWriteRule).toContain('QA');
     });
 
-    it('should enforce server-only write protection on electronic_signatures (Phase 4 Hardening)', () => {
+    it('should enforce append-only and checksum write protection on electronic_signatures', () => {
       const content = fs.readFileSync(dbRulesPath, 'utf8');
       const rules = JSON.parse(content).rules;
       const sigWriteRule = rules.electronic_signatures['$sig_id']['.write'];
 
-      expect(sigWriteRule).toBe(false);
+      expect(sigWriteRule).toContain('!data.exists()');
+      expect(sigWriteRule).toContain('checksum');
     });
 
     it('should enforce server-only write protection on release_commands', () => {

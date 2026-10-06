@@ -77,10 +77,7 @@ export class SecurityRulesValidator {
     const rootCollection = segments[0];
 
     // Chốt chặn máy chủ (Server-Only Collections): Cấm client tự ý ghi
-    if (
-      (rootCollection === 'release_commands' || rootCollection === 'electronic_signatures') &&
-      action !== 'READ'
-    ) {
+    if (rootCollection === 'release_commands' && action !== 'READ') {
       return {
         allowed: false,
         reason: `Server-Only Collection: Thao tác ghi trên '${rootCollection}' chỉ được thực hiện thông qua Cloud Function máy chủ.`,
@@ -315,6 +312,37 @@ export class SecurityRulesValidator {
     // 9. Ràng buộc Cảnh báo chất lượng (Quality Alerts)
     if (rootCollection === 'quality_alerts') {
       return { allowed: true };
+    }
+
+    // 10. Ràng buộc Chữ ký điện tử (FDA 21 CFR Part 11)
+    if (rootCollection === 'electronic_signatures') {
+      if (action === 'READ') return { allowed: true };
+      if (action === 'CREATE') {
+        if (!payload?.checksum || !payload?.documentId || !payload?.documentType) {
+          return {
+            allowed: false,
+            reason:
+              'Chữ ký điện tử thiếu thông tin bắt buộc (documentId, documentType hoặc checksum).',
+          };
+        }
+        if (
+          payload.documentType === 'BATCH_RELEASE' ||
+          payload.documentType === 'COA_ISSUE' ||
+          payload.documentType === 'BATCH_REJECT'
+        ) {
+          if (user.role !== 'QA' && !user.isAdmin) {
+            return {
+              allowed: false,
+              reason: 'Chỉ QA hoặc Quản trị viên mới có thẩm quyền ký xuất xưởng hoặc từ chối Lô.',
+            };
+          }
+        }
+        return { allowed: true };
+      }
+      return {
+        allowed: false,
+        reason: 'ALCOA+ Violation: Chữ ký điện tử là bất biến (Append-only), cấm sửa đổi hoặc xóa.',
+      };
     }
 
     return { allowed: true };

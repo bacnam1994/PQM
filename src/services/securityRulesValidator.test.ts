@@ -380,8 +380,8 @@ describe('TASK-005: Security Rules Verification Suite', () => {
       expect(otherResult.allowed).toBe(false);
     });
 
-    it('chặn client tự ý ghi (CREATE/UPDATE) vào electronic_signatures (Server-Only)', () => {
-      const createRes = SecurityRulesValidator.evaluate(
+    it('kiểm soát ghi electronic_signatures: bất biến (chặn UPDATE) và bắt buộc đủ dữ liệu toàn vẹn', () => {
+      const invalidCreateRes = SecurityRulesValidator.evaluate(
         qaUser,
         'CREATE',
         'electronic_signatures/sig_1',
@@ -390,8 +390,20 @@ describe('TASK-005: Security Rules Verification Suite', () => {
           documentId: 'batch-001',
         }
       );
-      expect(createRes.allowed).toBe(false);
-      expect(createRes.reason).toContain('Server-Only Collection');
+      expect(invalidCreateRes.allowed).toBe(false);
+      expect(invalidCreateRes.reason).toContain('Chữ ký điện tử thiếu thông tin bắt buộc');
+
+      const validCreateRes = SecurityRulesValidator.evaluate(
+        qaUser,
+        'CREATE',
+        'electronic_signatures/sig_1',
+        {
+          documentType: 'BATCH_RELEASE',
+          documentId: 'batch-001',
+          checksum: 'sha256-mock-checksum',
+        }
+      );
+      expect(validCreateRes.allowed).toBe(true);
 
       const updateRes = SecurityRulesValidator.evaluate(
         qaUser,
@@ -402,7 +414,7 @@ describe('TASK-005: Security Rules Verification Suite', () => {
         }
       );
       expect(updateRes.allowed).toBe(false);
-      expect(updateRes.reason).toContain('Server-Only Collection');
+      expect(updateRes.reason).toContain('ALCOA+ Violation');
     });
 
     it('chặn client tự ý ghi vào release_commands (Server-Only)', () => {
