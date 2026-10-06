@@ -118,22 +118,35 @@ jobs:
       - name: Build Production Bundle (Vite)
         run: npm run build
 
-      - name: Deploy to Firebase Hosting (via Service Account)
-        if: env.FIREBASE_SA != ''
-        uses: FirebaseExtended/action-hosting-deploy@v0
-        with:
-          repoToken: ${{ secrets.GITHUB_TOKEN }}
-          firebaseServiceAccount: ${{ env.FIREBASE_SA }}
-          channelId: live
-          projectId: v-biotech
+      - name: Build Cloud Functions
+        run: |
+          cd functions
+          npm ci
+          npm run build
+          cd ..
 
-      - name: Deploy to Firebase Hosting (via FIREBASE_TOKEN fallback)
+      - name: Deploy to Firebase (Functions & Hosting via Service Account)
+        if: env.FIREBASE_SA != ''
+        run: |
+          echo '${{ env.FIREBASE_SA }}' > $RUNNER_TEMP/firebase_sa.json
+          GOOGLE_APPLICATION_CREDENTIALS=$RUNNER_TEMP/firebase_sa.json npx firebase-tools deploy --only functions,hosting --project v-biotech
+          rm -f $RUNNER_TEMP/firebase_sa.json
+
+      - name: Deploy to Firebase (Functions & Hosting via FIREBASE_TOKEN fallback)
         if: env.FIREBASE_SA == '' && env.FIREBASE_TOKEN != ''
-        run: npx firebase-tools deploy --only hosting --token "${{ env.FIREBASE_TOKEN }}" --project v-biotech
+        run: npx firebase-tools deploy --only functions,hosting --token "${{ env.FIREBASE_TOKEN }}" --project v-biotech
+
+      - name: Verify Cloud Functions Deployment
+        if: env.FIREBASE_SA != '' || env.FIREBASE_TOKEN != ''
+        run: |
+          echo "🔍 Verifying deployed Cloud Functions..."
+          if [ -n "${{ env.FIREBASE_TOKEN }}" ]; then
+            npx firebase-tools functions:list --token "${{ env.FIREBASE_TOKEN }}" --project v-biotech
+          fi
 
       - name: Informational Notice (If no Firebase secrets configured yet)
         if: env.FIREBASE_SA == '' && env.FIREBASE_TOKEN == ''
         run: |
           echo "ℹ️ Lưu ý: Build hoàn tất thành công 100%!"
-          echo "Để kích hoạt tự động deploy lên Firebase Hosting (v-biotech.web.app):"
+          echo "Để kích hoạt tự động deploy lên Firebase (v-biotech):"
           echo "Vui lòng cấu hình Secret 'FIREBASE_SERVICE_ACCOUNT_V_BIOTECH' hoặc 'FIREBASE_TOKEN' trong Settings -> Secrets của GitHub Repository."
