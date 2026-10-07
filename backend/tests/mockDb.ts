@@ -37,6 +37,21 @@ export function createStrictMockDatabase() {
             val: () => (val !== null ? JSON.parse(JSON.stringify(val)) : null),
           };
         }),
+        child: (subPath: string) => {
+          const joinedPath = path ? `${path}/${subPath}` : subPath;
+          return db.ref(joinedPath);
+        },
+        remove: vi.fn().mockImplementation(async () => {
+          delete storage[path];
+          const parts = path.split('/');
+          if (parts.length > 1) {
+            const parentPath = parts.slice(0, -1).join('/');
+            const field = parts[parts.length - 1];
+            if (storage[parentPath] && typeof storage[parentPath] === 'object') {
+              delete storage[parentPath][field];
+            }
+          }
+        }),
         set: vi.fn().mockImplementation(async (data: any) => {
           validateNoUndefined(data, path);
           storage[path] = JSON.parse(JSON.stringify(data));

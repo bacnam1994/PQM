@@ -14,9 +14,13 @@
 
 import { Batch, TestResult, TCCS, ProductFormula, ElectronicSignature } from '../../types';
 import { IBatchRepository } from '../../repositories/BatchRepository';
-import { batchRepository as defaultRepo } from '../../repositories/firebase/FirebaseBatchRepository';
+import {
+  batchRepository as defaultRepo,
+  FirebaseBatchRepository,
+} from '../../repositories/firebase/FirebaseBatchRepository';
 import { validateOptimisticLock, nextVersion } from '../../utils/concurrency';
 import { signatureService } from '../../services/signatureService';
+import { getReleaseCommandPort } from '../../services/releaseCommandPort';
 import { BatchRules } from '../../domain/rules';
 import { BatchReleaseDecisionService } from '../../domain/batch/BatchReleaseDecisionService';
 import { BatchStateMachine } from '../../domain/workflow/stateMachine';
@@ -453,6 +457,24 @@ export class BatchWorkflowHandlers {
     };
 
     if (!flags.enableBatchWorkflowFacade) {
+      if (actionId === 'BATCH_RELEASE_APPROVE' && this.repo instanceof FirebaseBatchRepository) {
+        const releasePort = getReleaseCommandPort();
+        const signatureId =
+          options?.signature?.id || (options?.signature as any)?.signatureId || '';
+        const idempotencyKey =
+          options?.idempotencyKey ||
+          `REL-CMD-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+        const serverResult = await releasePort.executeRelease({
+          batchId,
+          expectedVersion: options?.expectedVersion ?? currentBatch.version ?? 1,
+          signatureId,
+          idempotencyKey,
+        });
+        cleanBatch.version = serverResult.newVersion;
+        cleanBatch.status = 'RELEASED';
+        cleanBatch.releasedAt = serverResult.releasedAt;
+        return cleanBatch;
+      }
       if (typeof this.repo.updateStatus === 'function') {
         await this.repo.updateStatus(batchId, calculatedNextState, effectiveReason, repoMetadata);
       } else {
@@ -475,6 +497,25 @@ export class BatchWorkflowHandlers {
         idempotencyKey: options?.idempotencyKey,
       },
       async () => {
+        if (actionId === 'BATCH_RELEASE_APPROVE' && this.repo instanceof FirebaseBatchRepository) {
+          const releasePort = getReleaseCommandPort();
+          const signatureId =
+            options?.signature?.id || (options?.signature as any)?.signatureId || '';
+          const idempotencyKey =
+            options?.idempotencyKey ||
+            `REL-CMD-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+          const serverResult = await releasePort.executeRelease({
+            batchId,
+            expectedVersion: options?.expectedVersion ?? currentBatch.version ?? 1,
+            signatureId,
+            idempotencyKey,
+          });
+          cleanBatch.version = serverResult.newVersion;
+          cleanBatch.status = 'RELEASED';
+          cleanBatch.releasedAt = serverResult.releasedAt;
+          return cleanBatch;
+        }
+
         if (typeof this.repo.updateStatus === 'function') {
           await this.repo.updateStatus(batchId, calculatedNextState, effectiveReason, repoMetadata);
         } else {

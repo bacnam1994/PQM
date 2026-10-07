@@ -193,7 +193,7 @@ describe('TASK-005: Security Rules Verification Suite', () => {
         status: 'RELEASED',
       });
       expect(result.allowed).toBe(false);
-      expect(result.reason).toContain('Chỉ QA mới có thẩm quyền');
+      expect(result.reason).toContain('Server Authority Enforcement');
     });
 
     it('chặn nhân viên Sản xuất hoặc QC tự ý từ chối REJECTED lô hàng', () => {
@@ -217,11 +217,13 @@ describe('TASK-005: Security Rules Verification Suite', () => {
       expect(result.reason).toContain('bị khóa');
     });
 
-    it('cho phép QA phê duyệt xuất xưởng hoặc từ chối lô sản xuất', () => {
+    it('chặn QA client trực tiếp phê duyệt xuất xưởng RELEASED (bắt buộc External Backend), nhưng cho phép từ chối REJECTED', () => {
       const resRelease = SecurityRulesValidator.evaluate(qaUser, 'UPDATE', 'batches/b1', {
         status: 'RELEASED',
       });
-      expect(resRelease.allowed).toBe(true);
+      expect(resRelease.allowed).toBe(false);
+      expect(resRelease.reason).toContain('Server Authority Enforcement');
+
       const resReject = SecurityRulesValidator.evaluate(qaUser, 'UPDATE', 'batches/b1', {
         status: 'REJECTED',
       });
@@ -380,7 +382,7 @@ describe('TASK-005: Security Rules Verification Suite', () => {
       expect(otherResult.allowed).toBe(false);
     });
 
-    it('kiểm soát ghi electronic_signatures: bất biến (chặn UPDATE) và bắt buộc đủ dữ liệu toàn vẹn', () => {
+    it('kiểm soát ghi electronic_signatures: cấm toàn bộ client ghi (Server Authority Only)', () => {
       const invalidCreateRes = SecurityRulesValidator.evaluate(
         qaUser,
         'CREATE',
@@ -391,7 +393,7 @@ describe('TASK-005: Security Rules Verification Suite', () => {
         }
       );
       expect(invalidCreateRes.allowed).toBe(false);
-      expect(invalidCreateRes.reason).toContain('Chữ ký điện tử thiếu thông tin bắt buộc');
+      expect(invalidCreateRes.reason).toContain('Server Authority Enforcement');
 
       const validCreateRes = SecurityRulesValidator.evaluate(
         qaUser,
@@ -403,7 +405,8 @@ describe('TASK-005: Security Rules Verification Suite', () => {
           checksum: 'sha256-mock-checksum',
         }
       );
-      expect(validCreateRes.allowed).toBe(true);
+      expect(validCreateRes.allowed).toBe(false);
+      expect(validCreateRes.reason).toContain('Server Authority Enforcement');
 
       const updateRes = SecurityRulesValidator.evaluate(
         qaUser,
@@ -414,7 +417,7 @@ describe('TASK-005: Security Rules Verification Suite', () => {
         }
       );
       expect(updateRes.allowed).toBe(false);
-      expect(updateRes.reason).toContain('ALCOA+ Violation');
+      expect(updateRes.reason).toContain('Server Authority Enforcement');
     });
 
     it('chặn client tự ý ghi vào release_commands (Server-Only)', () => {

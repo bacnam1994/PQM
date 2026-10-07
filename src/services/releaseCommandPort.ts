@@ -32,14 +32,11 @@ export interface BatchReleaseCommandOutput {
   commandId: string;
 }
 
+import { getBackendApiUrl } from './signatureService';
+
 export interface IReleaseCommandPort {
   executeRelease(input: BatchReleaseCommandInput): Promise<BatchReleaseCommandOutput>;
 }
-
-const BACKEND_API_URL =
-  (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_BACKEND_API_URL) ||
-  (typeof process !== 'undefined' && process.env?.VITE_BACKEND_API_URL) ||
-  'http://localhost:4000';
 
 /**
  * Production HTTP Backend Implementation of Release Command
@@ -48,7 +45,7 @@ export class HttpReleaseCommandAdapter implements IReleaseCommandPort {
   private baseUrl: string;
 
   constructor(baseUrl?: string) {
-    this.baseUrl = baseUrl || BACKEND_API_URL;
+    this.baseUrl = baseUrl || getBackendApiUrl();
   }
 
   async executeRelease(input: BatchReleaseCommandInput): Promise<BatchReleaseCommandOutput> {

@@ -4,6 +4,7 @@
   "description": "PQM External Backend Authority (Signature, Release, Auth)",
   "main": "dist/index.js",
   "scripts": {
+    "prebuild": "npm --prefix ../packages/release-engine run build",
     "build": "tsc",
     "start": "node dist/index.js",
     "dev": "node --loader ts-node/esm src/index.ts",
@@ -11,10 +12,12 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@pqm/release-engine": "file:../packages/release-engine",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
-    "firebase-admin": "^12.0.0"
+    "firebase-admin": "^12.0.0",
+    "zod": "^3.24.2"
   },
   "devDependencies": {
     "@types/cors": "^2.8.17",

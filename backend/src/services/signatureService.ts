@@ -5,10 +5,13 @@
  * Implements technical controls aligned with FDA 21 CFR Part 11 & GMP-WHO Annex 11:
  * - Deterministic Canonical SHA-256 Checksum
  * - Role & Permission Enforcement (QA / QC / ADMIN)
- * - Server-only write to electronic_signatures/
- * - ALCOA+ Audit Log recording
+ * - Strict Zod Boundary Validation
+ * - Collision-resistant UUIDs (crypto.randomUUID)
+ * - Atomic Multi-location Write (electronic_signatures/ + audit_logs/)
+ * - Zero Client Mutation (.write: false enforced in RTDB rules)
  */
 
+import crypto from 'crypto';
 import * as admin from 'firebase-admin';
 import {
   calculateCanonicalSignatureChecksum,
@@ -16,7 +19,11 @@ import {
   SignatureDocumentType,
 } from '@pqm/release-engine';
 import { AuthenticatedUser } from '../middleware/auth';
-import { CreateSignatureRequestBody, CreateSignatureResponseBody } from '../types/signature';
+import {
+  createSignatureSchema,
+  CreateSignatureRequestBody,
+  CreateSignatureResponseBody,
+} from '../types/signature';
 import { removeUndefinedFields } from '../utils/canonicalSignature';
 import { AppError } from '../utils/errors';
 
@@ -26,24 +33,21 @@ export class ServerSignatureService {
    */
   async createSignature(
     user: AuthenticatedUser,
-    input: CreateSignatureRequestBody,
+    rawInput: unknown,
     correlationId: string,
     db: admin.database.Database
   ): Promise<CreateSignatureResponseBody> {
     const startTime = Date.now();
 
-    // 1. Validate Input
-    if (!input.documentId || typeof input.documentId !== 'string' || !input.documentId.trim()) {
-      throw new AppError('VALIDATION_ERROR', 'Mã tài liệu (Document ID) không được để trống.', 400);
-    }
-    if (!input.documentType || typeof input.documentType !== 'string') {
-      throw new AppError(
-        'VALIDATION_ERROR',
-        'Loại tài liệu ký duyệt (Document Type) không được để trống.',
-        400
-      );
+    // 1. Strict Boundary Validation with Zod (Phase 12)
+    const parseResult = createSignatureSchema.safeParse(rawInput);
+    if (!parseResult.success) {
+      const firstIssue = parseResult.error.issues[0];
+      const message = `${firstIssue.path.join('.') || 'input'}: ${firstIssue.message}`;
+      throw new AppError('VALIDATION_ERROR', `Dữ liệu chữ ký không hợp lệ: ${message}`, 400);
     }
 
+    const input: CreateSignatureRequestBody = parseResult.data;
     const documentType = input.documentType as SignatureDocumentType;
     const documentId = input.documentId.trim();
 
@@ -86,22 +90,18 @@ export class ServerSignatureService {
       role: user.role,
       meaning,
       signedAt,
-      ...(input.documentVersion !== undefined &&
-      input.documentVersion !== null &&
-      !isNaN(Number(input.documentVersion))
-        ? { documentVersion: Number(input.documentVersion) }
-        : {}),
-      ...(input.comments !== undefined &&
-      input.comments !== null &&
-      typeof input.comments === 'string' &&
-      input.comments.trim() !== ''
+      ...(input.documentVersion !== undefined ? { documentVersion: input.documentVersion } : {}),
+      ...(input.comments !== undefined && input.comments.trim() !== ''
         ? { comments: input.comments.trim() }
         : {}),
     };
 
     // 4. Calculate Deterministic Canonical SHA-256 Checksum
     const checksum = calculateCanonicalSignatureChecksum(unsignedData as any);
-    const sigId = `sig_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+
+    // Phase 13: Collision-safe UUIDs
+    const sigId = `sig_${crypto.randomUUID()}`;
+    const auditId = `audit_sig_${crypto.randomUUID()}`;
 
     const signature: ElectronicSignature = removeUndefinedFields({
       id: sigId,
@@ -110,11 +110,7 @@ export class ServerSignatureService {
       status: 'CREATED' as const,
     });
 
-    // 5. Server-Authoritative Writes to RTDB
-    await db.ref(`electronic_signatures/${sigId}`).set(signature);
-
-    // 6. Server-Side ALCOA+ Audit Log Write
-    const auditId = `audit_sig_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    // 5. Server-Side ALCOA+ Audit Log Payload
     const auditPayload = removeUndefinedFields({
       eventId: auditId,
       timestamp: signedAt,
@@ -129,7 +125,14 @@ export class ServerSignatureService {
       details: `Electronic signature created [${documentType}] id=${documentId} by ${user.email} (${user.role})`,
       correlationId,
     });
-    await db.ref(`audit_logs/${auditId}`).set(auditPayload);
+
+    // 6. Phase 5: Atomic Multi-location Commit (Signature + Audit in one atomic operation)
+    const updates: Record<string, any> = {
+      [`/electronic_signatures/${sigId}`]: signature,
+      [`/audit_logs/${auditId}`]: auditPayload,
+    };
+
+    await db.ref().update(updates);
 
     return {
       success: true,

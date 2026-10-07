@@ -4,14 +4,16 @@
  *
  * Enforces:
  * 1. Authentication & Authorization (QA / ADMIN only)
- * 2. Transactional Idempotency Claim (PROCESSING -> COMPLETED / FAILED)
- * 3. Optimistic Concurrency Control (OCC) against expectedVersion
- * 4. Fresh DB reads for Batch, Signatures, TestResults, Deviations
- * 5. Single Canonical Release Engine (7 Gates + NIST SHA-256 Checksum)
- * 6. Atomic Multi-path Commit: Batch RELEASED, Signature CONSUMED, Command COMPLETED, Audit Log
- * 7. Immutable ALCOA+ Historical Release Snapshot
+ * 2. Atomic Lease-based Idempotency Claim (PROCESSING with leaseExpiresAt -> COMPLETED / FAILED)
+ * 3. Stale Processing Recovery (Detects orphaned PROCESSING and reclaims safely)
+ * 4. True Atomic Optimistic Concurrency Control (OCC transaction on /batches/{batchId})
+ * 5. Fresh DB reads for Batch, Signatures, TestResults, Deviations
+ * 6. Single Canonical Release Engine (7 Gates + NIST SHA-256 Checksum)
+ * 7. Atomic Multi-path Commit: Batch RELEASED, Signature CONSUMED, Command COMPLETED, Audit Log
+ * 8. Consistent Failure Logging on /release_commands/{idempotencyKey}
  */
 
+import crypto from 'crypto';
 import * as admin from 'firebase-admin';
 import {
   CanonicalReleaseEngine,
@@ -22,17 +24,22 @@ import {
   QualityDeviation,
 } from '@pqm/release-engine';
 import { AuthenticatedUser } from '../middleware/auth';
-import { BatchReleaseRequestBody, BatchReleaseResponseBody } from '../types/release';
+import {
+  batchReleaseSchema,
+  BatchReleaseRequestBody,
+  BatchReleaseResponseBody,
+} from '../types/release';
 import { AppError } from '../utils/errors';
 
 export class ServerReleaseService {
   async approveRelease(
     user: AuthenticatedUser,
-    input: BatchReleaseRequestBody,
+    rawInput: unknown,
     correlationId: string,
     db: admin.database.Database
   ): Promise<BatchReleaseResponseBody> {
     const startTime = Date.now();
+    const LEASE_DURATION_MS = 60000; // 60 seconds lease
 
     // 1. Role Authorization Check
     if (user.role !== 'QA' && !user.isAdmin) {
@@ -43,28 +50,25 @@ export class ServerReleaseService {
       );
     }
 
-    // 2. Input Validation
-    const { idempotencyKey, batchId, expectedVersion, signatureId } = input;
-    if (!idempotencyKey || typeof idempotencyKey !== 'string' || !idempotencyKey.trim()) {
-      throw new AppError('VALIDATION_ERROR', 'Thiếu idempotencyKey hợp lệ.', 400);
-    }
-    if (!batchId || typeof batchId !== 'string' || !batchId.trim()) {
-      throw new AppError('VALIDATION_ERROR', 'Thiếu batchId hợp lệ.', 400);
-    }
-    if (typeof expectedVersion !== 'number' || expectedVersion < 1) {
+    // 2. Strict Boundary Input Validation with Zod (Phase 12)
+    const parseResult = batchReleaseSchema.safeParse(rawInput);
+    if (!parseResult.success) {
+      const firstIssue = parseResult.error.issues[0];
+      const message = `${firstIssue.path.join('.') || 'input'}: ${firstIssue.message}`;
       throw new AppError(
         'VALIDATION_ERROR',
-        'expectedVersion không hợp lệ (phải là số nguyên >= 1).',
+        `Dữ liệu lệnh xuất xưởng không hợp lệ: ${message}`,
         400
       );
     }
-    if (!signatureId || typeof signatureId !== 'string' || !signatureId.trim()) {
-      throw new AppError('VALIDATION_ERROR', 'Thiếu signatureId hợp lệ.', 400);
-    }
 
+    const input: BatchReleaseRequestBody = parseResult.data;
+    const { idempotencyKey, batchId, expectedVersion, signatureId } = input;
     const commandRef = db.ref(`/release_commands/${idempotencyKey}`);
+    const batchRef = db.ref(`/batches/${batchId}`);
 
-    // 3. Transactionally Claim Idempotency Key
+    // 3. Phase 4: Transactionally Claim Idempotency Key with Lease Expiration
+    let commandReclaimed = false;
     const claimResult = await commandRef.transaction((current) => {
       if (current === null) {
         return {
@@ -73,6 +77,8 @@ export class ServerReleaseService {
           batchId,
           actorUid: user.uid,
           status: 'PROCESSING',
+          processingStartedAt: startTime,
+          leaseExpiresAt: startTime + LEASE_DURATION_MS,
           createdAt: startTime,
         };
       }
@@ -92,86 +98,192 @@ export class ServerReleaseService {
       }
 
       if (existing?.status === 'PROCESSING') {
+        const isLeaseActive = startTime <= (existing.leaseExpiresAt ?? 0);
+        if (isLeaseActive) {
+          throw new AppError(
+            'IDEMPOTENCY_CONFLICT',
+            'Lệnh xuất xưởng đang được xử lý (PROCESSING). Vui lòng đợi hoặc thử lại sau.',
+            409
+          );
+        }
+
+        // Stale lease detected! Inspect batch status before deciding
+        const staleBatchSnap = await batchRef.once('value');
+        const staleBatch = staleBatchSnap.val();
+
+        if (staleBatch?.status === 'RELEASED' && staleBatch.releaseCommandId === idempotencyKey) {
+          // Batch was actually released in prior attempt: return existing result
+          if (existing.result) {
+            return {
+              ...existing.result,
+              idempotencyReplayed: true,
+              durationMs: Date.now() - startTime,
+            };
+          }
+        }
+
+        // Batch not released: safely reclaim command with renewed lease
+        commandReclaimed = true;
+        await commandRef.update({
+          status: 'PROCESSING',
+          processingStartedAt: startTime,
+          leaseExpiresAt: startTime + LEASE_DURATION_MS,
+          reclaimedAt: startTime,
+          reclaimedBy: user.uid,
+          correlationId,
+        });
+      } else {
+        // Status is FAILED: allow retry with renewed lease
+        await commandRef.set({
+          commandId: idempotencyKey,
+          correlationId,
+          batchId,
+          actorUid: user.uid,
+          status: 'PROCESSING',
+          processingStartedAt: startTime,
+          leaseExpiresAt: startTime + LEASE_DURATION_MS,
+          createdAt: startTime,
+          retryOf: existing?.failedAt || startTime,
+        });
+      }
+    }
+
+    let batchLockHeld = false;
+
+    try {
+      // 4. Phase 3: True Atomic Optimistic Concurrency Control (OCC) Claim on /batches/{batchId}
+      let versionConflictDetected = false;
+      let actualVersionOnServer = 1;
+      let batchNotFound = false;
+      let batchStatusInvalid: string | null = null;
+      let activeLockHeldByOther = false;
+
+      const claimBatchResult = await batchRef.transaction((currentBatch) => {
+        if (currentBatch === null) {
+          batchNotFound = true;
+          return undefined;
+        }
+
+        const currentVersion = currentBatch.version ?? 1;
+        if (currentVersion !== expectedVersion) {
+          versionConflictDetected = true;
+          actualVersionOnServer = currentVersion;
+          return undefined;
+        }
+
+        if (currentBatch.status === 'RELEASED') {
+          versionConflictDetected = true;
+          actualVersionOnServer = currentVersion;
+          return undefined;
+        }
+
+        if (currentBatch.status !== 'TESTING') {
+          batchStatusInvalid = currentBatch.status;
+          return undefined;
+        }
+
+        // Check if an active release lock is held by another command
+        if (currentBatch.releaseLock) {
+          const lock = currentBatch.releaseLock;
+          const isLockActive = startTime <= (lock.leaseExpiresAt ?? 0);
+          if (isLockActive && lock.commandId !== idempotencyKey) {
+            activeLockHeldByOther = true;
+            return undefined;
+          }
+        }
+
+        // Atomically claim release lock on batch
+        currentBatch.releaseLock = {
+          commandId: idempotencyKey,
+          claimedBy: user.uid,
+          claimedAt: startTime,
+          leaseExpiresAt: startTime + LEASE_DURATION_MS,
+          expectedVersion,
+        };
+
+        return currentBatch;
+      });
+
+      if (!claimBatchResult.committed) {
+        if (versionConflictDetected || activeLockHeldByOther) {
+          await commandRef.update({
+            status: 'FAILED',
+            failureCode: 'OCC_CONFLICT',
+            failedAt: Date.now(),
+            expectedVersion,
+            actualVersion: actualVersionOnServer,
+            correlationId,
+          });
+          throw new AppError(
+            'VERSION_CONFLICT',
+            `CONCURRENCY_CONFLICT: Phiên bản lô không khớp hoặc đang có lệnh xuất xưởng đồng thời (mong đợi: v${expectedVersion}, hiện tại trên server: v${actualVersionOnServer}). Vui lòng tải lại dữ liệu mới nhất.`,
+            409
+          );
+        }
+
+        if (batchNotFound) {
+          await commandRef.update({
+            status: 'FAILED',
+            failureCode: 'BATCH_NOT_FOUND',
+            failedAt: Date.now(),
+            correlationId,
+          });
+          throw new AppError(
+            'BATCH_NOT_FOUND',
+            `Không tìm thấy thông tin Lô sản xuất với ID: ${batchId}`,
+            404
+          );
+        }
+
+        if (batchStatusInvalid === 'RELEASED') {
+          await commandRef.update({
+            status: 'FAILED',
+            failureCode: 'ALREADY_RELEASED',
+            failedAt: Date.now(),
+            correlationId,
+          });
+          throw new AppError('BATCH_STATE_INVALID', 'Lô sản xuất đã ở trạng thái RELEASED.', 400);
+        }
+
+        if (batchStatusInvalid) {
+          await commandRef.update({
+            status: 'FAILED',
+            failureCode: 'INVALID_STATUS',
+            failedAt: Date.now(),
+            correlationId,
+          });
+          throw new AppError(
+            'BATCH_STATE_INVALID',
+            `Lô phải ở trạng thái TESTING trước khi xuất xưởng (trạng thái hiện tại: ${batchStatusInvalid}).`,
+            400
+          );
+        }
+
+        // Generic OCC conflict fallback
+        await commandRef.update({
+          status: 'FAILED',
+          failureCode: 'OCC_CONFLICT',
+          failedAt: Date.now(),
+          correlationId,
+        });
         throw new AppError(
-          'IDEMPOTENCY_CONFLICT',
-          'Lệnh xuất xưởng đang được xử lý (PROCESSING). Vui lòng đợi hoặc thử lại sau.',
+          'VERSION_CONFLICT',
+          `CONCURRENCY_CONFLICT: Không thể khóa Lô xuất xưởng. Vui lòng tải lại dữ liệu mới nhất.`,
           409
         );
       }
 
-      // If FAILED, mark as new attempt
-      await commandRef.set({
-        commandId: idempotencyKey,
-        correlationId,
-        batchId,
-        actorUid: user.uid,
-        status: 'PROCESSING',
-        createdAt: startTime,
-        retryOf: existing?.failedAt || startTime,
-      });
-    }
+      batchLockHeld = true;
 
-    try {
-      // 4. Fresh Database Reads
+      // 5. Fresh Database Reads for Related Records
       const [batchSnap, sigSnap, testResultsSnap, deviationsSnap] = await Promise.all([
-        db.ref(`/batches/${batchId}`).once('value'),
+        batchRef.once('value'),
         db.ref(`/electronic_signatures/${signatureId}`).once('value'),
         db.ref('/testResults').orderByChild('batchId').equalTo(batchId).once('value'),
         db.ref('/quality_deviations').orderByChild('batchId').equalTo(batchId).once('value'),
       ]);
 
-      const batch = batchSnap.val() as Batch | null;
-      if (!batch) {
-        await commandRef.update({
-          status: 'FAILED',
-          failureCode: 'BATCH_NOT_FOUND',
-          failedAt: Date.now(),
-        });
-        throw new AppError(
-          'BATCH_NOT_FOUND',
-          `Không tìm thấy thông tin Lô sản xuất với ID: ${batchId}`,
-          404
-        );
-      }
-
-      // 5. Optimistic Concurrency Control (OCC)
-      const currentVersion = batch.version ?? 1;
-      if (currentVersion !== expectedVersion) {
-        await commandRef.update({
-          status: 'FAILED',
-          failureCode: 'OCC_CONFLICT',
-          failedAt: Date.now(),
-          expectedVersion,
-          actualVersion: currentVersion,
-        });
-        throw new AppError(
-          'VERSION_CONFLICT',
-          `CONCURRENCY_CONFLICT: Phiên bản lô không khớp (mong đợi: v${expectedVersion}, hiện tại trên server: v${currentVersion}). Vui lòng tải lại dữ liệu mới nhất.`,
-          409
-        );
-      }
-
-      // State Machine Check
-      if (batch.status === 'RELEASED') {
-        await commandRef.update({
-          status: 'FAILED',
-          failureCode: 'ALREADY_RELEASED',
-          failedAt: Date.now(),
-        });
-        throw new AppError('BATCH_STATE_INVALID', 'Lô sản xuất đã ở trạng thái RELEASED.', 400);
-      }
-      if (batch.status !== 'TESTING') {
-        await commandRef.update({
-          status: 'FAILED',
-          failureCode: 'INVALID_STATUS',
-          failedAt: Date.now(),
-        });
-        throw new AppError(
-          'BATCH_STATE_INVALID',
-          `Lô phải ở trạng thái TESTING trước khi xuất xưởng (trạng thái hiện tại: ${batch.status}).`,
-          400
-        );
-      }
+      const batch = batchSnap.val() as Batch;
 
       // 6. Signature Validation
       const signature = sigSnap.val() as ElectronicSignature | null;
@@ -180,6 +292,7 @@ export class ServerReleaseService {
           status: 'FAILED',
           failureCode: 'SIGNATURE_NOT_FOUND',
           failedAt: Date.now(),
+          correlationId,
         });
         throw new AppError(
           'SIGNATURE_INVALID',
@@ -193,6 +306,7 @@ export class ServerReleaseService {
           status: 'FAILED',
           failureCode: 'SIGNATURE_NOT_CREATED',
           failedAt: Date.now(),
+          correlationId,
         });
         throw new AppError(
           'SIGNATURE_CONSUMED',
@@ -206,6 +320,7 @@ export class ServerReleaseService {
           status: 'FAILED',
           failureCode: 'ERR_SIGNATURE_MISMATCH',
           failedAt: Date.now(),
+          correlationId,
         });
         throw new AppError(
           'SIGNATURE_INVALID',
@@ -219,6 +334,7 @@ export class ServerReleaseService {
           status: 'FAILED',
           failureCode: 'ERR_SIGNATURE_ACTOR_MISMATCH',
           failedAt: Date.now(),
+          correlationId,
         });
         throw new AppError(
           'PERMISSION_DENIED',
@@ -234,6 +350,7 @@ export class ServerReleaseService {
           status: 'FAILED',
           failureCode: 'ERR_SIGNATURE_TAMPERED',
           failedAt: Date.now(),
+          correlationId,
         });
         throw new AppError(
           'CHECKSUM_MISMATCH',
@@ -274,6 +391,7 @@ export class ServerReleaseService {
           failedAt: Date.now(),
           blockers: releaseDecision.blockers,
           gates: releaseDecision.gates,
+          correlationId,
         });
         throw new AppError(
           'VALIDATION_ERROR',
@@ -284,7 +402,7 @@ export class ServerReleaseService {
 
       // 8. Build ALCOA+ Immutable Snapshot
       const commitTimestamp = new Date().toISOString();
-      const newVersion = currentVersion + 1;
+      const newVersion = expectedVersion + 1;
       const releaseSnapshot = CanonicalReleaseEngine.buildHistoricalReleaseSnapshot({
         batch,
         decision: releaseDecision,
@@ -293,7 +411,8 @@ export class ServerReleaseService {
         evaluatedAt: commitTimestamp,
       });
 
-      const auditId = `AUD-BATCH-${batchId}-RELEASE-${Date.now()}`;
+      // Phase 13: Collision-safe UUID for audit
+      const auditId = `AUD-BATCH-${batchId}-RELEASE-${crypto.randomUUID()}`;
 
       const commandResponse: BatchReleaseResponseBody = {
         success: true,
@@ -308,7 +427,7 @@ export class ServerReleaseService {
       // 9. Atomic Multi-path Commit
       const updates: Record<string, any> = {};
 
-      // Batch updates
+      // Batch updates (Releases the batch, updates version, and clears releaseLock)
       updates[`/batches/${batchId}/status`] = 'RELEASED';
       updates[`/batches/${batchId}/version`] = newVersion;
       updates[`/batches/${batchId}/releasedAt`] = commitTimestamp;
@@ -316,6 +435,7 @@ export class ServerReleaseService {
       updates[`/batches/${batchId}/releaseSnapshot`] = releaseSnapshot;
       updates[`/batches/${batchId}/releaseCommandId`] = idempotencyKey;
       updates[`/batches/${batchId}/updatedAt`] = commitTimestamp;
+      updates[`/batches/${batchId}/releaseLock`] = null;
 
       // Signature consumed
       updates[`/electronic_signatures/${signatureId}/status`] = 'CONSUMED';
@@ -350,7 +470,7 @@ export class ServerReleaseService {
         entityId: batchId,
         previousState: {
           status: batch.status,
-          version: currentVersion,
+          version: expectedVersion,
         },
         newState: {
           status: 'RELEASED',
@@ -363,7 +483,7 @@ export class ServerReleaseService {
         signatureId,
       };
 
-      // ATOMIC WRITE
+      // ATOMIC MULTI-LOCATION WRITE
       await db.ref().update(updates);
 
       return {
@@ -371,6 +491,15 @@ export class ServerReleaseService {
         durationMs: Date.now() - startTime,
       };
     } catch (err: any) {
+      // Phase 14: Release Error Consistency & Lock Cleanup
+      if (batchLockHeld) {
+        // Clear lock on batch so subsequent requests are not blocked
+        await batchRef
+          .child('releaseLock')
+          .remove()
+          .catch(() => {});
+      }
+
       if (err instanceof AppError) {
         throw err;
       }
@@ -381,6 +510,7 @@ export class ServerReleaseService {
           failureCode: 'DATABASE_FAILURE',
           failedAt: Date.now(),
           errorMessage: err?.message || 'Lỗi hệ thống khi commit xuất xưởng',
+          correlationId,
         })
         .catch(() => {});
 

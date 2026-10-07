@@ -316,4 +316,187 @@ describe('Server-Authoritative Batch Release API (POST /api/batch-release/approv
     expect(res.body.success).toBe(false);
     expect(res.body.error.code).toBe('PERMISSION_DENIED');
   });
+
+  describe('PHASE 3: Atomic OCC & Concurrent Race Handling', () => {
+    it('concurrent release requests A & B with expectedVersion=5: exactly one succeeds and the other gets VERSION_CONFLICT', async () => {
+      // 1. Setup initial state: version = 5, status = 'TESTING'
+      const { sigId: sigA } = setupValidBatchAndSignature();
+      mockDb._storage[`batches/${validBatchId}`].version = 5;
+      mockDb._storage[`batches/${validBatchId}`].status = 'TESTING';
+
+      // 2. Setup signature for request B
+      const unsignedSigB = {
+        documentType: 'BATCH_RELEASE' as const,
+        documentId: validBatchId,
+        signerUid: qaUid,
+        signerName: 'QA Lead',
+        signerEmail: qaEmail,
+        role: 'QA',
+        meaning: 'Phê duyệt xuất xưởng Lô B',
+        signedAt: '2026-10-06T12:05:00Z',
+      };
+      const checksumB = calculateCanonicalSignatureChecksum(unsignedSigB);
+      const sigB = 'sig_test_valid_02';
+      mockDb._storage[`electronic_signatures/${sigB}`] = {
+        id: sigB,
+        ...unsignedSigB,
+        checksum: checksumB,
+        status: 'CREATED',
+      };
+
+      const token = JSON.stringify({
+        uid: qaUid,
+        email: qaEmail,
+        role: 'QA',
+        auth_time: Math.floor(Date.now() / 1000) - 10,
+      });
+
+      // 3. Fire concurrent requests A & B
+      const [resA, resB] = await Promise.all([
+        request(app)
+          .post('/api/batch-release/approve')
+          .set('Authorization', `Bearer ${token}`)
+          .send({
+            batchId: validBatchId,
+            signatureId: sigA,
+            expectedVersion: 5,
+            idempotencyKey: 'IDEMP-CONCUR-A-001',
+          }),
+        request(app)
+          .post('/api/batch-release/approve')
+          .set('Authorization', `Bearer ${token}`)
+          .send({
+            batchId: validBatchId,
+            signatureId: sigB,
+            expectedVersion: 5,
+            idempotencyKey: 'IDEMP-CONCUR-B-001',
+          }),
+      ]);
+
+      const statuses = [resA.status, resB.status].sort();
+      // Exactly one 200 SUCCESS and one 409 VERSION_CONFLICT
+      expect(statuses).toEqual([200, 409]);
+
+      const conflictRes = resA.status === 409 ? resA : resB;
+      expect(conflictRes.body.error.code).toBe('VERSION_CONFLICT');
+
+      // 4. Verification of database state: version must be exactly 6, status must be RELEASED
+      const finalBatch = mockDb._storage[`batches/${validBatchId}`];
+      expect(finalBatch.version).toBe(6);
+      expect(finalBatch.status).toBe('RELEASED');
+      expect(finalBatch.releaseLock).toBeNull();
+    });
+  });
+
+  describe('PHASE 4: Idempotency Lease Expiration & Stale Recovery', () => {
+    it('should reject retry while PROCESSING lease is still active with 409 IDEMPOTENCY_CONFLICT', async () => {
+      const { sigId } = setupValidBatchAndSignature();
+      const idempotencyKey = 'IDEMP-LEASE-ACTIVE-001';
+
+      // Simulate active PROCESSING command with lease valid for 60s
+      mockDb._storage[`release_commands/${idempotencyKey}`] = {
+        commandId: idempotencyKey,
+        batchId: validBatchId,
+        actorUid: qaUid,
+        status: 'PROCESSING',
+        processingStartedAt: Date.now() - 10000,
+        leaseExpiresAt: Date.now() + 50000, // Still active!
+      };
+
+      const token = JSON.stringify({
+        uid: qaUid,
+        email: qaEmail,
+        role: 'QA',
+        auth_time: Math.floor(Date.now() / 1000) - 10,
+      });
+
+      const res = await request(app)
+        .post('/api/batch-release/approve')
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          batchId: validBatchId,
+          signatureId: sigId,
+          expectedVersion: 1,
+          idempotencyKey,
+        });
+
+      expect(res.status).toBe(409);
+      expect(res.body.error.code).toBe('IDEMPOTENCY_CONFLICT');
+    });
+
+    it('should reclaim command when PROCESSING lease is expired and batch was not released', async () => {
+      const { sigId } = setupValidBatchAndSignature();
+      const idempotencyKey = 'IDEMP-LEASE-EXPIRED-001';
+
+      // Simulate stale PROCESSING command from a crashed server (> 60s ago)
+      mockDb._storage[`release_commands/${idempotencyKey}`] = {
+        commandId: idempotencyKey,
+        batchId: validBatchId,
+        actorUid: qaUid,
+        status: 'PROCESSING',
+        processingStartedAt: Date.now() - 120000,
+        leaseExpiresAt: Date.now() - 60000, // Expired!
+      };
+
+      const token = JSON.stringify({
+        uid: qaUid,
+        email: qaEmail,
+        role: 'QA',
+        auth_time: Math.floor(Date.now() / 1000) - 10,
+      });
+
+      const res = await request(app)
+        .post('/api/batch-release/approve')
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          batchId: validBatchId,
+          signatureId: sigId,
+          expectedVersion: 1,
+          idempotencyKey,
+        });
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.status).toBe('RELEASED');
+
+      // Command is completed
+      const cmd = mockDb._storage[`release_commands/${idempotencyKey}`];
+      expect(cmd.status).toBe('COMPLETED');
+    });
+  });
+
+  describe('PHASE 14: Release Error Consistency', () => {
+    it('failure records FAILED, failureCode, failedAt, and correlationId on command record', async () => {
+      const { sigId } = setupValidBatchAndSignature();
+      const idempotencyKey = 'IDEMP-FAIL-RECORD-001';
+
+      const token = JSON.stringify({
+        uid: qaUid,
+        email: qaEmail,
+        role: 'QA',
+        auth_time: Math.floor(Date.now() / 1000) - 10,
+      });
+
+      // Send invalid expectedVersion to cause failure
+      const res = await request(app)
+        .post('/api/batch-release/approve')
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          batchId: validBatchId,
+          signatureId: sigId,
+          expectedVersion: 999, // Mismatched version
+          idempotencyKey,
+        });
+
+      expect(res.status).toBe(409);
+      expect(res.body.error.code).toBe('VERSION_CONFLICT');
+
+      const cmd = mockDb._storage[`release_commands/${idempotencyKey}`];
+      expect(cmd).toBeDefined();
+      expect(cmd.status).toBe('FAILED');
+      expect(cmd.failureCode).toBe('OCC_CONFLICT');
+      expect(cmd.failedAt).toBeTypeOf('number');
+      expect(cmd.correlationId).toBeDefined();
+    });
+  });
 });

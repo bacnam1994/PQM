@@ -25,15 +25,63 @@ try {
 
 export const app = express();
 
-// Middleware: CORS & JSON body parser
+// Configuration: Allowed CORS Origins
+export const getAllowedOrigins = (): string[] => {
+  const defaultOrigins = [
+    'https://v-biotech.web.app',
+    'https://v-biotech.firebaseapp.com',
+    'http://localhost:5173',
+    'http://localhost:4173',
+    'http://localhost:3000',
+    'http://127.0.0.1:5173',
+    'http://127.0.0.1:4173',
+  ];
+
+  const envOrigins = process.env.CORS_ALLOWED_ORIGINS
+    ? process.env.CORS_ALLOWED_ORIGINS.split(',')
+        .map((o) => o.trim())
+        .filter(Boolean)
+    : [];
+
+  return Array.from(new Set([...defaultOrigins, ...envOrigins]));
+};
+
+// Middleware: Strict CORS
 app.use(
   cors({
-    origin: '*',
+    origin: (origin, callback) => {
+      // Allow non-browser requests (mobile, server-to-server, unit tests)
+      if (!origin) {
+        return callback(null, true);
+      }
+      const allowed = getAllowedOrigins();
+      if (allowed.includes(origin)) {
+        return callback(null, true);
+      }
+      return callback(new Error(`CORS blocked: Origin '${origin}' is not allowed by CORS policy.`));
+    },
+    credentials: true,
     methods: ['GET', 'POST', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'x-correlation-id', 'x-request-id'],
   })
 );
+
 app.use(express.json());
+
+// Handle CORS error response
+app.use((err: any, req: Request, res: Response, next: NextFunction) => {
+  if (err && err.message && err.message.includes('CORS blocked')) {
+    return res.status(403).json({
+      success: false,
+      error: {
+        code: 'CORS_BLOCKED',
+        message: err.message,
+        correlationId: extractCorrelationId(req),
+      },
+    });
+  }
+  next(err);
+});
 
 // Correlation ID & Structured Logging Middleware
 app.use((req: Request, res: Response, next: NextFunction) => {

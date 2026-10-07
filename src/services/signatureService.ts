@@ -34,14 +34,31 @@ export async function computeSignatureChecksum(
   return calculateCanonicalSignatureChecksum(data as any);
 }
 
-const BACKEND_API_URL =
-  (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_BACKEND_API_URL) ||
-  (typeof process !== 'undefined' && process.env?.VITE_BACKEND_API_URL) ||
-  'http://localhost:4000';
+export function getBackendApiUrl(): string {
+  const isProd =
+    (typeof import.meta !== 'undefined' && import.meta.env?.PROD) ||
+    (typeof process !== 'undefined' && process.env?.NODE_ENV === 'production');
+
+  const envUrl =
+    (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_BACKEND_API_URL) ||
+    (typeof process !== 'undefined' && process.env?.VITE_BACKEND_API_URL);
+
+  if (envUrl && typeof envUrl === 'string' && envUrl.trim()) {
+    return envUrl.trim();
+  }
+
+  if (isProd) {
+    throw new Error(
+      'CẤU HÌNH BẢO MẬT BẮT BUỘC: Thiếu biến môi trường VITE_BACKEND_API_URL trong môi trường Production. Tuyệt đối không fallback localhost!'
+    );
+  }
+
+  return 'http://localhost:4000';
+}
 
 export class SignatureService {
   private readonly collectionPath = 'electronic_signatures';
-  private apiUrl: string = BACKEND_API_URL;
+  private apiUrl: string = getBackendApiUrl();
 
   public setApiUrl(url: string): void {
     this.apiUrl = url;

@@ -1,48 +1,60 @@
 /// <reference types="vitest" />
 
-import { defineConfig } from 'vitest/config';
+import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
-
 import path from 'path';
 
 // https://vitejs.dev/config/
-export default defineConfig(({ mode }) => ({
-  // Firebase Hosting phục vụ từ root '/' — không cần prefix như GitHub Pages
-  base: '/',
-  resolve: {
-    alias: {
-      '@': path.resolve(__dirname, './src'),
-      '@pqm/release-engine': path.resolve(__dirname, './packages/release-engine/src/index.ts'),
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, process.cwd(), '');
+  const backendApiUrl = process.env.VITE_BACKEND_API_URL || env.VITE_BACKEND_API_URL;
+
+  if (mode === 'production') {
+    if (!backendApiUrl || !backendApiUrl.trim()) {
+      throw new Error(
+        'SECURITY BUILD GUARD: Missing mandatory environment variable VITE_BACKEND_API_URL in production build. Production bundles must have external backend authority URL configured.'
+      );
+    }
+  }
+
+  return {
+    // Firebase Hosting phục vụ từ root '/' — không cần prefix như GitHub Pages
+    base: '/',
+    resolve: {
+      alias: {
+        '@': path.resolve(__dirname, './src'),
+        '@pqm/release-engine': path.resolve(__dirname, './packages/release-engine/src/index.ts'),
+      },
     },
-  },
-  plugins: [react()],
-  build: {
-    minify: 'esbuild',
-    chunkSizeWarningLimit: 1000,
-    rollupOptions: {
-      output: {
-        manualChunks: {
-          'vendor-react': ['react', 'react-dom', 'react-router-dom'],
-          'vendor-ui': ['@headlessui/react', '@heroicons/react'],
-          'vendor-charts': ['recharts'],
-          'vendor-query': [
-            '@tanstack/react-query',
-            '@tanstack/react-query-persist-client',
-            '@tanstack/query-sync-storage-persister',
-          ],
-          'vendor-virtual': ['@tanstack/react-virtual'],
-          'vendor-ai': ['@google/generative-ai'],
-          'vendor-firebase': [
-            'firebase/app',
-            'firebase/auth',
-            'firebase/database',
-            'firebase/storage',
-          ],
+    plugins: [react()],
+    build: {
+      minify: 'esbuild',
+      chunkSizeWarningLimit: 1000,
+      rollupOptions: {
+        output: {
+          manualChunks: {
+            'vendor-react': ['react', 'react-dom', 'react-router-dom'],
+            'vendor-ui': ['@headlessui/react', '@heroicons/react'],
+            'vendor-charts': ['recharts'],
+            'vendor-query': [
+              '@tanstack/react-query',
+              '@tanstack/react-query-persist-client',
+              '@tanstack/query-sync-storage-persister',
+            ],
+            'vendor-virtual': ['@tanstack/react-virtual'],
+            'vendor-ai': ['@google/generative-ai'],
+            'vendor-firebase': [
+              'firebase/app',
+              'firebase/auth',
+              'firebase/database',
+              'firebase/storage',
+            ],
+          },
         },
       },
     },
-  },
-  esbuild: {
-    drop: mode === 'production' ? ['console', 'debugger'] : [],
-  },
-}));
+    esbuild: {
+      drop: mode === 'production' ? ['console', 'debugger'] : [],
+    },
+  };
+});

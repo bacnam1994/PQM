@@ -35,11 +35,10 @@ describe('Firebase Rules & Security Integration Perimeter', () => {
       expect(parsedRules.release_commands['$cmd_id']['.write']).toBe(false);
     });
 
-    it('electronic_signatures: write MUST be restricted and append-only', () => {
+    it('electronic_signatures: write MUST be strictly false (server-only write)', () => {
       expect(parsedRules.electronic_signatures).toBeDefined();
-      const sigWrite = parsedRules.electronic_signatures['$sig_id']['.write'];
-      expect(sigWrite).toContain('!data.exists()');
-      expect(sigWrite).toContain('checksum');
+      expect(parsedRules.electronic_signatures['.write']).toBe(false);
+      expect(parsedRules.electronic_signatures['$sig_id']['.write']).toBe(false);
     });
 
     it('root write MUST be strictly false', () => {
@@ -132,12 +131,11 @@ describe('Firebase Rules & Security Integration Perimeter', () => {
       expect(readRule).toContain("root.child('users/' + auth.uid + '/role').val() !== 'GUEST'");
     });
 
-    // Case 3: USER → electronic_signatures WRITE DENIED if tampering with existing or unauthenticated
-    it('Case 3: electronic_signatures WRITE MUST require auth and enforce append-only (!data.exists())', () => {
+    // Case 3: USER/QA → electronic_signatures WRITE DENIED (strictly false for client)
+    it('Case 3: electronic_signatures WRITE MUST be DENIED for any client (Server Authority Only)', () => {
       const writeRule = parsedRules.electronic_signatures['$sig_id']['.write'];
-      expect(writeRule).toContain('auth != null');
-      expect(writeRule).toContain('!data.exists()');
-      expect(writeRule).toContain('checksum');
+      expect(writeRule).toBe(false);
+      expect(parsedRules.electronic_signatures['.write']).toBe(false);
     });
 
     // Case 4: QA → audit_logs WRITE DENY
@@ -159,11 +157,33 @@ describe('Firebase Rules & Security Integration Perimeter', () => {
       expect(writeRule).not.toContain("role').val() == 'USER'");
     });
 
-    // Case 7: QA → approve release requires valid releaseSignatures and PASS quality
-    it('Case 7: QA → approve release requires valid release signatures and PASS quality (Gate 7)', () => {
+    // Case 7: QA → direct client batch RELEASED mutation MUST be DENIED
+    it('Case 7: QA client direct batch RELEASED mutation MUST be DENIED (External Backend Authority Required)', () => {
       const writeRule = parsedRules.batches['$item_id']['.write'];
-      expect(writeRule).toContain("newData.hasChild('releaseSignatures')");
-      expect(writeRule).toContain('qualityStatus');
+      expect(writeRule).toContain("newData.child('status').val() !== 'RELEASED'");
+      expect(writeRule).toContain("!newData.hasChild('releaseSnapshot')");
+      expect(writeRule).toContain("!newData.hasChild('releasedAt')");
+    });
+
+    // Phase 11: User Role Escalation Audit (TEST 8)
+    it('Phase 11: USER cannot elevate role to ADMIN (Role Escalation DENIED)', () => {
+      const userWriteRule = parsedRules.users['$uid']['.write'];
+      expect(userWriteRule).toBeDefined();
+      // Verifies self-write forbids changing existing role
+      expect(userWriteRule).toContain(
+        "data.hasChild('role') && newData.child('role').val() === data.child('role').val()"
+      );
+      // Verifies newly created self-records can only be GUEST
+      expect(userWriteRule).toContain("!data.exists() && newData.child('role').val() === 'GUEST'");
+    });
+
+    it('Phase 11: USER cannot elevate isAdmin to true (Privilege Escalation DENIED)', () => {
+      const userWriteRule = parsedRules.users['$uid']['.write'];
+      expect(userWriteRule).toBeDefined();
+      // Verifies self-write strictly forbids isAdmin = true
+      expect(userWriteRule).toContain(
+        "!newData.hasChild('isAdmin') || newData.child('isAdmin').val() === false"
+      );
     });
   });
 });
