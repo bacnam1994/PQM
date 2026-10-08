@@ -12,6 +12,7 @@ import dotenv from 'dotenv';
 import { initializeFirebaseAdmin } from './config/firebaseAdmin';
 import { signatureRouter } from './routes/signature';
 import { releaseRouter } from './routes/release';
+import { aiRouter } from './routes/ai';
 import { extractCorrelationId } from './utils/correlationId';
 
 dotenv.config();
@@ -124,6 +125,7 @@ app.get('/health', (_req: Request, res: Response) => {
 // Mount Routes
 app.use('/api/signatures', signatureRouter);
 app.use('/api/batch-release', releaseRouter);
+app.use('/api/ai', aiRouter);
 
 // Global 404 handler
 app.use((req: Request, res: Response) => {

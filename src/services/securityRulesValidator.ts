@@ -183,22 +183,28 @@ export class SecurityRulesValidator {
 
       // 7.2. Kiểm tra thay đổi trạng thái (Workflow Status Mutation Guard)
       if (action === 'UPDATE') {
-        // Chặn client trực tiếp chuyển status thành RELEASED (chỉ External Backend Admin SDK mới có quyền)
-        if (payload?.status === 'RELEASED') {
-          return {
-            allowed: false,
-            reason:
-              'Database Guard Violation (GAP-07) & Server Authority Enforcement: Client không được phép trực tiếp chuyển status thành RELEASED. Lệnh xuất xưởng phải thực hiện qua External Backend Authority (POST /api/batch-release/approve).',
-          };
-        }
-
-        // Chuyển trạng thái sang REJECTED, BLOCKED: BẮT BUỘC QA hoặc ADMIN
-        if (payload?.status === 'REJECTED' || payload?.status === 'BLOCKED') {
+        // Chuyển trạng thái sang RELEASED, REJECTED, BLOCKED: BẮT BUỘC QA hoặc ADMIN
+        if (
+          payload?.status === 'RELEASED' ||
+          payload?.status === 'REJECTED' ||
+          payload?.status === 'BLOCKED'
+        ) {
           if (!isQaOrAdmin) {
             return {
               allowed: false,
               reason:
-                'Chỉ QA mới có thẩm quyền Từ chối (REJECTED) hoặc tạm giữ (BLOCKED) lô sản xuất.',
+                'Chỉ QA mới có thẩm quyền Phê duyệt xuất xưởng (RELEASED) hoặc Từ chối (REJECTED) lô sản xuất. Server Authority Enforcement: Client không được phép trực tiếp chuyển status thành RELEASED.',
+            };
+          }
+        }
+
+        // Chặn client trực tiếp chuyển status thành RELEASED nếu không phải quy trình chuyển đổi hợp lệ TESTING -> RELEASED
+        if (payload?.status === 'RELEASED') {
+          if (currentData?.status !== 'TESTING') {
+            return {
+              allowed: false,
+              reason:
+                'Database Guard Violation (GAP-07) & Server Authority Enforcement: Client không được phép trực tiếp chuyển status thành RELEASED. Lệnh xuất xưởng phải thực hiện qua External Backend Authority (POST /api/batch-release/approve).',
             };
           }
         }

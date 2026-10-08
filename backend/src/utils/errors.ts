@@ -17,6 +17,13 @@ export type ErrorCode =
   | 'VERSION_CONFLICT'
   | 'IDEMPOTENCY_CONFLICT'
   | 'CHECKSUM_MISMATCH'
+  | 'AI_UNAVAILABLE'
+  | 'AI_TIMEOUT'
+  | 'AI_RATE_LIMITED'
+  | 'AI_INVALID_RESPONSE'
+  | 'AI_CONTEXT_INVALID'
+  | 'AI_PERMISSION_DENIED'
+  | 'AI_AUTH_REQUIRED'
   | 'INTERNAL';
 
 export class AppError extends Error {

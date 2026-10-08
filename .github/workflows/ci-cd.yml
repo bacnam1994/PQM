@@ -147,6 +147,14 @@ jobs:
         env:
           VITE_BACKEND_API_URL: ${{ env.VITE_BACKEND_API_URL }}
 
+      - name: 11. Secret Scan Guard (Verify frontend bundle contains NO API keys)
+        run: |
+          if grep -rn "AIzaSy" dist/ 2>/dev/null; then
+            echo "::error::CRITICAL SECURITY BREACH: Google API Key pattern detected in dist/ bundle!"
+            exit 1
+          fi
+          echo "Verified: Frontend bundle is 100% clean of Google API secrets."
+
       - name: Build External Backend Artifacts
         run: |
           cd backend
@@ -182,12 +190,18 @@ jobs:
             BACKEND_PID=$!
             sleep 3
             HEALTH=$(curl -fsS http://localhost:4000/health)
+            AI_HEALTH=$(curl -fsS http://localhost:4000/api/ai/health)
             kill $BACKEND_PID
             if ! echo "$HEALTH" | grep -q '"status":"healthy"'; then
               echo "::error::Compiled backend health check failed."
               exit 1
             fi
+            if ! echo "$AI_HEALTH" | grep -q '"service":"pqm-ai-backend"'; then
+              echo "::error::Compiled backend AI health check failed."
+              exit 1
+            fi
             echo "Compiled backend verified healthy: $HEALTH"
+            echo "Compiled backend AI verified healthy: $AI_HEALTH"
             cd ..
           fi
 

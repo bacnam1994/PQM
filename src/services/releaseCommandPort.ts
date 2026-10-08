@@ -32,7 +32,7 @@ export interface BatchReleaseCommandOutput {
   commandId: string;
 }
 
-import { getBackendApiUrl } from './signatureService';
+import { getBackendApiUrl } from '../utils/backendApiUrl';
 
 export interface IReleaseCommandPort {
   executeRelease(input: BatchReleaseCommandInput): Promise<BatchReleaseCommandOutput>;

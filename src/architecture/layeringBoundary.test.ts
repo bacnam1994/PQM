@@ -117,15 +117,23 @@ describe('Phase 8: Architecture Layering Boundary & Reliability', () => {
     const qcUser = { uid: 'u-qc', email: 'qc@pqm.com', role: 'QC' as const, isAdmin: false };
 
     // QC không được duyệt xuất xưởng lô
-    const qcRelease = SecurityRulesValidator.evaluate(qcUser, 'UPDATE', 'batches/b1', {
-      status: 'RELEASED',
-    });
+    const qcRelease = SecurityRulesValidator.evaluate(
+      qcUser,
+      'UPDATE',
+      'batches/b1',
+      { status: 'RELEASED' },
+      { status: 'TESTING' }
+    );
     expect(qcRelease.allowed).toBe(false);
 
     // QA được duyệt xuất xưởng lô
-    const qaRelease = SecurityRulesValidator.evaluate(qaUser, 'UPDATE', 'batches/b1', {
-      status: 'RELEASED',
-    });
+    const qaRelease = SecurityRulesValidator.evaluate(
+      qaUser,
+      'UPDATE',
+      'batches/b1',
+      { status: 'RELEASED' },
+      { status: 'TESTING' }
+    );
     expect(qaRelease.allowed).toBe(true);
   });
 

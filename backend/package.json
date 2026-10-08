@@ -12,6 +12,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@google/generative-ai": "^0.24.1",
     "@pqm/release-engine": "file:../packages/release-engine",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
