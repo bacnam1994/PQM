@@ -13,7 +13,10 @@ import {
 import { fetchTestResultsByBatchId, fetchTestResultById } from '../../services/testResultService';
 import { ensureArray } from '../../utils';
 import { TestResult, TestResultEntry, TCCS } from '../../types';
-import { verifyEvaluationSnapshotIntegrity } from '../../domain/evaluation/EvaluationSnapshotBuilder';
+import {
+  verifyEvaluationSnapshotIntegrity,
+  validateEvaluationSnapshot,
+} from '../../domain/evaluation/EvaluationSnapshotBuilder';
 import { coaService } from '../../services/app/CoAService';
 
 const CoAReportPage = () => {
@@ -171,6 +174,29 @@ const CoAReportPage = () => {
             hydratedBatch.tccs = batchTccs;
           }
 
+          // [PHASE 8 & 12] Toàn diện Validation cho EvaluationSnapshot
+          if (rawResult.evaluationSnapshot) {
+            const validation = validateEvaluationSnapshot(
+              rawResult.evaluationSnapshot,
+              rawResult,
+              batchTccs
+            );
+            if (!validation.isValid) {
+              const isOfficialDoc =
+                rawResult.workflowStatus === 'APPROVED' || rawResult.workflowStatus === 'RELEASED';
+
+              if (isOfficialDoc) {
+                // Official CoA -> BLOCK!
+                if (isMounted) {
+                  setFailClosedReason(
+                    `PHIẾU KIỂM NGHIỆM ĐÃ THAY ĐỔI: Bản chụp thẩm định hiện tại không còn đồng nhất với dữ liệu Phiếu kiểm nghiệm mới nhất (${validation.reason || 'Dữ liệu không khớp'}). Cần thực hiện đánh giá/thẩm tra lại trước khi phát hành CoA chính thức.`
+                  );
+                }
+                return;
+              }
+            }
+          }
+
           const finalResult: HydratedTestResult = {
             ...rawResult,
             batch: hydratedBatch,
@@ -308,6 +334,34 @@ const CoAReportPage = () => {
                 );
               }
               return;
+            }
+
+            // [PHASE 8 & 12] Toàn diện Validation cho EvaluationSnapshot trên Lô
+            const targetTestResultForBatch =
+              latestResult ||
+              ({
+                id: batchSnapshot.testResultId || `tr-${batchId}`,
+                batchId,
+                results: finalResults,
+                overallStatus: batchSnapshot.overallStatus,
+              } as TestResult);
+
+            const batchSnapValidation = validateEvaluationSnapshot(
+              batchSnapshot,
+              targetTestResultForBatch,
+              tccsForEvaluation
+            );
+
+            if (!batchSnapValidation.isValid) {
+              const isOfficialDoc = batch.status === 'RELEASED';
+              if (isOfficialDoc) {
+                if (isMounted) {
+                  setFailClosedReason(
+                    `PHIẾU KIỂM NGHIỆM ĐÃ THAY ĐỔI: Bản chụp thẩm định hiện tại không còn đồng nhất với dữ liệu Phiếu kiểm nghiệm mới nhất (${batchSnapValidation.reason || 'Dữ liệu không khớp'}). Cần thực hiện đánh giá/thẩm tra lại trước khi phát hành CoA chính thức.`
+                  );
+                }
+                return;
+              }
             }
 
             if (isMounted) {

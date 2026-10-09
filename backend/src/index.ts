@@ -13,6 +13,7 @@ import { initializeFirebaseAdmin } from './config/firebaseAdmin';
 import { signatureRouter } from './routes/signature';
 import { releaseRouter } from './routes/release';
 import { aiRouter } from './routes/ai';
+import { AIService } from './ai/aiService';
 import { extractCorrelationId } from './utils/correlationId';
 
 dotenv.config();
@@ -113,12 +114,17 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 
 // Health check endpoint
 app.get('/health', (_req: Request, res: Response) => {
+  const isAiConfigured = AIService.isConfigured();
   res.status(200).json({
     status: 'healthy',
     service: 'pqm-backend-authority',
     version: '1.0.0',
     timestamp: new Date().toISOString(),
     uptimeSeconds: Math.floor(process.uptime()),
+    components: {
+      backend: 'healthy',
+      aiProvider: isAiConfigured ? 'configured' : 'unconfigured',
+    },
   });
 });
 

@@ -55,7 +55,40 @@ export interface AIHealthResponse {
     service: string;
     model: string;
     isConfigured: boolean;
+    providerStatus?: string;
     supportedTypes: string[];
+  };
+  correlationId: string;
+}
+
+export interface AIConfigResponse {
+  success: boolean;
+  data: {
+    isConfigured: boolean;
+    maskedKey: string;
+    model: string;
+    source: string;
+  };
+  correlationId: string;
+}
+
+export interface AITestResponse {
+  success: boolean;
+  message: string;
+  data: {
+    latencyMs: number;
+    model: string;
+  };
+  correlationId: string;
+}
+
+export interface AIConfigUpdateResponse {
+  success: boolean;
+  message: string;
+  data: {
+    isConfigured: boolean;
+    maskedKey: string;
+    model: string;
   };
   correlationId: string;
 }
@@ -112,6 +145,87 @@ export class AIBackendClient {
       return await response.json();
     } catch (err: any) {
       throw new Error(`Không thể kết nối đến máy chủ AI Backend: ${err.message || String(err)}`);
+    }
+  }
+
+  /**
+   * Get server-side AI configuration (ADMIN only, masked secret)
+   */
+  public static async getConfig(): Promise<AIConfigResponse> {
+    const token = await this.getIdToken();
+    try {
+      const response = await fetch(`${this.apiUrl}/api/ai/config`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      const json = await response.json();
+      if (!response.ok || !json.success) {
+        throw new Error(json.error?.message || `Lỗi khi lấy cấu hình AI (HTTP ${response.status})`);
+      }
+      return json;
+    } catch (err: any) {
+      throw new Error(`Không thể lấy cấu hình máy chủ AI: ${err.message || String(err)}`);
+    }
+  }
+
+  /**
+   * Update server-side AI configuration (ADMIN only, validates before saving)
+   */
+  public static async updateConfig(payload: {
+    apiKey: string;
+    model?: string;
+  }): Promise<AIConfigUpdateResponse> {
+    const token = await this.getIdToken();
+    try {
+      const response = await fetch(`${this.apiUrl}/api/ai/config`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+      });
+      const json = await response.json();
+      if (!response.ok || !json.success) {
+        throw new Error(
+          json.error?.message || `Lỗi khi cập nhật cấu hình AI (HTTP ${response.status})`
+        );
+      }
+      return json;
+    } catch (err: any) {
+      throw new Error(`Không thể cập nhật cấu hình máy chủ AI: ${err.message || String(err)}`);
+    }
+  }
+
+  /**
+   * Test AI connection from server (ADMIN only)
+   */
+  public static async testConfig(payload?: {
+    apiKey?: string;
+    model?: string;
+  }): Promise<AITestResponse> {
+    const token = await this.getIdToken();
+    try {
+      const response = await fetch(`${this.apiUrl}/api/ai/config/test`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload || {}),
+      });
+      const json = await response.json();
+      if (!response.ok || !json.success) {
+        throw new Error(
+          json.error?.message || `Lỗi khi kiểm tra kết nối AI (HTTP ${response.status})`
+        );
+      }
+      return json;
+    } catch (err: any) {
+      throw new Error(`Kiểm tra kết nối AI thất bại: ${err.message || String(err)}`);
     }
   }
 

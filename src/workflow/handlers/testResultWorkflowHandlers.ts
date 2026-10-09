@@ -12,7 +12,13 @@
  * - TEST_RESULT_DELETE
  */
 
-import { TestResult, Batch, TestResultWorkflowStatus, ElectronicSignature } from '../../types';
+import {
+  TestResult,
+  Batch,
+  TCCS,
+  TestResultWorkflowStatus,
+  ElectronicSignature,
+} from '../../types';
 import { ITestResultRepository } from '../../repositories/TestResultRepository';
 import { testResultRepository as defaultRepo } from '../../repositories/firebase/FirebaseTestResultRepository';
 import {
@@ -21,7 +27,7 @@ import {
 } from '../../services/app/DeviationAppService';
 import { validateOptimisticLock, nextVersion } from '../../utils/concurrency';
 import { signatureService } from '../../services/signatureService';
-import { buildEvaluationSnapshot } from '../../domain/evaluation';
+import { buildEvaluationSnapshot, isEvaluationSnapshotStale } from '../../domain/evaluation';
 import {
   resolveTestResultStatus,
   calculateOverallStatusForTestResult,
@@ -56,7 +62,7 @@ export class TestResultWorkflowHandlers {
   async handleCreate(
     testResult: TestResult,
     currentUser: any,
-    options?: { batch?: Batch }
+    options?: { batch?: Batch; boundTccs?: TCCS; tccs?: TCCS }
   ): Promise<TestResult> {
     const flags = getWorkflowFeatureFlags();
     const actor = this.toActor(currentUser);
@@ -91,11 +97,21 @@ export class TestResultWorkflowHandlers {
       if (calc) evaluatedStatus = calc;
     }
 
-    const evaluationSnapshot =
-      testResult.evaluationSnapshot ||
-      buildEvaluationSnapshot({ ...testResult, overallStatus: evaluatedStatus }, currentUser, {
-        batch: options?.batch,
-      });
+    const boundTccs = options?.boundTccs || options?.tccs || (options?.batch as any)?.tccs;
+    const testResultForEval: TestResult = { ...testResult, overallStatus: evaluatedStatus };
+    const staleCheck = isEvaluationSnapshotStale(
+      testResult.evaluationSnapshot,
+      testResultForEval,
+      boundTccs
+    );
+    const shouldRebuildSnapshot = !testResult.evaluationSnapshot || staleCheck.stale;
+
+    const evaluationSnapshot = shouldRebuildSnapshot
+      ? buildEvaluationSnapshot(testResultForEval, currentUser, {
+          batch: options?.batch,
+          boundTccs,
+        })
+      : testResult.evaluationSnapshot;
 
     const cleanResult: TestResult = {
       ...testResult,
@@ -150,10 +166,20 @@ export class TestResultWorkflowHandlers {
     testResult: TestResult,
     currentUser: any,
     oldTestResult?: TestResult,
-    options?: { batch?: Batch }
+    options?: { batch?: Batch; boundTccs?: TCCS; tccs?: TCCS }
   ): Promise<TestResult> {
     const flags = getWorkflowFeatureFlags();
     const actor = this.toActor(currentUser);
+
+    // Kiểm tra bảo vệ hồ sơ đã APPROVED / RELEASED (Phase 7 & Phase 15 & 19)
+    const currentWorkflowStatus: TestResultWorkflowStatus =
+      oldTestResult?.workflowStatus || testResult.workflowStatus || 'DRAFT';
+
+    if (currentWorkflowStatus === 'APPROVED' || currentWorkflowStatus === 'RELEASED') {
+      throw new Error(
+        `Từ chối thao tác: Không thể chỉnh sửa trực tiếp Phiếu kiểm nghiệm ở trạng thái ${currentWorkflowStatus}. Theo quy chuẩn ALCOA+ và 21 CFR Part 11, hồ sơ đã niêm phong chỉ có thể thay thế (SUPERSEDED) kèm biên bản giải trình/phiếu mới.`
+      );
+    }
 
     // Kiểm tra OCC
     validateOptimisticLock(
@@ -192,13 +218,24 @@ export class TestResultWorkflowHandlers {
     }
 
     const newVersion = nextVersion(oldTestResult?.version ?? testResult.version);
-    const shouldRebuildSnapshot =
-      !testResult.evaluationSnapshot ||
-      testResult.evaluationSnapshot.overallStatus !== evaluatedStatus;
+    const boundTccs = options?.boundTccs || options?.tccs || (options?.batch as any)?.tccs;
+    const testResultForEval: TestResult = {
+      ...testResult,
+      overallStatus: evaluatedStatus,
+    };
+
+    // Stale detection toàn diện (Phase 1, 2, 3, 4) - Rebuild khi bất kỳ dữ liệu nào ảnh hưởng thay đổi
+    const staleCheck = isEvaluationSnapshotStale(
+      testResult.evaluationSnapshot,
+      testResultForEval,
+      boundTccs
+    );
+    const shouldRebuildSnapshot = !testResult.evaluationSnapshot || staleCheck.stale;
 
     const evaluationSnapshot = shouldRebuildSnapshot
-      ? buildEvaluationSnapshot({ ...testResult, overallStatus: evaluatedStatus }, currentUser, {
+      ? buildEvaluationSnapshot(testResultForEval, currentUser, {
           batch: options?.batch,
+          boundTccs,
         })
       : testResult.evaluationSnapshot;
 

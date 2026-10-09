@@ -7,7 +7,7 @@
     "prebuild": "npm --prefix ../packages/release-engine run build",
     "build": "tsc",
     "start": "node dist/index.js",
-    "dev": "node --loader ts-node/esm src/index.ts",
+    "dev": "npm run build && node dist/index.js",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },

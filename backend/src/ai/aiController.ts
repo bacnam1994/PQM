@@ -6,7 +6,12 @@
 import { Request, Response } from 'express';
 import { AppError, sendErrorResponse } from '../utils/errors';
 import { extractCorrelationId } from '../utils/correlationId';
-import { AIAnalyzeRequestSchema, type AIAnalysisType } from './aiTypes';
+import {
+  AIAnalyzeRequestSchema,
+  AIConfigUpdateSchema,
+  AITestConnectionSchema,
+  type AIAnalysisType,
+} from './aiTypes';
 import { AIService } from './aiService';
 
 // AI RBAC Feature Permission Map (Phase 3)
@@ -36,7 +41,7 @@ export class AIController {
    */
   public static async health(req: Request, res: Response): Promise<void> {
     const correlationId = req.correlationId || extractCorrelationId(req, 'AI');
-    const isConfigured = !!process.env.GEMINI_API_KEY;
+    const isConfigured = AIService.isConfigured();
 
     res.status(200).json({
       success: true,
@@ -44,6 +49,7 @@ export class AIController {
         service: 'pqm-ai-backend',
         model: AIService.getModelName(),
         isConfigured,
+        providerStatus: isConfigured ? 'READY' : 'KEY_MISSING',
         supportedTypes: [
           'batch_analysis',
           'test_result_analysis',
@@ -54,6 +60,175 @@ export class AIController {
       },
       correlationId,
     });
+  }
+
+  /**
+   * Get AI configuration status (ADMIN only, masked secret)
+   * GET /api/ai/config
+   */
+  public static async getConfig(req: Request, res: Response): Promise<void> {
+    const correlationId = req.correlationId || extractCorrelationId(req, 'AI');
+    const user = req.user;
+
+    if (!user) {
+      sendErrorResponse(res, 'UNAUTHENTICATED', 'Yêu cầu đăng nhập.', 401, correlationId);
+      return;
+    }
+
+    if (!user.isAdmin) {
+      sendErrorResponse(
+        res,
+        'PERMISSION_DENIED',
+        'Chỉ Quản trị viên (ADMIN) mới có quyền xem cấu hình máy chủ AI.',
+        403,
+        correlationId
+      );
+      return;
+    }
+
+    res.status(200).json({
+      success: true,
+      data: {
+        isConfigured: AIService.isConfigured(),
+        maskedKey: AIService.getMaskedKey(),
+        model: AIService.getModelName(),
+        source: AIService.getKeySource(),
+      },
+      correlationId,
+    });
+  }
+
+  /**
+   * Update AI configuration (ADMIN only, validates before saving)
+   * POST /api/ai/config
+   */
+  public static async updateConfig(req: Request, res: Response): Promise<void> {
+    const correlationId = req.correlationId || extractCorrelationId(req, 'AI');
+    const user = req.user;
+
+    if (!user) {
+      sendErrorResponse(res, 'UNAUTHENTICATED', 'Yêu cầu đăng nhập.', 401, correlationId);
+      return;
+    }
+
+    if (!user.isAdmin) {
+      sendErrorResponse(
+        res,
+        'PERMISSION_DENIED',
+        'Chỉ Quản trị viên (ADMIN) mới có quyền cập nhật cấu hình máy chủ AI.',
+        403,
+        correlationId
+      );
+      return;
+    }
+
+    const parseResult = AIConfigUpdateSchema.safeParse(req.body);
+    if (!parseResult.success) {
+      const issues = parseResult.error.issues
+        .map((i) => `${i.path.join('.')}: ${i.message}`)
+        .join(', ');
+      sendErrorResponse(
+        res,
+        'VALIDATION_ERROR',
+        `Dữ liệu cấu hình không hợp lệ: ${issues}`,
+        400,
+        correlationId
+      );
+      return;
+    }
+
+    const { apiKey, model } = parseResult.data;
+    try {
+      // Test candidate key to ensure it functions properly before persisting
+      await AIService.testConnection(apiKey, model);
+      // Persist config
+      AIService.setRuntimeConfig(apiKey, model);
+
+      res.status(200).json({
+        success: true,
+        message: 'Cấu hình và kiểm tra API Key thành công.',
+        data: {
+          isConfigured: true,
+          maskedKey: AIService.getMaskedKey(),
+          model: AIService.getModelName(),
+        },
+        correlationId,
+      });
+    } catch (err: any) {
+      if (err instanceof AppError) {
+        sendErrorResponse(res, err.code, err.message, err.statusCode, correlationId, err.details);
+      } else {
+        sendErrorResponse(
+          res,
+          'AI_UNAVAILABLE',
+          `Không thể kích hoạt API Key: ${err.message || String(err)}`,
+          400,
+          correlationId
+        );
+      }
+    }
+  }
+
+  /**
+   * Test AI connection (ADMIN only)
+   * POST /api/ai/config/test
+   */
+  public static async testConfig(req: Request, res: Response): Promise<void> {
+    const correlationId = req.correlationId || extractCorrelationId(req, 'AI');
+    const user = req.user;
+
+    if (!user) {
+      sendErrorResponse(res, 'UNAUTHENTICATED', 'Yêu cầu đăng nhập.', 401, correlationId);
+      return;
+    }
+
+    if (!user.isAdmin) {
+      sendErrorResponse(
+        res,
+        'PERMISSION_DENIED',
+        'Chỉ Quản trị viên (ADMIN) mới có quyền kiểm tra kết nối API Key.',
+        403,
+        correlationId
+      );
+      return;
+    }
+
+    const parseResult = AITestConnectionSchema.safeParse(req.body || {});
+    if (!parseResult.success) {
+      sendErrorResponse(
+        res,
+        'VALIDATION_ERROR',
+        'Tham số kiểm tra không hợp lệ.',
+        400,
+        correlationId
+      );
+      return;
+    }
+
+    try {
+      const testResult = await AIService.testConnection(
+        parseResult.data.apiKey,
+        parseResult.data.model
+      );
+      res.status(200).json({
+        success: true,
+        message: 'Kết nối Google Gemini API thành công.',
+        data: testResult,
+        correlationId,
+      });
+    } catch (err: any) {
+      if (err instanceof AppError) {
+        sendErrorResponse(res, err.code, err.message, err.statusCode, correlationId, err.details);
+      } else {
+        sendErrorResponse(
+          res,
+          'AI_UNAVAILABLE',
+          `Lỗi kiểm tra kết nối: ${err.message || String(err)}`,
+          502,
+          correlationId
+        );
+      }
+    }
   }
 
   /**

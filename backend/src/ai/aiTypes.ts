@@ -107,7 +107,24 @@ export const AIAnalyzeRequestSchema = z.object({
   batchId: z.string().optional(),
   testResultId: z.string().optional(),
   deviationId: z.string().optional(),
-  documentId: z.string().optional(),
   promptOverride: z.string().max(2000).optional(),
   correlationId: z.string().optional(),
 });
+
+// Zod schemas for AI Configuration Management (Phase 5, 6, 7)
+export const AIConfigUpdateSchema = z.object({
+  apiKey: z
+    .string()
+    .min(10, 'API Key tối thiểu 10 ký tự')
+    .max(200, 'API Key tối đa 200 ký tự')
+    .refine((val) => val.trim().length > 0, 'API Key không được để trống'),
+  model: z.string().optional(),
+});
+
+export const AITestConnectionSchema = z.object({
+  apiKey: z.string().optional(),
+  model: z.string().optional(),
+});
+
+export type AIConfigUpdatePayload = z.infer<typeof AIConfigUpdateSchema>;
+export type AITestConnectionPayload = z.infer<typeof AITestConnectionSchema>;

@@ -22,7 +22,7 @@ import {
 import { useCriteriaResolver } from '../../hooks/useCriteriaResolver';
 import { normalizeName, diceScore } from '../../services/criteriaAliasService';
 import { lookupPharmaTerm, isCriteriaMatch } from '../../utils/aiMapping';
-import { AlternateRuleResolver } from '../../domain/evaluation';
+import { AlternateRuleResolver, isEvaluationSnapshotStale } from '../../domain/evaluation';
 import { detectLabOrganization } from '../../services/ai/externalLabTemplates';
 import { matchLaboratory } from '../../services/laboratoryService';
 
@@ -212,8 +212,23 @@ const CoAReport = memo(({ res, batch, product, tccs, formula }: CoAReportProps) 
 
   // Kiểm tra xem Lô / Phiếu kiểm nghiệm đã có EvaluationSnapshot niêm phong chính thức chưa (SC-14 & BR-COA-001)
   const snapshot = res.evaluationSnapshot || (batch as any)?.evaluationSnapshot;
+  const isApprovedDocument =
+    res.workflowStatus === 'APPROVED' ||
+    res.workflowStatus === 'RELEASED' ||
+    (batch as any)?.status === 'RELEASED' ||
+    (res as any)?.status === 'APPROVED';
+
+  const snapshotStaleCheck = useMemo(() => {
+    if (!snapshot) return { stale: true, reason: 'Chưa có bản chụp thẩm định' };
+    return isEvaluationSnapshotStale(snapshot, res, tccs);
+  }, [snapshot, res, tccs]);
+
   const isOfficialSnapshot = Boolean(
-    snapshot && Array.isArray(snapshot.criterionResults) && snapshot.criterionResults.length > 0
+    isApprovedDocument &&
+    snapshot &&
+    Array.isArray(snapshot.criterionResults) &&
+    snapshot.criterionResults.length > 0 &&
+    !snapshotStaleCheck.stale
   );
 
   // Ngày ký phiếu theo chuẩn văn bản hành chính Việt Nam (Khánh Hòa, ngày ... tháng ... năm ...)
@@ -345,9 +360,13 @@ const CoAReport = memo(({ res, batch, product, tccs, formula }: CoAReportProps) 
 
   // Lọc và trích xuất danh sách chỉ tiêu
   // Ưu tiên số 1: Nếu TestResult hoặc Batch đã có Frozen EvaluationSnapshot -> Đọc 100% trực tiếp từ snapshot!
-  // Tuân thủ 100% Hợp đồng SC-14 & Quy tắc BR-COA-001 (Single Source of Truth) - CẤM TỰ TÍNH TOÁN LẠI
   const deduplicatedResults = useMemo(() => {
-    if (isOfficialSnapshot && snapshot) {
+    if (
+      snapshot &&
+      Array.isArray(snapshot.criterionResults) &&
+      snapshot.criterionResults.length > 0 &&
+      !snapshotStaleCheck.stale
+    ) {
       return snapshot.criterionResults.map((snapCrit: any) => {
         const c = allCriteriaMap.get(normalizeName(snapCrit.criteriaName));
         return {
@@ -638,8 +657,25 @@ const CoAReport = memo(({ res, batch, product, tccs, formula }: CoAReportProps) 
       className="relative bg-white p-10 text-slate-900 max-w-[21cm] mx-auto print:shadow-none print:border-0 print:p-0 print:max-w-none print:mx-0 overflow-hidden"
       style={{ fontFamily: "'Times New Roman', Times, serif" }}
     >
+      {/* Banner cảnh báo nếu bản chụp snapshot bị stale */}
+      {snapshot && snapshotStaleCheck.stale && (
+        <div className="mb-6 p-4 rounded-xl border-2 border-red-500 bg-red-50 text-red-900 print:hidden flex items-start gap-3">
+          <span className="text-xl">⚠️</span>
+          <div>
+            <h4 className="font-bold text-sm uppercase tracking-wide">
+              PHIẾU KIỂM NGHIỆM ĐÃ THAY ĐỔI
+            </h4>
+            <p className="text-xs mt-0.5 leading-relaxed">
+              Bản chụp thẩm định hiện tại không còn đồng nhất với dữ liệu Phiếu kiểm nghiệm mới nhất
+              ({snapshotStaleCheck.reason}). Cần thực hiện đánh giá/thẩm tra lại trước khi phát hành
+              CoA chính thức.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Banner cảnh báo bản nháp nếu chưa có EvaluationSnapshot chính thức (SC-14) */}
-      {!isOfficialSnapshot && (
+      {!isOfficialSnapshot && !snapshotStaleCheck.stale && (
         <div className="mb-6 p-4 rounded-xl border-2 border-amber-400 bg-amber-50 text-amber-900 print:hidden flex items-start gap-3">
           <span className="text-xl">⚠️</span>
           <div>

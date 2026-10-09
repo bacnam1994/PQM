@@ -7,6 +7,8 @@
  * STRICTLY READ-ONLY: Never writes or mutates batch, test, or signature records.
  */
 
+import fs from 'fs';
+import path from 'path';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { AppError } from '../utils/errors';
 import type { AuthenticatedUser } from '../middleware/auth';
@@ -30,20 +32,122 @@ export function setCustomModelCaller(caller: ModelCallerFn | null): void {
 }
 
 export class AIService {
-  public static getModelName(): string {
-    return process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+  private static runtimeApiKey: string | null = null;
+  private static runtimeModel: string | null = null;
+
+  public static isConfigured(): boolean {
+    const key = this.runtimeApiKey || process.env.GEMINI_API_KEY;
+    return Boolean(key && key.trim().length >= 10);
   }
 
-  private static getApiKey(): string {
-    const key = process.env.GEMINI_API_KEY;
+  public static getModelName(): string {
+    return this.runtimeModel || process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+  }
+
+  public static getKeySource(): 'RUNTIME' | 'ENV' | 'NONE' {
+    if (this.runtimeApiKey) return 'RUNTIME';
+    if (process.env.GEMINI_API_KEY) return 'ENV';
+    return 'NONE';
+  }
+
+  public static getMaskedKey(): string {
+    const key = this.runtimeApiKey || process.env.GEMINI_API_KEY;
+    if (!key) return '';
+    const trimmed = key.trim();
+    if (trimmed.length <= 8) return '****';
+    return `${trimmed.slice(0, 6)}...${trimmed.slice(-4)}`;
+  }
+
+  public static getApiKey(): string {
+    const key = this.runtimeApiKey || process.env.GEMINI_API_KEY;
     if (!key) {
       throw new AppError(
         'AI_UNAVAILABLE',
-        'Máy chủ AI chưa được cấu hình GEMINI_API_KEY. Vui lòng thiết lập biến môi trường ở backend.',
+        'Máy chủ AI chưa được cấu hình GEMINI_API_KEY. Vui lòng thiết lập biến môi trường ở backend hoặc cấu hình trong mục Cài đặt AI.',
         503
       );
     }
     return key;
+  }
+
+  public static setRuntimeConfig(apiKey: string, model?: string): void {
+    const trimmedKey = apiKey.trim();
+    this.runtimeApiKey = trimmedKey;
+    process.env.GEMINI_API_KEY = trimmedKey;
+    if (model) {
+      this.runtimeModel = model.trim();
+      process.env.GEMINI_MODEL = model.trim();
+    }
+    this.persistToEnv(trimmedKey, model);
+  }
+
+  private static persistToEnv(apiKey: string, model?: string): void {
+    try {
+      const envPath = path.resolve(process.cwd(), '.env');
+      if (fs.existsSync(envPath)) {
+        let content = fs.readFileSync(envPath, 'utf8');
+        if (/^GEMINI_API_KEY=/m.test(content)) {
+          content = content.replace(/^GEMINI_API_KEY=.*$/m, `GEMINI_API_KEY=${apiKey}`);
+        } else {
+          content += `\nGEMINI_API_KEY=${apiKey}`;
+        }
+        if (model) {
+          if (/^GEMINI_MODEL=/m.test(content)) {
+            content = content.replace(/^GEMINI_MODEL=.*$/m, `GEMINI_MODEL=${model}`);
+          } else {
+            content += `\nGEMINI_MODEL=${model}`;
+          }
+        }
+        fs.writeFileSync(envPath, content, 'utf8');
+      }
+    } catch (err: any) {
+      console.warn('[AIService] Không thể ghi đè file .env:', err.message);
+    }
+  }
+
+  public static async testConnection(
+    candidateKey?: string,
+    candidateModel?: string
+  ): Promise<{ latencyMs: number; model: string }> {
+    const key = candidateKey ? candidateKey.trim() : this.getApiKey();
+    const modelName = candidateModel ? candidateModel.trim() : this.getModelName();
+
+    if (customModelCaller) {
+      const start = Date.now();
+      await customModelCaller('Health check', 'PING', modelName);
+      return { latencyMs: Date.now() - start, model: modelName };
+    }
+
+    const genAI = new GoogleGenerativeAI(key);
+    const model = genAI.getGenerativeModel({
+      model: modelName,
+      generationConfig: {
+        maxOutputTokens: 10,
+        temperature: 0,
+      },
+    });
+
+    const start = Date.now();
+    try {
+      const result = await model.generateContent('Ping. Trả lời "OK".');
+      const response = await result.response;
+      response.text();
+      const latencyMs = Date.now() - start;
+      return { latencyMs, model: modelName };
+    } catch (err: any) {
+      const msg = err?.message || String(err);
+      if (msg.includes('API_KEY_INVALID') || msg.includes('API key not valid')) {
+        throw new AppError('AI_UNAVAILABLE', 'Khóa API Gemini không hợp lệ.', 400);
+      }
+      if (msg.includes('RESOURCE_EXHAUSTED') || msg.includes('429')) {
+        throw new AppError(
+          'AI_RATE_LIMITED',
+          'Đã vượt quá hạn mức truy vấn Google Gemini API (Quota Exceeded / 429).',
+          429
+        );
+      }
+      throw new AppError('AI_UNAVAILABLE', `Không thể kết nối Gemini API: ${msg}`, 502);
+    }
   }
 
   /**

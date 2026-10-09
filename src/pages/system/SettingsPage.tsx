@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useAppStore } from '../../store/useAppStore';
 import { testResultAppService } from '../../services/app/TestResultAppService';
 import {
@@ -319,40 +319,128 @@ const SettingsPage: React.FC = () => {
   });
 
   // ─── AI Backend Authority State (Firebase Spark Free) ────────────
+  const currentUser = useAppStore((state) => state.user);
+  const isAdmin = Boolean(currentUser?.isAdmin || currentUser?.role === 'ADMIN');
+
   const [backendHealth, setBackendHealth] = useState<{
     isChecking: boolean;
     isOnline: boolean;
+    isConfigured?: boolean;
     model?: string;
+    errorMessage?: string;
   }>({
     isChecking: true,
     isOnline: false,
   });
 
+  const [serverAiConfig, setServerAiConfig] = useState<{
+    isConfigured: boolean;
+    maskedKey: string;
+    model: string;
+    source: string;
+  } | null>(null);
+
+  const [inputApiKey, setInputApiKey] = useState('');
+  const [showApiKey, setShowApiKey] = useState(false);
+  const [isSavingKey, setIsSavingKey] = useState(false);
+  const [isTestingKey, setIsTestingKey] = useState(false);
+  const [keyActionFeedback, setKeyActionFeedback] = useState<{
+    type: 'success' | 'error' | 'info';
+    message: string;
+  } | null>(null);
+
   const [hasLegacyLocalKey, setHasLegacyLocalKey] = useState(
-    () => !!localStorage.getItem('GEMINI_API_KEY')
+    () => typeof window !== 'undefined' && !!localStorage.getItem('GEMINI_API_KEY')
   );
 
-  useEffect(() => {
-    let active = true;
-    AIBackendClient.checkHealth()
-      .then((res) => {
-        if (active) {
-          setBackendHealth({
-            isChecking: false,
-            isOnline: res.success,
-            model: res.data?.model,
-          });
-        }
-      })
-      .catch(() => {
-        if (active) {
-          setBackendHealth({ isChecking: false, isOnline: false });
-        }
+  const fetchBackendStatus = useCallback(async () => {
+    setBackendHealth((prev) => ({ ...prev, isChecking: true }));
+    try {
+      const res = await AIBackendClient.checkHealth();
+      setBackendHealth({
+        isChecking: false,
+        isOnline: true,
+        isConfigured: res.data?.isConfigured,
+        model: res.data?.model,
       });
-    return () => {
-      active = false;
-    };
-  }, []);
+
+      if (isAdmin) {
+        try {
+          const configRes = await AIBackendClient.getConfig();
+          if (configRes.success) {
+            setServerAiConfig(configRes.data);
+          }
+        } catch {
+          // Non-blocking if auth token not ready yet
+        }
+      }
+    } catch (err: any) {
+      setBackendHealth({
+        isChecking: false,
+        isOnline: false,
+        isConfigured: false,
+        errorMessage: err.message || 'Không thể kết nối đến máy chủ backend.',
+      });
+      setServerAiConfig(null);
+    }
+  }, [isAdmin]);
+
+  useEffect(() => {
+    fetchBackendStatus();
+  }, [fetchBackendStatus]);
+
+  const handleTestKey = async () => {
+    setIsTestingKey(true);
+    setKeyActionFeedback(null);
+    try {
+      const res = await AIBackendClient.testConfig({
+        apiKey: inputApiKey.trim() || undefined,
+        model: defaultModel,
+      });
+      setKeyActionFeedback({
+        type: 'success',
+        message: `${res.message} (Độ trễ: ${res.data.latencyMs}ms)`,
+      });
+    } catch (err: any) {
+      setKeyActionFeedback({
+        type: 'error',
+        message: err.message || 'Kiểm tra kết nối Gemini API thất bại.',
+      });
+    } finally {
+      setIsTestingKey(false);
+    }
+  };
+
+  const handleSaveServerKey = async () => {
+    if (!inputApiKey.trim()) {
+      setKeyActionFeedback({
+        type: 'error',
+        message: 'Vui lòng nhập API Key trước khi lưu.',
+      });
+      return;
+    }
+    setIsSavingKey(true);
+    setKeyActionFeedback(null);
+    try {
+      const res = await AIBackendClient.updateConfig({
+        apiKey: inputApiKey.trim(),
+        model: defaultModel,
+      });
+      setKeyActionFeedback({
+        type: 'success',
+        message: res.message || 'Đã lưu cấu hình API Key trên máy chủ thành công.',
+      });
+      setInputApiKey('');
+      await fetchBackendStatus();
+    } catch (err: any) {
+      setKeyActionFeedback({
+        type: 'error',
+        message: err.message || 'Không thể lưu cấu hình API Key.',
+      });
+    } finally {
+      setIsSavingKey(false);
+    }
+  };
 
   const handleClearLegacyKey = () => {
     localStorage.removeItem('GEMINI_API_KEY');
@@ -379,7 +467,7 @@ const SettingsPage: React.FC = () => {
 
   // Thống kê learned mappings
   const aiLearnedMappings = useAppStore((state) => state.aiLearnedMappings) || [];
-  const isAiConfigured = backendHealth.isOnline;
+  const isAiConfigured = Boolean(backendHealth.isOnline && backendHealth.isConfigured);
 
   // Tối ưu 2: Gom nhóm selectors của useUIStore
   const {
@@ -740,35 +828,171 @@ const SettingsPage: React.FC = () => {
 
           {/* Trạng thái AI Backend Authority */}
           <div
-            className={`flex items-center gap-3 px-4 py-3 rounded-xl border ${
+            className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 py-3.5 rounded-xl border ${
               backendHealth.isChecking
                 ? 'bg-sky-500/10 border-sky-500/20 text-sky-700 dark:text-sky-300'
                 : isAiConfigured
                   ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-700 dark:text-emerald-300'
-                  : 'bg-amber-500/10 border-amber-500/20 text-amber-700 dark:text-amber-300'
+                  : backendHealth.isOnline
+                    ? 'bg-amber-500/10 border-amber-500/20 text-amber-700 dark:text-amber-300'
+                    : 'bg-rose-500/10 border-rose-500/20 text-rose-700 dark:text-rose-300'
             }`}
           >
-            {backendHealth.isChecking ? (
-              <ArrowPathIcon className="w-5 h-5 flex-shrink-0 animate-spin" />
-            ) : isAiConfigured ? (
-              <CheckCircleIcon className="w-5 h-5 flex-shrink-0" />
-            ) : (
-              <ExclamationTriangleIcon className="w-5 h-5 flex-shrink-0" />
-            )}
-            <div>
-              <p className="text-sm font-bold">
-                {backendHealth.isChecking
-                  ? 'Đang kiểm tra kết nối AI Backend Authority...'
-                  : isAiConfigured
-                    ? 'AI Backend Authority đang hoạt động an toàn ✅'
-                    : 'Máy chủ AI Backend Authority tạm thời chưa sẵn sàng ⚠️'}
-              </p>
-              <p className="text-xs opacity-80">
-                {isAiConfigured
-                  ? `Mô hình: ${backendHealth.model || 'Gemini 2.5'} | Endpoint: ${AIBackendClient.getApiUrl()} | Kiến trúc: Firebase Spark Free (Server Authority - Zero Client Secrets).`
-                  : `Vui lòng khởi động backend authority (npm run dev trong thư mục backend/) hoặc kiểm tra biến môi trường VITE_BACKEND_API_URL.`}
-              </p>
+            <div className="flex items-start gap-3">
+              {backendHealth.isChecking ? (
+                <ArrowPathIcon className="w-5 h-5 flex-shrink-0 animate-spin mt-0.5" />
+              ) : isAiConfigured ? (
+                <CheckCircleIcon className="w-5 h-5 flex-shrink-0 mt-0.5" />
+              ) : (
+                <ExclamationTriangleIcon className="w-5 h-5 flex-shrink-0 mt-0.5" />
+              )}
+              <div>
+                <p className="text-sm font-bold">
+                  {backendHealth.isChecking
+                    ? 'Đang kiểm tra kết nối AI Backend Authority...'
+                    : isAiConfigured
+                      ? 'AI Backend Authority đang hoạt động an toàn ✅'
+                      : backendHealth.isOnline
+                        ? 'AI Backend Authority trực tuyến nhưng chưa có API Key ⚠️'
+                        : 'Máy chủ AI Backend Authority tạm thời chưa sẵn sàng ⚠️'}
+                </p>
+                <p className="text-xs opacity-90 mt-0.5 leading-relaxed">
+                  {backendHealth.isChecking
+                    ? 'Đang kiểm tra dịch vụ AI...'
+                    : isAiConfigured
+                      ? `Mô hình: ${backendHealth.model || 'Gemini 2.5'} | Endpoint: ${AIBackendClient.getApiUrl()} | Kiến trúc: Firebase Spark Free (Server Authority - Zero Client Secrets).`
+                      : backendHealth.isOnline
+                        ? `Máy chủ backend kết nối thành công tại ${AIBackendClient.getApiUrl()}, nhưng chưa được cấu hình GEMINI_API_KEY. Quản trị viên (ADMIN) vui lòng nhập API Key bên dưới.`
+                        : `Không thể kết nối đến máy chủ backend tại ${AIBackendClient.getApiUrl()}. Vui lòng khởi động backend authority (npm run dev trong thư mục backend/) hoặc kiểm tra biến môi trường VITE_BACKEND_API_URL.`}
+                </p>
+              </div>
             </div>
+            <button
+              type="button"
+              onClick={fetchBackendStatus}
+              disabled={backendHealth.isChecking}
+              className="self-start sm:self-center flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-surface border border-border hover:bg-surface-2 transition flex-shrink-0 text-ink cursor-pointer"
+              title="Kiểm tra lại trạng thái kết nối"
+            >
+              <ArrowPathIcon
+                className={`w-3.5 h-3.5 ${backendHealth.isChecking ? 'animate-spin' : ''}`}
+              />
+              Kiểm tra lại
+            </button>
+          </div>
+
+          {/* Quản lý Khóa Gemini API Key trên Server */}
+          <div className="p-4 bg-surface-2/60 border border-border rounded-xl space-y-3.5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <KeyIcon className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                <h4 className="text-sm font-bold text-ink">
+                  Quản lý Khóa Gemini API Key (Server-Side)
+                </h4>
+              </div>
+              <div className="flex items-center gap-2 text-xs">
+                <span className="text-ink-muted">Trạng thái khóa:</span>
+                {backendHealth.isConfigured ? (
+                  <span className="px-2 py-0.5 rounded-full font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                    Đã cấu hình {serverAiConfig?.maskedKey ? `(${serverAiConfig.maskedKey})` : ''}
+                  </span>
+                ) : (
+                  <span className="px-2 py-0.5 rounded-full font-semibold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+                    Chưa cấu hình
+                  </span>
+                )}
+              </div>
+            </div>
+
+            <p className="text-xs text-ink-muted leading-relaxed">
+              Khóa API được xử lý và lưu trữ độc quyền tại External Backend Authority (21 CFR Part
+              11 / Spark Free). Trình duyệt client không bao giờ lưu trữ hoặc tiếp xúc với khóa bí
+              mật.
+            </p>
+
+            {isAdmin ? (
+              <div className="space-y-3 pt-2 border-t border-border/60">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-ink-muted flex items-center justify-between">
+                    <span>Cập nhật API Key mới cho máy chủ</span>
+                    <a
+                      href="https://aistudio.google.com/app/apikey"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-1"
+                    >
+                      Lấy API Key miễn phí tại Google AI Studio
+                      <ArrowTopRightOnSquareIcon className="w-3 h-3" />
+                    </a>
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showApiKey ? 'text' : 'password'}
+                      value={inputApiKey}
+                      onChange={(e) => setInputApiKey(e.target.value)}
+                      placeholder={
+                        backendHealth.isConfigured
+                          ? 'Nhập API Key mới để cập nhật (để trống nếu giữ nguyên)...'
+                          : 'Nhập API Key Gemini (bắt đầu bằng AIzaSy...)...'
+                      }
+                      className="w-full p-2.5 pr-10 bg-surface border border-border rounded-xl font-mono text-xs text-ink outline-none focus:ring-2 focus:ring-emerald-500/20"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowApiKey(!showApiKey)}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-ink-muted hover:text-ink cursor-pointer"
+                    >
+                      {showApiKey ? (
+                        <EyeSlashIcon className="w-4 h-4" />
+                      ) : (
+                        <EyeIcon className="w-4 h-4" />
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                {keyActionFeedback && (
+                  <div
+                    className={`p-3 rounded-lg text-xs font-medium border ${
+                      keyActionFeedback.type === 'success'
+                        ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-700 dark:text-emerald-300'
+                        : 'bg-rose-500/10 border-rose-500/20 text-rose-700 dark:text-rose-300'
+                    }`}
+                  >
+                    {keyActionFeedback.message}
+                  </div>
+                )}
+
+                <div className="flex flex-wrap items-center gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={handleTestKey}
+                    disabled={isTestingKey || (!inputApiKey.trim() && !backendHealth.isConfigured)}
+                    className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold rounded-xl border border-border bg-surface hover:bg-surface-2 text-ink disabled:opacity-50 transition cursor-pointer"
+                  >
+                    <ArrowPathIcon
+                      className={`w-3.5 h-3.5 ${isTestingKey ? 'animate-spin' : ''}`}
+                    />
+                    {isTestingKey ? 'Đang kiểm tra...' : 'Thử kết nối API'}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleSaveServerKey}
+                    disabled={isSavingKey || !inputApiKey.trim()}
+                    className="flex items-center gap-1.5 px-4 py-2 text-xs font-bold rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-50 transition shadow-xs cursor-pointer"
+                  >
+                    <CheckCircleIcon className="w-3.5 h-3.5" />
+                    {isSavingKey ? 'Đang lưu...' : 'Lưu khóa lên máy chủ'}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="p-3 bg-surface border border-border rounded-lg text-xs text-ink-muted italic">
+                🔒 Chỉ tài khoản Quản trị viên (ADMIN) mới có thẩm quyền cập nhật hoặc thay đổi khóa
+                Gemini API Key trên máy chủ.
+              </div>
+            )}
           </div>
 
           {/* Cảnh báo bảo mật & dọn dẹp API Key cũ nếu có */}
