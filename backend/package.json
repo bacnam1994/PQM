@@ -5,6 +5,8 @@
   "main": "dist/index.js",
   "scripts": {
     "prebuild": "npm --prefix ../packages/release-engine run build",
+    "pretypecheck": "npm --prefix ../packages/release-engine run build",
+    "pretest": "npm --prefix ../packages/release-engine run build",
     "build": "tsc",
     "start": "node dist/index.js",
     "dev": "npm run build && node dist/index.js",

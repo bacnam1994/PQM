@@ -35,9 +35,11 @@ jobs:
       - name: 2. Frontend & Shared Engine Typecheck
         run: npm run typecheck
 
-      - name: 3. Backend Dependencies (npm ci)
+      - name: 3. Backend Dependencies (npm ci & build shared packages)
         run: |
-          cd backend
+          cd packages/release-engine
+          npm run build
+          cd ../../backend
           npm ci
           cd ..
 
