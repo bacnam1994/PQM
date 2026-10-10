@@ -21,6 +21,52 @@ export const getApiKey = (): string => {
   return import.meta.env.VITE_GEMINI_API_KEY || '';
 };
 
+export const hasClientApiKey = (): boolean => {
+  return Boolean(getApiKey());
+};
+
+export const saveClientApiKey = (key: string): void => {
+  if (typeof window !== 'undefined') {
+    localStorage.setItem('GEMINI_API_KEY', key.trim());
+  }
+};
+
+export const clearClientApiKey = (): void => {
+  if (typeof window !== 'undefined') {
+    localStorage.removeItem('GEMINI_API_KEY');
+  }
+};
+
+export const testClientGeminiConnection = async (
+  candidateKey?: string,
+  modelName: string = DEFAULT_GEMINI_MODEL
+): Promise<{ latencyMs: number; model: string }> => {
+  const key = candidateKey ? candidateKey.trim() : getApiKey();
+  if (!key) {
+    throw new Error('Vui lòng nhập API Key để kiểm tra kết nối.');
+  }
+
+  const genAI = await createGoogleGenerativeAI(key);
+  const model = genAI.getGenerativeModel({
+    model: modelName,
+    generationConfig: {
+      maxOutputTokens: 10,
+      temperature: 0,
+    },
+  });
+
+  const start = Date.now();
+  try {
+    const result = await model.generateContent('Ping. Trả lời "OK".');
+    const response = await result.response;
+    response.text();
+    const latencyMs = Date.now() - start;
+    return { latencyMs, model: modelName };
+  } catch (err: any) {
+    throw new Error(formatGeminiError(err));
+  }
+};
+
 export const formatGeminiError = (error: any): string => {
   const msg = error?.message || String(error || '');
   if (

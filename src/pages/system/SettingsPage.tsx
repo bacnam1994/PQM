@@ -57,6 +57,12 @@ import { resetConsent } from '../../hooks/useCookieConsent';
 import { useShallow } from 'zustand/react/shallow';
 import { AVAILABLE_GEMINI_MODELS, DEFAULT_GEMINI_MODEL } from '../../constants/aiModels';
 import { AIBackendClient } from '../../services/ai/aiBackendClient';
+import {
+  testClientGeminiConnection,
+  saveClientApiKey,
+  clearClientApiKey,
+  getApiKey as getClientApiKey,
+} from '../../services/ai/geminiService';
 
 /** Panel hiển thị trạng thái bộ lọc đã lưu và cho phép reset từng trang */
 const FilterStatusPanel: React.FC = () => {
@@ -392,14 +398,39 @@ const SettingsPage: React.FC = () => {
   const handleTestKey = async () => {
     setIsTestingKey(true);
     setKeyActionFeedback(null);
+    const candidateKey = inputApiKey.trim() || getClientApiKey() || undefined;
+
+    if (backendHealth.isOnline) {
+      try {
+        const res = await AIBackendClient.testConfig({
+          apiKey: inputApiKey.trim() || undefined,
+          model: defaultModel,
+        });
+        setKeyActionFeedback({
+          type: 'success',
+          message: `${res.message} (Độ trễ: ${res.data.latencyMs}ms) [Máy chủ Backend]`,
+        });
+        setIsTestingKey(false);
+        return;
+      } catch (err: any) {
+        // Nếu lỗi không phải do backend offline, hiển thị lỗi
+        if (!err.message?.includes('Failed to fetch') && !candidateKey) {
+          setKeyActionFeedback({
+            type: 'error',
+            message: err.message || 'Kiểm tra kết nối Gemini API thất bại.',
+          });
+          setIsTestingKey(false);
+          return;
+        }
+      }
+    }
+
+    // Chế độ Firebase Free: Thử nghiệm kết nối trực tiếp từ trình duyệt
     try {
-      const res = await AIBackendClient.testConfig({
-        apiKey: inputApiKey.trim() || undefined,
-        model: defaultModel,
-      });
+      const res = await testClientGeminiConnection(candidateKey, defaultModel);
       setKeyActionFeedback({
         type: 'success',
-        message: `${res.message} (Độ trễ: ${res.data.latencyMs}ms)`,
+        message: `Kiểm tra kết nối Google Gemini API thành công! (Mô hình: ${res.model}, Độ trễ: ${res.latencyMs}ms) [Chế độ Firebase Free]`,
       });
     } catch (err: any) {
       setKeyActionFeedback({
@@ -411,8 +442,9 @@ const SettingsPage: React.FC = () => {
     }
   };
 
-  const handleSaveServerKey = async () => {
-    if (!inputApiKey.trim()) {
+  const handleSaveKey = async () => {
+    const keyToSave = inputApiKey.trim();
+    if (!keyToSave) {
       setKeyActionFeedback({
         type: 'error',
         message: 'Vui lòng nhập API Key trước khi lưu.',
@@ -421,30 +453,54 @@ const SettingsPage: React.FC = () => {
     }
     setIsSavingKey(true);
     setKeyActionFeedback(null);
-    try {
-      const res = await AIBackendClient.updateConfig({
-        apiKey: inputApiKey.trim(),
-        model: defaultModel,
-      });
-      setKeyActionFeedback({
-        type: 'success',
-        message: res.message || 'Đã lưu cấu hình API Key trên máy chủ thành công.',
-      });
-      setInputApiKey('');
-      await fetchBackendStatus();
-    } catch (err: any) {
-      setKeyActionFeedback({
-        type: 'error',
-        message: err.message || 'Không thể lưu cấu hình API Key.',
-      });
-    } finally {
-      setIsSavingKey(false);
+
+    // Luôn lưu bản sao an toàn vào LocalStorage cho Chế độ Firebase Free
+    saveClientApiKey(keyToSave);
+    setHasLegacyLocalKey(true);
+
+    if (backendHealth.isOnline) {
+      try {
+        const res = await AIBackendClient.updateConfig({
+          apiKey: keyToSave,
+          model: defaultModel,
+        });
+        setKeyActionFeedback({
+          type: 'success',
+          message: `${res.message || 'Đã lưu cấu hình API Key trên máy chủ và trình duyệt thành công.'}`,
+        });
+        setInputApiKey('');
+        await fetchBackendStatus();
+      } catch {
+        // Backend không lưu được nhưng Client đã lưu thành công
+        setKeyActionFeedback({
+          type: 'success',
+          message:
+            'Đã lưu khóa API Gemini vào trình duyệt (Chế độ Firebase Free)! Tất cả tính năng AI (OCR, Chatbot, Phân tích) đã sẵn sàng sử dụng.',
+        });
+        setInputApiKey('');
+      } finally {
+        setIsSavingKey(false);
+      }
+      return;
     }
+
+    // Backend đang offline: Lưu vào Client LocalStorage cho Firebase Free
+    setKeyActionFeedback({
+      type: 'success',
+      message:
+        'Đã lưu khóa API Gemini vào trình duyệt thành công (Chế độ Firebase Free)! Các tính năng AI đã sẵn sàng hoạt động.',
+    });
+    setInputApiKey('');
+    setIsSavingKey(false);
   };
 
-  const handleClearLegacyKey = () => {
-    localStorage.removeItem('GEMINI_API_KEY');
+  const handleClearKey = () => {
+    clearClientApiKey();
     setHasLegacyLocalKey(false);
+    setKeyActionFeedback({
+      type: 'info',
+      message: 'Đã xóa khóa API Gemini khỏi bộ nhớ trình duyệt.',
+    });
   };
 
   // ─── AI Model and Thinking Mode States ──────────────────────────────
@@ -826,44 +882,46 @@ const SettingsPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Trạng thái AI Backend Authority */}
+          {/* Trạng thái Hoạt động AI */}
           <div
             className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 py-3.5 rounded-xl border ${
               backendHealth.isChecking
                 ? 'bg-sky-500/10 border-sky-500/20 text-sky-700 dark:text-sky-300'
-                : isAiConfigured
+                : backendHealth.isOnline
                   ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-700 dark:text-emerald-300'
-                  : backendHealth.isOnline
-                    ? 'bg-amber-500/10 border-amber-500/20 text-amber-700 dark:text-amber-300'
-                    : 'bg-rose-500/10 border-rose-500/20 text-rose-700 dark:text-rose-300'
+                  : hasLegacyLocalKey || Boolean(getClientApiKey())
+                    ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-700 dark:text-emerald-300'
+                    : 'bg-amber-500/10 border-amber-500/20 text-amber-700 dark:text-amber-300'
             }`}
           >
             <div className="flex items-start gap-3">
               {backendHealth.isChecking ? (
                 <ArrowPathIcon className="w-5 h-5 flex-shrink-0 animate-spin mt-0.5" />
-              ) : isAiConfigured ? (
+              ) : backendHealth.isOnline ? (
                 <CheckCircleIcon className="w-5 h-5 flex-shrink-0 mt-0.5" />
+              ) : hasLegacyLocalKey || Boolean(getClientApiKey()) ? (
+                <SparklesIcon className="w-5 h-5 flex-shrink-0 mt-0.5" />
               ) : (
                 <ExclamationTriangleIcon className="w-5 h-5 flex-shrink-0 mt-0.5" />
               )}
               <div>
                 <p className="text-sm font-bold">
                   {backendHealth.isChecking
-                    ? 'Đang kiểm tra kết nối AI Backend Authority...'
-                    : isAiConfigured
-                      ? 'AI Backend Authority đang hoạt động an toàn ✅'
-                      : backendHealth.isOnline
-                        ? 'AI Backend Authority trực tuyến nhưng chưa có API Key ⚠️'
-                        : 'Máy chủ AI Backend Authority tạm thời chưa sẵn sàng ⚠️'}
+                    ? 'Đang kiểm tra dịch vụ AI...'
+                    : backendHealth.isOnline
+                      ? 'AI Backend Authority đang kết nối an toàn ✅'
+                      : hasLegacyLocalKey || Boolean(getClientApiKey())
+                        ? 'Chế độ Trực tiếp Firebase Free (Client Direct Mode) đang sẵn sàng 🟢'
+                        : 'Chế độ Firebase Free: Chưa cấu hình Gemini API Key ⚠️'}
                 </p>
                 <p className="text-xs opacity-90 mt-0.5 leading-relaxed">
                   {backendHealth.isChecking
-                    ? 'Đang kiểm tra dịch vụ AI...'
-                    : isAiConfigured
-                      ? `Mô hình: ${backendHealth.model || 'Gemini 2.5'} | Endpoint: ${AIBackendClient.getApiUrl()} | Kiến trúc: Firebase Spark Free (Server Authority - Zero Client Secrets).`
-                      : backendHealth.isOnline
-                        ? `Máy chủ backend kết nối thành công tại ${AIBackendClient.getApiUrl()}, nhưng chưa được cấu hình GEMINI_API_KEY. Quản trị viên (ADMIN) vui lòng nhập API Key bên dưới.`
-                        : `Không thể kết nối đến máy chủ backend tại ${AIBackendClient.getApiUrl()}. Vui lòng khởi động backend authority (npm run dev trong thư mục backend/) hoặc kiểm tra biến môi trường VITE_BACKEND_API_URL.`}
+                    ? 'Đang kiểm tra kết nối...'
+                    : backendHealth.isOnline
+                      ? `Mô hình: ${backendHealth.model || defaultModel} | Endpoint: ${AIBackendClient.getApiUrl()} | Chế độ Server Authority.`
+                      : hasLegacyLocalKey || Boolean(getClientApiKey())
+                        ? `Hoạt động 100% trên nền tảng Firebase Free (Spark). Trình duyệt gọi trực tiếp Google Gemini API (${defaultModel}) — Hoàn toàn miễn phí, không phụ thuộc máy chủ ngoài.`
+                        : `Ứng dụng đang chạy trên Firebase Free (Spark). Vui lòng nhập API Key Gemini bên dưới để kích hoạt đầy đủ các tính năng AI (OCR, Chatbot, Phân tích dữ liệu).`}
                 </p>
               </div>
             </div>
@@ -881,20 +939,22 @@ const SettingsPage: React.FC = () => {
             </button>
           </div>
 
-          {/* Quản lý Khóa Gemini API Key trên Server */}
+          {/* Quản lý Khóa Gemini API Key */}
           <div className="p-4 bg-surface-2/60 border border-border rounded-xl space-y-3.5">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <div className="flex items-center gap-2">
                 <KeyIcon className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                <h4 className="text-sm font-bold text-ink">
-                  Quản lý Khóa Gemini API Key (Server-Side)
-                </h4>
+                <h4 className="text-sm font-bold text-ink">Quản lý Khóa Google Gemini API Key</h4>
               </div>
               <div className="flex items-center gap-2 text-xs">
                 <span className="text-ink-muted">Trạng thái khóa:</span>
                 {backendHealth.isConfigured ? (
                   <span className="px-2 py-0.5 rounded-full font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-                    Đã cấu hình {serverAiConfig?.maskedKey ? `(${serverAiConfig.maskedKey})` : ''}
+                    Máy chủ {serverAiConfig?.maskedKey ? `(${serverAiConfig.maskedKey})` : ''}
+                  </span>
+                ) : hasLegacyLocalKey || Boolean(getClientApiKey()) ? (
+                  <span className="px-2 py-0.5 rounded-full font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                    Đã lưu trên Trình duyệt (Firebase Free)
                   </span>
                 ) : (
                   <span className="px-2 py-0.5 rounded-full font-semibold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
@@ -905,120 +965,108 @@ const SettingsPage: React.FC = () => {
             </div>
 
             <p className="text-xs text-ink-muted leading-relaxed">
-              Khóa API được xử lý và lưu trữ độc quyền tại External Backend Authority (21 CFR Part
-              11 / Spark Free). Trình duyệt client không bao giờ lưu trữ hoặc tiếp xúc với khóa bí
-              mật.
+              Khóa API được sử dụng để chạy tính năng OCR quét phiếu kiểm nghiệm, Chatbot trợ lý,
+              điều tra OOS và thẩm định lô. Hỗ trợ đầy đủ cả định dạng khóa mới (bắt đầu bằng{' '}
+              <code className="px-1 py-0.5 bg-surface border border-border rounded">AQ...</code>) và
+              định dạng truyền thống (
+              <code className="px-1 py-0.5 bg-surface border border-border rounded">AIzaSy...</code>
+              ).
             </p>
 
-            {isAdmin ? (
-              <div className="space-y-3 pt-2 border-t border-border/60">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-ink-muted flex items-center justify-between">
-                    <span>Cập nhật API Key mới cho máy chủ</span>
-                    <a
-                      href="https://aistudio.google.com/app/apikey"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-1"
-                    >
-                      Lấy API Key miễn phí tại Google AI Studio
-                      <ArrowTopRightOnSquareIcon className="w-3 h-3" />
-                    </a>
-                  </label>
-                  <div className="relative">
-                    <input
-                      type={showApiKey ? 'text' : 'password'}
-                      value={inputApiKey}
-                      onChange={(e) => setInputApiKey(e.target.value)}
-                      placeholder={
-                        backendHealth.isConfigured
-                          ? 'Nhập API Key mới để cập nhật (để trống nếu giữ nguyên)...'
-                          : 'Nhập API Key Gemini...'
-                      }
-                      className="w-full p-2.5 pr-10 bg-surface border border-border rounded-xl font-mono text-xs text-ink outline-none focus:ring-2 focus:ring-emerald-500/20"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowApiKey(!showApiKey)}
-                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-ink-muted hover:text-ink cursor-pointer"
-                    >
-                      {showApiKey ? (
-                        <EyeSlashIcon className="w-4 h-4" />
-                      ) : (
-                        <EyeIcon className="w-4 h-4" />
-                      )}
-                    </button>
-                  </div>
+            <div className="space-y-3 pt-2 border-t border-border/60">
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-ink-muted flex items-center justify-between">
+                  <span>Nhập hoặc Cập nhật Google Gemini API Key</span>
+                  <a
+                    href="https://aistudio.google.com/app/apikey"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-1"
+                  >
+                    Lấy API Key miễn phí tại Google AI Studio
+                    <ArrowTopRightOnSquareIcon className="w-3 h-3" />
+                  </a>
+                </label>
+                <div className="relative">
+                  <input
+                    type={showApiKey ? 'text' : 'password'}
+                    value={inputApiKey}
+                    onChange={(e) => setInputApiKey(e.target.value)}
+                    placeholder={
+                      hasLegacyLocalKey || Boolean(getClientApiKey())
+                        ? 'Đã lưu khóa trong trình duyệt. Nhập API Key mới để cập nhật nếu muốn...'
+                        : 'Nhập API Key Gemini (AQ... hoặc AIzaSy...)...'
+                    }
+                    className="w-full p-2.5 pr-10 bg-surface border border-border rounded-xl font-mono text-xs text-ink outline-none focus:ring-2 focus:ring-emerald-500/20"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowApiKey(!showApiKey)}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-ink-muted hover:text-ink cursor-pointer"
+                  >
+                    {showApiKey ? (
+                      <EyeSlashIcon className="w-4 h-4" />
+                    ) : (
+                      <EyeIcon className="w-4 h-4" />
+                    )}
+                  </button>
                 </div>
+              </div>
 
-                {keyActionFeedback && (
-                  <div
-                    className={`p-3 rounded-lg text-xs font-medium border ${
-                      keyActionFeedback.type === 'success'
-                        ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-700 dark:text-emerald-300'
+              {keyActionFeedback && (
+                <div
+                  className={`p-3 rounded-lg text-xs font-medium border ${
+                    keyActionFeedback.type === 'success'
+                      ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-700 dark:text-emerald-300'
+                      : keyActionFeedback.type === 'info'
+                        ? 'bg-sky-500/10 border-sky-500/20 text-sky-700 dark:text-sky-300'
                         : 'bg-rose-500/10 border-rose-500/20 text-rose-700 dark:text-rose-300'
-                    }`}
+                  }`}
+                >
+                  {keyActionFeedback.message}
+                </div>
+              )}
+
+              <div className="flex flex-wrap items-center gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={handleTestKey}
+                  disabled={
+                    isTestingKey ||
+                    (!inputApiKey.trim() &&
+                      !hasLegacyLocalKey &&
+                      !Boolean(getClientApiKey()) &&
+                      !backendHealth.isConfigured)
+                  }
+                  className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold rounded-xl border border-border bg-surface hover:bg-surface-2 text-ink disabled:opacity-50 transition cursor-pointer"
+                >
+                  <ArrowPathIcon className={`w-3.5 h-3.5 ${isTestingKey ? 'animate-spin' : ''}`} />
+                  {isTestingKey ? 'Đang kiểm tra...' : 'Thử kết nối API'}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleSaveKey}
+                  disabled={isSavingKey || !inputApiKey.trim()}
+                  className="flex items-center gap-1.5 px-4 py-2 text-xs font-bold rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-50 transition shadow-xs cursor-pointer"
+                >
+                  <CheckCircleIcon className="w-3.5 h-3.5" />
+                  {isSavingKey ? 'Đang lưu...' : 'Lưu khóa API'}
+                </button>
+
+                {(hasLegacyLocalKey || Boolean(getClientApiKey())) && (
+                  <button
+                    type="button"
+                    onClick={handleClearKey}
+                    className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold rounded-xl border border-rose-500/20 bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 transition cursor-pointer"
                   >
-                    {keyActionFeedback.message}
-                  </div>
+                    <TrashIcon className="w-3.5 h-3.5" />
+                    Xóa Key khỏi trình duyệt
+                  </button>
                 )}
-
-                <div className="flex flex-wrap items-center gap-2 pt-1">
-                  <button
-                    type="button"
-                    onClick={handleTestKey}
-                    disabled={isTestingKey || (!inputApiKey.trim() && !backendHealth.isConfigured)}
-                    className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold rounded-xl border border-border bg-surface hover:bg-surface-2 text-ink disabled:opacity-50 transition cursor-pointer"
-                  >
-                    <ArrowPathIcon
-                      className={`w-3.5 h-3.5 ${isTestingKey ? 'animate-spin' : ''}`}
-                    />
-                    {isTestingKey ? 'Đang kiểm tra...' : 'Thử kết nối API'}
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={handleSaveServerKey}
-                    disabled={isSavingKey || !inputApiKey.trim()}
-                    className="flex items-center gap-1.5 px-4 py-2 text-xs font-bold rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-50 transition shadow-xs cursor-pointer"
-                  >
-                    <CheckCircleIcon className="w-3.5 h-3.5" />
-                    {isSavingKey ? 'Đang lưu...' : 'Lưu khóa lên máy chủ'}
-                  </button>
-                </div>
               </div>
-            ) : (
-              <div className="p-3 bg-surface border border-border rounded-lg text-xs text-ink-muted italic">
-                🔒 Chỉ tài khoản Quản trị viên (ADMIN) mới có thẩm quyền cập nhật hoặc thay đổi khóa
-                Gemini API Key trên máy chủ.
-              </div>
-            )}
-          </div>
-
-          {/* Cảnh báo bảo mật & dọn dẹp API Key cũ nếu có */}
-          {hasLegacyLocalKey && (
-            <div className="flex items-center justify-between p-3.5 bg-rose-500/10 border border-rose-500/20 rounded-xl text-rose-700 dark:text-rose-300">
-              <div className="flex items-center gap-2.5">
-                <ShieldExclamationIcon className="w-5 h-5 flex-shrink-0" />
-                <div>
-                  <p className="text-xs font-bold">
-                    Phát hiện API Key Gemini cũ trong localStorage trình duyệt
-                  </p>
-                  <p className="text-[11px] opacity-80">
-                    Hệ thống đã nâng cấp sang External Backend Authority. Khóa API tại client không
-                    còn cần thiết.
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={handleClearLegacyKey}
-                className="px-3 py-1.5 text-xs font-bold bg-rose-600 text-white rounded-lg hover:bg-rose-700 transition"
-              >
-                Xóa Key Trình duyệt
-              </button>
             </div>
-          )}
+          </div>
 
           {/* Cấu hình mô hình và suy luận */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-3 border-t border-border">
