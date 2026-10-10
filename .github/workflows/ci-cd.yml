@@ -155,14 +155,15 @@ jobs:
 
       - name: 11. Secret Scan Guard (Verify frontend bundle contains NO server secrets)
         run: |
-          # Firebase Web API key is public client identifier; verify no backend Gemini or unauthorized secrets leak into dist/
-          UNAUTHORIZED_KEYS=$(grep -rn "AIzaSy" dist/ 2>/dev/null | grep -v "AIzaSyD9vhI4dxnj87u_TIrjiu2Z-4Zm_1np6c0" || true)
+          # Detect unauthorized 39-character Google/Gemini API keys (AIzaSy followed by 33 base64url characters)
+          # Exclude the public Firebase client configuration key
+          UNAUTHORIZED_KEYS=$(grep -rnoE "AIzaSy[A-Za-z0-9_-]{33}" dist/ 2>/dev/null | grep -v "AIzaSyD9vhI4dxnj87u_TIrjiu2Z-4Zm_1np6c0" || true)
           if [ -n "$UNAUTHORIZED_KEYS" ]; then
-            echo "::error::CRITICAL SECURITY BREACH: Unauthorized Google API Key pattern detected in dist/ bundle!"
+            echo "::error::CRITICAL SECURITY BREACH: Unauthorized Google API Key detected in dist/ bundle!"
             echo "$UNAUTHORIZED_KEYS"
             exit 1
           fi
-          echo "Verified: Frontend bundle is 100% clean of Google API secrets."
+          echo "Verified: Frontend bundle is 100% clean of unauthorized Google API secrets."
 
       - name: Build External Backend Artifacts
         run: |

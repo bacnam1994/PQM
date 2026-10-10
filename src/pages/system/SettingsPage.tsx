@@ -933,7 +933,7 @@ const SettingsPage: React.FC = () => {
                       placeholder={
                         backendHealth.isConfigured
                           ? 'Nhập API Key mới để cập nhật (để trống nếu giữ nguyên)...'
-                          : 'Nhập API Key Gemini (bắt đầu bằng AIzaSy...)...'
+                          : 'Nhập API Key Gemini...'
                       }
                       className="w-full p-2.5 pr-10 bg-surface border border-border rounded-xl font-mono text-xs text-ink outline-none focus:ring-2 focus:ring-emerald-500/20"
                     />
