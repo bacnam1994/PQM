@@ -5,6 +5,7 @@ on:
     branches: [ main, master ]
   pull_request:
     branches: [ main, master ]
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -60,6 +61,9 @@ jobs:
           cd backend
           npm test
           cd ..
+        env:
+          NODE_ENV: test
+          CI: true
 
       - name: 7. Firebase Security Rules Tests
         run: npx vitest run src/services/rulesAudit.test.ts src/services/securityRulesValidator.test.ts tests/security/firebaseRulesSecurity.test.ts

@@ -81,6 +81,14 @@ export class AIService {
     this.persistToEnv(trimmedKey, model);
   }
 
+  public static resetRuntimeConfig(): void {
+    this.runtimeApiKey = null;
+    this.runtimeModel = null;
+    delete process.env.GEMINI_API_KEY;
+    delete process.env.GEMINI_MODEL;
+    customModelCaller = null;
+  }
+
   private static persistToEnv(apiKey: string, model?: string): void {
     try {
       const envPath = path.resolve(process.cwd(), '.env');

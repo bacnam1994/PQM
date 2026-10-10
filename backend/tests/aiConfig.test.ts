@@ -3,7 +3,7 @@
  * Unit & Integration tests for Server-Side AI Configuration & Health API (Phases 4, 5, 6, 7)
  */
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import request from 'supertest';
 import { app } from '../src/index';
 import { setCustomAdminInstances } from '../src/config/firebaseAdmin';
@@ -15,6 +15,7 @@ describe('Server-Authoritative AI Configuration & Health API', () => {
   let mockAuth: any;
 
   beforeEach(() => {
+    AIService.resetRuntimeConfig();
     mockDb = createStrictMockDatabase();
     mockAuth = createMockAuth();
     setCustomAdminInstances({ db: mockDb, auth: mockAuth });
@@ -44,6 +45,11 @@ describe('Server-Authoritative AI Configuration & Health API', () => {
 
     // Default mock model caller
     setCustomModelCaller(async () => 'OK');
+  });
+
+  afterEach(() => {
+    AIService.resetRuntimeConfig();
+    setCustomModelCaller(null);
   });
 
   const adminToken = JSON.stringify({

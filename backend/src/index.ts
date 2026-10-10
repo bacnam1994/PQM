@@ -147,7 +147,7 @@ app.use((req: Request, res: Response) => {
 
 // Start listening if run directly
 const PORT = process.env.PORT || 4000;
-if (process.env.NODE_ENV !== 'test') {
+if (process.env.NODE_ENV !== 'test' && !process.env.VITEST) {
   app.listen(PORT, () => {
     console.log(`[PQM Backend Authority] Server running on port ${PORT}`);
   });
