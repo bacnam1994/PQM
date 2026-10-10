@@ -265,8 +265,8 @@ export function buildTestResultIndex(
       return { relationshipType: 'INVALID_EMPTY_BATCH_ID', reason: 'TestResult record is empty' };
     }
 
-    const rawBatchId = (r.batchId || '').trim();
-    const rawBatchNo = ((r as any).batchNo || '').trim();
+    const rawBatchId = (r.batchId || (r as any).batch?.id || '').trim();
+    const rawBatchNo = ((r as any).batchNo || (r as any).batch?.batchNo || '').trim();
 
     // 1. Kiểm tra Technical Relationship (PRIMARY)
     if (rawBatchId && batchIdMap.has(rawBatchId)) {
@@ -288,7 +288,22 @@ export function buildTestResultIndex(
 
     // 3. Kiểm tra nếu batchId hoặc r.batchNo chứa số lô (batchNo)
     const checkBatchNoMatch = (candidateBatchNo: string) => {
-      const matchedList = batchNoGroupMap.get(candidateBatchNo.toLowerCase());
+      const normalizedNo = candidateBatchNo.toLowerCase().trim();
+      let matchedList = batchNoGroupMap.get(normalizedNo);
+      if (!matchedList || matchedList.length === 0) {
+        const stripped = normalizedNo.replace(/^0+/, '');
+        if (stripped && stripped !== normalizedNo) {
+          matchedList = batchNoGroupMap.get(stripped);
+        }
+        if (!matchedList || matchedList.length === 0) {
+          for (const [key, list] of batchNoGroupMap.entries()) {
+            if (key.replace(/^0+/, '') === (stripped || normalizedNo)) {
+              matchedList = list;
+              break;
+            }
+          }
+        }
+      }
       if (matchedList && matchedList.length > 0) {
         if (matchedList.length > 1) {
           // Trùng lặp số lô -> AMBIGUOUS_MATCH

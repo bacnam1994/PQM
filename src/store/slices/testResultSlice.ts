@@ -118,11 +118,12 @@ export const createTestResultSlice: StoreSlice<TestResultSlice> = (set, get) => 
       'mergeTestResults'
     ),
 
-  fetchAllTestResultsForDashboard: async () => {
+  fetchAllTestResultsForDashboard: async (force?: boolean) => {
     try {
       const state = get();
-      // Nếu đã có dữ liệu và vừa tải trong vòng 60 giây, không cần fetch lại
+      // Nếu đã có dữ liệu và vừa tải trong vòng 60 giây, không cần fetch lại (trừ khi force = true)
       if (
+        !force &&
         state.allTestResults &&
         state.allTestResults.length > 0 &&
         (state as any)._lastFetchTestResultsTime &&
@@ -130,7 +131,7 @@ export const createTestResultSlice: StoreSlice<TestResultSlice> = (set, get) => 
       ) {
         return;
       }
-      const list = await testResultRepository.findRecent(200);
+      const list = await testResultRepository.findRecent(2000);
       const existingInCache =
         queryClient.getQueryData<TestResult[]>(TEST_RESULT_QUERY_KEYS.all) || [];
       const map = new Map<string, TestResult>();
@@ -145,6 +146,7 @@ export const createTestResultSlice: StoreSlice<TestResultSlice> = (set, get) => 
       set(
         {
           allTestResults: merged,
+          testResults: merged,
           _lastFetchTestResultsTime: Date.now(),
         } as any,
         false,

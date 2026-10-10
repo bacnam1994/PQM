@@ -152,7 +152,7 @@ export interface TestResultSliceActions {
   ) => Promise<void>;
   loadMoreTestResults: () => void;
   mergeTestResults: (list: TestResult[]) => void;
-  fetchAllTestResultsForDashboard: () => Promise<void>;
+  fetchAllTestResultsForDashboard: (force?: boolean) => Promise<void>;
 }
 
 export type TestResultSlice = TestResultSliceState & TestResultSliceActions;

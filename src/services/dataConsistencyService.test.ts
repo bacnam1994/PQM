@@ -1095,5 +1095,33 @@ describe('dataConsistencyService - Data Linkage & Consistency Engine', () => {
       );
       expect(missingIssue).toBeUndefined();
     });
+
+    it('14. Regression Test: Không tạo cảnh báo RELEASED_BATCH_NO_PASSING_TEST khi lô đã xuất xưởng có phiếu kiểm nghiệm hợp lệ (khớp ID hoặc BatchNo kể cả tiền tố số 0)', () => {
+      const releasedBatch: Batch = {
+        ...sampleBatch,
+        id: 'batch_006bd64a',
+        batchNo: '042605',
+        status: 'RELEASED',
+      };
+      const matchingTestResult: any = {
+        id: 'res_d067e65',
+        batchId: 'batch_006bd64a',
+        batchNo: '042605',
+        labName: 'CASE',
+        testDate: '2024-05-10',
+        overallStatus: 'PASS',
+      };
+      const report = auditDataConsistency({
+        products: [sampleProduct],
+        rawMaterials: [sampleRawMaterial],
+        tccsList: [sampleTCCS],
+        productFormulas: [sampleFormula],
+        batches: [releasedBatch],
+        testResults: [matchingTestResult],
+        dataFreshness: { testResultsLoaded: true, isTestResultsLoading: false },
+      });
+      const alert = report.issues.find((i) => i.type === 'RELEASED_BATCH_NO_PASSING_TEST');
+      expect(alert).toBeUndefined();
+    });
   });
 });

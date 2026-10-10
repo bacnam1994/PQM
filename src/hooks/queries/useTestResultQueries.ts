@@ -16,7 +16,7 @@ export function useTestResultsQuery(limit?: number) {
     queryFn: async () => {
       const items = limit
         ? await testResultQueries.findRecent(limit)
-        : await testResultQueries.findRecent(500);
+        : await testResultQueries.findRecent(2000);
       return items.sort(
         (a, b) =>
           new Date(b.testDate || b.createdAt || 0).getTime() -

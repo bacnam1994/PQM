@@ -119,7 +119,7 @@ export abstract class BaseFirebaseRepository<T extends { id: string }> implement
         }
       } else {
         // Lấy số lượng giới hạn vừa đủ cho trang hiện tại
-        const maxToFetch = Math.min(pageSize * currentPage + 1, 200);
+        const maxToFetch = Math.min(pageSize * currentPage + 1, 5000);
         q =
           direction === 'asc'
             ? query(q, limitToFirst(maxToFetch))

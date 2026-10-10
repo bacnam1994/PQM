@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import {
   ShieldCheckIcon,
   ExclamationTriangleIcon,
@@ -36,6 +36,8 @@ export const DataConsistencyCenter: React.FC = () => {
     productFormulas,
     rawMaterials,
     testResults,
+    allTestResults,
+    fetchAllTestResultsForDashboard,
     criteriaAliases,
     testingLaboratories,
     updateProductFormula,
@@ -51,16 +53,34 @@ export const DataConsistencyCenter: React.FC = () => {
   const [selectedCategory, setSelectedCategory] = useState<ConsistencyCategory | 'ALL'>('ALL');
   const [expandedIssueId, setExpandedIssueId] = useState<string | null>(null);
 
+  // Tự động tải toàn bộ phiếu kiểm nghiệm khi mở DataConsistencyCenter
+  useEffect(() => {
+    fetchAllTestResultsForDashboard();
+  }, [fetchAllTestResultsForDashboard]);
+
+  // Hợp nhất danh sách kiểm nghiệm từ allTestResults và testResults
+  const effectiveTestResults = useMemo(() => {
+    const map = new Map<string, TestResult>();
+    (allTestResults || []).forEach((r) => map.set(r.id, r));
+    (testResults || []).forEach((r) => map.set(r.id, r));
+    return Array.from(map.values());
+  }, [allTestResults, testResults]);
+
   const syncStatus = useAppStore((state) => state.syncStatus);
   const loadState = useMemo(() => {
     if (syncStatus === 'OFFLINE') return 'OFFLINE';
     if (syncStatus === 'ERROR') return 'ERROR';
     if (syncStatus === 'SAVING') return 'LOADING';
+    if (isScanning) return 'LOADING';
+    // Nếu có lô hàng nhưng chưa có phiếu kiểm nghiệm nào được nạp, trạng thái là PARTIAL
+    if ((batches || []).length > 0 && effectiveTestResults.length === 0) {
+      return 'PARTIAL';
+    }
     if (syncStatus === 'SAVED' || syncStatus === 'IDLE') return 'LOADED';
     return 'NOT_STARTED';
-  }, [syncStatus]);
+  }, [syncStatus, isScanning, batches, effectiveTestResults.length]);
 
-  const isTestResultsLoading = loadState === 'LOADING';
+  const isTestResultsLoading = loadState === 'LOADING' || loadState === 'PARTIAL';
   const testResultsLoaded = loadState === 'LOADED';
 
   // Lấy dữ liệu hệ thống hiện tại kèm trạng thái Freshness chuẩn hóa
@@ -71,7 +91,7 @@ export const DataConsistencyCenter: React.FC = () => {
       tccsList: tccsList || [],
       productFormulas: productFormulas || [],
       rawMaterials: rawMaterials || [],
-      testResults: testResults || [],
+      testResults: effectiveTestResults,
       criteriaAliases: criteriaAliases || [],
       testingLaboratories: testingLaboratories || [],
       dataFreshness: {
@@ -88,7 +108,7 @@ export const DataConsistencyCenter: React.FC = () => {
       tccsList,
       productFormulas,
       rawMaterials,
-      testResults,
+      effectiveTestResults,
       criteriaAliases,
       testingLaboratories,
       isTestResultsLoading,
@@ -98,15 +118,21 @@ export const DataConsistencyCenter: React.FC = () => {
     ]
   );
 
-  const handleManualScan = useCallback(() => {
+  const handleManualScan = useCallback(async () => {
     setIsScanning(true);
-    queryClient.invalidateQueries({ queryKey: TEST_RESULT_QUERY_KEYS.all });
-    queryClient.invalidateQueries({ queryKey: BATCH_QUERY_KEYS.all });
-    setTimeout(() => {
-      setIsScanning(false);
+    try {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: TEST_RESULT_QUERY_KEYS.all }),
+        queryClient.invalidateQueries({ queryKey: BATCH_QUERY_KEYS.all }),
+        fetchAllTestResultsForDashboard(true),
+      ]);
       toast.success('Đã hoàn tất rà soát toàn bộ hệ thống!');
-    }, 400);
-  }, []);
+    } catch (err: any) {
+      toast.error('Lỗi khi rà soát dữ liệu: ' + (err?.message || err));
+    } finally {
+      setIsScanning(false);
+    }
+  }, [fetchAllTestResultsForDashboard]);
 
   // Thực hiện quét liên kết dữ liệu
   const report: ConsistencyReport = useMemo(() => {
@@ -158,7 +184,7 @@ export const DataConsistencyCenter: React.FC = () => {
           }
         } else if (issue.autoHealAction === 'FIX_TEST_STATUS') {
           const { testResultId, correctStatus } = issue.healPayload;
-          const testRes = testResults.find((t) => t.id === testResultId);
+          const testRes = effectiveTestResults.find((t) => t.id === testResultId);
           if (testRes) {
             const statusUpper = String((testRes as any).status || '').toUpperCase();
             if (
@@ -212,7 +238,7 @@ export const DataConsistencyCenter: React.FC = () => {
           const { batchId, testResultIds } = issue.healPayload;
           if (batchId && Array.isArray(testResultIds)) {
             for (const trId of testResultIds) {
-              const testRes = testResults.find((t) => t.id === trId);
+              const testRes = effectiveTestResults.find((t) => t.id === trId);
               if (testRes) {
                 const statusUpper = String((testRes as any).status || '').toUpperCase();
                 if (
@@ -248,7 +274,7 @@ export const DataConsistencyCenter: React.FC = () => {
           toast.success('Đã dọn dẹp alias mồ côi');
         } else if (issue.autoHealAction === 'NORMALIZE_TEST_LAB') {
           const { testResultId, targetLabId, canonicalLabName } = issue.healPayload;
-          const testRes = testResults.find((t) => t.id === testResultId);
+          const testRes = effectiveTestResults.find((t) => t.id === testResultId);
           if (testRes) {
             await updateTestResult({
               ...testRes,
@@ -270,7 +296,7 @@ export const DataConsistencyCenter: React.FC = () => {
       notify,
       productFormulas,
       rawMaterials,
-      testResults,
+      effectiveTestResults,
       tccsList,
       updateProductFormula,
       updateTestResult,
@@ -304,7 +330,7 @@ export const DataConsistencyCenter: React.FC = () => {
 
       // 2. Cập nhật Test Result Statuses (Bảo vệ phiếu đã phê duyệt + tái thẩm định qua Engine)
       for (const trId of Object.keys(plan.testResultStatusUpdates)) {
-        const tr = testResults.find((t) => t.id === trId);
+        const tr = effectiveTestResults.find((t) => t.id === trId);
         if (tr) {
           const statusUpper = String((tr as any).status || '').toUpperCase();
           if (
@@ -355,7 +381,7 @@ export const DataConsistencyCenter: React.FC = () => {
 
       // 5. Chuẩn hóa Test Result Laboratories
       for (const trId of Object.keys(plan.testResultLabUpdates)) {
-        const tr = testResults.find((t) => t.id === trId);
+        const tr = effectiveTestResults.find((t) => t.id === trId);
         if (tr) {
           const update = plan.testResultLabUpdates[trId];
           await updateTestResult({
@@ -383,7 +409,7 @@ export const DataConsistencyCenter: React.FC = () => {
     notify,
     report,
     systemSnapshot,
-    testResults,
+    effectiveTestResults,
     tccsList,
     updateProductFormula,
     updateTestResult,
