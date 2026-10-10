@@ -8,12 +8,12 @@ export default defineConfig({
     alias: {
       '@': path.resolve(__dirname, './src'),
       '@pqm/release-engine': path.resolve(__dirname, './packages/release-engine/src/index.ts'),
-      'firebase-admin': path.resolve(__dirname, './functions/node_modules/firebase-admin'),
+      'firebase-admin': path.resolve(__dirname, './backend/node_modules/firebase-admin'),
       'firebase-functions/v2/https': path.resolve(
         __dirname,
-        './functions/node_modules/firebase-functions/lib/v2/providers/https.js'
+        './tests/helpers/firebaseFunctionsMock.ts'
       ),
-      'firebase-functions': path.resolve(__dirname, './functions/node_modules/firebase-functions'),
+      'firebase-functions': path.resolve(__dirname, './tests/helpers/firebaseFunctionsMock.ts'),
     },
   },
   test: {
@@ -23,10 +23,11 @@ export default defineConfig({
       'src/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}',
       'tests/**/*.test.{js,mjs,cjs,ts,mts,cts,jsx,tsx}',
     ],
-    // Loại trừ các file Playwright E2E test để tránh conflict với Vitest
+    // Loại trừ các file Playwright E2E test và backend test suite
     exclude: [
       '**/node_modules/**',
       '**/dist/**',
+      'backend/**',
       'e2e/**',
       'tests/*.spec.ts',
       '**/store/test-result-form.spec.ts',

@@ -119,8 +119,8 @@ jobs:
     needs: [quality-gate, e2e-tests]
     runs-on: ubuntu-latest
     timeout-minutes: 25
-    # Only deploy on push to main or master
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+    # Deploy on push or workflow_dispatch to main or master
+    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
     env:
       FIREBASE_SA: ${{ secrets['FIREBASE_SERVICE_ACCOUNT_V_BIOTECH'] }}
       FIREBASE_TOKEN: ${{ secrets['FIREBASE_TOKEN'] }}
@@ -153,10 +153,13 @@ jobs:
         env:
           VITE_BACKEND_API_URL: ${{ env.VITE_BACKEND_API_URL }}
 
-      - name: 11. Secret Scan Guard (Verify frontend bundle contains NO API keys)
+      - name: 11. Secret Scan Guard (Verify frontend bundle contains NO server secrets)
         run: |
-          if grep -rn "AIzaSy" dist/ 2>/dev/null; then
-            echo "::error::CRITICAL SECURITY BREACH: Google API Key pattern detected in dist/ bundle!"
+          # Firebase Web API key is public client identifier; verify no backend Gemini or unauthorized secrets leak into dist/
+          UNAUTHORIZED_KEYS=$(grep -rn "AIzaSy" dist/ 2>/dev/null | grep -v "AIzaSyD9vhI4dxnj87u_TIrjiu2Z-4Zm_1np6c0" || true)
+          if [ -n "$UNAUTHORIZED_KEYS" ]; then
+            echo "::error::CRITICAL SECURITY BREACH: Unauthorized Google API Key pattern detected in dist/ bundle!"
+            echo "$UNAUTHORIZED_KEYS"
             exit 1
           fi
           echo "Verified: Frontend bundle is 100% clean of Google API secrets."
