@@ -94,14 +94,18 @@ export interface AIConfigUpdateResponse {
 }
 
 export class AIBackendClient {
-  private static apiUrl = getBackendApiUrl();
+  private static customApiUrl: string | null = null;
 
   public static setApiUrl(url: string): void {
-    this.apiUrl = url;
+    this.customApiUrl = url;
   }
 
   public static getApiUrl(): string {
-    return this.apiUrl;
+    return this.customApiUrl || getBackendApiUrl();
+  }
+
+  public static get apiUrl(): string {
+    return this.getApiUrl();
   }
 
   /**

@@ -146,7 +146,15 @@ jobs:
             echo "::error::CRITICAL: VITE_BACKEND_API_URL is missing. Production build forbidden without backend API URL."
             exit 1
           fi
-          echo "Verified VITE_BACKEND_API_URL: $VITE_BACKEND_API_URL"
+          if echo "$VITE_BACKEND_API_URL" | grep -qE "localhost|127\.0\.0\.1"; then
+            echo "::error::CRITICAL: VITE_BACKEND_API_URL must NOT be localhost or 127.0.0.1 in production!"
+            exit 1
+          fi
+          if ! echo "$VITE_BACKEND_API_URL" | grep -q "^https://"; then
+            echo "::error::CRITICAL: VITE_BACKEND_API_URL must start with https:// in production!"
+            exit 1
+          fi
+          echo "Verified VITE_BACKEND_API_URL format is valid: $VITE_BACKEND_API_URL"
 
       - name: 10. Build Frontend Production Bundle (Vite)
         run: npm run build
@@ -172,17 +180,24 @@ jobs:
           npm run build
           cd ..
 
-      - name: 12 & 13. Deploy Backend & Verify GET /health
+      - name: 12 & 13. Deploy Backend & Verify Live Health (/health & /api/ai/health)
         run: |
           if [ -n "$BACKEND_DEPLOY_HOOK_URL" ]; then
             echo "Deploying External Backend via Deploy Hook..."
-            curl -fsS -X POST "$BACKEND_DEPLOY_HOOK_URL"
-            echo "Waiting for Backend Health Check at $VITE_BACKEND_API_URL/health..."
+            HOOK_STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$BACKEND_DEPLOY_HOOK_URL")
+            if [ "$HOOK_STATUS" -lt 200 ] || [ "$HOOK_STATUS" -ge 400 ]; then
+              echo "::error::Backend deploy hook returned HTTP $HOOK_STATUS. Deploy hook execution failed!"
+              exit 1
+            fi
+            echo "Deploy hook triggered successfully (HTTP $HOOK_STATUS). Waiting for backend to warm up..."
             HEALTHY=false
             for i in $(seq 1 24); do
-              RESPONSE=$(curl -fsS --max-time 10 "$VITE_BACKEND_API_URL/health" 2>/dev/null || echo "")
-              if echo "$RESPONSE" | grep -q '"status":"healthy"'; then
-                echo "External Backend is healthy: $RESPONSE"
+              HEALTH_RESP=$(curl -fsS --max-time 10 "$VITE_BACKEND_API_URL/health" 2>/dev/null || echo "")
+              AI_HEALTH_RESP=$(curl -fsS --max-time 10 "$VITE_BACKEND_API_URL/api/ai/health" 2>/dev/null || echo "")
+              if echo "$HEALTH_RESP" | grep -q '"status":"healthy"' && echo "$AI_HEALTH_RESP" | grep -q '"service":"pqm-ai-backend"'; then
+                echo "External Backend verified healthy on attempt $i!"
+                echo "Backend Health: $HEALTH_RESP"
+                echo "AI Service Health: $AI_HEALTH_RESP"
                 HEALTHY=true
                 break
               fi
@@ -190,29 +205,22 @@ jobs:
               sleep 5
             done
             if [ "$HEALTHY" != "true" ]; then
-              echo "::error::Backend health check failed after deploy."
+              echo "::error::Backend health check failed at $VITE_BACKEND_API_URL after 120s."
               exit 1
             fi
           else
-            echo "No BACKEND_DEPLOY_HOOK_URL secret found. Verifying local compiled backend health..."
-            cd backend
-            PORT=4000 node dist/index.js &
-            BACKEND_PID=$!
-            sleep 3
-            HEALTH=$(curl -fsS http://localhost:4000/health)
-            AI_HEALTH=$(curl -fsS http://localhost:4000/api/ai/health)
-            kill $BACKEND_PID
-            if ! echo "$HEALTH" | grep -q '"status":"healthy"'; then
-              echo "::error::Compiled backend health check failed."
+            echo "No BACKEND_DEPLOY_HOOK_URL configured. Verifying live production backend health at $VITE_BACKEND_API_URL..."
+            HEALTH_RESP=$(curl -fsS --max-time 10 "$VITE_BACKEND_API_URL/health" 2>/dev/null || echo "")
+            AI_HEALTH_RESP=$(curl -fsS --max-time 10 "$VITE_BACKEND_API_URL/api/ai/health" 2>/dev/null || echo "")
+            if echo "$HEALTH_RESP" | grep -q '"status":"healthy"' && echo "$AI_HEALTH_RESP" | grep -q '"service":"pqm-ai-backend"'; then
+              echo "Production backend is healthy and reachable: $HEALTH_RESP"
+              echo "AI service is reachable: $AI_HEALTH_RESP"
+            else
+              echo "::error::CRITICAL: Production backend at $VITE_BACKEND_API_URL is NOT reachable and BACKEND_DEPLOY_HOOK_URL secret is not configured!"
+              echo "::error::Running backend locally on runner is strictly forbidden as proof of production deployment."
+              echo "::error::Backend deployment is BLOCKED until the external backend service is active and responding."
               exit 1
             fi
-            if ! echo "$AI_HEALTH" | grep -q '"service":"pqm-ai-backend"'; then
-              echo "::error::Compiled backend AI health check failed."
-              exit 1
-            fi
-            echo "Compiled backend verified healthy: $HEALTH"
-            echo "Compiled backend AI verified healthy: $AI_HEALTH"
-            cd ..
           fi
 
       - name: 14. Deploy to Firebase Hosting (STRICTLY --only hosting, zero functions)

@@ -45,7 +45,14 @@ export const getAllowedOrigins = (): string[] => {
         .filter(Boolean)
     : [];
 
-  return Array.from(new Set([...defaultOrigins, ...envOrigins]));
+  const extraOrigins = [process.env.FRONTEND_URL, process.env.APP_URL]
+    .filter((url): url is string => Boolean(url && url.trim()))
+    .map((u) => u.trim());
+
+  // Filter out any accidental wildcard '*' to guarantee production safety
+  const combined = [...defaultOrigins, ...envOrigins, ...extraOrigins].filter((o) => o !== '*');
+
+  return Array.from(new Set(combined));
 };
 
 // Middleware: Strict CORS

@@ -15,6 +15,17 @@ export default defineConfig(({ mode }) => {
         'SECURITY BUILD GUARD: Missing mandatory environment variable VITE_BACKEND_API_URL in production build. Production bundles must have external backend authority URL configured.'
       );
     }
+    const trimmed = backendApiUrl.trim();
+    if (trimmed.includes('localhost') || trimmed.includes('127.0.0.1')) {
+      throw new Error(
+        `SECURITY BUILD GUARD: VITE_BACKEND_API_URL must NOT be localhost or 127.0.0.1 in production build! Received: ${trimmed}`
+      );
+    }
+    if (!trimmed.startsWith('https://')) {
+      throw new Error(
+        `SECURITY BUILD GUARD: VITE_BACKEND_API_URL must use HTTPS protocol in production build! Received: ${trimmed}`
+      );
+    }
   }
 
   return {

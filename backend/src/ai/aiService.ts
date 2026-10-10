@@ -7,8 +7,6 @@
  * STRICTLY READ-ONLY: Never writes or mutates batch, test, or signature records.
  */
 
-import fs from 'fs';
-import path from 'path';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { AppError } from '../utils/errors';
 import type { AuthenticatedUser } from '../middleware/auth';
@@ -70,6 +68,10 @@ export class AIService {
     return key;
   }
 
+  public static isPersistent(): boolean {
+    return this.getKeySource() === 'ENV';
+  }
+
   public static setRuntimeConfig(apiKey: string, model?: string): void {
     const trimmedKey = apiKey.trim();
     this.runtimeApiKey = trimmedKey;
@@ -78,7 +80,6 @@ export class AIService {
       this.runtimeModel = model.trim();
       process.env.GEMINI_MODEL = model.trim();
     }
-    this.persistToEnv(trimmedKey, model);
   }
 
   public static resetRuntimeConfig(): void {
@@ -87,30 +88,6 @@ export class AIService {
     delete process.env.GEMINI_API_KEY;
     delete process.env.GEMINI_MODEL;
     customModelCaller = null;
-  }
-
-  private static persistToEnv(apiKey: string, model?: string): void {
-    try {
-      const envPath = path.resolve(process.cwd(), '.env');
-      if (fs.existsSync(envPath)) {
-        let content = fs.readFileSync(envPath, 'utf8');
-        if (/^GEMINI_API_KEY=/m.test(content)) {
-          content = content.replace(/^GEMINI_API_KEY=.*$/m, `GEMINI_API_KEY=${apiKey}`);
-        } else {
-          content += `\nGEMINI_API_KEY=${apiKey}`;
-        }
-        if (model) {
-          if (/^GEMINI_MODEL=/m.test(content)) {
-            content = content.replace(/^GEMINI_MODEL=.*$/m, `GEMINI_MODEL=${model}`);
-          } else {
-            content += `\nGEMINI_MODEL=${model}`;
-          }
-        }
-        fs.writeFileSync(envPath, content, 'utf8');
-      }
-    } catch (err: any) {
-      console.warn('[AIService] Không thể ghi đè file .env:', err.message);
-    }
   }
 
   public static async testConnection(

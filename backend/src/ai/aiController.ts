@@ -93,6 +93,7 @@ export class AIController {
         maskedKey: AIService.getMaskedKey(),
         model: AIService.getModelName(),
         source: AIService.getKeySource(),
+        isPersistent: AIService.isPersistent(),
       },
       correlationId,
     });
@@ -141,16 +142,21 @@ export class AIController {
     try {
       // Test candidate key to ensure it functions properly before persisting
       await AIService.testConnection(apiKey, model);
-      // Persist config
+      // Persist config to runtime
       AIService.setRuntimeConfig(apiKey, model);
 
       res.status(200).json({
         success: true,
-        message: 'Cấu hình và kiểm tra API Key thành công.',
+        message:
+          'Cấu hình và kiểm tra API Key thành công (Lưu tạm thời trong In-Memory Runtime của máy chủ).',
+        warning:
+          'LƯU Ý: Khóa API được lưu tạm trong bộ nhớ phiên làm việc của máy chủ và sẽ bị mất khi máy chủ restart hoặc redeploy. Để lưu bền vững vĩnh viễn, vui lòng cấu hình biến GEMINI_API_KEY trong Dashboard của nhà cung cấp hosting backend.',
         data: {
           isConfigured: true,
           maskedKey: AIService.getMaskedKey(),
           model: AIService.getModelName(),
+          source: 'RUNTIME',
+          isPersistent: false,
         },
         correlationId,
       });

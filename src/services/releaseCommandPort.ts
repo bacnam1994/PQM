@@ -42,10 +42,14 @@ export interface IReleaseCommandPort {
  * Production HTTP Backend Implementation of Release Command
  */
 export class HttpReleaseCommandAdapter implements IReleaseCommandPort {
-  private baseUrl: string;
+  private customBaseUrl?: string;
 
   constructor(baseUrl?: string) {
-    this.baseUrl = baseUrl || getBackendApiUrl();
+    this.customBaseUrl = baseUrl;
+  }
+
+  private get baseUrl(): string {
+    return this.customBaseUrl || getBackendApiUrl();
   }
 
   async executeRelease(input: BatchReleaseCommandInput): Promise<BatchReleaseCommandOutput> {

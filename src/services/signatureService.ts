@@ -39,10 +39,14 @@ export { getBackendApiUrl };
 
 export class SignatureService {
   private readonly collectionPath = 'electronic_signatures';
-  private apiUrl: string = getBackendApiUrl();
+  private customApiUrl: string | null = null;
 
   public setApiUrl(url: string): void {
-    this.apiUrl = url;
+    this.customApiUrl = url;
+  }
+
+  private get apiUrl(): string {
+    return this.customApiUrl || getBackendApiUrl();
   }
 
   /**
