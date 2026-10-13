@@ -57,4 +57,5 @@ export interface CreateSignatureResponseBody {
   signature: ElectronicSignature;
   durationMs: number;
   correlationId: string;
+  idempotencyReplayed?: boolean;
 }

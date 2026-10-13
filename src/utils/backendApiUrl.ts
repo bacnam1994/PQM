@@ -13,7 +13,7 @@ export function getBackendApiUrl(): string {
     (typeof process !== 'undefined' && process.env?.VITE_BACKEND_API_URL);
 
   if (envUrl && typeof envUrl === 'string' && envUrl.trim()) {
-    const trimmed = envUrl.trim();
+    const trimmed = envUrl.trim().replace(/\/+$/, '');
     if (isProd && (trimmed.includes('localhost') || trimmed.includes('127.0.0.1'))) {
       throw new Error(
         'CẤU HÌNH BẢO MẬT BẮT BUỘC: VITE_BACKEND_API_URL trong môi trường Production không được sử dụng localhost hoặc 127.0.0.1!'

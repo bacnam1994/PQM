@@ -55,6 +55,7 @@ export interface ElectronicSignature {
   revokedBy?: string;
   revokeReason?: string;
   comments?: string;
+  correlationId?: string;
 }
 
 export interface CreateSignatureInput {

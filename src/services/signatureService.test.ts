@@ -191,6 +191,103 @@ describe('SignatureService - Server-Authoritative (No Client Fallback)', () => {
       expect(sig.signerEmail).toBe(adminUser.email);
       expect(mockSet).not.toHaveBeenCalled();
     });
+
+    it('PHASE 4: should catch network failure (Failed to fetch) and provide informative error with correlationId', async () => {
+      vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('Failed to fetch')));
+
+      const correlationId = 'SIG-CORR-NETWORK-ERR';
+      try {
+        await service.createElectronicSignature(qaUser, {
+          documentType: 'BATCH_RELEASE',
+          documentId: 'batch-001',
+          correlationId,
+        });
+        expect.unreachable('Should have thrown network error');
+      } catch (err: any) {
+        expect(err.message).toContain('Không thể kết nối đến Máy chủ Ký duyệt');
+        expect(err.message).toContain('Failed to fetch');
+        expect(err.message).toContain('CHƯA XÁC NHẬN chữ ký');
+        expect(err.isNetworkError).toBe(true);
+        expect(err.correlationId).toBe(correlationId);
+      }
+
+      // Zero writes to RTDB
+      expect(mockSet).not.toHaveBeenCalled();
+    });
+
+    it('PHASE 4: should handle non-JSON / HTML response (e.g. 502 Bad Gateway) gracefully', async () => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue({
+          ok: false,
+          status: 502,
+          json: async () => {
+            throw new Error('Unexpected token < in JSON at position 0');
+          },
+        })
+      );
+
+      const correlationId = 'SIG-CORR-HTML-502';
+      await expect(
+        service.createElectronicSignature(qaUser, {
+          documentType: 'BATCH_RELEASE',
+          documentId: 'batch-001',
+          correlationId,
+        })
+      ).rejects.toThrow(/không đúng định dạng JSON/);
+
+      expect(mockSet).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('checkBackendHealth', () => {
+    it('returns healthy status when backend /health responds with 200 and healthy JSON', async () => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue({
+          ok: true,
+          status: 200,
+          json: async () => ({
+            status: 'healthy',
+            service: 'pqm-backend-authority',
+            version: '1.0.0',
+          }),
+        })
+      );
+
+      const health = await service.checkBackendHealth();
+      expect(health.healthy).toBe(true);
+      expect(health.service).toBe('pqm-backend-authority');
+      expect(health.version).toBe('1.0.0');
+    });
+
+    it('returns unhealthy status when backend returns non-ok status', async () => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue({
+          ok: false,
+          status: 404,
+          statusText: 'Not Found',
+          json: async () => ({}),
+        })
+      );
+
+      const health = await service.checkBackendHealth();
+      expect(health.healthy).toBe(false);
+      expect(health.error).toContain('HTTP 404');
+    });
+
+    it('returns cold-start / timeout warning when fetch aborts', async () => {
+      const abortError = new Error('The operation was aborted');
+      abortError.name = 'AbortError';
+
+      vi.stubGlobal('fetch', vi.fn().mockRejectedValue(abortError));
+
+      const health = await service.checkBackendHealth(100);
+      expect(health.healthy).toBe(false);
+      expect(health.isColdStart).toBe(true);
+      expect(health.error).toContain('Cold Start');
+    });
   });
 
   describe('verifySignatureIntegrity', () => {

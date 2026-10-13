@@ -56,6 +56,7 @@ export interface CanonicalElectronicSignature {
   revokedBy?: string;
   revokeReason?: string;
   comments?: string;
+  correlationId?: string;
 }
 
 export type ReleaseCommandState = 'PROCESSING' | 'COMPLETED' | 'FAILED';

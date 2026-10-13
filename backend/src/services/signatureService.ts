@@ -74,7 +74,32 @@ export class ServerSignatureService {
       }
     }
 
-    // 3. Construct Canonical Unsigned Data
+    // 3. Idempotency Check: if a signature was already created with this correlationId, return it
+    if (correlationId) {
+      const existingSnap = await db
+        .ref('electronic_signatures')
+        .orderByChild('correlationId')
+        .equalTo(correlationId)
+        .once('value');
+
+      if (existingSnap.exists()) {
+        const signatures = Object.values(existingSnap.val()) as ElectronicSignature[];
+        const match = signatures.find(
+          (s) => s.documentId === documentId && s.documentType === documentType
+        );
+        if (match) {
+          return {
+            success: true,
+            signature: match,
+            durationMs: Date.now() - startTime,
+            correlationId,
+            idempotencyReplayed: true,
+          };
+        }
+      }
+    }
+
+    // 4. Construct Canonical Unsigned Data
     const signedAt = new Date().toISOString();
     const meaning =
       input.meaning && typeof input.meaning === 'string' && input.meaning.trim() !== ''
@@ -94,9 +119,10 @@ export class ServerSignatureService {
       ...(input.comments !== undefined && input.comments.trim() !== ''
         ? { comments: input.comments.trim() }
         : {}),
+      ...(correlationId ? { correlationId } : {}),
     };
 
-    // 4. Calculate Deterministic Canonical SHA-256 Checksum
+    // 5. Calculate Deterministic Canonical SHA-256 Checksum
     const checksum = calculateCanonicalSignatureChecksum(unsignedData as any);
 
     // Phase 13: Collision-safe UUIDs

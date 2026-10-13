@@ -71,9 +71,19 @@ app.use(
     },
     credentials: true,
     methods: ['GET', 'POST', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'x-correlation-id', 'x-request-id'],
+    allowedHeaders: [
+      'Content-Type',
+      'Authorization',
+      'x-correlation-id',
+      'x-request-id',
+      'x-idempotency-key',
+      'idempotency-key',
+    ],
   })
 );
+
+// Explicit preflight OPTIONS handler for all endpoints
+app.options('*', cors());
 
 app.use(express.json());
 

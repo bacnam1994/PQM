@@ -60,25 +60,61 @@ export class HttpReleaseCommandAdapter implements IReleaseCommandPort {
     const correlationId =
       input.correlationId || `REL-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
 
-    const response = await fetch(`${this.baseUrl}/api/batch-release/approve`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
-        'x-correlation-id': correlationId,
-      },
-      body: JSON.stringify({
-        batchId: input.batchId,
-        expectedVersion: input.expectedVersion,
-        signatureId: input.signatureId,
-        idempotencyKey: input.idempotencyKey,
-        correlationId,
-      }),
-    });
+    let response: Response;
+    try {
+      response = await fetch(`${this.baseUrl}/api/batch-release/approve`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+          'x-correlation-id': correlationId,
+        },
+        body: JSON.stringify({
+          batchId: input.batchId,
+          expectedVersion: input.expectedVersion,
+          signatureId: input.signatureId,
+          idempotencyKey: input.idempotencyKey,
+          correlationId,
+        }),
+      });
+    } catch (networkErr: any) {
+      const errorMsg =
+        `Không thể kết nối đến Máy chủ Phê duyệt Xuất xưởng (Backend Authority tại ${this.baseUrl}). ` +
+        `Yêu cầu mạng thất bại: ${networkErr?.message || 'Failed to fetch'}. ` +
+        `CHƯA XÁC NHẬN trạng thái xuất xưởng của Lô. ` +
+        `Lệnh xuất xưởng đã được bảo lưu khóa Idempotency (${input.idempotencyKey}). ` +
+        `Vui lòng kiểm tra lại trạng thái Lô trước khi thử lại (Mã đối chiếu: ${correlationId}).`;
 
-    const data = await response.json();
+      const enhancedErr: any = new Error(errorMsg);
+      enhancedErr.name = 'ReleaseNetworkError';
+      enhancedErr.isNetworkError = true;
+      enhancedErr.correlationId = correlationId;
+      enhancedErr.idempotencyKey = input.idempotencyKey;
+      throw enhancedErr;
+    }
+
+    let data: any = {};
+    try {
+      data = await response.json();
+    } catch {
+      throw new Error(
+        `Máy chủ xuất xưởng trả về định dạng phản hồi không hợp lệ (HTTP ${response.status}). Mã đối chiếu: ${correlationId}.`
+      );
+    }
+
     if (!response.ok || !data.success) {
-      throw new Error(data.error?.message || 'Lỗi xuất xưởng lô trên máy chủ.');
+      const serverCode = data.error?.code ? `[${data.error.code}] ` : '';
+      const serverCorrelation = data.error?.correlationId || correlationId;
+      const serverMessage = data.error?.message;
+      const errMsg = serverMessage
+        ? `${serverCode}${serverMessage} (Mã đối chiếu: ${serverCorrelation})`
+        : `Lỗi xuất xưởng lô trên máy chủ (HTTP ${response.status}). Mã đối chiếu: ${serverCorrelation}.`;
+
+      const enhancedErr: any = new Error(errMsg);
+      enhancedErr.code = data.error?.code;
+      enhancedErr.statusCode = response.status;
+      enhancedErr.correlationId = serverCorrelation;
+      throw enhancedErr;
     }
 
     return data;

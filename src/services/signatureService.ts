@@ -50,6 +50,63 @@ export class SignatureService {
   }
 
   /**
+   * Kiểm tra tình trạng kết nối tới External Backend Authority
+   */
+  async checkBackendHealth(timeoutMs = 6000): Promise<{
+    healthy: boolean;
+    service?: string;
+    version?: string;
+    statusText?: string;
+    statusCode?: number;
+    error?: string;
+    isColdStart?: boolean;
+    apiUrl: string;
+  }> {
+    const apiUrl = this.apiUrl;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+    try {
+      const res = await fetch(`${apiUrl}/health`, {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
+        signal: controller.signal,
+      });
+      clearTimeout(timer);
+
+      if (!res.ok) {
+        return {
+          healthy: false,
+          statusCode: res.status,
+          statusText: res.statusText,
+          error: `Máy chủ phản hồi HTTP ${res.status} (${res.statusText || 'Error'})`,
+          apiUrl,
+        };
+      }
+
+      const data = await res.json().catch(() => ({}));
+      return {
+        healthy: data.status === 'healthy',
+        service: data.service,
+        version: data.version,
+        statusCode: res.status,
+        apiUrl,
+      };
+    } catch (err: any) {
+      clearTimeout(timer);
+      const isTimeout = err?.name === 'AbortError';
+      return {
+        healthy: false,
+        error: isTimeout
+          ? 'Hết thời gian chờ phản hồi (>6s). Máy chủ có thể đang khởi động (Cold Start).'
+          : err?.message || 'Không thể kết nối đến máy chủ.',
+        isColdStart: isTimeout,
+        apiUrl,
+      };
+    }
+  }
+
+  /**
    * Tạo chữ ký điện tử hợp lệ với kiểm soát kỹ thuật tương thích 21 CFR Part 11
    */
   async createElectronicSignature(
@@ -148,23 +205,63 @@ export class SignatureService {
       payload.comments = input.comments.trim();
     }
 
-    const response = await fetch(`${this.apiUrl}/api/signatures`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${idToken}`,
-        'x-correlation-id': correlationId,
-      },
-      body: JSON.stringify(payload),
-    });
+    let response: Response;
+    try {
+      response = await fetch(`${this.apiUrl}/api/signatures`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${idToken}`,
+          'x-correlation-id': correlationId,
+        },
+        body: JSON.stringify(payload),
+      });
+    } catch (networkErr: any) {
+      const errorMsg =
+        `Không thể kết nối đến Máy chủ Ký duyệt (Backend Authority tại ${this.apiUrl}). ` +
+        `Yêu cầu mạng thất bại: ${networkErr?.message || 'Failed to fetch'}. ` +
+        `CHƯA XÁC NHẬN chữ ký đã được tạo trên hệ thống. ` +
+        `Vui lòng kiểm tra lại kết nối mạng/máy chủ backend hoặc liên hệ Quản trị viên (Mã đối chiếu: ${correlationId}).`;
 
-    const data = await response.json().catch(() => ({}));
+      const enhancedErr: any = new Error(errorMsg);
+      enhancedErr.name = 'SignatureNetworkError';
+      enhancedErr.isNetworkError = true;
+      enhancedErr.correlationId = correlationId;
+      enhancedErr.apiUrl = this.apiUrl;
+      enhancedErr.originalError = networkErr;
+      throw enhancedErr;
+    }
+
+    let data: any = {};
+    try {
+      data = await response.json();
+    } catch {
+      const errorMsg =
+        `Máy chủ ký duyệt phản hồi không đúng định dạng JSON (HTTP ${response.status}). ` +
+        `Vui lòng kiểm tra lại dịch vụ backend (Mã đối chiếu: ${correlationId}).`;
+      const enhancedErr: any = new Error(errorMsg);
+      enhancedErr.name = 'SignatureResponseError';
+      enhancedErr.statusCode = response.status;
+      enhancedErr.correlationId = correlationId;
+      enhancedErr.apiUrl = this.apiUrl;
+      throw enhancedErr;
+    }
 
     if (!response.ok || !data.success || !data.signature) {
-      const errMsg =
-        data.error?.message ||
-        `Lỗi tạo chữ ký điện tử trên máy chủ (HTTP ${response.status}). Vui lòng thử lại.`;
-      throw new Error(errMsg);
+      const serverCode = data.error?.code ? `[${data.error.code}] ` : '';
+      const serverCorrelation = data.error?.correlationId || correlationId;
+      const serverMessage = data.error?.message;
+      const errMsg = serverMessage
+        ? `${serverCode}${serverMessage} (Mã đối chiếu: ${serverCorrelation})`
+        : `Lỗi tạo chữ ký điện tử trên máy chủ (HTTP ${response.status}). Mã đối chiếu: ${serverCorrelation}.`;
+
+      const enhancedErr: any = new Error(errMsg);
+      enhancedErr.name = 'SignatureServerError';
+      enhancedErr.statusCode = response.status;
+      enhancedErr.code = data.error?.code;
+      enhancedErr.correlationId = serverCorrelation;
+      enhancedErr.apiUrl = this.apiUrl;
+      throw enhancedErr;
     }
 
     return data.signature;

@@ -24,6 +24,7 @@ export type ErrorCode =
   | 'AI_CONTEXT_INVALID'
   | 'AI_PERMISSION_DENIED'
   | 'AI_AUTH_REQUIRED'
+  | 'CORS_BLOCKED'
   | 'INTERNAL';
 
 export class AppError extends Error {

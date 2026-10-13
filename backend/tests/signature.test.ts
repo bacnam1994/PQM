@@ -421,4 +421,52 @@ describe('Server-Authoritative Electronic Signature API (POST /api/signatures)',
       expect(res.body.error.code).toBe('CORS_BLOCKED');
     });
   });
+
+  describe('Idempotency & Replay Protection', () => {
+    it('returns existing signature when called with identical correlationId', async () => {
+      const freshAuthTime = Math.floor(Date.now() / 1000) - 20;
+      const token = JSON.stringify({
+        uid: 'user-qa-1',
+        email: 'qa@vbiotech.com',
+        auth_time: freshAuthTime,
+        role: 'QA',
+      });
+      mockDb._storage['users/user-qa-1'] = {
+        uid: 'user-qa-1',
+        email: 'qa@vbiotech.com',
+        role: 'QA',
+      };
+
+      const correlationId = 'SIG-TEST-IDEMPOTENT-001';
+
+      // First call
+      const res1 = await request(app)
+        .post('/api/signatures')
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          documentType: 'BATCH_RELEASE',
+          documentId: 'batch-idem-01',
+          correlationId,
+        });
+
+      expect(res1.status).toBe(200);
+      expect(res1.body.success).toBe(true);
+      const sigId1 = res1.body.signature.id;
+
+      // Second call with same correlationId (e.g. client retried after network glitch)
+      const res2 = await request(app)
+        .post('/api/signatures')
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          documentType: 'BATCH_RELEASE',
+          documentId: 'batch-idem-01',
+          correlationId,
+        });
+
+      expect(res2.status).toBe(200);
+      expect(res2.body.success).toBe(true);
+      expect(res2.body.idempotencyReplayed).toBe(true);
+      expect(res2.body.signature.id).toBe(sigId1);
+    });
+  });
 });
