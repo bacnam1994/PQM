@@ -274,7 +274,7 @@ export function useBatchList() {
             return;
           }
 
-          // NẾU LÔ ĐANG Ở PENDING: Chuyển tiếp hợp lệ PENDING -> TESTING trước khi mở modal ký
+          // NẾU LÔ ĐANG Ở PENDING: Chuyển tiếp hợp lệ PENDING -> TESTING trước khi mở modal xuất xưởng
           if (freshBatch.status === 'PENDING') {
             await updateBatchStatus(freshBatch.id, 'TESTING');
             const reFetched = await batchAppService.getBatchById(batchId);
@@ -283,8 +283,10 @@ export function useBatchList() {
             }
           }
 
-          // Gate 1-6 PASS -> Mở ESignatureModal với freshBatch và freshBatch.version
-          setESignatureTarget({ batchId, batch: freshBatch });
+          // Gate 1-6 PASS -> Mở modal xác nhận xuất xưởng trực tiếp (không bắt buộc chữ ký)
+          setRejectReason('Phê duyệt xuất xưởng đạt chuẩn 7 Cổng GMP');
+          setPendingStatusUpdate({ status: 'RELEASED', batchId });
+          setIsStatusConfirmOpen(true);
           return;
         } catch (err: any) {
           console.error('Lỗi khi kiểm tra điều kiện xuất xưởng:', err);
@@ -306,31 +308,14 @@ export function useBatchList() {
   const handleESignatureSuccess = async (signature: ElectronicSignature) => {
     if (!eSignatureTarget) return;
     try {
-      // Phase 9 & 11: FETCH FRESH BATCH trước khi release
-      const freshBatch = await batchAppService.getBatchById(eSignatureTarget.batchId);
-      if (!freshBatch) {
-        throw new Error(`Không tìm thấy Lô ${eSignatureTarget.batchId} trong cơ sở dữ liệu.`);
-      }
-
-      // COMPARE documentVersion (Phase 9 & 11)
-      if (
-        signature.documentVersion !== undefined &&
-        freshBatch.version !== undefined &&
-        signature.documentVersion !== freshBatch.version
-      ) {
-        throw new Error(
-          `ERR_SIGNATURE_VERSION_MISMATCH: Lô đã thay đổi sau khi mở màn hình ký (v${signature.documentVersion} ➔ v${freshBatch.version}). Vui lòng tải lại và thực hiện ký lại.`
-        );
-      }
-
       await approveBatchRelease(eSignatureTarget.batchId, signature);
       notify({
         type: 'SUCCESS',
         title: 'Xuất xưởng Lô thành công',
-        message: `Đã phê duyệt xuất xưởng Lô ${freshBatch.batchNo || eSignatureTarget.batchId} với chữ ký điện tử hợp lệ (21 CFR Part 11).`,
+        message: `Đã phê duyệt xuất xưởng Lô thành công.`,
       });
     } catch (error: any) {
-      console.error('Lỗi xuất xưởng Lô có chữ ký điện tử:', error);
+      console.error('Lỗi xuất xưởng Lô:', error);
       notify({
         type: 'ERROR',
         title: 'Lỗi xuất xưởng',
@@ -344,6 +329,18 @@ export function useBatchList() {
   const confirmBatchStatusUpdate = async () => {
     if (!pendingStatusUpdate) return;
     try {
+      if (pendingStatusUpdate.status === 'RELEASED') {
+        await approveBatchRelease(pendingStatusUpdate.batchId, undefined, {
+          reason: rejectReason || 'Phê duyệt xuất xưởng đạt chuẩn 7 Cổng GMP',
+        });
+        notify({
+          type: 'SUCCESS',
+          title: 'Xuất xưởng Lô thành công',
+          message: `Đã phê duyệt xuất xưởng Lô sang ĐÃ XUẤT XƯỞNG (RELEASED).`,
+        });
+        return;
+      }
+
       await updateBatchStatus(
         pendingStatusUpdate.batchId,
         pendingStatusUpdate.status as any,

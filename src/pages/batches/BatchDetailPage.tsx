@@ -165,16 +165,16 @@ const BatchDetailPage = () => {
     };
   }, [batch, releaseDecision]);
 
-  const handleOpenSignRelease = async () => {
+  const handleOpenReleaseConfirm = async () => {
     if (!batch || !releaseDecision) return;
 
-    // Phase 3: Gate 1-6 PASS + User có quyền QA/ADMIN -> Cho phép mở ESignatureModal
+    // Gate 1-6 PASS + User có quyền QA/ADMIN -> Cho phép xuất xưởng trực tiếp
     if (!gates1to6Pass) {
       const firstBlocker =
         releaseDecision.gates
           .filter((g) => g.gateIndex <= 6 && !g.passed)
           .flatMap((g) => g.blockers)[0] ||
-        'Cần hoàn thành Cổng 1 đến Cổng 6 (đặc biệt: Hồ sơ sản xuất BPR phải được QA phê duyệt) trước khi ký xuất xưởng.';
+        'Cần hoàn thành Cổng 1 đến Cổng 6 (đặc biệt: Hồ sơ sản xuất BPR phải được QA phê duyệt) trước khi xuất xưởng.';
       notify({
         type: 'ERROR',
         title: 'Quy chuẩn GMP & Release Guard',
@@ -187,7 +187,7 @@ const BatchDetailPage = () => {
       notify({
         type: 'ERROR',
         title: 'Từ chối quyền hạn',
-        message: 'Chỉ vai trò QA hoặc Quản trị viên (ADMIN) mới có thẩm quyền ký duyệt xuất xưởng.',
+        message: 'Chỉ vai trò QA hoặc Quản trị viên (ADMIN) mới có thẩm quyền xuất xưởng.',
       });
       return;
     }
@@ -198,63 +198,14 @@ const BatchDetailPage = () => {
         type: 'ERROR',
         title: 'Chưa đủ điều kiện xuất xưởng',
         message:
-          'Lô sản xuất đang ở trạng thái Chờ xử lý (PENDING). Vui lòng chuyển Lô sang Đang kiểm nghiệm (TESTING) trước khi thực hiện ký duyệt xuất xưởng.',
+          'Lô sản xuất đang ở trạng thái Chờ xử lý (PENDING). Vui lòng chuyển Lô sang Đang kiểm nghiệm (TESTING) trước khi thực hiện xuất xưởng.',
       });
       return;
     }
 
-    let targetBatch = batch;
-    const fresh = await batchAppService.getBatchById(batch.id);
-    if (fresh) {
-      targetBatch = fresh;
-    }
-
-    setSignTargetBatch(targetBatch);
-    setIsSignReleaseOpen(true);
-  };
-
-  const handleSignReleaseSuccess = async (signature: ElectronicSignature) => {
-    if (!batch) return;
-    try {
-      // Phase 9 & 11: FETCH FRESH BATCH trước khi release
-      const freshBatch = (await batchAppService.getBatchById(batch.id)) || signTargetBatch || batch;
-
-      // Phase 5: Re-evaluate 7 Gates với chữ ký thật
-      const reEvaluatedDecision = BatchReleaseDecisionService.resolveBatchReleaseDecision({
-        batch: freshBatch,
-        testResults: viewBatchResults,
-        deviations: batchDeviations,
-        userRole: role,
-        userSignature: signature,
-        boundTccs: (freshBatch as any)?.tccs || (batch as any)?.tccs,
-      });
-
-      if (!reEvaluatedDecision.eligible) {
-        notify({
-          type: 'ERROR',
-          title: 'Release Guard: Chữ ký chưa đủ điều kiện',
-          message:
-            reEvaluatedDecision.blockers[0] || 'Lô chưa thỏa mãn 7 Cổng kiểm soát xuất xưởng.',
-        });
-        return;
-      }
-
-      // Phase 8: Chỉ gọi approveBatchRelease với BATCH_RELEASE_APPROVE
-      await approveBatchRelease(freshBatch.id, signature);
-      notify({
-        type: 'SUCCESS',
-        title: 'Xuất xưởng Lô thành công',
-        message: `Đã phê duyệt xuất xưởng Lô ${freshBatch.batchNo} với chữ ký điện tử hợp lệ (FDA 21 CFR Part 11 - 7/7 Gates PASSED).`,
-      });
-      setSignTargetBatch(null);
-    } catch (error: any) {
-      console.error('Lỗi xuất xưởng Lô:', error);
-      notify({
-        type: 'ERROR',
-        title: 'Lỗi xuất xưởng',
-        message: error.message || 'Không thể xuất xưởng Lô',
-      });
-    }
+    setStatusReason('Phê duyệt xuất xưởng đạt chuẩn 7 Cổng GMP');
+    setPendingStatusUpdate({ status: 'RELEASED', batchId: batch.id });
+    setIsStatusConfirmOpen(true);
   };
 
   // --- BPR REVIEW HANDLERS (PHASE 1 & 2) ---
@@ -356,7 +307,7 @@ const BatchDetailPage = () => {
 
   const handleStatusChangeClick = (newStatus: string, batchId: string) => {
     if (newStatus === 'RELEASED') {
-      handleOpenSignRelease();
+      handleOpenReleaseConfirm();
       return;
     }
     setStatusReason('');
@@ -367,6 +318,35 @@ const BatchDetailPage = () => {
   const handleConfirmStatusChange = async () => {
     if (!pendingStatusUpdate || !batch) return;
     try {
+      if (pendingStatusUpdate.status === 'RELEASED') {
+        const freshBatch = (await batchAppService.getBatchById(batch.id)) || batch;
+        const reEvaluatedDecision = BatchReleaseDecisionService.resolveBatchReleaseDecision({
+          batch: freshBatch,
+          testResults: viewBatchResults,
+          deviations: batchDeviations,
+          userRole: role,
+          boundTccs: (freshBatch as any)?.tccs || (batch as any)?.tccs,
+        });
+
+        if (!reEvaluatedDecision.eligible) {
+          notify({
+            type: 'ERROR',
+            title: 'Release Guard: Lô chưa đủ điều kiện xuất xưởng',
+            message:
+              reEvaluatedDecision.blockers[0] || 'Lô chưa thỏa mãn 7 Cổng kiểm soát xuất xưởng.',
+          });
+          return;
+        }
+
+        await approveBatchRelease(freshBatch.id, undefined, { reason: statusReason });
+        notify({
+          type: 'SUCCESS',
+          title: 'Xuất xưởng Lô thành công',
+          message: `Đã phê duyệt xuất xưởng Lô ${freshBatch.batchNo} thành công (7/7 Cổng kiểm soát đạt chuẩn GMP).`,
+        });
+        return;
+      }
+
       await updateBatchStatus(
         pendingStatusUpdate.batchId,
         pendingStatusUpdate.status as any,
@@ -586,10 +566,10 @@ const BatchDetailPage = () => {
                 {canSignRelease && (
                   <button
                     type="button"
-                    onClick={handleOpenSignRelease}
+                    onClick={handleOpenReleaseConfirm}
                     className="flex items-center gap-1.5 px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white rounded-lg font-medium shadow-xs text-xs cursor-pointer transition-colors"
                   >
-                    <ShieldCheckIcon className="h-4 w-4" /> Ký xuất xưởng
+                    <CheckCircleIcon className="h-4 w-4" /> Xuất xưởng Lô
                   </button>
                 )}
               </>
@@ -1066,26 +1046,26 @@ const BatchDetailPage = () => {
                       </div>
                     )}
 
-                    {/* GATE 7 ACTIONS (Phase 3 & 4) */}
+                    {/* GATE 7 ACTIONS */}
                     {g.gateIndex === 7 && !g.passed && (
                       <div className="pt-1.5 border-t border-border/60 flex items-center justify-between flex-wrap gap-1.5 pl-6">
                         {gates1to6Pass ? (
                           canSignRelease ? (
                             <button
                               type="button"
-                              onClick={handleOpenSignRelease}
+                              onClick={handleOpenReleaseConfirm}
                               className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded text-[10px] transition-colors cursor-pointer flex items-center gap-1 shadow-xs"
                             >
-                              <ShieldCheckIcon className="h-3.5 w-3.5" /> Ký duyệt xuất xưởng
+                              <CheckCircleIcon className="h-3.5 w-3.5" /> Phê duyệt xuất xưởng
                             </button>
                           ) : (
                             <span className="text-[10px] text-rose-600 dark:text-rose-400 font-semibold">
-                              Cần quyền QA hoặc Quản trị viên để ký duyệt
+                              Cần quyền QA hoặc Quản trị viên để phê duyệt
                             </span>
                           )
                         ) : (
                           <span className="text-[10px] text-ink-muted italic">
-                            (Yêu cầu hoàn tất Cổng 1-6 trước khi ký xuất xưởng)
+                            (Yêu cầu hoàn tất Cổng 1-6 trước khi xuất xưởng)
                           </span>
                         )}
                       </div>
@@ -1094,8 +1074,8 @@ const BatchDetailPage = () => {
                     {g.gateIndex === 7 && g.passed && (
                       <div className="pt-1.5 border-t border-border/60 flex items-center justify-between flex-wrap gap-1.5 pl-6 text-[9px] text-emerald-600 dark:text-emerald-400">
                         <span className="flex items-center gap-1 font-semibold">
-                          <ShieldCheckIcon className="h-3.5 w-3.5 text-emerald-600" />
-                          Signature: ĐÃ KÝ (21 CFR Part 11)
+                          <CheckCircleIcon className="h-3.5 w-3.5 text-emerald-600" />
+                          Pháp lý & Thẩm quyền: ĐÃ PHÊ DUYỆT XUẤT XƯỞNG
                           {batch.releasedBy ? ` · ${batch.releasedBy}` : ''}
                         </span>
                         {batch.releasedAt && (
@@ -1109,7 +1089,7 @@ const BatchDetailPage = () => {
                 ))}
               </div>
 
-              {/* Action Projection Panel: Hướng dẫn & Nút hành động trực tiếp (Phase 7) */}
+              {/* Action Projection Panel: Hướng dẫn & Nút hành động trực tiếp */}
               <div className="pt-3 border-t border-border mt-3 space-y-2">
                 {releaseDecision.eligible || batch.status === 'RELEASED' ? (
                   <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-800 dark:text-emerald-300 text-xs font-semibold flex items-center justify-between">
@@ -1122,10 +1102,10 @@ const BatchDetailPage = () => {
                     {canSignRelease && batch.status !== 'RELEASED' && (
                       <button
                         type="button"
-                        onClick={handleOpenSignRelease}
+                        onClick={handleOpenReleaseConfirm}
                         className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white rounded-lg text-xs font-bold cursor-pointer transition-colors shadow-xs flex items-center gap-1"
                       >
-                        <ShieldCheckIcon className="h-4 w-4" /> Phê duyệt xuất xưởng
+                        <CheckCircleIcon className="h-4 w-4" /> Phê duyệt xuất xưởng
                       </button>
                     )}
                   </div>
@@ -1137,16 +1117,16 @@ const BatchDetailPage = () => {
                         <CheckCircleIcon className="h-3.5 w-3.5 text-blue-600" /> Cổng 1-6 đã ĐẠT
                       </p>
                       <p className="text-[11px] text-blue-700/80 dark:text-blue-300/80 mt-0.5">
-                        Chờ QA/Admin ký số 21 CFR Part 11 để hoàn tất Gate 7.
+                        Chờ QA/Admin phê duyệt xuất xưởng để hoàn tất Gate 7.
                       </p>
                     </div>
                     {canSignRelease ? (
                       <button
                         type="button"
-                        onClick={handleOpenSignRelease}
+                        onClick={handleOpenReleaseConfirm}
                         className="shrink-0 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white rounded-lg text-xs font-bold cursor-pointer transition-colors shadow-xs flex items-center gap-1"
                       >
-                        <ShieldCheckIcon className="h-4 w-4" /> Ký duyệt xuất xưởng
+                        <CheckCircleIcon className="h-4 w-4" /> Phê duyệt xuất xưởng
                       </button>
                     ) : (
                       <span className="shrink-0 text-[10px] font-bold px-2 py-1 bg-surface-2 border border-border text-ink-muted rounded-lg">
@@ -1412,35 +1392,23 @@ const BatchDetailPage = () => {
         batchTestResults={viewBatchResults}
       />
 
-      {/* Modal Ký duyệt Điện tử (FDA 21 CFR Part 11) */}
-      {isSignReleaseOpen && (signTargetBatch || batch) && (
-        <ESignatureModal
-          isOpen={isSignReleaseOpen}
-          onClose={() => {
-            setIsSignReleaseOpen(false);
-            setSignTargetBatch(null);
-          }}
-          documentType="BATCH_RELEASE"
-          documentId={batch.id}
-          documentTitle={`Lô sản xuất: ${batch.batchNo} - ${batch.product?.name || ''}`}
-          documentVersion={(signTargetBatch || batch).version}
-          onSuccess={handleSignReleaseSuccess}
-        />
-      )}
-
-      {/* Modal Xác nhận đổi trạng thái cho Admin/QA */}
+      {/* Modal Xác nhận đổi trạng thái hoặc Xuất xưởng cho Admin/QA */}
       <ConfirmationModal
         isOpen={isStatusConfirmOpen}
         onClose={() => setIsStatusConfirmOpen(false)}
         onConfirm={handleConfirmStatusChange}
-        title="Xác nhận điều chỉnh trạng thái Lô"
+        title={
+          pendingStatusUpdate?.status === 'RELEASED'
+            ? 'Xác nhận Phê duyệt Xuất xưởng Lô'
+            : 'Xác nhận điều chỉnh trạng thái Lô'
+        }
         message={
           <div className="space-y-3">
             <p className="text-ink text-sm">
               Bạn có chắc chắn muốn chuyển trạng thái Lô <strong>{batch?.batchNo}</strong> sang{' '}
               <strong className="text-emerald-600">
                 {pendingStatusUpdate?.status === 'RELEASED'
-                  ? 'PHÊ DUYỆT (RELEASED)'
+                  ? 'ĐÃ XUẤT XƯỞNG (RELEASED)'
                   : pendingStatusUpdate?.status === 'REJECTED'
                     ? 'TỪ CHỐI (REJECTED)'
                     : pendingStatusUpdate?.status === 'TESTING'
@@ -1448,11 +1416,18 @@ const BatchDetailPage = () => {
                       : pendingStatusUpdate?.status === 'PENDING'
                         ? 'CHỜ KIỂM (PENDING)'
                         : pendingStatusUpdate?.status === 'BLOCKED'
-                          ? 'KHÓA LÔ (BLOCKED)'
+                          ? 'TẠM KHÓA (BLOCKED)'
                           : pendingStatusUpdate?.status}
-              </strong>{' '}
-              không?
+              </strong>
+              ?
             </p>
+            {pendingStatusUpdate?.status === 'RELEASED' && (
+              <p className="text-xs text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 p-2.5 rounded-lg border border-emerald-500/20">
+                ✓ Lô sản xuất đã được kiểm tra đạt chuẩn toàn bộ 7 Cổng kiểm soát xuất xưởng (GMP
+                Release Gates). Thao tác này sẽ ghi nhận thẩm quyền xuất xưởng trực tiếp và lưu vết
+                Audit Trail.
+              </p>
+            )}
             <div>
               <label className="text-xs font-semibold text-ink-muted block mb-1">
                 Lý do / Ghi chú điều chỉnh:

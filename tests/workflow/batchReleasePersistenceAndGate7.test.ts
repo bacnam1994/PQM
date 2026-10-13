@@ -176,7 +176,7 @@ describe('Batch Release Persistence & Gate 7 Evaluation Test Suite', () => {
       expect(gate7!.status).toBe('PASS');
     });
 
-    it('Lô chưa RELEASED và thiếu chữ ký: Gate 7 bắt buộc FAIL và báo ERR_SIGNATURE_MISSING (Fail-Closed)', () => {
+    it('Lô chưa RELEASED và người dùng không có quyền QA/ADMIN: Gate 7 bắt buộc FAIL và báo ERR_ROLE_UNAUTHORIZED', () => {
       const pendingBatch: Batch = {
         ...mockBatch,
         status: 'TESTING',
@@ -186,14 +186,14 @@ describe('Batch Release Persistence & Gate 7 Evaluation Test Suite', () => {
       const decision = BatchReleaseDecisionService.resolveBatchReleaseDecision({
         batch: pendingBatch,
         testResults: mockTestResults,
-        userRole: 'QA',
+        userRole: 'USER',
         userSignature: undefined,
       });
 
       expect(decision.eligible).toBe(false);
       const gate7 = decision.gates.find((g) => g.gateIndex === 7);
       expect(gate7!.passed).toBe(false);
-      expect(gate7!.blockers?.[0]).toContain('ERR_SIGNATURE_MISSING');
+      expect(gate7!.blockers?.[0]).toContain('ERR_ROLE_UNAUTHORIZED');
     });
   });
 
@@ -228,20 +228,18 @@ describe('Batch Release Persistence & Gate 7 Evaluation Test Suite', () => {
       expect(gate7!.status).toBe('PASS');
     });
 
-    it('evaluateReleasePreview: Gate 7 ở trạng thái WAITING và KHÔNG ném blocker ERR_SIGNATURE_MISSING làm đỏ giao diện', () => {
+    it('evaluateReleasePreview: Với người dùng chưa đủ thẩm quyền, Gate 7 ở trạng thái WAITING', () => {
       const previewDecision = BatchReleaseDecisionService.evaluateReleasePreview({
         batch: mockBatch,
         testResults: mockTestResults,
-        userRole: 'QA',
+        userRole: 'USER',
       });
 
       const gate7 = previewDecision.gates.find((g) => g.gateIndex === 7);
       expect(gate7).toBeDefined();
       expect(gate7!.status).toBe('WAITING');
       expect(gate7!.passed).toBe(false);
-      expect(gate7!.details).toContain('Chờ ký điện tử xuất xưởng');
-      // Không được chứa blocker đỏ ERR_SIGNATURE_MISSING trên preview
-      expect(gate7!.blockers || []).toHaveLength(0);
+      expect(gate7!.details).toContain('Chờ người dùng có thẩm quyền');
     });
 
     it('Chữ ký thiếu documentId hoặc documentId không khớp: Gate 7 bắt buộc FAIL với ERR_SIGNATURE_MISMATCH', () => {

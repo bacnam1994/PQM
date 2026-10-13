@@ -201,12 +201,12 @@ describe('Batch Release Concurrency & OCC Hardening (P0-1 đến P1-4)', () => {
     mockBatch.hasActiveOOS = false;
     mockBatch.hasActiveDeviation = false;
 
-    // Trường hợp 1: Chưa có chữ ký (Gate 1-6 PASS, Gate 7 chờ ký)
+    // Trường hợp 1: Người dùng không đủ thẩm quyền (Gate 1-6 PASS, Gate 7 chờ thẩm quyền QA)
     const progressWithoutSig = BatchReleaseProgressService.resolveReleaseProgress({
       batch: mockBatch,
       testResults: mockResults,
       boundTccs: baseTccs,
-      userRole: 'QA',
+      userRole: 'USER',
     });
 
     expect(progressWithoutSig.releaseGateProgress.completed).toBe(6);

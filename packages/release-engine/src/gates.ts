@@ -280,20 +280,8 @@ export function evaluate7Gates(params: EvaluateGatesParams): {
     blockers.push(msg);
   }
 
-  let signaturePassed = false;
-  if (!userSignature) {
-    if (isPreview) {
-      signaturePassed = false;
-    } else {
-      signaturePassed = false;
-      const msg =
-        'ERR_SIGNATURE_MISSING: Thiếu chữ ký điện tử 21 CFR Part 11 của QA/Admin phê duyệt xuất xưởng.';
-      gate7Blockers.push(msg);
-      blockers.push(msg);
-    }
-  } else {
-    signaturePassed = true;
-
+  let signaturePassed = true;
+  if (userSignature) {
     // Document Type check
     if (userSignature.documentType !== 'BATCH_RELEASE') {
       signaturePassed = false;
@@ -368,11 +356,11 @@ export function evaluate7Gates(params: EvaluateGatesParams): {
     }
   }
 
-  const gate7Passed = hasProperRole && isNotExpired && signaturePassed && !!userSignature;
+  const gate7Passed = hasProperRole && isNotExpired && signaturePassed;
   let gate7Status: 'PASS' | 'FAIL' | 'BLOCKED' | 'WAITING' = 'FAIL';
   if (gate7Passed) {
     gate7Status = 'PASS';
-  } else if (!userSignature && isPreview) {
+  } else if (!hasProperRole && isPreview) {
     gate7Status = 'WAITING';
   } else {
     gate7Status = 'FAIL';
@@ -381,14 +369,16 @@ export function evaluate7Gates(params: EvaluateGatesParams): {
   gates.push({
     gateIndex: 7,
     gateKey: 'GATE_7_AUTHORITY_AND_SIGNATURE',
-    gateName: 'Pháp lý, Thẩm quyền & Chữ ký 21 CFR Part 11',
+    gateName: 'Pháp lý & Thẩm quyền Phê duyệt Xuất xưởng',
     passed: gate7Passed,
     status: gate7Status,
     details: gate7Passed
-      ? `Đã ký số bởi ${userSignature?.signerEmail || 'QA/Admin'}`
-      : isPreview && !userSignature
-        ? 'Chờ chữ ký điện tử của QA/Admin'
-        : 'Chưa đạt điều kiện thẩm quyền & chữ ký số',
+      ? userSignature
+        ? `Đã phê duyệt xuất xưởng (kèm chữ ký số của ${userSignature.signerEmail || 'QA/Admin'})`
+        : `Phê duyệt trực tiếp bởi ${effectiveRole || 'QA/Admin'} (Đủ thẩm quyền & Còn hạn dùng)`
+      : isPreview && !hasProperRole
+        ? 'Chờ người dùng có thẩm quyền QA/Admin phê duyệt'
+        : gate7Blockers.join('; ') || 'Không đủ thẩm quyền hoặc lô đã hết hạn',
     blockers: gate7Blockers,
   });
 

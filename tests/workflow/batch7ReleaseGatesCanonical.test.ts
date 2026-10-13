@@ -149,31 +149,39 @@ describe('Batch 7 Release Gates Canonical Tests (Phase 20 Requirements)', () => 
     expect(progress.readyForFinalApproval).toBe(false);
   });
 
-  // CASE 2: Gate 1-6 PASS, Gate 7 signature missing
-  it('CASE 2: Gate 1-6 PASS, Gate 7 signature missing -> Batch status = TESTING, Release = 6/7, Current Gate = 7', () => {
+  // CASE 2: Gate 1-6 PASS, Gate 7 unauthorized role vs QA direct release
+  it('CASE 2: Gate 1-6 PASS, USER role stalls at Gate 7 (6/7), QA role passes directly (7/7)', () => {
     mockBatch.bprReviewStatus = 'APPROVED'; // Gate 6 PASS
     mockBatch.status = 'TESTING';
 
-    const progress = BatchReleaseProgressService.resolveReleaseProgress({
+    // 1. Khi người dùng không đủ thẩm quyền (USER) -> Dừng tại Gate 7
+    const progressUser = BatchReleaseProgressService.resolveReleaseProgress({
       batch: mockBatch,
       testResults: mockTestResults,
-      userRole: 'QA',
-      // no userSignature
+      userRole: 'USER',
     });
 
     expect(mockBatch.status).toBe('TESTING');
-    expect(progress.releaseGateProgress.completed).toBe(6);
-    expect(progress.releaseGateProgress.total).toBe(7);
-    expect(progress.releaseGateProgress.currentGate).toBe(7);
-    expect(progress.releaseGateProgress.percentage).toBe(86);
-    expect(progress.releaseStage).toBe('GATE_7');
-    expect(progress.readyForFinalApproval).toBe(true);
+    expect(progressUser.releaseGateProgress.completed).toBe(6);
+    expect(progressUser.releaseGateProgress.total).toBe(7);
+    expect(progressUser.releaseGateProgress.currentGate).toBe(7);
+    expect(progressUser.releaseGateProgress.percentage).toBe(86);
+    expect(progressUser.releaseStage).toBe('GATE_7');
+    expect(progressUser.readyForSignature).toBe(true);
 
-    const gate7 = progress.gateResults.find((g) => g.gateIndex === 7);
-    expect(gate7).toBeDefined();
-    expect(gate7!.passed).toBe(false);
-    expect(gate7!.status).toBe('WAITING');
-    expect(gate7!.blockers?.[0]).toContain('ERR_SIGNATURE_MISSING');
+    const gate7User = progressUser.gateResults.find((g) => g.gateIndex === 7);
+    expect(gate7User).toBeDefined();
+    expect(gate7User!.passed).toBe(false);
+
+    // 2. Khi người dùng là QA -> Không cần chữ ký, Gate 7 PASS trực tiếp
+    const progressQA = BatchReleaseProgressService.resolveReleaseProgress({
+      batch: mockBatch,
+      testResults: mockTestResults,
+      userRole: 'QA',
+    });
+    expect(progressQA.releaseGateProgress.completed).toBe(7);
+    expect(progressQA.releaseStage).toBe('READY_TO_RELEASE');
+    expect(progressQA.readyForRelease).toBe(true);
   });
 
   // CASE 3: Gate 1-6 PASS, Gate 7 valid signature -> 7/7 READY_TO_RELEASE -> BATCH_RELEASE_APPROVE -> RELEASED
@@ -366,8 +374,8 @@ describe('Batch 7 Release Gates Canonical Tests (Phase 20 Requirements)', () => 
     }
   });
 
-  // CASE 8: RELOAD BROWSER -> Sau 6/7, reload giữ nguyên 6/7 và Gate 7
-  it('CASE 8: RELOAD -> Sau khi đạt 6/7 (BPR APPROVED), fetch lại Batch từ repo vẫn giữ 6/7, Gate 7, không quay về 100% Chờ kiểm nghiệm', async () => {
+  // CASE 8: RELOAD BROWSER -> Sau khi BPR APPROVED, reload giữ nguyên tiến trình READY_TO_RELEASE (7/7)
+  it('CASE 8: RELOAD -> Sau khi đạt BPR APPROVED, fetch lại Batch từ repo vẫn giữ READY_TO_RELEASE (7/7), không quay về 100% Chờ kiểm nghiệm', async () => {
     // 1. Approve BPR
     mockBatch.bprReviewStatus = 'UNDER_REVIEW';
     const approvedBatch = await service.approveBpr(mockBatch.id, qaUser, {
@@ -375,19 +383,19 @@ describe('Batch 7 Release Gates Canonical Tests (Phase 20 Requirements)', () => 
     });
 
     expect(approvedBatch.bprReviewStatus).toBe('APPROVED');
-    expect(approvedBatch.releaseStage).toBe('GATE_7');
-    expect(approvedBatch.releaseGateProgress?.completed).toBe(6);
-    expect(approvedBatch.releaseGateProgress?.currentGate).toBe(7);
+    expect(approvedBatch.releaseStage).toBe('READY_TO_RELEASE');
+    expect(approvedBatch.releaseGateProgress?.completed).toBe(7);
+    expect(approvedBatch.releaseGateProgress?.currentGate).toBe(8);
 
     // 2. Giả lập reload browser (fetch fresh batch từ repo)
     const reloadedBatch = await mockRepo.findById(mockBatch.id);
     expect(reloadedBatch).toBeDefined();
     expect(reloadedBatch!.status).toBe('TESTING');
-    expect(reloadedBatch!.releaseStage).toBe('GATE_7');
-    expect(reloadedBatch!.releaseGateProgress?.completed).toBe(6);
+    expect(reloadedBatch!.releaseStage).toBe('READY_TO_RELEASE');
+    expect(reloadedBatch!.releaseGateProgress?.completed).toBe(7);
     expect(reloadedBatch!.releaseGateProgress?.total).toBe(7);
-    expect(reloadedBatch!.releaseGateProgress?.currentGate).toBe(7);
-    expect(reloadedBatch!.releaseGateProgress?.percentage).toBe(86);
+    expect(reloadedBatch!.releaseGateProgress?.currentGate).toBe(8);
+    expect(reloadedBatch!.releaseGateProgress?.percentage).toBe(100);
   });
 
   // CASE 9: PENDING BATCH -> BATCH_RELEASE_APPROVE từ chối khi PENDING, bắt buộc qua BATCH_DISPATCH_TESTING -> TESTING -> RELEASED

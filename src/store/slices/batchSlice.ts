@@ -108,7 +108,7 @@ export const createBatchSlice: StoreSlice<BatchSlice> = (set, get) => ({
 
   approveBatchRelease: async (
     id: string,
-    signature: ElectronicSignature,
+    signature?: ElectronicSignature,
     options?: { reason?: string }
   ) => {
     try {

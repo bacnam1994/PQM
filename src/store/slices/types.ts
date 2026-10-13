@@ -122,7 +122,7 @@ export interface BatchSliceActions {
   ) => Promise<void>;
   approveBatchRelease: (
     id: string,
-    signature: ElectronicSignature,
+    signature?: ElectronicSignature,
     options?: { reason?: string }
   ) => Promise<Batch>;
   submitBpr: (id: string, comment?: string) => Promise<Batch>;

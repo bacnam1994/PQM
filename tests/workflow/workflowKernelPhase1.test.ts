@@ -131,11 +131,12 @@ describe('Workflow Kernel Phase 1: Engine & Gate Verification', () => {
     it('1.5. Bắt buộc Chữ ký số 21 CFR Part 11 cho thao tác phê duyệt (SIGNATURE_REQUIRED)', async () => {
       const result = await UnifiedWorkflowExecutor.execute(
         {
-          actionId: 'BATCH_RELEASE_APPROVE', // requiresSignature: true
+          actionId: 'BATCH_REJECT', // requiresSignature: true
           entityType: 'BATCH',
           entityId: 'batch_001',
           actor: qaActor,
           payload: {},
+          reason: 'Từ chối lô do vi phạm chất lượng',
           signature: null, // Thiếu chữ ký
         },
         async () => ({ success: true })

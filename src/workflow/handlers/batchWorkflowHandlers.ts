@@ -20,7 +20,7 @@ import {
 } from '../../repositories/firebase/FirebaseBatchRepository';
 import { validateOptimisticLock, nextVersion } from '../../utils/concurrency';
 import { signatureService } from '../../services/signatureService';
-import { getReleaseCommandPort } from '../../services/releaseCommandPort';
+import { logAuditAction } from '../../services/auditService';
 import { BatchRules } from '../../domain/rules';
 import { BatchReleaseDecisionService } from '../../domain/batch/BatchReleaseDecisionService';
 import { BatchStateMachine } from '../../domain/workflow/stateMachine';
@@ -457,28 +457,19 @@ export class BatchWorkflowHandlers {
     };
 
     if (!flags.enableBatchWorkflowFacade) {
-      if (actionId === 'BATCH_RELEASE_APPROVE' && this.repo instanceof FirebaseBatchRepository) {
-        const releasePort = getReleaseCommandPort();
-        const signatureId =
-          options?.signature?.id || (options?.signature as any)?.signatureId || '';
-        const idempotencyKey =
-          options?.idempotencyKey ||
-          `REL-CMD-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
-        const serverResult = await releasePort.executeRelease({
-          batchId,
-          expectedVersion: options?.expectedVersion ?? currentBatch.version ?? 1,
-          signatureId,
-          idempotencyKey,
-        });
-        cleanBatch.version = serverResult.newVersion;
-        cleanBatch.status = 'RELEASED';
-        cleanBatch.releasedAt = serverResult.releasedAt;
-        return cleanBatch;
-      }
       if (typeof this.repo.updateStatus === 'function') {
         await this.repo.updateStatus(batchId, calculatedNextState, effectiveReason, repoMetadata);
       } else {
         await this.repo.update(cleanBatch);
+      }
+      if (actionId === 'BATCH_RELEASE_APPROVE') {
+        logAuditAction({
+          action: 'UPDATE',
+          collection: 'BATCHES',
+          documentId: batchId,
+          details: `Xuất xưởng Lô thành công: ${currentBatch.batchNo || batchId} [${currentStatus} -> RELEASED] [QA/Admin: ${currentUser?.email || currentUser?.uid}]`,
+          performedBy: currentUser?.email || currentUser?.uid || 'QA/Admin',
+        });
       }
       return cleanBatch;
     }
@@ -497,29 +488,19 @@ export class BatchWorkflowHandlers {
         idempotencyKey: options?.idempotencyKey,
       },
       async () => {
-        if (actionId === 'BATCH_RELEASE_APPROVE' && this.repo instanceof FirebaseBatchRepository) {
-          const releasePort = getReleaseCommandPort();
-          const signatureId =
-            options?.signature?.id || (options?.signature as any)?.signatureId || '';
-          const idempotencyKey =
-            options?.idempotencyKey ||
-            `REL-CMD-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
-          const serverResult = await releasePort.executeRelease({
-            batchId,
-            expectedVersion: options?.expectedVersion ?? currentBatch.version ?? 1,
-            signatureId,
-            idempotencyKey,
-          });
-          cleanBatch.version = serverResult.newVersion;
-          cleanBatch.status = 'RELEASED';
-          cleanBatch.releasedAt = serverResult.releasedAt;
-          return cleanBatch;
-        }
-
         if (typeof this.repo.updateStatus === 'function') {
           await this.repo.updateStatus(batchId, calculatedNextState, effectiveReason, repoMetadata);
         } else {
           await this.repo.update(cleanBatch);
+        }
+        if (actionId === 'BATCH_RELEASE_APPROVE') {
+          logAuditAction({
+            action: 'UPDATE',
+            collection: 'BATCHES',
+            documentId: batchId,
+            details: `Xuất xưởng Lô thành công: ${currentBatch.batchNo || batchId} [${currentStatus} -> RELEASED] [QA/Admin: ${currentUser?.email || currentUser?.uid}]`,
+            performedBy: currentUser?.email || currentUser?.uid || 'QA/Admin',
+          });
         }
         return cleanBatch;
       },

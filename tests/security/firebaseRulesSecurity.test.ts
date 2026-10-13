@@ -24,10 +24,12 @@ describe('Firebase Rules & Security Integration Perimeter', () => {
   const parsedRules = JSON.parse(rulesContent).rules;
   const firebaseJson = JSON.parse(fs.readFileSync(firebaseJsonPath, 'utf8'));
 
-  describe('1. Server-Only Write Controls (Zero Client Mutation)', () => {
-    it('audit_logs: write MUST be strictly false', () => {
+  describe('1. Server-Only & Immutable Write Controls (Zero Unauthorized Mutation)', () => {
+    it('audit_logs: write MUST be strictly append-only (immutable: no edit, no delete)', () => {
       expect(parsedRules.audit_logs).toBeDefined();
-      expect(parsedRules.audit_logs['$log_id']['.write']).toBe(false);
+      expect(parsedRules.audit_logs['$log_id']['.write']).toContain(
+        '!data.exists() && newData.exists()'
+      );
     });
 
     it('release_commands: write MUST be strictly false', () => {
@@ -94,8 +96,10 @@ describe('Firebase Rules & Security Integration Perimeter', () => {
   });
 
   describe('3. Batch Release Client Bypass Defense', () => {
-    it('batches write rule MUST reject any client mutation setting status to RELEASED', () => {
+    it('batches write rule MUST guard status RELEASED for authorized QA and ADMIN only', () => {
       const writeRule = parsedRules.batches['$item_id']['.write'];
+      expect(writeRule).toContain("newData.child('status').val() === 'RELEASED'");
+      expect(writeRule).toContain("data.child('status').val() === 'TESTING'");
       expect(writeRule).toContain("newData.child('status').val() !== 'RELEASED'");
     });
 
@@ -138,10 +142,10 @@ describe('Firebase Rules & Security Integration Perimeter', () => {
       expect(parsedRules.electronic_signatures['.write']).toBe(false);
     });
 
-    // Case 4: QA → audit_logs WRITE DENY
-    it('Case 4: QA → audit_logs WRITE MUST be DENIED (server-only / immutable)', () => {
+    // Case 4: QA → audit_logs WRITE APPEND-ONLY
+    it('Case 4: audit_logs WRITE MUST be immutable append-only (!data.exists() && newData.exists())', () => {
       const writeRule = parsedRules.audit_logs['$log_id']['.write'];
-      expect(writeRule).toBe(false);
+      expect(writeRule).toContain('!data.exists() && newData.exists()');
     });
 
     // Case 5: USER → release_commands WRITE DENY
@@ -157,12 +161,13 @@ describe('Firebase Rules & Security Integration Perimeter', () => {
       expect(writeRule).not.toContain("role').val() == 'USER'");
     });
 
-    // Case 7: QA → direct client batch RELEASED mutation MUST be DENIED
-    it('Case 7: QA client direct batch RELEASED mutation MUST be DENIED (External Backend Authority Required)', () => {
+    // Case 7: QA/ADMIN authorized client batch RELEASED mutation allowed under strict guard, unauth DENIED
+    it('Case 7: QA/ADMIN authorized client batch RELEASED mutation allowed under strict guard, unauth DENIED', () => {
       const writeRule = parsedRules.batches['$item_id']['.write'];
-      expect(writeRule).toContain("newData.child('status').val() !== 'RELEASED'");
-      expect(writeRule).toContain("!newData.hasChild('releaseSnapshot')");
-      expect(writeRule).toContain("!newData.hasChild('releasedAt')");
+      expect(writeRule).toContain("newData.child('status').val() === 'RELEASED'");
+      expect(writeRule).toContain("data.child('status').val() === 'TESTING'");
+      expect(writeRule).toContain('releasedAt');
+      expect(writeRule).toContain('releasedBy');
     });
 
     // Phase 11: User Role Escalation Audit (TEST 8)

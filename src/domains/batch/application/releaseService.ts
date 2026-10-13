@@ -117,13 +117,7 @@ export class ReleaseService {
       );
     }
 
-    // 3. Kiểm tra chữ ký điện tử 21 CFR Part 11 (Bắt buộc cho QA; nếu có chữ ký thì bắt buộc kiểm tra tính hợp lệ)
-    if (!isAdmin && !signature) {
-      throw new Error(
-        'Quy chuẩn 21 CFR Part 11: Yêu cầu chữ ký điện tử hợp lệ của QA trước khi xuất xưởng.'
-      );
-    }
-
+    // 3. Tùy chọn kiểm tra chữ ký điện tử nếu có cung cấp
     if (signature) {
       const isSigValid = await signatureService.verifySignatureIntegrity(signature);
       if (!isSigValid) {

@@ -245,20 +245,19 @@ describe('Batch BPR Workflow & 7 Release Gates Test Suite', () => {
       expect(gate6!.passed).toBe(true);
     });
 
-    it('Gate 7 FAIL khi thiếu chữ ký điện tử -> cannot release (ERR_SIGNATURE_MISSING)', () => {
+    it('Gate 7 FAIL khi người dùng không có thẩm quyền QA/ADMIN (USER, QC) -> cannot release', () => {
       mockBatch.bprReviewStatus = 'APPROVED';
 
       const decision = BatchReleaseDecisionService.resolveBatchReleaseDecision({
         batch: mockBatch,
         testResults: mockTestResults,
-        userRole: 'QA',
-        // userSignature is undefined
+        userRole: 'USER',
       });
 
       expect(decision.eligible).toBe(false);
       const gate7 = decision.gates.find((g) => g.gateIndex === 7);
       expect(gate7!.passed).toBe(false);
-      expect(gate7!.blockers[0]).toContain('ERR_SIGNATURE_MISSING');
+      expect(gate7!.blockers[0]).toContain('ERR_ROLE_UNAUTHORIZED');
     });
 
     it('Gate 7 FAIL khi chữ ký thuộc documentType khác (BATCH, BATCH_REJECT, COA_ISSUE)', async () => {
@@ -442,7 +441,7 @@ describe('Batch BPR Workflow & 7 Release Gates Test Suite', () => {
       expect(approvedBprBatch.bprReviewStatus).toBe('APPROVED');
       expect(approvedBprBatch.status).toBe('TESTING'); // Vẫn là TESTING
 
-      // Bước 5: Đánh giá Release trước khi ký -> Gate 1-6 PASS, Gate 7 thiếu chữ ký
+      // Bước 5: Đánh giá Release trước khi duyệt -> Gate 1-6 PASS, Gate 7 PASS với QA (Đủ thẩm quyền)
       const preSignDecision = BatchReleaseDecisionService.resolveBatchReleaseDecision({
         batch: approvedBprBatch,
         testResults: mockTestResults,
@@ -450,7 +449,7 @@ describe('Batch BPR Workflow & 7 Release Gates Test Suite', () => {
       });
       const gates1to6Pass = preSignDecision.gates.slice(0, 6).every((g) => g.passed);
       expect(gates1to6Pass).toBe(true);
-      expect(preSignDecision.eligible).toBe(false); // Chưa ký nên chưa eligible
+      expect(preSignDecision.eligible).toBe(true); // QA có thẩm quyền nên eligible trực tiếp
 
       // Bước 6: Tạo chữ ký BATCH_RELEASE thật
       const releaseSig: ElectronicSignature = {

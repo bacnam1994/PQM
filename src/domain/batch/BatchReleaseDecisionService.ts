@@ -64,6 +64,7 @@ export interface BatchReleaseDecision {
   dataFreshness: DataFreshnessState;
   decisionTrace: string[];
   readyForSignature?: boolean;
+  readyToRelease?: boolean;
 }
 
 export interface ResolveBatchReleaseDecisionParams {
@@ -578,21 +579,9 @@ export class BatchReleaseDecisionService {
       blockers.push(msg);
     }
 
-    // Tự động xác thực chữ ký điện tử 21 CFR Part 11
-    let signaturePassed = false;
-    if (!userSignature) {
-      if (isPreview) {
-        // Chế độ xem trước (Preview): Cổng 7 ở trạng thái WAITING chờ ký, KHÔNG thêm blocker đỏ
-        signaturePassed = false;
-      } else {
-        signaturePassed = false;
-        const msg =
-          'ERR_SIGNATURE_MISSING: Thiếu chữ ký điện tử 21 CFR Part 11 của QA/Admin phê duyệt xuất xưởng.';
-        gate7Blockers.push(msg);
-        blockers.push(msg);
-      }
-    } else {
-      signaturePassed = true;
+    // Tùy chọn xác thực chữ ký điện tử nếu có truyền vào
+    let signaturePassed = true;
+    if (userSignature) {
       // a. Document Type check (Chỉ chấp nhận BATCH_RELEASE)
       const docType = userSignature.documentType;
       if (docType !== 'BATCH_RELEASE') {
@@ -698,31 +687,35 @@ export class BatchReleaseDecisionService {
       }
     }
 
-    const gate7Passed = hasProperRole && isNotExpired && signaturePassed && !!userSignature;
+    const gate7Passed = hasProperRole && isNotExpired && signaturePassed;
     let gate7Status: 'PASS' | 'FAIL' | 'BLOCKED' | 'WAITING' = 'FAIL';
     if (gate7Passed) {
       gate7Status = 'PASS';
-    } else if (!userSignature) {
+    } else if (!hasProperRole && isPreview) {
       gate7Status = 'WAITING';
     } else {
       gate7Status = 'FAIL';
     }
 
-    let gate7Details = 'Chưa ký điện tử phê duyệt';
-    if (gate7Passed && userSignature) {
-      const signerName =
-        userSignature.signerName || userSignature.signerEmail || userSignature.signerUid;
-      gate7Details = `Đã ký số phê duyệt xuất xưởng (21 CFR Part 11) bởi ${signerName} (${userSignature.role || 'QA'})`;
+    let gate7Details = 'Không đạt yêu cầu Gate 7';
+    if (gate7Passed) {
+      if (userSignature) {
+        const signerName =
+          userSignature.signerName || userSignature.signerEmail || userSignature.signerUid;
+        gate7Details = `Đã phê duyệt xuất xưởng (kèm chữ ký số của ${signerName} - ${userSignature.role || 'QA'})`;
+      } else {
+        gate7Details = `Phê duyệt trực tiếp bởi ${effectiveRole || 'QA/Admin'} (Đủ thẩm quyền & Còn hạn sử dụng)`;
+      }
     } else if (gate7Status === 'WAITING') {
-      gate7Details = 'Chờ ký điện tử xuất xưởng (21 CFR Part 11)';
+      gate7Details = 'Chờ người dùng có thẩm quyền QA/Admin phê duyệt';
     } else {
-      gate7Details = gate7Blockers.join('; ') || 'Không đạt yêu cầu Gate 7';
+      gate7Details = gate7Blockers.join('; ') || 'Không đủ thẩm quyền hoặc lô đã hết hạn';
     }
 
     gates.push({
       gateIndex: 7,
       gateKey: 'GATE_7_AUTHORITY_AND_SIGNATURE',
-      gateName: 'Pháp lý, Thẩm quyền & Chữ ký 21 CFR Part 11',
+      gateName: 'Pháp lý & Thẩm quyền Phê duyệt Xuất xưởng',
       passed: gate7Passed,
       status: gate7Status,
       details: gate7Details,
@@ -747,6 +740,7 @@ export class BatchReleaseDecisionService {
     return {
       eligible,
       readyForSignature,
+      readyToRelease: eligible,
       batchId,
       batchNo,
       currentStatus,
@@ -756,7 +750,7 @@ export class BatchReleaseDecisionService {
       gates,
       blockers: Array.from(new Set(blockers)),
       warnings: Array.from(new Set(warnings)),
-      requiredSignature: true,
+      requiredSignature: false,
       requiredRole: ['ADMIN', 'QA'],
       dataFreshness,
       decisionTrace,
