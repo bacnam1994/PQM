@@ -227,8 +227,7 @@ const CoAReport = memo(({ res, batch, product, tccs, formula }: CoAReportProps) 
     isApprovedDocument &&
     snapshot &&
     Array.isArray(snapshot.criterionResults) &&
-    snapshot.criterionResults.length > 0 &&
-    !snapshotStaleCheck.stale
+    snapshot.criterionResults.length > 0
   );
 
   // Ngày ký phiếu theo chuẩn văn bản hành chính Việt Nam (Khánh Hòa, ngày ... tháng ... năm ...)
@@ -359,13 +358,72 @@ const CoAReport = memo(({ res, batch, product, tccs, formula }: CoAReportProps) 
   }, [res.labName]);
 
   // Lọc và trích xuất danh sách chỉ tiêu
-  // Ưu tiên số 1: Nếu TestResult hoặc Batch đã có Frozen EvaluationSnapshot -> Đọc 100% trực tiếp từ snapshot!
+  // Luôn cập nhật theo thông tin phiếu kiểm nghiệm mới nhất (res.results) khi có dữ liệu
   const deduplicatedResults = useMemo(() => {
+    if (res.results && res.results.length > 0) {
+      const uniqueMap = new Map<string, TestResultEntry>();
+      res.results.forEach((r) => {
+        const rName = (r.criteriaName || '').trim();
+        if (!rName) return;
+        // Dùng resolveKey để normalize + resolve alias làm key
+        const rKey = resolver.resolveKey(rName);
+        const existing = uniqueMap.get(rKey);
+        if (!existing || (r.isPass === true && existing.isPass !== true)) {
+          uniqueMap.set(rKey, r);
+        }
+      });
+
+      // Tự động phân giải các chỉ tiêu "Miễn kiểm" bị thiếu hoặc rỗng qua AlternateRuleResolver (Single Source of Truth)
+      if (tccs) {
+        const allCriteria = [
+          ...(tccs.mainQualityCriteria || []),
+          ...(tccs.safetyCriteria || []),
+        ].filter((c) => c && c.name && c.name.trim() !== '');
+
+        const currentEntries = Array.from(uniqueMap.values());
+
+        allCriteria.forEach((c) => {
+          const cKey = normalizeName(c.name);
+          const existingEntry = uniqueMap.get(cKey);
+
+          // Nội suy nếu chỉ tiêu bị thiếu, hoặc có tồn tại nhưng rỗng (dữ liệu cũ)
+          const isMissingOrEmpty =
+            !existingEntry ||
+            existingEntry.value === null ||
+            existingEntry.value === undefined ||
+            String(existingEntry.value).trim() === '';
+
+          if (isMissingOrEmpty) {
+            const altStatus = AlternateRuleResolver.resolveCriterionState(
+              c.name,
+              undefined,
+              currentEntries,
+              tccs,
+              c
+            );
+
+            if (altStatus.isExempted) {
+              uniqueMap.set(cKey, {
+                criteriaName: c.name,
+                value: 'Miễn kiểm',
+                isPass: true,
+                isExtra: false,
+                unit: c.unit,
+                alternateState: 'EXEMPTED',
+                alternateNote: altStatus.displayNote,
+              });
+            }
+          }
+        });
+      }
+
+      return Array.from(uniqueMap.values());
+    }
+
     if (
       snapshot &&
       Array.isArray(snapshot.criterionResults) &&
-      snapshot.criterionResults.length > 0 &&
-      !snapshotStaleCheck.stale
+      snapshot.criterionResults.length > 0
     ) {
       return snapshot.criterionResults.map((snapCrit: any) => {
         const c = allCriteriaMap.get(normalizeName(snapCrit.criteriaName));
@@ -384,65 +442,8 @@ const CoAReport = memo(({ res, batch, product, tccs, formula }: CoAReportProps) 
       });
     }
 
-    if (!res.results) return [];
-    const uniqueMap = new Map<string, TestResultEntry>();
-    res.results.forEach((r) => {
-      const rName = (r.criteriaName || '').trim();
-      if (!rName) return;
-      // Dùng resolveKey để normalize + resolve alias làm key
-      const rKey = resolver.resolveKey(rName);
-      const existing = uniqueMap.get(rKey);
-      if (!existing || (r.isPass === true && existing.isPass !== true)) {
-        uniqueMap.set(rKey, r);
-      }
-    });
-
-    // Tự động phân giải các chỉ tiêu "Miễn kiểm" bị thiếu hoặc rỗng qua AlternateRuleResolver (Single Source of Truth)
-    if (tccs) {
-      const allCriteria = [
-        ...(tccs.mainQualityCriteria || []),
-        ...(tccs.safetyCriteria || []),
-      ].filter((c) => c && c.name && c.name.trim() !== '');
-
-      const currentEntries = Array.from(uniqueMap.values());
-
-      allCriteria.forEach((c) => {
-        const cKey = normalizeName(c.name);
-        const existingEntry = uniqueMap.get(cKey);
-
-        // Nội suy nếu chỉ tiêu bị thiếu, hoặc có tồn tại nhưng rỗng (dữ liệu cũ)
-        const isMissingOrEmpty =
-          !existingEntry ||
-          existingEntry.value === null ||
-          existingEntry.value === undefined ||
-          String(existingEntry.value).trim() === '';
-
-        if (isMissingOrEmpty) {
-          const altStatus = AlternateRuleResolver.resolveCriterionState(
-            c.name,
-            undefined,
-            currentEntries,
-            tccs,
-            c
-          );
-
-          if (altStatus.isExempted) {
-            uniqueMap.set(cKey, {
-              criteriaName: c.name,
-              value: 'Miễn kiểm',
-              isPass: true,
-              isExtra: false,
-              unit: c.unit,
-              alternateState: 'EXEMPTED',
-              alternateNote: altStatus.displayNote,
-            });
-          }
-        }
-      });
-    }
-
-    return Array.from(uniqueMap.values());
-  }, [res.results, tccs, resolver]);
+    return [];
+  }, [res.results, snapshot, tccs, resolver, allCriteriaMap]);
 
   const groupedResults = useMemo(() => {
     if (!deduplicatedResults.length) return [];
@@ -657,25 +658,8 @@ const CoAReport = memo(({ res, batch, product, tccs, formula }: CoAReportProps) 
       className="relative bg-white p-10 text-slate-900 max-w-[21cm] mx-auto print:shadow-none print:border-0 print:p-0 print:max-w-none print:mx-0 overflow-hidden"
       style={{ fontFamily: "'Times New Roman', Times, serif" }}
     >
-      {/* Banner cảnh báo nếu bản chụp snapshot bị stale */}
-      {snapshot && snapshotStaleCheck.stale && (
-        <div className="mb-6 p-4 rounded-xl border-2 border-red-500 bg-red-50 text-red-900 print:hidden flex items-start gap-3">
-          <span className="text-xl">⚠️</span>
-          <div>
-            <h4 className="font-bold text-sm uppercase tracking-wide">
-              PHIẾU KIỂM NGHIỆM ĐÃ THAY ĐỔI
-            </h4>
-            <p className="text-xs mt-0.5 leading-relaxed">
-              Bản chụp thẩm định hiện tại không còn đồng nhất với dữ liệu Phiếu kiểm nghiệm mới nhất
-              ({snapshotStaleCheck.reason}). Cần thực hiện đánh giá/thẩm tra lại trước khi phát hành
-              CoA chính thức.
-            </p>
-          </div>
-        </div>
-      )}
-
       {/* Banner cảnh báo bản nháp nếu chưa có EvaluationSnapshot chính thức (SC-14) */}
-      {!isOfficialSnapshot && !snapshotStaleCheck.stale && (
+      {!isOfficialSnapshot && (
         <div className="mb-6 p-4 rounded-xl border-2 border-amber-400 bg-amber-50 text-amber-900 print:hidden flex items-start gap-3">
           <span className="text-xl">⚠️</span>
           <div>

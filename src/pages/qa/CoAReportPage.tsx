@@ -17,6 +17,7 @@ import {
   verifyEvaluationSnapshotIntegrity,
   validateEvaluationSnapshot,
 } from '../../domain/evaluation/EvaluationSnapshotBuilder';
+import { QualityEvaluationEngine } from '../../domain/evaluation/QualityEvaluationEngine';
 import { coaService } from '../../services/app/CoAService';
 
 const CoAReportPage = () => {
@@ -174,7 +175,7 @@ const CoAReportPage = () => {
             hydratedBatch.tccs = batchTccs;
           }
 
-          // [PHASE 8 & 12] Toàn diện Validation cho EvaluationSnapshot
+          // Khi thông tin Phiếu kiểm nghiệm có thay đổi, tự động tái thẩm định và cập nhật snapshot
           if (rawResult.evaluationSnapshot) {
             const validation = validateEvaluationSnapshot(
               rawResult.evaluationSnapshot,
@@ -182,18 +183,12 @@ const CoAReportPage = () => {
               batchTccs
             );
             if (!validation.isValid) {
-              const isOfficialDoc =
-                rawResult.workflowStatus === 'APPROVED' || rawResult.workflowStatus === 'RELEASED';
-
-              if (isOfficialDoc) {
-                // Official CoA -> BLOCK!
-                if (isMounted) {
-                  setFailClosedReason(
-                    `PHIẾU KIỂM NGHIỆM ĐÃ THAY ĐỔI: Bản chụp thẩm định hiện tại không còn đồng nhất với dữ liệu Phiếu kiểm nghiệm mới nhất (${validation.reason || 'Dữ liệu không khớp'}). Cần thực hiện đánh giá/thẩm tra lại trước khi phát hành CoA chính thức.`
-                  );
-                }
-                return;
-              }
+              const updatedSnapshot = QualityEvaluationEngine.evaluate(rawResult, batchTccs, {
+                email:
+                  (rawResult as any).testedBy || (rawResult as any).approvedBy || 'qa@vbiotech.vn',
+              });
+              rawResult.evaluationSnapshot = updatedSnapshot;
+              rawResult.overallStatus = updatedSnapshot.overallStatus;
             }
           }
 
@@ -346,6 +341,7 @@ const CoAReportPage = () => {
                 overallStatus: batchSnapshot.overallStatus,
               } as TestResult);
 
+            let effectiveBatchSnapshot = batchSnapshot;
             const batchSnapValidation = validateEvaluationSnapshot(
               batchSnapshot,
               targetTestResultForBatch,
@@ -353,29 +349,30 @@ const CoAReportPage = () => {
             );
 
             if (!batchSnapValidation.isValid) {
-              const isOfficialDoc = batch.status === 'RELEASED';
-              if (isOfficialDoc) {
-                if (isMounted) {
-                  setFailClosedReason(
-                    `PHIẾU KIỂM NGHIỆM ĐÃ THAY ĐỔI: Bản chụp thẩm định hiện tại không còn đồng nhất với dữ liệu Phiếu kiểm nghiệm mới nhất (${batchSnapValidation.reason || 'Dữ liệu không khớp'}). Cần thực hiện đánh giá/thẩm tra lại trước khi phát hành CoA chính thức.`
-                  );
-                }
-                return;
-              }
+              // Khi dữ liệu Phiếu kiểm nghiệm của Lô có thay đổi, tự động cập nhật snapshot theo PKN mới nhất
+              effectiveBatchSnapshot = QualityEvaluationEngine.evaluate(
+                targetTestResultForBatch,
+                tccsForEvaluation,
+                { email: batch.releasedBy || 'qa@vbiotech.vn' }
+              );
             }
 
             if (isMounted) {
               setResult({
-                id: `coa-${batchId}`,
+                id: latestResult?.id || `coa-${batchId}`,
                 batchId: batchId,
-                labName: 'Phòng Kiểm Nghiệm',
+                labName: latestResult?.labName || 'Phòng Kiểm Nghiệm',
                 testDate: latestResult?.testDate || new Date().toISOString(),
                 results: finalResults,
-                evaluationSnapshot: batchSnapshot,
-                overallStatus: batchSnapshot.overallStatus === 'PASS' ? 'PASS' : 'FAIL',
-                notes: `CoA chính thức phát hành từ Bản chụp thẩm định niêm phong.`,
-                createdAt: batchSnapshot.timestamp || new Date().toISOString(),
-                batch: { ...batch, tccs: tccsForEvaluation, evaluationSnapshot: batchSnapshot },
+                evaluationSnapshot: effectiveBatchSnapshot,
+                overallStatus: effectiveBatchSnapshot.overallStatus === 'PASS' ? 'PASS' : 'FAIL',
+                notes: `CoA phát hành từ kết quả kiểm nghiệm của Lô.`,
+                createdAt: effectiveBatchSnapshot.timestamp || new Date().toISOString(),
+                batch: {
+                  ...batch,
+                  tccs: tccsForEvaluation,
+                  evaluationSnapshot: effectiveBatchSnapshot,
+                },
                 product: batch.product,
               } as HydratedTestResult);
             }

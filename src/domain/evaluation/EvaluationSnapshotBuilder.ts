@@ -186,7 +186,21 @@ export function isEvaluationSnapshotStale(
 
   // 2. Khóa ngoại testResultId
   const snapshotTrId = snapshot.testResultId || (snapshot as any).testResultId;
-  if (snapshotTrId && testResult.id && snapshotTrId !== testResult.id) {
+  const isSyntheticCoA =
+    testResult.id && (testResult.id.startsWith('coa-') || testResult.id.startsWith('coa_'));
+  const isMatchingBatch = Boolean(
+    (snapshot.batchId || (snapshot as any).batchId) &&
+    testResult.batchId &&
+    (snapshot.batchId || (snapshot as any).batchId) === testResult.batchId
+  );
+
+  if (
+    snapshotTrId &&
+    testResult.id &&
+    snapshotTrId !== testResult.id &&
+    !isSyntheticCoA &&
+    !isMatchingBatch
+  ) {
     return {
       stale: true,
       reason: `Snapshot gắn sai testResultId (snapshot: ${snapshotTrId}, testResult: ${testResult.id})`,
