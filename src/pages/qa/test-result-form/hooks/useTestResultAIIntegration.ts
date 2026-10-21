@@ -20,6 +20,7 @@ import { normalizeAIData } from '../../../../services/ai/aiDraftManager';
 import { generateId, BATCH_STATUS } from '../../../../utils';
 import { resolveCanonicalLab } from '../../../../services/laboratoryService';
 import { evaluateDocumentConfidenceGuard } from '../../../../services/ocr/confidenceGuard';
+import { extractDataFromExcel } from '../../../../services/import/excelIngestionService';
 
 /**
  * OCR-09: Áp dụng Confidence Guard lên danh sách chỉ tiêu đã được AI làm giàu.
@@ -561,15 +562,36 @@ export function useTestResultAIIntegration({
         const file = files[0];
         setIsAiProcessing(true);
         try {
-          const prompt = buildExtractionPrompt(allActiveTccsNames, undefined, testingLaboratories);
-          const result = await geminiService.extractDataFromDocument(file, prompt);
+          const isExcel =
+            file.name.endsWith('.xlsx') ||
+            file.name.endsWith('.xls') ||
+            file.name.endsWith('.csv') ||
+            file.type.includes('spreadsheet') ||
+            file.type.includes('excel');
 
-          setAiScanInfo({
-            documentType: result.documentType,
-            pageCount: result.pageCount,
-            notes: result.notes,
-            fileCount: 1,
-          });
+          let result: any;
+          if (isExcel) {
+            result = await extractDataFromExcel(file);
+            setAiScanInfo({
+              documentType: 'Bảng tính Excel',
+              pageCount: result.sheetCount,
+              notes: result.notes,
+              fileCount: 1,
+            });
+          } else {
+            const prompt = buildExtractionPrompt(
+              allActiveTccsNames,
+              undefined,
+              testingLaboratories
+            );
+            result = await geminiService.extractDataFromDocument(file, prompt);
+            setAiScanInfo({
+              documentType: result.documentType,
+              pageCount: result.pageCount,
+              notes: result.notes,
+              fileCount: 1,
+            });
+          }
 
           const rawItems: AIExtractedItem[] = (result.testResults || []).map((r: any) => ({
             criteriaName: r.criteriaName || '',
@@ -652,17 +674,29 @@ export function useTestResultAIIntegration({
           );
 
           try {
-            const res = await geminiService.extractDataFromDocument(
-              f,
-              prompt,
-              (step: string, percent: number) => {
-                setBatchScanFiles((prev) =>
-                  prev.map((item, idx) =>
-                    idx === i ? { ...item, progressStep: step, progressPercent: percent } : item
-                  )
-                );
-              }
-            );
+            const isExcel =
+              f.name.endsWith('.xlsx') ||
+              f.name.endsWith('.xls') ||
+              f.name.endsWith('.csv') ||
+              f.type.includes('spreadsheet') ||
+              f.type.includes('excel');
+
+            let res: any;
+            if (isExcel) {
+              res = await extractDataFromExcel(f);
+            } else {
+              res = await geminiService.extractDataFromDocument(
+                f,
+                prompt,
+                (step: string, percent: number) => {
+                  setBatchScanFiles((prev) =>
+                    prev.map((item, idx) =>
+                      idx === i ? { ...item, progressStep: step, progressPercent: percent } : item
+                    )
+                  );
+                }
+              );
+            }
             results.push(res);
             setBatchScanFiles((prev) =>
               prev.map((item, idx) =>

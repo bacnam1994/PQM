@@ -79,7 +79,7 @@ export class QualityEvaluationEngine {
   static evaluate(
     testResult: TestResult,
     tccs?: TCCS | null,
-    currentUser?: { email?: string; [key: string]: unknown } | null
+    currentUser?: { email?: string; [key: string]: any } | null
   ): EvaluationSnapshot {
     let overallStatus: CanonicalQualityStatus = 'UNKNOWN';
 

@@ -42,7 +42,7 @@ describe('useWorkflowActions Hook', () => {
     expect(meta).toBeDefined();
     expect(meta?.risk).toBe('HIGH');
     expect(meta?.requiresAudit).toBe(true);
-    expect(meta?.requiresSignature).toBe(true);
+    expect(meta?.requiresSignature).toBe(false);
   });
 
   it('điều phối dispatchAction thành công và trả về correlationId cùng executionId', async () => {

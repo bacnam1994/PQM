@@ -3,7 +3,7 @@
  * =======================
  * Dịch vụ đối chiếu đa phiếu và đánh giá sai lệch giữa các phòng kiểm nghiệm (Lab Bias).
  * Cho phép so sánh Phiếu nội bộ vs Phiếu gửi ngoài (QUATEST 3, CASE, NIFC, Eurofins) hoặc CoA Nhà cung cấp.
- * 
+ *
  * Hỗ trợ:
  * - Xử lý dữ liệu dưới ngưỡng phát hiện (Censored Data: LOD, LOQ, KPH) theo chuẩn ICH Q2 & US EPA
  * - Phân tích sai số hệ thống có định hướng (Directional Lab Bias Engine)
@@ -14,7 +14,12 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import { getApiKey, getGeminiModel } from './geminiService';
 import { TestResultEntry } from '../../types';
 import { isCriteriaMatch } from '../../utils/aiMapping';
-import { parseLabResultValue, ParsedLabValue, detectLabOrganization, RecognizedLab } from './externalLabTemplates';
+import {
+  parseLabResultValue,
+  ParsedLabValue,
+  detectLabOrganization,
+  RecognizedLab,
+} from './externalLabTemplates';
 
 export interface ComparisonEntry {
   criteriaName: string;
@@ -30,7 +35,13 @@ export interface ComparisonEntry {
   source2Method?: string;
   limit?: string;
   rpd?: number; // Relative Percent Difference (%)
-  deviationLevel: 'EXCELLENT' | 'ACCEPTABLE' | 'WARNING' | 'CRITICAL' | 'QUALITATIVE_DIFF' | 'SINGLE_SOURCE';
+  deviationLevel:
+    | 'EXCELLENT'
+    | 'ACCEPTABLE'
+    | 'WARNING'
+    | 'CRITICAL'
+    | 'QUALITATIVE_DIFF'
+    | 'SINGLE_SOURCE';
   analysis?: string;
   isCensoredDataComparison?: boolean;
   censoredDetails?: string;
@@ -63,19 +74,19 @@ export interface LabBiasAssessment {
 export interface LabComparisonResult {
   comparisonId: string;
   generatedAt: string;
-  report1: { 
-    title: string; 
-    labName: string; 
-    testDate?: string; 
-    batchNo?: string; 
+  report1: {
+    title: string;
+    labName: string;
+    testDate?: string;
+    batchNo?: string;
     overallStatus?: string;
     detectedLabOrg?: RecognizedLab;
   };
-  report2: { 
-    title: string; 
-    labName: string; 
-    testDate?: string; 
-    batchNo?: string; 
+  report2: {
+    title: string;
+    labName: string;
+    testDate?: string;
+    batchNo?: string;
     overallStatus?: string;
     detectedLabOrg?: RecognizedLab;
   };
@@ -126,25 +137,82 @@ export const classifyDeviation = (
 
   // Nếu là số có %RPD
   if (rpd !== undefined) {
-    if (rpd <= 5.0) return 'EXCELLENT';        // Sai lệch <= 5%: Rất tốt
-    if (rpd <= 12.0) return 'ACCEPTABLE';     // Sai lệch <= 12%: Chấp nhận được trong phân tích dược
-    if (rpd <= 25.0) return 'WARNING';        // Sai lệch 12-25%: Cần lưu ý
-    return 'CRITICAL';                        // Sai lệch > 25%: Bất thường nghiêm trọng
+    if (rpd <= 5.0) return 'EXCELLENT'; // Sai lệch <= 5%: Rất tốt
+    if (rpd <= 12.0) return 'ACCEPTABLE'; // Sai lệch <= 12%: Chấp nhận được trong phân tích dược
+    if (rpd <= 25.0) return 'WARNING'; // Sai lệch 12-25%: Cần lưu ý
+    return 'CRITICAL'; // Sai lệch > 25%: Bất thường nghiêm trọng
   }
 
   // Nếu là định tính (chuỗi)
   const s1 = String(v1).trim().toLowerCase();
   const s2 = String(v2).trim().toLowerCase();
   if (s1 === s2) return 'EXCELLENT';
-  if ((s1.includes('đạt') || s1.includes('pass') || s1.includes('dương tính')) && (s2.includes('không') || s2.includes('fail') || s2.includes('âm tính'))) {
+  if (
+    (s1.includes('đạt') || s1.includes('pass') || s1.includes('dương tính')) &&
+    (s2.includes('không') || s2.includes('fail') || s2.includes('âm tính'))
+  ) {
     return 'CRITICAL';
   }
   return 'QUALITATIVE_DIFF';
 };
 
+export function areUnitsEquivalent(u1?: string, u2?: string): boolean {
+  if (!u1 || !u2) return true;
+  const norm1 = u1.trim().toLowerCase().replace(/\s+/g, '');
+  const norm2 = u2.trim().toLowerCase().replace(/\s+/g, '');
+  if (norm1 === norm2) return true;
+  if ((norm1 === 'ppm' && norm2 === 'mg/kg') || (norm1 === 'mg/kg' && norm2 === 'ppm')) return true;
+  if (
+    (norm1 === '%' && (norm2 === 'g/100g' || norm2 === 'g/100ml')) ||
+    (norm2 === '%' && (norm1 === 'g/100g' || norm1 === 'g/100ml'))
+  )
+    return true;
+  if (
+    (norm1 === 'ppb' && (norm2 === 'µg/kg' || norm2 === 'ug/kg')) ||
+    (norm2 === 'ppb' && (norm1 === 'µg/kg' || norm1 === 'ug/kg'))
+  )
+    return true;
+  return false;
+}
+
+export function areMethodsEquivalent(m1?: string, m2?: string): boolean {
+  if (!m1 || !m2) return true;
+  const norm1 = m1
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '');
+  const norm2 = m2
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '');
+  if (norm1 === norm2) return true;
+  const keywords = [
+    'hplc',
+    'uvvis',
+    'uv-vis',
+    'aas',
+    'gcms',
+    'gc-ms',
+    'tcvn',
+    'aoac',
+    'usp',
+    'bp',
+    'smeww',
+    'ph',
+    'đo quang',
+    'vi sinh',
+  ];
+  for (const kw of keywords) {
+    const kwn = kw.replace(/[^a-z0-9]/g, '');
+    if (norm1.includes(kwn) && norm2.includes(kwn)) return true;
+  }
+  return false;
+}
+
 /**
  * Xử lý đánh giá chuyên sâu cho dữ liệu ngưỡng phát hiện (Censored Data: KPH, < LOD, < LOQ)
- * theo chuẩn ICH Q2 & US EPA Methods
+ * theo chuẩn ICH Q2 & US EPA Methods.
+ * Chỉ tính chênh lệch khi hai kết quả có đơn vị và phương pháp tương đương.
  */
 export const evaluateCensoredDataRPD = (
   parsed1: ParsedLabValue,
@@ -157,13 +225,23 @@ export const evaluateCensoredDataRPD = (
   analysis?: string;
   isCensored: boolean;
 } => {
+  // 1. Kiểm tra tính tương đương của đơn vị đo
+  if (!areUnitsEquivalent(parsed1.unit, parsed2.unit)) {
+    return {
+      rpd: undefined,
+      deviationLevel: 'QUALITATIVE_DIFF',
+      analysis: `Cảnh báo: Đơn vị đo không tương đương ("${parsed1.unit || '---'}" vs "${parsed2.unit || '---'}"). Không tính chênh lệch khi đơn vị khác biệt.`,
+      isCensored: false,
+    };
+  }
+
   // Nếu có mâu thuẫn trực tiếp giữa cờ Đạt/Không đạt
   if (pass1 !== undefined && pass2 !== undefined && pass1 !== pass2) {
     return {
       rpd: undefined,
       deviationLevel: 'CRITICAL',
       analysis: 'Mâu thuẫn kết luận chất lượng: Một bên Đạt và một bên Không đạt.',
-      isCensored: true
+      isCensored: true,
     };
   }
 
@@ -172,8 +250,9 @@ export const evaluateCensoredDataRPD = (
     return {
       rpd: 0,
       deviationLevel: 'EXCELLENT',
-      analysis: 'Cả hai phòng lab đều không phát hiện (KPH / Âm tính) - Kết quả hoàn toàn đồng thuận.',
-      isCensored: true
+      analysis:
+        'Cả hai phòng lab đều không phát hiện (KPH / Âm tính) - Kết quả hoàn toàn đồng thuận.',
+      isCensored: true,
     };
   }
 
@@ -185,7 +264,8 @@ export const evaluateCensoredDataRPD = (
     const numericLab = parsed1.isNonDetect ? 'Phiếu 2' : 'Phiếu 1';
 
     const numVal = numeric.numericValue;
-    const limit = nonDetect.quantificationLimit ?? nonDetect.detectionLimit ?? nonDetect.numericValue;
+    const limit =
+      nonDetect.quantificationLimit ?? nonDetect.detectionLimit ?? nonDetect.numericValue;
 
     if (numVal !== undefined && limit !== undefined) {
       // Nếu giá trị định lượng nằm trong ngưỡng không phát hiện của bên kia (numVal <= limit)
@@ -194,7 +274,7 @@ export const evaluateCensoredDataRPD = (
           rpd: 0,
           deviationLevel: 'ACCEPTABLE',
           analysis: `Tương thích ngưỡng phát hiện: ${numericLab} định lượng được ${numVal}, nằm trong giới hạn phát hiện (${limit}) của ${nonDetectLab}.`,
-          isCensored: true
+          isCensored: true,
         };
       } else {
         // Giá trị thực vượt quá ngưỡng phát hiện: Áp dụng phương pháp thay thế L/2 theo chuẩn EPA
@@ -205,7 +285,7 @@ export const evaluateCensoredDataRPD = (
           rpd,
           deviationLevel: level,
           analysis: `${numericLab} phát hiện (${numVal}) trong khi ${nonDetectLab} báo KPH (ngưỡng ${limit}). RPD ước lượng qua phương pháp thay thế LOD/2 là ${rpd}%.`,
-          isCensored: true
+          isCensored: true,
         };
       }
     }
@@ -214,7 +294,7 @@ export const evaluateCensoredDataRPD = (
       rpd: undefined,
       deviationLevel: 'QUALITATIVE_DIFF',
       analysis: `${numericLab} ghi nhận định lượng trong khi ${nonDetectLab} ghi nhận không phát hiện.`,
-      isCensored: true
+      isCensored: true,
     };
   }
 
@@ -225,16 +305,22 @@ export const evaluateCensoredDataRPD = (
     return {
       rpd,
       deviationLevel,
-      isCensored: false
+      isCensored: false,
     };
   }
 
   // TH 4: Dạng định tính chuỗi thông thường
-  const deviationLevel = classifyDeviation(undefined, parsed1.rawValue, parsed2.rawValue, pass1, pass2);
+  const deviationLevel = classifyDeviation(
+    undefined,
+    parsed1.rawValue,
+    parsed2.rawValue,
+    pass1,
+    pass2
+  );
   return {
     rpd: undefined,
     deviationLevel,
-    isCensored: false
+    isCensored: false,
   };
 };
 
@@ -249,7 +335,7 @@ export const matchAndCompareEntries = (
   const matchedEntries: ComparisonEntry[] = [];
   const usedIdx2 = new Set<number>();
 
-  results1.forEach(item1 => {
+  results1.forEach((item1) => {
     const name1 = item1.criteriaName;
     let bestMatchIdx = -1;
 
@@ -266,7 +352,7 @@ export const matchAndCompareEntries = (
     if (bestMatchIdx !== -1) {
       usedIdx2.add(bestMatchIdx);
       const item2 = results2[bestMatchIdx];
-      
+
       const parsed1 = parseLabResultValue(item1.value, item1.unit, (item1 as any).analysisMethod);
       const parsed2 = parseLabResultValue(item2.value, item2.unit, (item2 as any).analysisMethod);
 
@@ -289,7 +375,7 @@ export const matchAndCompareEntries = (
         deviationLevel: evalResult.deviationLevel,
         analysis: evalResult.analysis,
         isCensoredDataComparison: evalResult.isCensored,
-        censoredDetails: evalResult.analysis
+        censoredDetails: evalResult.analysis,
       });
     } else {
       matchedEntries.push({
@@ -302,7 +388,7 @@ export const matchAndCompareEntries = (
         source2Name: '—',
         source2Value: 'Không kiểm',
         limit: item1.limit,
-        deviationLevel: 'SINGLE_SOURCE'
+        deviationLevel: 'SINGLE_SOURCE',
       });
     }
   });
@@ -320,7 +406,7 @@ export const matchAndCompareEntries = (
         source2Pass: item2.isPass,
         source2Method: (item2 as any).analysisMethod,
         limit: item2.limit,
-        deviationLevel: 'SINGLE_SOURCE'
+        deviationLevel: 'SINGLE_SOURCE',
       });
     }
   });
@@ -336,14 +422,14 @@ export const computeLabBias = (
   report2: LabReportSource,
   entries: ComparisonEntry[]
 ): LabBiasAssessment => {
-  const commonEntries = entries.filter(e => e.deviationLevel !== 'SINGLE_SOURCE');
-  
+  const commonEntries = entries.filter((e) => e.deviationLevel !== 'SINGLE_SOURCE');
+
   let num1Higher = 0;
   let num2Higher = 0;
   let equalCount = 0;
   const biasValues: number[] = [];
 
-  commonEntries.forEach(e => {
+  commonEntries.forEach((e) => {
     const p1 = parseLabResultValue(e.source1Value);
     const p2 = parseLabResultValue(e.source2Value);
 
@@ -356,7 +442,7 @@ export const computeLabBias = (
         const signedDiffPercent = ((v1 - v2) / avg) * 100;
         biasValues.push(signedDiffPercent);
 
-        if (Math.abs(v1 - v2) <= (avg * 0.02)) {
+        if (Math.abs(v1 - v2) <= avg * 0.02) {
           equalCount++;
         } else if (v1 > v2) {
           num1Higher++;
@@ -368,9 +454,10 @@ export const computeLabBias = (
   });
 
   const totalNumericPairs = num1Higher + num2Higher + equalCount;
-  const meanBiasPercent = biasValues.length > 0
-    ? Math.round((biasValues.reduce((a, b) => a + b, 0) / biasValues.length) * 100) / 100
-    : 0;
+  const meanBiasPercent =
+    biasValues.length > 0
+      ? Math.round((biasValues.reduce((a, b) => a + b, 0) / biasValues.length) * 100) / 100
+      : 0;
 
   const lab1Name = report1.labName || 'Phiếu 1';
   const lab2Name = report2.labName || 'Phiếu 2';
@@ -399,7 +486,8 @@ export const computeLabBias = (
     }
   }
 
-  let assessmentSummary = 'Không phát hiện sai số hệ thống rõ rệt giữa hai đơn vị thử nghiệm (độ lệch ngẫu nhiên trong giới hạn cho phép).';
+  let assessmentSummary =
+    'Không phát hiện sai số hệ thống rõ rệt giữa hai đơn vị thử nghiệm (độ lệch ngẫu nhiên trong giới hạn cho phép).';
   if (direction === 'SOURCE1_HIGHER') {
     assessmentSummary = `Phát hiện Sai số Hệ thống (Lab Bias): ${lab1Name} đo giá trị cao hơn ${lab2Name} ở ${biasRatio}% chỉ tiêu định lượng (độ lệch thiên vị trung bình +${Math.abs(meanBiasPercent)}%).`;
   } else if (direction === 'SOURCE2_HIGHER') {
@@ -408,20 +496,36 @@ export const computeLabBias = (
 
   const causes: string[] = [];
   if (isSystematic) {
-    causes.push(`Độ lệch hệ thống ${direction === 'SOURCE1_HIGHER' ? lab1Name : lab2Name} đo cao hơn: Nghi ngờ chất chuẩn đối chiếu (Reference Standard) có độ tinh khiết công bố khác nhau.`);
-    causes.push('Khác biệt về hiệu suất thu hồi mẫu (Extraction Recovery Rate) hoặc phương pháp chiết tách mẫu thử.');
-    causes.push('Độ tuyến tính của đường chuẩn thiết bị phân tích (HPLC / GC / UV-Vis Detector Response Factor).');
+    causes.push(
+      `Độ lệch hệ thống ${direction === 'SOURCE1_HIGHER' ? lab1Name : lab2Name} đo cao hơn: Nghi ngờ chất chuẩn đối chiếu (Reference Standard) có độ tinh khiết công bố khác nhau.`
+    );
+    causes.push(
+      'Khác biệt về hiệu suất thu hồi mẫu (Extraction Recovery Rate) hoặc phương pháp chiết tách mẫu thử.'
+    );
+    causes.push(
+      'Độ tuyến tính của đường chuẩn thiết bị phân tích (HPLC / GC / UV-Vis Detector Response Factor).'
+    );
   } else {
-    causes.push('Độ dao động giữa hai phòng lab nằm trong giới hạn dung sai cho phép của phương pháp thử nghiệm liên phòng.');
+    causes.push(
+      'Độ dao động giữa hai phòng lab nằm trong giới hạn dung sai cho phép của phương pháp thử nghiệm liên phòng.'
+    );
   }
 
   const recommendations: string[] = [];
   if (isSystematic) {
-    recommendations.push('Yêu cầu phòng lab ngoại kiểm cung cấp sắc ký đồ (Chromatogram Overlay) và hệ số đáp ứng pic để kiểm tra đối chiếu.');
-    recommendations.push('Thực hiện thử nghiệm độ thu hồi mẫu thêm chuẩn (Spike Recovery Test) trên cùng một lô chất chuẩn đối chiếu.');
-    recommendations.push('Rà soát lại quy trình hiệu chuẩn cân phân tích và micropipette tại cả hai phòng thử nghiệm.');
+    recommendations.push(
+      'Yêu cầu phòng lab ngoại kiểm cung cấp sắc ký đồ (Chromatogram Overlay) và hệ số đáp ứng pic để kiểm tra đối chiếu.'
+    );
+    recommendations.push(
+      'Thực hiện thử nghiệm độ thu hồi mẫu thêm chuẩn (Spike Recovery Test) trên cùng một lô chất chuẩn đối chiếu.'
+    );
+    recommendations.push(
+      'Rà soát lại quy trình hiệu chuẩn cân phân tích và micropipette tại cả hai phòng thử nghiệm.'
+    );
   } else {
-    recommendations.push('Lưu hồ sơ đối chiếu vào báo cáo đánh giá năng lực phòng lab định kỳ (Inter-laboratory Proficiency Review).');
+    recommendations.push(
+      'Lưu hồ sơ đối chiếu vào báo cáo đánh giá năng lực phòng lab định kỳ (Inter-laboratory Proficiency Review).'
+    );
   }
 
   return {
@@ -435,7 +539,7 @@ export const computeLabBias = (
     confidence,
     assessmentSummary,
     potentialCauses: causes,
-    actionRecommendations: recommendations
+    actionRecommendations: recommendations,
   };
 };
 
@@ -447,31 +551,39 @@ export const generateRuleBasedComparisonAnalysis = (
   report2: LabReportSource,
   entries: ComparisonEntry[]
 ) => {
-  const commonEntries = entries.filter(e => e.deviationLevel !== 'SINGLE_SOURCE');
-  const critical = commonEntries.filter(e => e.deviationLevel === 'CRITICAL');
-  const warnings = commonEntries.filter(e => e.deviationLevel === 'WARNING');
-  const excellent = commonEntries.filter(e => e.deviationLevel === 'EXCELLENT' || e.deviationLevel === 'ACCEPTABLE');
+  const commonEntries = entries.filter((e) => e.deviationLevel !== 'SINGLE_SOURCE');
+  const critical = commonEntries.filter((e) => e.deviationLevel === 'CRITICAL');
+  const warnings = commonEntries.filter((e) => e.deviationLevel === 'WARNING');
+  const excellent = commonEntries.filter(
+    (e) => e.deviationLevel === 'EXCELLENT' || e.deviationLevel === 'ACCEPTABLE'
+  );
 
   const biasAssessment = computeLabBias(report1, report2, entries);
 
   const causes = [...biasAssessment.potentialCauses];
   if (critical.length > 0) {
-    causes.unshift(`Có ${critical.length} chỉ tiêu lệch mức nghiêm trọng (>25% hoặc mâu thuẫn Đạt/Không đạt). Cần rà soát độ chuẩn xác phương pháp phân tích.`);
+    causes.unshift(
+      `Có ${critical.length} chỉ tiêu lệch mức nghiêm trọng (>25% hoặc mâu thuẫn Đạt/Không đạt). Cần rà soát độ chuẩn xác phương pháp phân tích.`
+    );
   }
   if (warnings.length > 0) {
-    causes.unshift(`Có ${warnings.length} chỉ tiêu có độ lệch từ 12-25%, có thể do kỹ thuật chuẩn bị mẫu thử hoặc độ tinh khiết chất chuẩn khác nhau.`);
+    causes.unshift(
+      `Có ${warnings.length} chỉ tiêu có độ lệch từ 12-25%, có thể do kỹ thuật chuẩn bị mẫu thử hoặc độ tinh khiết chất chuẩn khác nhau.`
+    );
   }
 
   const recommendations = [...biasAssessment.actionRecommendations];
   if (critical.length > 0) {
-    recommendations.unshift(`Thực hiện kiểm tra chéo lại (Re-test) các chỉ tiêu: ${critical.map(c => c.criteriaName).join(', ')} trên mẫu lưu.`);
+    recommendations.unshift(
+      `Thực hiện kiểm tra chéo lại (Re-test) các chỉ tiêu: ${critical.map((c) => c.criteriaName).join(', ')} trên mẫu lưu.`
+    );
   }
 
   return {
     summary: `Đối chiếu giữa "${report1.labName || 'Phiếu 1'}" và "${report2.labName || 'Phiếu 2'}" trên ${commonEntries.length} chỉ tiêu chung: ${excellent.length} chỉ tiêu đồng thuận, ${warnings.length} chỉ tiêu lệch vừa, ${critical.length} chỉ tiêu lệch nghiêm trọng.`,
     systematicBiasAssessment: biasAssessment.assessmentSummary,
     potentialCauses: causes,
-    actionRecommendations: recommendations
+    actionRecommendations: recommendations,
   };
 };
 
@@ -486,15 +598,21 @@ export const compareLabReports = async (
   const comparisonId = `COMP-${Date.now().toString(36).toUpperCase()}`;
   const entries = matchAndCompareEntries(report1.results, report2.results, learnedMappings);
 
-  const commonEntries = entries.filter(e => e.deviationLevel !== 'SINGLE_SOURCE');
+  const commonEntries = entries.filter((e) => e.deviationLevel !== 'SINGLE_SOURCE');
   const evaluatedCount = commonEntries.length;
-  const consistentCount = commonEntries.filter(e => e.deviationLevel === 'EXCELLENT' || e.deviationLevel === 'ACCEPTABLE').length;
-  const minorDiffCount = commonEntries.filter(e => e.deviationLevel === 'WARNING').length;
-  const criticalDiffCount = commonEntries.filter(e => e.deviationLevel === 'CRITICAL').length;
+  const consistentCount = commonEntries.filter(
+    (e) => e.deviationLevel === 'EXCELLENT' || e.deviationLevel === 'ACCEPTABLE'
+  ).length;
+  const minorDiffCount = commonEntries.filter((e) => e.deviationLevel === 'WARNING').length;
+  const criticalDiffCount = commonEntries.filter((e) => e.deviationLevel === 'CRITICAL').length;
 
-  const validRpds = commonEntries.map(e => e.rpd).filter((r): r is number => r !== undefined);
-  const avgRpd = validRpds.length > 0 ? Math.round((validRpds.reduce((a, b) => a + b, 0) / validRpds.length) * 100) / 100 : 0;
-  const agreementRate = evaluatedCount > 0 ? Math.round((consistentCount / evaluatedCount) * 1000) / 10 : 100;
+  const validRpds = commonEntries.map((e) => e.rpd).filter((r): r is number => r !== undefined);
+  const avgRpd =
+    validRpds.length > 0
+      ? Math.round((validRpds.reduce((a, b) => a + b, 0) / validRpds.length) * 100) / 100
+      : 0;
+  const agreementRate =
+    evaluatedCount > 0 ? Math.round((consistentCount / evaluatedCount) * 1000) / 10 : 100;
 
   const biasAssessment = computeLabBias(report1, report2, entries);
   const detectedOrg1 = detectLabOrganization(report1.labName || report1.title);
@@ -509,7 +627,7 @@ export const compareLabReports = async (
       testDate: report1.testDate,
       batchNo: report1.batchNo,
       overallStatus: report1.overallStatus,
-      detectedLabOrg: detectedOrg1
+      detectedLabOrg: detectedOrg1,
     },
     report2: {
       title: report2.title,
@@ -517,7 +635,7 @@ export const compareLabReports = async (
       testDate: report2.testDate,
       batchNo: report2.batchNo,
       overallStatus: report2.overallStatus,
-      detectedLabOrg: detectedOrg2
+      detectedLabOrg: detectedOrg2,
     },
     entries,
     metrics: {
@@ -526,10 +644,10 @@ export const compareLabReports = async (
       minorDiffCount,
       criticalDiffCount,
       agreementRatePercent: agreementRate,
-      avgRpdPercent: avgRpd
+      avgRpdPercent: avgRpd,
     },
     biasAssessment,
-    aiAnalysis: generateRuleBasedComparisonAnalysis(report1, report2, entries)
+    aiAnalysis: generateRuleBasedComparisonAnalysis(report1, report2, entries),
   };
 
   // Thử gọi AI nâng cao nếu có API Key
@@ -549,7 +667,11 @@ THÔNG TIN PHIẾU:
 - Đơn vị 2: ${report2.labName || 'Phiếu 2'} (${detectedOrg2}) (Lô: ${report2.batchNo || 'N/A'}, Ngày kiểm: ${report2.testDate || 'N/A'}, Trạng thái: ${report2.overallStatus || 'N/A'})
 
 KẾT QUẢ ĐỐI CHIẾU CHỈ TIÊU (RPD = Relative Percent Difference, Đã chuẩn hóa Censored Data):
-${JSON.stringify(entries.filter(e => e.deviationLevel !== 'SINGLE_SOURCE'), null, 2)}
+${JSON.stringify(
+  entries.filter((e) => e.deviationLevel !== 'SINGLE_SOURCE'),
+  null,
+  2
+)}
 
 THỐNG KÊ LAB BIAS BAN ĐẦU:
 ${JSON.stringify(biasAssessment, null, 2)}
@@ -566,15 +688,20 @@ Trả về định dạng JSON thuần túy (không markdown) với cấu trúc:
 
     const response = await model.generateContent(prompt);
     const text = response.response.text();
-    const cleanJson = text.replace(/```json/gi, '').replace(/```/g, '').trim();
+    const cleanJson = text
+      .replace(/```json/gi, '')
+      .replace(/```/g, '')
+      .trim();
     const parsed = JSON.parse(cleanJson);
 
     if (parsed.summary) {
       baseResult.aiAnalysis = {
         summary: parsed.summary,
-        systematicBiasAssessment: parsed.systematicBiasAssessment || baseResult.aiAnalysis.systematicBiasAssessment,
+        systematicBiasAssessment:
+          parsed.systematicBiasAssessment || baseResult.aiAnalysis.systematicBiasAssessment,
         potentialCauses: parsed.potentialCauses || baseResult.aiAnalysis.potentialCauses,
-        actionRecommendations: parsed.actionRecommendations || baseResult.aiAnalysis.actionRecommendations
+        actionRecommendations:
+          parsed.actionRecommendations || baseResult.aiAnalysis.actionRecommendations,
       };
     }
   } catch (error) {

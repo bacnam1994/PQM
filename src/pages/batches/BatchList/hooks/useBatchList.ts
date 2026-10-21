@@ -217,93 +217,11 @@ export function useBatchList() {
     }
   }, [crud, deleteBatch, notify, user]);
 
-  const handleUpdateBatchStatusClick = useCallback(
-    async (newStatus: string, batchId: string) => {
-      if (newStatus === 'RELEASED') {
-        try {
-          // 1. FETCH FRESH BATCH từ service (Phase 9 & 11)
-          let freshBatch = await batchAppService.getBatchById(batchId);
-          if (!freshBatch) {
-            freshBatch = hydratedBatches.find((b) => b.id === batchId) || null;
-          }
-          if (!freshBatch) {
-            notify({
-              type: 'ERROR',
-              title: 'Lỗi xuất xưởng',
-              message: `Không tìm thấy thông tin lô ${batchId}.`,
-            });
-            return;
-          }
-
-          // 2. FETCH FRESH TEST RESULTS
-          let freshTestResults = await fetchTestResultsByBatchId(batchId);
-          if (!freshTestResults || freshTestResults.length === 0) {
-            const resolution = resolveTestResultsForBatch(freshBatch, sourceResults);
-            freshTestResults = resolution.allCandidateResults;
-          }
-
-          // 3. RELEASE DECISION - Đánh giá Gate 1-6
-          const releaseDecision = BatchReleaseDecisionService.resolveBatchReleaseDecision({
-            batch: freshBatch,
-            testResults: freshTestResults,
-            userRole: user?.role,
-            boundTccs: freshBatch.tccsSnapshot || (freshBatch as any)?.tccs,
-            asOfDate: new Date(),
-            isPreview: true,
-          });
-
-          // Check if Gate 1-6 PASS
-          const gates1to6 = releaseDecision.gates.filter(
-            (g) => g.gateIndex >= 1 && g.gateIndex <= 6
-          );
-          const gate1to6AllPass = gates1to6.length === 6 && gates1to6.every((g) => g.passed);
-
-          if (!gate1to6AllPass) {
-            const failingGate = gates1to6.find((g) => !g.passed);
-            const blockerMsg =
-              failingGate?.blockers?.[0] ||
-              failingGate?.details ||
-              releaseDecision.blockers[0] ||
-              'Lô chưa hoàn thành tất cả các cổng kiểm soát tiên quyết (Gate 1 - 6).';
-
-            notify({
-              type: 'ERROR',
-              title: 'Quy chuẩn GMP & Release Gates',
-              message: blockerMsg,
-            });
-            return;
-          }
-
-          // NẾU LÔ ĐANG Ở PENDING: Chuyển tiếp hợp lệ PENDING -> TESTING trước khi mở modal xuất xưởng
-          if (freshBatch.status === 'PENDING') {
-            await updateBatchStatus(freshBatch.id, 'TESTING');
-            const reFetched = await batchAppService.getBatchById(batchId);
-            if (reFetched) {
-              freshBatch = reFetched;
-            }
-          }
-
-          // Gate 1-6 PASS -> Mở modal xác nhận xuất xưởng trực tiếp (không bắt buộc chữ ký)
-          setRejectReason('Phê duyệt xuất xưởng đạt chuẩn 7 Cổng GMP');
-          setPendingStatusUpdate({ status: 'RELEASED', batchId });
-          setIsStatusConfirmOpen(true);
-          return;
-        } catch (err: any) {
-          console.error('Lỗi khi kiểm tra điều kiện xuất xưởng:', err);
-          notify({
-            type: 'ERROR',
-            title: 'Lỗi kiểm tra xuất xưởng',
-            message: err.message || 'Không thể kiểm tra điều kiện xuất xưởng.',
-          });
-          return;
-        }
-      }
-      setRejectReason('');
-      setPendingStatusUpdate({ status: newStatus, batchId });
-      setIsStatusConfirmOpen(true);
-    },
-    [hydratedBatches, sourceResults, notify, user, updateBatchStatus]
-  );
+  const handleUpdateBatchStatusClick = useCallback(async (newStatus: string, batchId: string) => {
+    setRejectReason('');
+    setPendingStatusUpdate({ status: newStatus as any, batchId });
+    setIsStatusConfirmOpen(true);
+  }, []);
 
   const handleESignatureSuccess = async (signature: ElectronicSignature) => {
     if (!eSignatureTarget) return;

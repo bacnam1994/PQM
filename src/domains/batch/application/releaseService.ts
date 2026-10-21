@@ -80,6 +80,7 @@ export class ReleaseService {
     boundTccs?: TCCS | null;
     deviations?: QualityDeviation[];
     signature?: ElectronicSignature;
+    requireSignature?: boolean;
     reason?: string;
   }): Promise<{ success: boolean; message: string }> {
     const {
@@ -117,7 +118,10 @@ export class ReleaseService {
       );
     }
 
-    // 3. Tùy chọn kiểm tra chữ ký điện tử nếu có cung cấp
+    // 3. Kiểm tra chữ ký điện tử nếu có yêu cầu hoặc có cung cấp chữ ký
+    if (options.requireSignature && !signature) {
+      throw new Error('Yêu cầu chữ ký điện tử hợp lệ của QA');
+    }
     if (signature) {
       const isSigValid = await signatureService.verifySignatureIntegrity(signature);
       if (!isSigValid) {

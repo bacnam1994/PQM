@@ -86,17 +86,9 @@ const CriteriaAliasManager = lazyWithRetry(
 );
 const AuditLogPage = lazyWithRetry(() => import('./pages/system/AuditLogPage'), 'AuditLogPage');
 const CoAVerifyPage = lazyWithRetry(() => import('./pages/public/CoAVerifyPage'), 'CoAVerifyPage');
-const DeviationListPage = lazyWithRetry(
-  () => import('./pages/qa/DeviationListPage'),
-  'DeviationListPage'
-);
-const ChangeControlListPage = lazyWithRetry(
-  () => import('./pages/quality/change-control/ChangeControlListPage'),
-  'ChangeControlListPage'
-);
-const Batch360Page = lazyWithRetry(
-  () => import('./pages/batches/batch-360/Batch360Page').then((m) => ({ default: m.Batch360Page })),
-  'Batch360Page'
+const ComparisonPage = lazyWithRetry(
+  () => import('./pages/quality/comparison/ComparisonPage'),
+  'ComparisonPage'
 );
 const Product360Page = lazyWithRetry(
   () =>
@@ -339,7 +331,7 @@ const AppRoutes: React.FC = () => {
             }
           />
           <Route path="/batches/:id" element={<BatchDetailPage />} />
-          <Route path="/batches/360/:id" element={<Batch360Page />} />
+          <Route path="/batches/360/:id" element={<Navigate to="/batches" replace />} />
           <Route path="/test-results" element={<TestResultList />} />
           <Route path="/laboratories" element={<LaboratoryManagementPage />} />
           <Route path="/labs" element={<Navigate to="/laboratories" replace />} />
@@ -354,8 +346,10 @@ const AppRoutes: React.FC = () => {
               </AdminRoute>
             }
           />
-          <Route path="/deviations" element={<DeviationListPage />} />
-          <Route path="/change-control" element={<ChangeControlListPage />} />
+          {/* So sánh Đối chiếu Lab (Nội bộ vs Ngoại kiểm) */}
+          <Route path="/quality/comparison" element={<ComparisonPage />} />
+          <Route path="/deviations" element={<Navigate to="/alerts" replace />} />
+          <Route path="/change-control" element={<Navigate to="/alerts" replace />} />
           <Route path="/reports/quality-summary" element={<QualitySummaryReport />} />
           <Route path="/reports/trend-analysis" element={<TrendAnalysisPage />} />
           <Route path="/alerts" element={<AlertsPage />} />

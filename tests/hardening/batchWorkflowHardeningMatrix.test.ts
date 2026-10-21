@@ -429,6 +429,7 @@ describe('Phase 14: Comprehensive 45-Test Matrix for Global Batch Workflow', () 
         testResults: [passingTestResult],
         boundTccs: baseTccs,
         userRole: 'QA',
+        requireSignature: true,
       });
       expect(dec.requiredSignature).toBe(true);
     });

@@ -121,6 +121,7 @@ describe('P0/P1 Closure Audit - Global Batch Workflow Suite', () => {
       testResults: [passingTestResult],
       boundTccs: mockTccs,
       userRole: 'QA',
+      requireSignature: true,
       // userSignature missing
     });
 

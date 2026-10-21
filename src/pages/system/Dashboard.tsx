@@ -13,6 +13,7 @@ import {
   CheckCircleIcon,
   ExclamationTriangleIcon,
   CheckBadgeIcon,
+  ArrowsRightLeftIcon,
 } from '@heroicons/react/24/outline';
 import { Link, useNavigate } from 'react-router-dom';
 import { Surface } from '../../components/ui';
@@ -365,77 +366,73 @@ const Dashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* ================= SIGNATURE PIPELINE ================= */}
+      {/* ================= QUALITY MONITORING PIPELINE & ACTIONS ================= */}
       <div className="p-5 sm:p-6 rounded-xl bg-surface border border-border shadow-xs space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3.5 border-b border-border">
           <div>
             <h2 className="text-sm sm:text-base font-semibold tracking-tight text-ink">
-              Chuỗi xử lý lô — Từ nguyên liệu đến xuất kho
+              Giám sát tình trạng kiểm nghiệm lô sản phẩm
             </h2>
             <p className="text-xs text-ink-muted mt-0.5">
-              Số lượng lô thực tế phân bổ tại mỗi công đoạn GMP
+              Phân bổ số lượng lô theo tiến độ kiểm nghiệm và trạng thái chất lượng
             </p>
           </div>
-          <Link
-            to="/batches"
-            className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-600 dark:text-emerald-400 hover:underline"
-          >
-            <Square3Stack3DIcon className="w-4 h-4" /> Xem chi tiết danh sách lô &rarr;
-          </Link>
+          <div className="flex items-center gap-3">
+            <Link
+              to="/quality/comparison"
+              className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-600 dark:text-emerald-400 hover:underline"
+            >
+              <ArrowsRightLeftIcon className="w-4 h-4" /> Đối chiếu Lab &rarr;
+            </Link>
+            <Link
+              to="/reports/trend-analysis"
+              className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-600 dark:text-emerald-400 hover:underline"
+            >
+              <ArrowTrendingUpIcon className="w-4 h-4" /> Xu hướng chất lượng &rarr;
+            </Link>
+          </div>
         </div>
 
-        {/* Pipeline Nodes */}
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3.5">
+        {/* Quality Stages */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
           {/* Stage 1 */}
           <div className="p-3.5 rounded-xl bg-surface-2/60 border border-border text-center flex flex-col items-center hover:bg-surface-2 transition-colors">
-            <div className="w-9 h-9 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center mb-2">
-              <CubeIcon className="w-4 h-4" />
+            <div className="w-9 h-9 rounded-lg bg-sky-500/10 text-sky-600 dark:text-sky-400 flex items-center justify-center mb-2">
+              <ClockIcon className="w-4 h-4" />
             </div>
-            <div className="text-lg font-bold text-ink tabular-nums">{pipelineStages.pending}</div>
-            <div className="text-xs font-semibold text-ink mt-0.5">Nguyên liệu</div>
-            <div className="text-[11px] text-ink-muted">Chờ cấp phép</div>
+            <div className="text-lg font-bold text-ink tabular-nums">{stats.pendingBatches}</div>
+            <div className="text-xs font-semibold text-ink mt-0.5">Chờ tiếp nhận</div>
+            <div className="text-[11px] text-ink-muted">Chưa phát sinh phiếu</div>
           </div>
 
           {/* Stage 2 */}
           <div className="p-3.5 rounded-xl bg-surface-2/60 border border-border text-center flex flex-col items-center hover:bg-surface-2 transition-colors">
-            <div className="w-9 h-9 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center mb-2">
-              <ArrowTrendingUpIcon className="w-4 h-4" />
+            <div className="w-9 h-9 rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center mb-2">
+              <ClipboardDocumentCheckIcon className="w-4 h-4" />
             </div>
-            <div className="text-lg font-bold text-ink tabular-nums">
-              {pipelineStages.production}
-            </div>
-            <div className="text-xs font-semibold text-ink mt-0.5">Sản xuất</div>
-            <div className="text-[11px] text-ink-muted">Đang pha chế</div>
+            <div className="text-lg font-bold text-ink tabular-nums">{stats.testingBatches}</div>
+            <div className="text-xs font-semibold text-ink mt-0.5">Đang kiểm nghiệm</div>
+            <div className="text-[11px] text-ink-muted">Phòng Lab thực hiện</div>
           </div>
 
           {/* Stage 3 */}
           <div className="p-3.5 rounded-xl bg-surface-2/60 border border-border text-center flex flex-col items-center hover:bg-surface-2 transition-colors">
-            <div className="w-9 h-9 rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center mb-2">
-              <ClipboardDocumentCheckIcon className="w-4 h-4" />
+            <div className="w-9 h-9 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center mb-2">
+              <CheckBadgeIcon className="w-4 h-4" />
             </div>
-            <div className="text-lg font-bold text-ink tabular-nums">{pipelineStages.testing}</div>
-            <div className="text-xs font-semibold text-ink mt-0.5">Kiểm nghiệm</div>
-            <div className="text-[11px] text-ink-muted">Phòng Lab QC</div>
+            <div className="text-lg font-bold text-ink tabular-nums">{stats.releasedBatches}</div>
+            <div className="text-xs font-semibold text-ink mt-0.5">Đạt tiêu chuẩn</div>
+            <div className="text-[11px] text-ink-muted">Kết quả phù hợp TCCS</div>
           </div>
 
           {/* Stage 4 */}
           <div className="p-3.5 rounded-xl bg-surface-2/60 border border-border text-center flex flex-col items-center hover:bg-surface-2 transition-colors">
-            <div className="w-9 h-9 rounded-lg bg-sky-500/10 text-sky-600 dark:text-sky-400 flex items-center justify-center mb-2">
-              <DocumentTextIcon className="w-4 h-4" />
+            <div className="w-9 h-9 rounded-lg bg-rose-500/10 text-rose-600 dark:text-rose-400 flex items-center justify-center mb-2">
+              <ShieldExclamationIcon className="w-4 h-4" />
             </div>
-            <div className="text-lg font-bold text-ink tabular-nums">{pipelineStages.review}</div>
-            <div className="text-xs font-semibold text-ink mt-0.5">Phê duyệt</div>
-            <div className="text-[11px] text-ink-muted">Chờ QA duyệt</div>
-          </div>
-
-          {/* Stage 5 */}
-          <div className="p-3.5 rounded-xl bg-surface-2/60 border border-border text-center flex flex-col items-center col-span-2 sm:col-span-1 hover:bg-surface-2 transition-colors">
-            <div className="w-9 h-9 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center mb-2">
-              <CheckBadgeIcon className="w-4 h-4" />
-            </div>
-            <div className="text-lg font-bold text-ink tabular-nums">{pipelineStages.exported}</div>
-            <div className="text-xs font-semibold text-ink mt-0.5">Xuất kho</div>
-            <div className="text-[11px] text-ink-muted">Đạt chuẩn phát hành</div>
+            <div className="text-lg font-bold text-ink tabular-nums">{stats.rejectedBatches}</div>
+            <div className="text-xs font-semibold text-ink mt-0.5">Không đạt / Cảnh báo</div>
+            <div className="text-[11px] text-ink-muted">Chỉ tiêu OOS / Lệch chuẩn</div>
           </div>
         </div>
       </div>

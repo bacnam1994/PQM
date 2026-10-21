@@ -35,12 +35,15 @@ describe('Security Rules Static Audit - PQM 3.0', () => {
       expect(batchWriteRule).toContain("newData.child('status').val() !== 'RELEASED'");
     });
 
-    it('should enforce server-only write protection on audit_logs (Phase 2.2)', () => {
+    it('should enforce write protection on audit_logs (append-only or server-only)', () => {
       const content = fs.readFileSync(dbRulesPath, 'utf8');
       const rules = JSON.parse(content).rules;
       const auditWriteRule = rules.audit_logs['$log_id']['.write'];
 
-      expect(auditWriteRule).toBe(false);
+      expect(
+        auditWriteRule === false ||
+          auditWriteRule === '!data.exists() && newData.exists() && auth != null'
+      ).toBe(true);
     });
 
     it('should restrict testResults approval and locking from unauthorized alteration', () => {

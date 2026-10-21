@@ -59,7 +59,7 @@ export function useQAQCActionQueue(): QAQCActionQueueReturn {
         type: 'BATCH_CLEARANCE',
         urgency: b.status === 'TESTING' ? 'HIGH' : 'MEDIUM',
         title: `Lô ${b.batchNo} — ${prod?.name || 'Sản phẩm'}`,
-        subtitle: `Trạng thái: ${b.status} | Đang chờ QA/QC thẩm định hồ sơ xuất xưởng`,
+        subtitle: `Trạng thái: ${b.status} | Đang theo dõi tiến độ kiểm nghiệm chất lượng`,
         link: `/batches/${b.id}`,
         timestamp: b.createdAt,
         tagText: b.status === 'TESTING' ? 'Chờ kiểm nghiệm' : 'Chờ bắt đầu',

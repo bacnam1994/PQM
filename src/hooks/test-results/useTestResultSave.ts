@@ -25,6 +25,7 @@ import {
   resolveCanonicalLab,
   DEFAULT_TESTING_LABORATORIES,
 } from '../../services/laboratoryService';
+import { normalizeName } from '../../services/criteriaAliasService';
 
 interface ExtraTestResultEntry extends TestResultEntry {
   limit?: string;
@@ -95,6 +96,36 @@ export const useTestResultSave = ({
           setIsSubmitting(false);
           return notify({ type: 'WARNING', message: 'Ngày kiểm nghiệm không được để trống!' });
         }
+
+        // Phát hiện phiếu trùng (Duplicate Test Result Detection)
+        if (crud.mode !== 'EDIT' && existingResultsForBatch && existingResultsForBatch.length > 0) {
+          const isDuplicate = existingResultsForBatch.some((existing: any) => {
+            if (
+              rawReportNo &&
+              existing.reportNo &&
+              existing.reportNo.trim().toLowerCase() === rawReportNo.trim().toLowerCase()
+            ) {
+              return true;
+            }
+            if (
+              existing.labName?.trim().toLowerCase() === finalLabName.trim().toLowerCase() &&
+              existing.testDate === testDate
+            ) {
+              return true;
+            }
+            return false;
+          });
+
+          if (isDuplicate) {
+            setIsSubmitting(false);
+            return notify({
+              type: 'ERROR',
+              title: 'Phiếu kiểm nghiệm trùng lặp',
+              message: `Đã tồn tại phiếu kiểm nghiệm từ "${finalLabName}" ngày ${testDate} hoặc trùng số hiệu "${rawReportNo || finalReportNo}" cho lô này!`,
+            });
+          }
+        }
+
         let results: TestResultEntry[] = [];
 
         if (activeTCCS) {
@@ -216,6 +247,20 @@ export const useTestResultSave = ({
             results.push(newEntry);
           }
         });
+
+        // Ngăn ghi trùng chỉ tiêu (Criteria Deduplication)
+        const seenCriteria = new Set<string>();
+        const uniqueResults: TestResultEntry[] = [];
+        for (const r of results) {
+          const normKey = normalizeName(r.criteriaName);
+          if (!seenCriteria.has(normKey)) {
+            seenCriteria.add(normKey);
+            uniqueResults.push(r);
+          } else {
+            console.warn(`[Ingestion Pipeline] Ngăn ghi trùng chỉ tiêu: ${r.criteriaName}`);
+          }
+        }
+        results = uniqueResults;
 
         if (results.length === 0) {
           setIsSubmitting(false);
@@ -363,8 +408,13 @@ export const useTestResultSave = ({
           );
         }
 
+        const targetProductId = currentBatch?.productId || activeTCCS?.productId;
+        const targetTccsId = activeTCCS?.id;
+
         const resultData: any = {
           batchId: formValues.batchId,
+          productId: targetProductId,
+          tccsId: targetTccsId,
           reportNo: finalReportNo,
           labName: finalLabName,
           testDate: (formData.get('testDate') as string) || formValues.testDate,
@@ -376,6 +426,18 @@ export const useTestResultSave = ({
         if (finalLabId) {
           resultData.labId = finalLabId;
         }
+
+        // Tạo niêm phong EvaluationSnapshot ALCOA+
+        const evaluationSnapshot = QualityEvaluationEngine.evaluate(
+          {
+            ...resultData,
+            id: crud.selectedItem?.id || 'temp-eval-id',
+          },
+          activeTCCS,
+          user
+        );
+        resultData.evaluationSnapshot = evaluationSnapshot;
+        resultData.evaluationHash = evaluationSnapshot.evaluationHash;
 
         if (crud.mode === 'EDIT' && crud.selectedItem) {
           const { batch, product, ...cleanResult } = crud.selectedItem as any;

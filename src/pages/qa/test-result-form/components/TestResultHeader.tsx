@@ -1,12 +1,12 @@
 import React from 'react';
-import { 
-  ArrowLeftIcon, 
-  ArrowPathIcon, 
-  CloudIcon, 
-  DocumentDuplicateIcon, 
-  ScaleIcon, 
-  InformationCircleIcon, 
-  XMarkIcon 
+import {
+  ArrowLeftIcon,
+  ArrowPathIcon,
+  CloudIcon,
+  DocumentDuplicateIcon,
+  ScaleIcon,
+  InformationCircleIcon,
+  XMarkIcon,
 } from '@heroicons/react/24/outline';
 import { VoiceInputButton } from '../../../../components/features/VoiceInputButton';
 import { ParsedVoiceCriteria } from '../../../../services/ai/voiceParserService';
@@ -67,7 +67,7 @@ export const TestResultHeader: React.FC<TestResultHeaderProps> = ({
           type="file"
           ref={fileInputRef}
           className="hidden"
-          accept="image/*,application/pdf"
+          accept="image/*,application/pdf,.xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
           multiple
           onChange={onAiFileSelect}
         />
@@ -93,7 +93,11 @@ export const TestResultHeader: React.FC<TestResultHeaderProps> = ({
           onClick={onOpenGDScan}
           className="flex items-center gap-1.5 px-3 py-1.5 bg-surface text-ink-soft hover:bg-surface-2 rounded-lg font-medium text-xs border border-border shadow-xs transition-all disabled:opacity-50 cursor-pointer"
         >
-          {isAiProcessing ? <ArrowPathIcon className="w-4 h-4 animate-spin text-emerald-600" /> : <CloudIcon className="w-4 h-4 text-emerald-600" />}
+          {isAiProcessing ? (
+            <ArrowPathIcon className="w-4 h-4 animate-spin text-emerald-600" />
+          ) : (
+            <CloudIcon className="w-4 h-4 text-emerald-600" />
+          )}
           Quét Google Drive
         </button>
 
@@ -103,8 +107,12 @@ export const TestResultHeader: React.FC<TestResultHeaderProps> = ({
           onClick={() => fileInputRef.current?.click()}
           className="flex items-center gap-1.5 px-3.5 py-1.5 bg-emerald-600 text-white rounded-lg font-medium text-xs hover:bg-emerald-700 shadow-xs transition-all disabled:opacity-50 cursor-pointer"
         >
-          {isAiProcessing ? <ArrowPathIcon className="w-4 h-4 animate-spin" /> : <DocumentDuplicateIcon className="w-4 h-4" />}
-          {isAiProcessing ? 'Đang trích xuất...' : 'Nhập dữ liệu bằng AI'}
+          {isAiProcessing ? (
+            <ArrowPathIcon className="w-4 h-4 animate-spin" />
+          ) : (
+            <DocumentDuplicateIcon className="w-4 h-4" />
+          )}
+          {isAiProcessing ? 'Đang trích xuất...' : 'Tải PDF/Excel/Ảnh'}
         </button>
       </div>
 
@@ -113,7 +121,10 @@ export const TestResultHeader: React.FC<TestResultHeaderProps> = ({
           <InformationCircleIcon className="w-5 h-5 text-emerald-600 flex-shrink-0 mt-0.5" />
           <div className="flex-1 min-w-0">
             <p className="text-xs font-bold text-emerald-700 dark:text-emerald-400 uppercase tracking-wider">
-              Kết quả AI Scan {aiScanInfo.fileCount && aiScanInfo.fileCount > 1 ? `– Đã đọc ${aiScanInfo.fileCount} file` : ''}
+              Kết quả AI Scan{' '}
+              {aiScanInfo.fileCount && aiScanInfo.fileCount > 1
+                ? `– Đã đọc ${aiScanInfo.fileCount} file`
+                : ''}
             </p>
             <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1">
               {aiScanInfo.documentType && (

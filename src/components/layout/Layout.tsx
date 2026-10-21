@@ -20,6 +20,8 @@ import {
   Square3Stack3DIcon,
   ClipboardDocumentCheckIcon,
   BuildingOffice2Icon,
+  ScaleIcon,
+  PlusCircleIcon,
   ExclamationTriangleIcon,
   ArrowPathRoundedSquareIcon,
   BellIcon,
@@ -120,36 +122,48 @@ interface NavGroup {
 }
 
 const navItems: NavGroup[] = [
-  { name: 'Bảng điều khiển', path: '/', icon: Squares2X2Icon },
+  { name: 'Tổng quan chất lượng', path: '/', icon: Squares2X2Icon },
   {
-    name: 'Danh mục',
+    name: 'Danh mục sản phẩm',
     icon: CubeIcon,
     children: [
       { name: 'Sản phẩm', path: '/products', icon: CubeIcon },
       { name: 'Nguyên liệu', path: '/materials', icon: CircleStackIcon },
-      { name: 'Chỉ tiêu', path: '/criteria', icon: AdjustmentsHorizontalIcon },
-      { name: 'Đơn vị kiểm nghiệm', path: '/laboratories', icon: BuildingOffice2Icon },
     ],
   },
   {
-    name: 'Hồ sơ',
+    name: 'Tiêu chuẩn chất lượng',
     icon: DocumentTextIcon,
     children: [
       { name: 'Hồ sơ TCCS', path: '/tccs', icon: DocumentTextIcon },
+      { name: 'Chỉ tiêu kiểm nghiệm', path: '/criteria', icon: AdjustmentsHorizontalIcon },
       { name: 'Công thức sản phẩm', path: '/product-formulas', icon: BeakerIcon },
     ],
   },
   {
-    name: 'Nghiệp vụ',
-    icon: Square3Stack3DIcon,
+    name: 'Phiếu kiểm nghiệm',
+    icon: ClipboardDocumentCheckIcon,
     children: [
-      { name: 'Quản lý Lô', path: '/batches', icon: Square3Stack3DIcon },
-      { name: 'Phiếu kiểm nghiệm', path: '/test-results', icon: ClipboardDocumentCheckIcon },
-      { name: 'Quản lý Sai lệch (CAPA)', path: '/deviations', icon: ExclamationTriangleIcon },
-      { name: 'Quản lý Thay đổi (CR)', path: '/change-control', icon: ArrowPathRoundedSquareIcon },
+      { name: 'Danh sách phiếu', path: '/test-results', icon: ClipboardDocumentCheckIcon },
+      { name: 'Nhập phiếu mới', path: '/test-results/new', icon: PlusCircleIcon },
+      { name: 'Đơn vị kiểm nghiệm', path: '/laboratories', icon: BuildingOffice2Icon },
+    ],
+  },
+  {
+    name: 'So sánh & Xu hướng',
+    icon: ChartBarIcon,
+    children: [
+      { name: 'Đối chiếu Lab (Nội/Ngoại)', path: '/quality/comparison', icon: ScaleIcon },
+      { name: 'Phân tích xu hướng (SPC)', path: '/reports/trend-analysis', icon: ChartBarIcon },
+      { name: 'Theo dõi theo Lô', path: '/batches', icon: Square3Stack3DIcon },
       { name: 'Cảnh báo chất lượng', path: '/alerts', icon: BellIcon, isAlerts: true },
+    ],
+  },
+  {
+    name: 'Báo cáo',
+    icon: DocumentChartBarIcon,
+    children: [
       { name: 'Báo cáo tổng hợp', path: '/reports/quality-summary', icon: DocumentChartBarIcon },
-      { name: 'Phân tích xu hướng', path: '/reports/trend-analysis', icon: ChartBarIcon },
     ],
   },
   {
@@ -157,8 +171,8 @@ const navItems: NavGroup[] = [
     icon: Cog6ToothIcon,
     children: [
       { name: 'Người dùng', path: '/users', icon: UsersIcon, adminOnly: true },
+      { name: 'Từ điển chỉ tiêu OCR', path: '/criteria-aliases', icon: LinkIcon, adminOnly: true },
       { name: 'Nhật ký kiểm toán', path: '/audit-logs', icon: ShieldCheckIcon, adminOnly: true },
-      { name: 'Liên kết chỉ tiêu', path: '/criteria-aliases', icon: LinkIcon, adminOnly: true },
       { name: 'Cấu hình', path: '/settings', icon: Cog6ToothIcon },
     ],
   },

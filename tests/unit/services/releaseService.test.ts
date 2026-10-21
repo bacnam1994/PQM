@@ -121,6 +121,7 @@ describe('ReleaseService Unit Tests', () => {
           testResults: [mockPassingTestResult],
           currentUser: { email: 'qa@pqm.com', role: 'QA' },
           boundTccs: mockTccs,
+          requireSignature: true,
         })
       ).rejects.toThrow('Yêu cầu chữ ký điện tử hợp lệ của QA');
     });

@@ -80,6 +80,7 @@ export interface ResolveBatchReleaseDecisionParams {
   dataFreshness?: DataFreshnessState;
   /** Cờ chỉ dùng cho Preview giao diện (không được dùng trong production mutation) */
   isPreview?: boolean;
+  requireSignature?: boolean;
 }
 
 export class BatchReleaseDecisionService {
@@ -579,9 +580,16 @@ export class BatchReleaseDecisionService {
       blockers.push(msg);
     }
 
-    // Tùy chọn xác thực chữ ký điện tử nếu có truyền vào
+    const requireSignature = params.requireSignature ?? false;
+
     let signaturePassed = true;
-    if (userSignature) {
+    if (requireSignature && !userSignature) {
+      signaturePassed = false;
+      const msg =
+        'ERR_SIGNATURE_MISSING: Thiếu chữ ký điện tử 21 CFR Part 11 của QA/Admin phê duyệt xuất xưởng.';
+      gate7Blockers.push(msg);
+      blockers.push(msg);
+    } else if (userSignature) {
       // a. Document Type check (Chỉ chấp nhận BATCH_RELEASE)
       const docType = userSignature.documentType;
       if (docType !== 'BATCH_RELEASE') {
@@ -731,7 +739,10 @@ export class BatchReleaseDecisionService {
     const eligible = allGatesPassed && blockers.length === 0;
     const gates1To6Passed = gates.slice(0, 6).every((g) => g.passed);
     const readyForSignature =
-      gates1To6Passed && blockers.length === 0 && batch.status !== 'RELEASED';
+      gates1To6Passed &&
+      (blockers.length === 0 ||
+        (blockers.length === 1 && blockers[0].includes('ERR_SIGNATURE_MISSING'))) &&
+      batch.status !== 'RELEASED';
 
     decisionTrace.push(
       `[DECISION] Kết luận: ${eligible ? 'ĐỦ ĐIỀU KIỆN (ELIGIBLE)' : 'KHÔNG ĐỦ ĐIỀU KIỆN (BLOCKED)'}. Số rào cản: ${blockers.length}. Sẵn sàng ký: ${readyForSignature}.`
@@ -750,7 +761,7 @@ export class BatchReleaseDecisionService {
       gates,
       blockers: Array.from(new Set(blockers)),
       warnings: Array.from(new Set(warnings)),
-      requiredSignature: false,
+      requiredSignature: requireSignature,
       requiredRole: ['ADMIN', 'QA'],
       dataFreshness,
       decisionTrace,

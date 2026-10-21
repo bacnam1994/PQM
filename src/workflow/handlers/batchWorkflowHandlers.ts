@@ -340,12 +340,16 @@ export class BatchWorkflowHandlers {
       throw new Error(`Quy chuẩn State Machine: ${transitionCheck.reason}`);
     }
 
-    // 5. Chữ ký số 21 CFR Part 11 đối với BATCH_REJECT & BATCH_RECALL
-    if (actionId === 'BATCH_REJECT' || actionId === 'BATCH_RECALL') {
-      if (options?.requireSignature || options?.signature) {
+    // 5. Chữ ký số 21 CFR Part 11 đối với BATCH_RELEASE_APPROVE, BATCH_REJECT & BATCH_RECALL
+    if (
+      actionId === 'BATCH_RELEASE_APPROVE' ||
+      actionId === 'BATCH_REJECT' ||
+      actionId === 'BATCH_RECALL'
+    ) {
+      if (options?.requireSignature) {
         if (!options?.signature) {
           throw new Error(
-            `Quy định 21 CFR Part 11: Yêu cầu chữ ký điện tử hợp lệ của QA/Admin trước khi thực hiện ${actionId}.`
+            `Yêu cầu chữ ký điện tử hợp lệ của QA / Admin trước khi thực hiện ${actionId}.`
           );
         }
         if (options.signature.documentId !== batchId) {

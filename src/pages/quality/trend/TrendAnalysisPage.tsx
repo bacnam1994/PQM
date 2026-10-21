@@ -1,9 +1,9 @@
 import React from 'react';
-import { 
-  ArrowTrendingUpIcon, 
-  ArrowDownTrayIcon, 
-  ChartBarIcon, 
-  InformationCircleIcon 
+import {
+  ArrowTrendingUpIcon,
+  ArrowDownTrayIcon,
+  ChartBarIcon,
+  InformationCircleIcon,
 } from '@heroicons/react/24/outline';
 import { PageHeader, DSCard } from '../../../components';
 import { Surface } from '../../../components/ui';
@@ -87,20 +87,30 @@ export const TrendAnalysisPage: React.FC = () => {
       {!state.loading && !state.selectedProductId && (
         <Surface variant="flat" padding="lg" className="text-center py-12">
           <ChartBarIcon className="w-12 h-12 text-ink-muted mx-auto mb-3" />
-          <p className="text-ink font-bold text-base">Chọn một sản phẩm để bắt đầu phân tích xu hướng SPC</p>
+          <p className="text-ink font-bold text-base">
+            Chọn một sản phẩm để bắt đầu phân tích xu hướng SPC
+          </p>
           <p className="text-ink-muted text-xs mt-1.5 max-w-md mx-auto leading-relaxed">
-            Hệ thống sẽ tự động tổng hợp kết quả kiểm nghiệm, tính toán năng lực quy trình Cpk, giới hạn kiểm soát 3σ (UCL, LCL) và dự báo độ ổn định theo thời gian bảo quản.
+            Hệ thống sẽ tự động tổng hợp kết quả kiểm nghiệm, tính toán năng lực quy trình Cpk, giới
+            hạn kiểm soát 3σ (UCL, LCL) và dự báo độ ổn định theo thời gian bảo quản.
           </p>
         </Surface>
       )}
 
-      {!state.loading && state.selectedProductId && state.selectedCriteriaName && state.chartData.length === 0 && (
-        <Surface variant="flat" padding="lg" className="text-center py-12">
-          <InformationCircleIcon className="w-10 h-10 text-ink-muted mx-auto mb-3" />
-          <p className="text-ink font-bold">Chưa có dữ liệu định lượng cho chỉ tiêu: &quot;{state.selectedCriteriaName}&quot;</p>
-          <p className="text-ink-muted text-xs mt-1">Vui lòng chọn chỉ tiêu khác hoặc kiểm tra lại phiếu kiểm nghiệm của sản phẩm này.</p>
-        </Surface>
-      )}
+      {!state.loading &&
+        state.selectedProductId &&
+        state.selectedCriteriaName &&
+        state.chartData.length === 0 && (
+          <Surface variant="flat" padding="lg" className="text-center py-12">
+            <InformationCircleIcon className="w-10 h-10 text-ink-muted mx-auto mb-3" />
+            <p className="text-ink font-bold">
+              Chưa có dữ liệu định lượng cho chỉ tiêu: &quot;{state.selectedCriteriaName}&quot;
+            </p>
+            <p className="text-ink-muted text-xs mt-1">
+              Vui lòng chọn chỉ tiêu khác hoặc kiểm tra lại phiếu kiểm nghiệm của sản phẩm này.
+            </p>
+          </Surface>
+        )}
 
       {/* Khi có đủ từ 2 điểm dữ liệu trở lên */}
       {!state.loading && state.chartData.length >= 2 && state.spcStats && (
@@ -136,11 +146,16 @@ export const TrendAnalysisPage: React.FC = () => {
         </>
       )}
 
-      {!state.loading && state.chartData.length === 1 && (
+      {!state.loading && state.chartData.length > 0 && !state.spcStats && (
         <Surface variant="flat" padding="md" className="text-center py-8">
           <InformationCircleIcon className="w-8 h-8 text-amber-500 mx-auto mb-2" />
-          <p className="text-ink font-semibold text-sm">Cần ít nhất 2 điểm dữ liệu để tính toán SPC</p>
-          <p className="text-ink-muted text-xs mt-1">Hiện có 1 lô: <strong>{state.chartData[0].batchNo}</strong> = {state.chartData[0].value}</p>
+          <p className="text-ink font-semibold text-sm">
+            Chưa đủ điều kiện thống kê để tính chỉ số SPC
+          </p>
+          <p className="text-ink-muted text-xs mt-1">
+            Cần tối thiểu 3 lô sản xuất và phương sai khác 0 để thiết lập giới hạn kiểm soát thống
+            kê (Hiện có {state.chartData.length} điểm dữ liệu).
+          </p>
         </Surface>
       )}
     </div>

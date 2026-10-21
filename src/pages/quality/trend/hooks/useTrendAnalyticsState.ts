@@ -353,7 +353,14 @@ export const useTrendAnalyticsState = () => {
         [...batchResults]
           .sort((a: any, b: any) => a.testDate.localeCompare(b.testDate))
           .forEach((r: any) => {
-            (r.results || []).forEach((entry: any) => {
+            (r.results || []).forEach((rawEntry: any) => {
+              const entry = {
+                ...rawEntry,
+                testResultId: r.id,
+                labName: r.labName,
+                testDate: r.testDate,
+                reportNo: r.reportNo,
+              };
               if (entry?.criteriaName) {
                 const canonicalKey = normalizeName(resolver.resolve(entry.criteriaName));
                 map.set(canonicalKey, entry);
@@ -404,12 +411,33 @@ export const useTrendAnalyticsState = () => {
             ? (value / declaredBasis) * 100
             : null;
         return value !== null
-          ? { batchNo: batch.batchNo, mfgDate: batch.mfgDate, value, percent }
+          ? {
+              batchId: batch.id,
+              batchNo: batch.batchNo,
+              mfgDate: batch.mfgDate,
+              testResultId: entry?.testResultId,
+              labName: entry?.labName,
+              testDate: entry?.testDate,
+              reportNo: entry?.reportNo,
+              criteriaName: entry?.criteriaName,
+              unit: entry?.unit,
+              rawValue: entry?.value,
+              value,
+              percent,
+            }
           : null;
       })
       .filter(Boolean) as {
+      batchId: string;
       batchNo: string;
       mfgDate: string;
+      testResultId?: string;
+      labName?: string;
+      testDate?: string;
+      reportNo?: string;
+      criteriaName?: string;
+      unit?: string;
+      rawValue?: string | number;
       value: number;
       percent: number | null;
     }[];
@@ -427,10 +455,11 @@ export const useTrendAnalyticsState = () => {
 
   const spcStats = useMemo(() => {
     const vals = chartData.map((d) => d.value).filter((v) => typeof v === 'number' && !isNaN(v));
-    if (vals.length < 2) return null;
+    // Giả định thống kê SPC: Cần ít nhất 3 lô và có phương sai (std > 0)
+    if (vals.length < 3) return null;
     const mean = calcMean(vals);
     const std = calcStdDev(vals, mean);
-    if (isNaN(mean) || isNaN(std)) return null;
+    if (isNaN(mean) || isNaN(std) || std === 0) return null;
     const ucl = mean + 3 * std;
     const lcl = mean - 3 * std;
     const rawUsl =
