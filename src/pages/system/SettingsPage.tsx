@@ -55,13 +55,18 @@ import { ProductFormula, FormulaIngredient } from '../../types';
 import { useUIStore } from '../../store/useUIStore';
 import { resetConsent } from '../../hooks/useCookieConsent';
 import { useShallow } from 'zustand/react/shallow';
-import { AVAILABLE_GEMINI_MODELS, DEFAULT_GEMINI_MODEL } from '../../constants/aiModels';
+import {
+  AVAILABLE_GEMINI_MODELS,
+  DEFAULT_GEMINI_MODEL,
+  getValidGeminiModel,
+} from '../../constants/aiModels';
 import { AIBackendClient } from '../../services/ai/aiBackendClient';
 import {
   testClientGeminiConnection,
   saveClientApiKey,
   clearClientApiKey,
   getApiKey as getClientApiKey,
+  getGeminiModel,
 } from '../../services/ai/geminiService';
 
 /** Panel hiển thị trạng thái bộ lọc đã lưu và cho phép reset từng trang */
@@ -504,16 +509,15 @@ const SettingsPage: React.FC = () => {
   };
 
   // ─── AI Model and Thinking Mode States ──────────────────────────────
-  const [defaultModel, setDefaultModel] = useState(
-    () => localStorage.getItem('GEMINI_MODEL') || DEFAULT_GEMINI_MODEL
-  );
+  const [defaultModel, setDefaultModel] = useState(() => getGeminiModel());
   const [isThinkingEnabled, setIsThinkingEnabled] = useState(
     () => localStorage.getItem('GEMINI_THINKING_ENABLED') !== 'false'
   );
 
   const handleSaveModel = (model: string) => {
-    setDefaultModel(model);
-    localStorage.setItem('GEMINI_MODEL', model);
+    const valid = getValidGeminiModel(model);
+    setDefaultModel(valid);
+    localStorage.setItem('GEMINI_MODEL', valid);
   };
 
   const handleToggleThinking = (enabled: boolean) => {
@@ -1080,15 +1084,15 @@ const SettingsPage: React.FC = () => {
                 onChange={(e) => handleSaveModel(e.target.value)}
                 className="w-full p-2.5 bg-surface-2 border border-border rounded-xl font-semibold text-ink text-xs outline-none focus:ring-2 focus:ring-emerald-500/20 cursor-pointer"
               >
-                <optgroup label="⚡ Gemini 2.5 (Tiêu chuẩn)">
-                  {AVAILABLE_GEMINI_MODELS.filter((m) => m.group.includes('2.5')).map((m) => (
+                <optgroup label="⚡ Gemini 3.8 (Tiêu chuẩn mới & Mặc định)">
+                  {AVAILABLE_GEMINI_MODELS.filter((m) => m.group === 'Gemini 3.8').map((m) => (
                     <option key={m.id} value={m.id}>
                       {m.badge}
                     </option>
                   ))}
                 </optgroup>
-                <optgroup label="📦 Gemini 2.0 (Tương thích)">
-                  {AVAILABLE_GEMINI_MODELS.filter((m) => m.group.includes('2.0')).map((m) => (
+                <optgroup label="📦 Mô hình tiền nhiệm (Legacy)">
+                  {AVAILABLE_GEMINI_MODELS.filter((m) => m.group !== 'Gemini 3.8').map((m) => (
                     <option key={m.id} value={m.id}>
                       {m.badge}
                     </option>

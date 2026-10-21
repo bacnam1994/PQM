@@ -17,6 +17,8 @@ import {
   formatGeminiError,
   AVAILABLE_GEMINI_MODELS,
   DEFAULT_GEMINI_MODEL,
+  getGeminiModel,
+  getValidGeminiModel,
 } from '../../services/ai/geminiService';
 import { buildExtractionPrompt } from '../../services/ai/prompts';
 import { useMasterCriteriaActiveQuery } from '../../hooks/queries/useMasterCriterionQueries';
@@ -135,9 +137,7 @@ export const AIAssistantChat: React.FC<AIAssistantChatProps> = ({
   const [isCreatingBatch, setIsCreatingBatch] = useState(false);
   const [chatInputText, setChatInputText] = useState('');
   const [showConfig, setShowConfig] = useState(false);
-  const [currentModel, setCurrentModel] = useState(
-    () => localStorage.getItem('GEMINI_MODEL') || DEFAULT_GEMINI_MODEL
-  );
+  const [currentModel, setCurrentModel] = useState(() => getGeminiModel());
   const [thinkingEnabled, setThinkingEnabled] = useState(
     () => localStorage.getItem('GEMINI_THINKING_ENABLED') === 'true'
   );
@@ -403,10 +403,11 @@ export const AIAssistantChat: React.FC<AIAssistantChatProps> = ({
   ]);
 
   const handleModelChange = (model: string) => {
-    setCurrentModel(model);
-    localStorage.setItem('GEMINI_MODEL', model);
-    const mInfo = AVAILABLE_GEMINI_MODELS.find((m) => m.id === model);
-    toast.success(`Đã chuyển sang mô hình ${mInfo?.name || model}`);
+    const validModel = getValidGeminiModel(model);
+    setCurrentModel(validModel);
+    localStorage.setItem('GEMINI_MODEL', validModel);
+    const mInfo = AVAILABLE_GEMINI_MODELS.find((m) => m.id === validModel);
+    toast.success(`Đã chuyển sang mô hình ${mInfo?.name || validModel}`);
   };
 
   const handleThinkingToggle = (enabled: boolean) => {
@@ -896,7 +897,7 @@ export const AIAssistantChat: React.FC<AIAssistantChatProps> = ({
           parts: [{ text: m.text }],
         }));
 
-      const preferredModel = localStorage.getItem('GEMINI_MODEL') || 'gemini-2.5-flash';
+      const preferredModel = getGeminiModel();
       const sessionMemoryPrompt = user?.uid ? buildSessionMemoryPrompt(user.uid) : '';
       const sessionAtStart = useAIChatHostStore.getState().activeSessionId;
       useAIChatHostStore.getState().setIsProcessing(true);
@@ -1041,15 +1042,15 @@ export const AIAssistantChat: React.FC<AIAssistantChatProps> = ({
                 onChange={(e) => handleModelChange(e.target.value)}
                 className="bg-surface border border-border text-[10px] font-bold text-ink px-2 py-1 rounded-lg outline-none focus:ring-1 focus:ring-emerald-500 cursor-pointer shadow-xs max-w-[200px]"
               >
-                <optgroup label="⚡ Gemini 2.5 (Tiêu chuẩn)">
-                  {AVAILABLE_GEMINI_MODELS.filter((m) => m.group.includes('2.5')).map((m) => (
+                <optgroup label="⚡ Gemini 3.8 (Tiêu chuẩn mới & Mặc định)">
+                  {AVAILABLE_GEMINI_MODELS.filter((m) => m.group === 'Gemini 3.8').map((m) => (
                     <option key={m.id} value={m.id}>
                       {m.badge}
                     </option>
                   ))}
                 </optgroup>
-                <optgroup label="📦 Gemini 2.0">
-                  {AVAILABLE_GEMINI_MODELS.filter((m) => m.group.includes('2.0')).map((m) => (
+                <optgroup label="📦 Mô hình tiền nhiệm (Legacy)">
+                  {AVAILABLE_GEMINI_MODELS.filter((m) => m.group !== 'Gemini 3.8').map((m) => (
                     <option key={m.id} value={m.id}>
                       {m.badge}
                     </option>
@@ -1258,8 +1259,7 @@ export const AIAssistantChat: React.FC<AIAssistantChatProps> = ({
                         role: m.sender === 'user' ? 'user' : 'model',
                         parts: [{ text: m.text }],
                       }));
-                    const preferredModel =
-                      localStorage.getItem('GEMINI_MODEL') || 'gemini-2.5-flash';
+                    const preferredModel = getGeminiModel();
                     const aiResponse = await geminiService.chatWithAppContext(
                       chip.prompt,
                       appContextData,

@@ -7,6 +7,7 @@
 
 import { createGoogleGenerativeAI } from '../../../services/ai/geminiClientLoader';
 import { getApiKey, getGeminiModel, formatGeminiError } from '../../../services/ai/geminiService';
+import { FALLBACK_GEMINI_MODEL } from '../../../constants/aiModels';
 import { promptRegistry, PromptDefinition } from '../../../services/ai/promptRegistry';
 import { logAuditAction } from '../../../services/auditService';
 import { semanticCache } from '../../../services/ai/semanticCacheService';
@@ -14,7 +15,7 @@ import { AIBoundaryRules } from '../domain/rules';
 import { AIGatewayRequest, AIGatewayResponse } from '../domain/types';
 
 export class AIGatewayService {
-  private fallbackModel = 'gemini-2.0-flash';
+  private fallbackModel = FALLBACK_GEMINI_MODEL;
 
   /**
    * Tính toán điểm tin cậy chuẩn hóa (0.0 -> 1.0)
@@ -102,7 +103,6 @@ export class AIGatewayService {
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
       try {
         const generationConfig: any = {
-          temperature: request.options?.temperature ?? promptDef.temperature,
           responseMimeType: 'application/json',
         };
 
@@ -125,9 +125,16 @@ export class AIGatewayService {
         break; // Thành công
       } catch (err: any) {
         const msg = String(err?.message || '');
-        if ((msg.includes('429') || msg.includes('503')) && currentModel !== this.fallbackModel) {
+        const isFallbackTrigger =
+          msg.includes('404') ||
+          msg.includes('not found') ||
+          msg.includes('is not supported') ||
+          msg.includes('429') ||
+          msg.includes('503');
+
+        if (isFallbackTrigger && currentModel !== this.fallbackModel) {
           console.warn(
-            `[AIGateway] Model ${currentModel} quá tải. Chuyển sang fallback ${this.fallbackModel}...`
+            `[AIGateway] Model ${currentModel} gặp sự cố (${msg.includes('404') ? '404 Không tìm thấy' : 'Quá tải'}). Chuyển sang fallback ${this.fallbackModel}...`
           );
           currentModel = this.fallbackModel;
           continue;

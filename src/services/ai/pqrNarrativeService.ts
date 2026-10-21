@@ -35,16 +35,25 @@ export interface PQRExecutiveNarrative {
 export const generatePQRRuleBasedNarrative = (
   summary: PQRQualityMetricsSummary
 ): PQRExecutiveNarrative => {
-  const { periodLabel, productName, totalBatches, passedBatches, failedBatches, passRate, criteriaCpkList, totalOOSCount } = summary;
+  const {
+    periodLabel,
+    productName,
+    totalBatches,
+    passedBatches,
+    failedBatches,
+    passRate,
+    criteriaCpkList,
+    totalOOSCount,
+  } = summary;
   const prodTitle = productName ? `sản phẩm ${productName}` : 'toàn bộ các dòng sản phẩm';
 
   // 1. Tổng quan
   const overview = `Trong kỳ đánh giá (${periodLabel}), hệ thống ghi nhận tổng cộng ${totalBatches} lô ${prodTitle} đã được sản xuất và kiểm nghiệm. Tỷ lệ lô đạt tiêu chuẩn chất lượng xuất xưởng đạt ${passRate.toFixed(1)}% (${passedBatches}/${totalBatches} lô Đạt, ${failedBatches} lô Không Đạt). Quy trình sản xuất duy trì sự ổn định cơ bản theo tiêu chuẩn GMP.`;
 
   // 2. Đánh giá Cpk
-  const validCpkItems = criteriaCpkList.filter(c => c.cpk != null && !isNaN(c.cpk));
-  const capableCount = validCpkItems.filter(c => c.cpk! >= 1.33).length;
-  const lowCpkItems = validCpkItems.filter(c => c.cpk! < 1.33);
+  const validCpkItems = criteriaCpkList.filter((c) => c.cpk != null && !isNaN(c.cpk));
+  const capableCount = validCpkItems.filter((c) => c.cpk! >= 1.33).length;
+  const lowCpkItems = validCpkItems.filter((c) => c.cpk! < 1.33);
 
   let cpkText = '';
   if (validCpkItems.length === 0) {
@@ -52,7 +61,7 @@ export const generatePQRRuleBasedNarrative = (
   } else if (lowCpkItems.length === 0) {
     cpkText = `Năng lực quá trình (SPC) đạt mức lý tưởng: 100% (${capableCount}/${validCpkItems.length}) các chỉ tiêu định lượng có chỉ số Cpk ≥ 1.33. Biến thiên quá trình được kiểm soát chặt chẽ, không có dấu hiệu trôi dạt có hệ thống.`;
   } else {
-    cpkText = `Có ${capableCount}/${validCpkItems.length} chỉ tiêu đạt năng lực quá trình chuẩn (Cpk ≥ 1.33). Tuy nhiên, ghi nhận ${lowCpkItems.length} chỉ tiêu có Cpk < 1.33 (${lowCpkItems.map(c => `${c.name}: Cpk ${c.cpk?.toFixed(2)}`).join(', ')}), cần theo dõi sát các yếu tố biến thiên từ nguyên liệu đầu vào và thông số vận hành máy.`;
+    cpkText = `Có ${capableCount}/${validCpkItems.length} chỉ tiêu đạt năng lực quá trình chuẩn (Cpk ≥ 1.33). Tuy nhiên, ghi nhận ${lowCpkItems.length} chỉ tiêu có Cpk < 1.33 (${lowCpkItems.map((c) => `${c.name}: Cpk ${c.cpk?.toFixed(2)}`).join(', ')}), cần theo dõi sát các yếu tố biến thiên từ nguyên liệu đầu vào và thông số vận hành máy.`;
   }
 
   // 3. Sai lệch & OOS
@@ -75,7 +84,7 @@ export const generatePQRRuleBasedNarrative = (
     conclusionAndPlanSection: conclusion,
     fullNarrative: full,
     generatedAt: new Date().toISOString(),
-    isAiEnriched: false
+    isAiEnriched: false,
   };
 };
 
@@ -85,7 +94,8 @@ const PQR_NARRATIVE_SCHEMA = {
   properties: {
     overviewSection: {
       type: SchemaType.STRING,
-      description: 'Đoạn 1: Tổng quan tình hình sản xuất và tỷ lệ đạt trong kỳ báo cáo, hành văn chuẩn GMP',
+      description:
+        'Đoạn 1: Tổng quan tình hình sản xuất và tỷ lệ đạt trong kỳ báo cáo, hành văn chuẩn GMP',
     },
     cpkEvaluationSection: {
       type: SchemaType.STRING,
@@ -104,7 +114,13 @@ const PQR_NARRATIVE_SCHEMA = {
       description: 'Toàn văn ghép 4 đoạn lại thành báo cáo hoàn chỉnh',
     },
   },
-  required: ['overviewSection', 'cpkEvaluationSection', 'deviationSection', 'conclusionAndPlanSection', 'fullNarrative'],
+  required: [
+    'overviewSection',
+    'cpkEvaluationSection',
+    'deviationSection',
+    'conclusionAndPlanSection',
+    'fullNarrative',
+  ],
 } as const;
 
 /**
@@ -125,7 +141,7 @@ Số liệu thống kê chất lượng trong kỳ:
 - Kỳ báo cáo: ${summary.periodLabel}
 - Tên sản phẩm: ${summary.productName || 'Toàn bộ sản phẩm'}
 - Tổng số lô sản xuất: ${summary.totalBatches} lô (${summary.passedBatches} Đạt, ${summary.failedBatches} Hỏng, Tỷ lệ Đạt: ${summary.passRate.toFixed(1)}%)
-- Năng lực quá trình Cpk: ${summary.criteriaCpkList.map(c => `${c.name}: Cpk ${c.cpk != null ? c.cpk.toFixed(2) : 'N/A'}`).join('; ')}
+- Năng lực quá trình Cpk: ${summary.criteriaCpkList.map((c) => `${c.name}: Cpk ${c.cpk != null ? c.cpk.toFixed(2) : 'N/A'}`).join('; ')}
 - Số lượng sự cố OOS: ${summary.totalOOSCount} sự cố
 
 Hãy viết một bản Báo cáo Đánh giá Tổng thể Chất lượng (Executive Quality Conclusion) chuyên nghiệp, hành văn chuẩn mực ngành Dược gồm 4 phần:
@@ -140,16 +156,18 @@ Hãy viết một bản Báo cáo Đánh giá Tổng thể Chất lượng (Exec
       deviationSection: string;
       conclusionAndPlanSection: string;
       fullNarrative: string;
-    }>(prompt, PQR_NARRATIVE_SCHEMA, undefined, undefined, 0.3);
+    }>(prompt, PQR_NARRATIVE_SCHEMA);
 
     return {
       overviewSection: parsed.overviewSection || base.overviewSection,
       cpkEvaluationSection: parsed.cpkEvaluationSection || base.cpkEvaluationSection,
       deviationSection: parsed.deviationSection || base.deviationSection,
       conclusionAndPlanSection: parsed.conclusionAndPlanSection || base.conclusionAndPlanSection,
-      fullNarrative: parsed.fullNarrative || `${parsed.overviewSection}\n\n${parsed.cpkEvaluationSection}\n\n${parsed.deviationSection}\n\n${parsed.conclusionAndPlanSection}`,
+      fullNarrative:
+        parsed.fullNarrative ||
+        `${parsed.overviewSection}\n\n${parsed.cpkEvaluationSection}\n\n${parsed.deviationSection}\n\n${parsed.conclusionAndPlanSection}`,
       generatedAt: new Date().toISOString(),
-      isAiEnriched: true
+      isAiEnriched: true,
     };
   } catch (err) {
     console.warn('AI PQR enrichment error:', err);

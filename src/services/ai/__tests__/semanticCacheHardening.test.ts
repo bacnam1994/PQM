@@ -10,7 +10,7 @@ describe('Phase 3 — Semantic Cache Correctness & Identity Binding Tests', () =
     const queryV1 = {
       promptId: 'AI_ASSISTANT',
       promptVersion: 'prompt-v22',
-      model: 'gemini-2.5-flash',
+      model: 'gemini-3.8-flash',
       entityId: 'batch:362605',
       dataVersionHash: 'TESTING|KN-2026-001|PENDING',
       input: 'Tình trạng kiểm nghiệm lô 362605 hiện tại thế nào?',
@@ -28,7 +28,7 @@ describe('Phase 3 — Semantic Cache Correctness & Identity Binding Tests', () =
     const queryV1 = {
       promptId: 'AI_ASSISTANT',
       promptVersion: 'prompt-v22',
-      model: 'gemini-2.5-flash',
+      model: 'gemini-3.8-flash',
       entityId: 'batch:362605',
       dataVersionHash: 'TESTING|KN-2026-001|PENDING',
       input: 'Tình trạng kiểm nghiệm lô 362605 hiện tại thế nào?',
@@ -50,7 +50,7 @@ describe('Phase 3 — Semantic Cache Correctness & Identity Binding Tests', () =
     const queryV21 = {
       promptId: 'AI_ASSISTANT',
       promptVersion: 'prompt-v21',
-      model: 'gemini-2.5-flash',
+      model: 'gemini-3.8-flash',
       entityId: 'batch:362605',
       dataVersionHash: 'RELEASED',
       input: 'Hạn dùng lô 362605 là khi nào?',
@@ -71,7 +71,7 @@ describe('Phase 3 — Semantic Cache Correctness & Identity Binding Tests', () =
     const queryFlash = {
       promptId: 'AI_ASSISTANT',
       promptVersion: 'prompt-v22',
-      model: 'gemini-2.5-flash',
+      model: 'gemini-3.8-flash',
       entityId: 'product:P01',
       dataVersionHash: 'ACTIVE',
       input: 'Sản phẩm P01 có bao nhiêu chỉ tiêu chất lượng?',
@@ -81,7 +81,7 @@ describe('Phase 3 — Semantic Cache Correctness & Identity Binding Tests', () =
 
     const queryPro = {
       ...queryFlash,
-      model: 'gemini-2.5-pro',
+      model: 'gemini-3.8-pro',
     };
 
     const cached = semanticCache.get(queryPro);

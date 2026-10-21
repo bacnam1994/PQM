@@ -39,7 +39,7 @@ export class AIService {
   }
 
   public static getModelName(): string {
-    return this.runtimeModel || process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+    return this.runtimeModel || process.env.GEMINI_MODEL || 'gemini-3.8-flash';
   }
 
   public static getKeySource(): 'RUNTIME' | 'ENV' | 'NONE' {
@@ -108,7 +108,7 @@ export class AIService {
       model: modelName,
       generationConfig: {
         maxOutputTokens: 10,
-        temperature: 0,
+        // Lưu ý: Không truyền temperature do Gemini 3.8 Flash không hỗ trợ tham số lấy mẫu này
       },
     });
 
@@ -121,14 +121,45 @@ export class AIService {
       return { latencyMs, model: modelName };
     } catch (err: any) {
       const msg = err?.message || String(err);
-      if (msg.includes('API_KEY_INVALID') || msg.includes('API key not valid')) {
-        throw new AppError('AI_UNAVAILABLE', 'Khóa API Gemini không hợp lệ.', 400);
+      if (
+        msg.includes('API_KEY_INVALID') ||
+        msg.includes('API key not valid') ||
+        msg.includes('PERMISSION_DENIED') ||
+        msg.includes('401') ||
+        msg.includes('403')
+      ) {
+        throw new AppError(
+          'AI_UNAVAILABLE',
+          'Khóa API Gemini không hợp lệ hoặc không có quyền truy cập (401/403).',
+          400
+        );
+      }
+      if (msg.includes('404') || msg.includes('not found') || msg.includes('is not supported')) {
+        throw new AppError(
+          'AI_UNAVAILABLE',
+          `Mô hình AI "${modelName}" không tồn tại hoặc không còn hỗ trợ (404). Vui lòng cập nhật sang gemini-3.8-flash.`,
+          404
+        );
+      }
+      if (msg.includes('400') || msg.includes('INVALID_ARGUMENT')) {
+        throw new AppError('AI_UNAVAILABLE', `Tham số yêu cầu không hợp lệ (400): ${msg}`, 400);
       }
       if (msg.includes('RESOURCE_EXHAUSTED') || msg.includes('429')) {
         throw new AppError(
           'AI_RATE_LIMITED',
           'Đã vượt quá hạn mức truy vấn Google Gemini API (Quota Exceeded / 429).',
           429
+        );
+      }
+      if (
+        msg.includes('503') ||
+        msg.includes('Service Unavailable') ||
+        msg.includes('overloaded')
+      ) {
+        throw new AppError(
+          'AI_UNAVAILABLE',
+          'Dịch vụ Google Gemini hiện đang quá tải hoặc tạm thời gián đoạn (503).',
+          503
         );
       }
       throw new AppError('AI_UNAVAILABLE', `Không thể kết nối Gemini API: ${msg}`, 502);
@@ -154,7 +185,7 @@ export class AIService {
       systemInstruction: systemPrompt,
       generationConfig: {
         responseMimeType: 'application/json',
-        temperature: 0.1,
+        // Lưu ý: Không truyền temperature do Gemini 3.8 Flash không hỗ trợ tham số lấy mẫu này
       },
     });
 
@@ -164,6 +195,26 @@ export class AIService {
       return response.text();
     } catch (err: any) {
       const msg = err?.message || String(err);
+      if (msg.includes('404') || msg.includes('not found') || msg.includes('is not supported')) {
+        throw new AppError(
+          'AI_UNAVAILABLE',
+          `Mô hình AI "${modelName}" không tồn tại hoặc đã ngừng hỗ trợ (404).`,
+          404
+        );
+      }
+      if (
+        msg.includes('API_KEY_INVALID') ||
+        msg.includes('API key not valid') ||
+        msg.includes('PERMISSION_DENIED') ||
+        msg.includes('401') ||
+        msg.includes('403')
+      ) {
+        throw new AppError(
+          'AI_UNAVAILABLE',
+          'Khóa API Gemini không hợp lệ hoặc không có quyền truy cập (401/403).',
+          403
+        );
+      }
       if (msg.includes('429') || msg.includes('RESOURCE_EXHAUSTED')) {
         throw new AppError(
           'AI_RATE_LIMITED',

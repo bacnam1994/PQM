@@ -2,7 +2,7 @@
  * deviationReportService.ts
  * ==========================
  * AI Smart Deviation Report Generator — chuẩn GMP WHO/FDA.
- * 
+ *
  * Khi lô FAIL hoặc có chỉ tiêu vượt giới hạn, AI tự soạn thảo
  * toàn bộ Báo cáo Sai lệch (Deviation Report) gồm 6 phần:
  * 1. Mô tả sự cố
@@ -16,7 +16,11 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { getApiKey, getGeminiModel } from './geminiService';
 
-export type DeviationDecision = 'RELEASE_WITH_NOTE' | 'REPROCESS' | 'REJECT' | 'PENDING_INVESTIGATION';
+export type DeviationDecision =
+  | 'RELEASE_WITH_NOTE'
+  | 'REPROCESS'
+  | 'REJECT'
+  | 'PENDING_INVESTIGATION';
 
 export interface DeviationFishboneCategory {
   category: 'Man' | 'Machine' | 'Material' | 'Method' | 'Measurement' | 'Milieu';
@@ -30,7 +34,7 @@ export interface DeviationCAPAItem {
   typeLabel: string;
   action: string;
   responsible: string;
-  deadline: string;   // e.g. "7 ngày", "30 ngày", "Ngay lập tức"
+  deadline: string; // e.g. "7 ngày", "30 ngày", "Ngay lập tức"
   verification: string;
 }
 
@@ -68,7 +72,7 @@ export interface DeviationReport {
     marketImpactScope: string;
     quarantineRequired: boolean;
     quarantineReason?: string;
-    notificationRequired: boolean;   // Báo cáo cơ quan quản lý
+    notificationRequired: boolean; // Báo cáo cơ quan quản lý
     notificationScope?: string;
   };
 
@@ -91,7 +95,7 @@ export interface DeviationReport {
   // ── Phần 6: Quyết định ──
   decision: DeviationDecision;
   decisionRationale: string;
-  conditions?: string[];     // Điều kiện kèm theo (nếu RELEASE_WITH_NOTE)
+  conditions?: string[]; // Điều kiện kèm theo (nếu RELEASE_WITH_NOTE)
   approvalRequired?: string; // Cấp duyệt cần thiết
 }
 
@@ -123,7 +127,7 @@ export const generateRuleBasedDeviationReport = (input: DeviationReportInput): D
   const firstFail = input.failedCriteria[0];
 
   const classifyDeviation = (criteria: typeof input.failedCriteria) => {
-    return criteria.map(c => {
+    return criteria.map((c) => {
       const actual = parseFloat(String(c.actualValue).replace(',', '.'));
       const specParts = c.specification?.match(/[\d.]+/g) || [];
       let deviationPercent: string | undefined;
@@ -132,7 +136,7 @@ export const generateRuleBasedDeviationReport = (input: DeviationReportInput): D
       if (!isNaN(actual) && specParts.length > 0) {
         const specVal = parseFloat(specParts[0]);
         if (!isNaN(specVal) && specVal > 0) {
-          const pct = Math.abs((actual - specVal) / specVal * 100);
+          const pct = Math.abs(((actual - specVal) / specVal) * 100);
           deviationPercent = `${pct.toFixed(1)}%`;
           severity = pct > 20 ? 'CRITICAL' : pct > 10 ? 'MAJOR' : 'MINOR';
         }
@@ -142,16 +146,26 @@ export const generateRuleBasedDeviationReport = (input: DeviationReportInput): D
     });
   };
 
-  const hasCritical = input.failedCriteria.some(c => {
+  const hasCritical = input.failedCriteria.some((c) => {
     const lowerName = (c.name || '').toLowerCase();
-    return lowerName.includes('vi sinh') || lowerName.includes('vô khuẩn') || 
-           lowerName.includes('chí nhiệt tố') || lowerName.includes('nội độc tố') ||
-           lowerName.includes('arsenic') || lowerName.includes('mercury') || 
-           lowerName.includes('lead') || lowerName.includes('chì') || lowerName.includes('thủy ngân');
+    return (
+      lowerName.includes('vi sinh') ||
+      lowerName.includes('vô khuẩn') ||
+      lowerName.includes('chí nhiệt tố') ||
+      lowerName.includes('nội độc tố') ||
+      lowerName.includes('arsenic') ||
+      lowerName.includes('mercury') ||
+      lowerName.includes('lead') ||
+      lowerName.includes('chì') ||
+      lowerName.includes('thủy ngân')
+    );
   });
 
-  const decision: DeviationDecision = hasCritical ? 'REJECT' : 
-    input.failedCriteria.length > 2 ? 'REPROCESS' : 'PENDING_INVESTIGATION';
+  const decision: DeviationDecision = hasCritical
+    ? 'REJECT'
+    : input.failedCriteria.length > 2
+      ? 'REPROCESS'
+      : 'PENDING_INVESTIGATION';
 
   return {
     reportId,
@@ -172,42 +186,169 @@ export const generateRuleBasedDeviationReport = (input: DeviationReportInput): D
       quarantineRequired: true,
       quarantineReason: `Lô có ${input.failedCriteria.length} chỉ tiêu không đạt, cần kiểm tra lại trước khi quyết định xử lý.`,
       notificationRequired: hasCritical,
-      notificationScope: hasCritical ? 'Báo cáo Sở Y tế / Cục Quản lý Dược theo quy định' : undefined,
+      notificationScope: hasCritical
+        ? 'Báo cáo Sở Y tế / Cục Quản lý Dược theo quy định'
+        : undefined,
     },
 
-    executiveSummary: `Lô ${input.batchNo} của sản phẩm "${input.productName}" không đạt ${input.failedCriteria.length} chỉ tiêu kiểm nghiệm: ${input.failedCriteria.map(c => `${c.name} (thực tế: ${c.actualValue}${c.unit || ''}, yêu cầu: ${c.specification})`).join('; ')}. ${hasCritical ? 'Phát hiện vi phạm chỉ tiêu an toàn nghiêm trọng — yêu cầu hành động khẩn cấp.' : 'Sai lệch cần điều tra kỹ nguyên nhân và xem xét khả năng tái chế/xử lý.'}`,
+    executiveSummary: `Lô ${input.batchNo} của sản phẩm "${input.productName}" không đạt ${input.failedCriteria.length} chỉ tiêu kiểm nghiệm: ${input.failedCriteria.map((c) => `${c.name} (thực tế: ${c.actualValue}${c.unit || ''}, yêu cầu: ${c.specification})`).join('; ')}. ${hasCritical ? 'Phát hiện vi phạm chỉ tiêu an toàn nghiêm trọng — yêu cầu hành động khẩn cấp.' : 'Sai lệch cần điều tra kỹ nguyên nhân và xem xét khả năng tái chế/xử lý.'}`,
 
     fishbone: [
-      { category: 'Man', label: 'Con người', causes: ['Kỹ năng thao tác chưa đạt yêu cầu', 'Thiếu giám sát trong quá trình sản xuất', 'Không tuân thủ quy trình đã được phê duyệt'] },
-      { category: 'Machine', label: 'Máy móc/Thiết bị', causes: ['Thiết bị chưa được hiệu chỉnh đúng hạn', 'Hư hỏng thiết bị không được phát hiện kịp thời', 'Thay đổi thiết bị không qua quy trình change control'] },
-      { category: 'Material', label: 'Nguyên vật liệu', causes: [`Chất lượng nguyên liệu ${firstFail?.name || 'chính'} không đạt tiêu chuẩn nhập kho`, 'Nguyên liệu bảo quản không đúng điều kiện', 'Nguyên liệu hết hạn hoặc bị ô nhiễm'] },
-      { category: 'Method', label: 'Phương pháp', causes: ['Quy trình sản xuất chưa tối ưu', 'Thông số quy trình sai lệch so với validation', 'Phương pháp kiểm tra chưa được validation đầy đủ'] },
-      { category: 'Measurement', label: 'Đo lường', causes: ['Phương pháp phân tích không phù hợp', 'Thiết bị đo không được hiệu chỉnh', 'Sai số trong quá trình lấy mẫu'] },
-      { category: 'Milieu', label: 'Môi trường', causes: ['Điều kiện nhiệt độ/độ ẩm bảo quản không phù hợp', 'Ô nhiễm chéo từ dây chuyền khác', 'Vệ sinh phòng sản xuất không đạt tiêu chuẩn'] },
+      {
+        category: 'Man',
+        label: 'Con người',
+        causes: [
+          'Kỹ năng thao tác chưa đạt yêu cầu',
+          'Thiếu giám sát trong quá trình sản xuất',
+          'Không tuân thủ quy trình đã được phê duyệt',
+        ],
+      },
+      {
+        category: 'Machine',
+        label: 'Máy móc/Thiết bị',
+        causes: [
+          'Thiết bị chưa được hiệu chỉnh đúng hạn',
+          'Hư hỏng thiết bị không được phát hiện kịp thời',
+          'Thay đổi thiết bị không qua quy trình change control',
+        ],
+      },
+      {
+        category: 'Material',
+        label: 'Nguyên vật liệu',
+        causes: [
+          `Chất lượng nguyên liệu ${firstFail?.name || 'chính'} không đạt tiêu chuẩn nhập kho`,
+          'Nguyên liệu bảo quản không đúng điều kiện',
+          'Nguyên liệu hết hạn hoặc bị ô nhiễm',
+        ],
+      },
+      {
+        category: 'Method',
+        label: 'Phương pháp',
+        causes: [
+          'Quy trình sản xuất chưa tối ưu',
+          'Thông số quy trình sai lệch so với validation',
+          'Phương pháp kiểm tra chưa được validation đầy đủ',
+        ],
+      },
+      {
+        category: 'Measurement',
+        label: 'Đo lường',
+        causes: [
+          'Phương pháp phân tích không phù hợp',
+          'Thiết bị đo không được hiệu chỉnh',
+          'Sai số trong quá trình lấy mẫu',
+        ],
+      },
+      {
+        category: 'Milieu',
+        label: 'Môi trường',
+        causes: [
+          'Điều kiện nhiệt độ/độ ẩm bảo quản không phù hợp',
+          'Ô nhiễm chéo từ dây chuyền khác',
+          'Vệ sinh phòng sản xuất không đạt tiêu chuẩn',
+        ],
+      },
     ],
 
     fiveWhy: [
-      { level: 1, question: `Tại sao ${firstFail?.name || 'chỉ tiêu'} không đạt?`, answer: `Kết quả thực tế (${firstFail?.actualValue}${firstFail?.unit || ''}) vượt ra ngoài giới hạn quy định (${firstFail?.specification}).` },
-      { level: 2, question: 'Tại sao có sự chênh lệch so với giới hạn?', answer: 'Cần điều tra thêm: có thể do sai số quy trình sản xuất hoặc chất lượng nguyên liệu đầu vào.' },
-      { level: 3, question: 'Tại sao quy trình/nguyên liệu không được kiểm soát?', answer: 'Cần xem xét hồ sơ lô, biểu đồ kiểm soát và tài liệu nguyên liệu đầu vào.' },
-      { level: 4, question: 'Tại sao hệ thống kiểm soát không phát hiện sớm?', answer: 'Cần đánh giá lại tần suất và phương pháp kiểm tra trong quá trình (IPC).'},
-      { level: 5, question: 'Tại sao không có biện pháp phòng ngừa hiệu quả?', answer: 'Nguyên nhân gốc rễ cuối cùng cần được xác nhận qua điều tra đầy đủ.' },
+      {
+        level: 1,
+        question: `Tại sao ${firstFail?.name || 'chỉ tiêu'} không đạt?`,
+        answer: `Kết quả thực tế (${firstFail?.actualValue}${firstFail?.unit || ''}) vượt ra ngoài giới hạn quy định (${firstFail?.specification}).`,
+      },
+      {
+        level: 2,
+        question: 'Tại sao có sự chênh lệch so với giới hạn?',
+        answer:
+          'Cần điều tra thêm: có thể do sai số quy trình sản xuất hoặc chất lượng nguyên liệu đầu vào.',
+      },
+      {
+        level: 3,
+        question: 'Tại sao quy trình/nguyên liệu không được kiểm soát?',
+        answer: 'Cần xem xét hồ sơ lô, biểu đồ kiểm soát và tài liệu nguyên liệu đầu vào.',
+      },
+      {
+        level: 4,
+        question: 'Tại sao hệ thống kiểm soát không phát hiện sớm?',
+        answer: 'Cần đánh giá lại tần suất và phương pháp kiểm tra trong quá trình (IPC).',
+      },
+      {
+        level: 5,
+        question: 'Tại sao không có biện pháp phòng ngừa hiệu quả?',
+        answer: 'Nguyên nhân gốc rễ cuối cùng cần được xác nhận qua điều tra đầy đủ.',
+      },
     ],
 
     rootCauseStatement: `Nguyên nhân gốc rễ sơ bộ: sai lệch chỉ tiêu "${firstFail?.name}" có thể xuất phát từ vấn đề nguyên liệu đầu vào, thông số quy trình sản xuất hoặc phương pháp phân tích kiểm nghiệm. Cần điều tra đầy đủ theo Giai đoạn 1 (Phòng kiểm nghiệm) và Giai đoạn 2 (Sản xuất) theo quy trình OOS.`,
 
     capaItems: [
-      { id: 'CAPA-001', type: 'IMMEDIATE', typeLabel: 'Khắc phục ngay', action: `Cách ly toàn bộ lô ${input.batchNo}. Không xuất xưởng cho đến khi có kết quả điều tra.`, responsible: 'QA Manager', deadline: 'Ngay lập tức', verification: 'Biên bản cách ly lô, cập nhật trạng thái trong hệ thống PQM' },
-      { id: 'CAPA-002', type: 'IMMEDIATE', typeLabel: 'Khắc phục ngay', action: 'Kiểm tra lại mẫu lưu (retained sample) tại phòng kiểm nghiệm nội bộ để xác nhận kết quả.', responsible: 'QC Manager', deadline: '3 ngày', verification: 'Biên bản kiểm tra lại, kết quả phân tích mẫu lưu' },
-      { id: 'CAPA-003', type: 'CORRECTIVE', typeLabel: 'Hành động khắc phục', action: `Xem xét lô nguyên liệu "${firstFail?.name || 'liên quan'}" đang tồn kho — giữ lại và kiểm tra lại nếu cùng số lô nhà cung cấp.`, responsible: 'Warehouse Manager', deadline: '7 ngày', verification: 'Kết quả kiểm tra nguyên liệu, biên bản đánh giá nhà cung cấp' },
-      { id: 'CAPA-004', type: 'CORRECTIVE', typeLabel: 'Hành động khắc phục', action: 'Rà soát và cập nhật các điểm kiểm soát trong quy trình SOP liên quan. Tăng tần suất kiểm tra IPC nếu cần.', responsible: 'Production Manager', deadline: '14 ngày', verification: 'Phiên bản SOP mới được phê duyệt, hồ sơ training nhân viên' },
-      { id: 'CAPA-005', type: 'PREVENTIVE', typeLabel: 'Hành động phòng ngừa', action: 'Thiết lập biểu đồ kiểm soát (Control Chart) cho chỉ tiêu này để phát hiện xu hướng trước khi vượt giới hạn.', responsible: 'QA Team', deadline: '30 ngày', verification: 'Biểu đồ SPC được thiết lập và vận hành trong hệ thống PQM' },
-      { id: 'CAPA-006', type: 'PREVENTIVE', typeLabel: 'Hành động phòng ngừa', action: 'Rà soát kế hoạch tái thẩm định quy trình sản xuất, đảm bảo thực hiện đúng hạn theo lịch revalidation.', responsible: 'Validation Team', deadline: '60 ngày', verification: 'Kế hoạch tái thẩm định được phê duyệt và lên lịch thực hiện' },
+      {
+        id: 'CAPA-001',
+        type: 'IMMEDIATE',
+        typeLabel: 'Khắc phục ngay',
+        action: `Cách ly toàn bộ lô ${input.batchNo}. Không xuất xưởng cho đến khi có kết quả điều tra.`,
+        responsible: 'QA Manager',
+        deadline: 'Ngay lập tức',
+        verification: 'Biên bản cách ly lô, cập nhật trạng thái trong hệ thống PQM',
+      },
+      {
+        id: 'CAPA-002',
+        type: 'IMMEDIATE',
+        typeLabel: 'Khắc phục ngay',
+        action:
+          'Kiểm tra lại mẫu lưu (retained sample) tại phòng kiểm nghiệm nội bộ để xác nhận kết quả.',
+        responsible: 'QC Manager',
+        deadline: '3 ngày',
+        verification: 'Biên bản kiểm tra lại, kết quả phân tích mẫu lưu',
+      },
+      {
+        id: 'CAPA-003',
+        type: 'CORRECTIVE',
+        typeLabel: 'Hành động khắc phục',
+        action: `Xem xét lô nguyên liệu "${firstFail?.name || 'liên quan'}" đang tồn kho — giữ lại và kiểm tra lại nếu cùng số lô nhà cung cấp.`,
+        responsible: 'Warehouse Manager',
+        deadline: '7 ngày',
+        verification: 'Kết quả kiểm tra nguyên liệu, biên bản đánh giá nhà cung cấp',
+      },
+      {
+        id: 'CAPA-004',
+        type: 'CORRECTIVE',
+        typeLabel: 'Hành động khắc phục',
+        action:
+          'Rà soát và cập nhật các điểm kiểm soát trong quy trình SOP liên quan. Tăng tần suất kiểm tra IPC nếu cần.',
+        responsible: 'Production Manager',
+        deadline: '14 ngày',
+        verification: 'Phiên bản SOP mới được phê duyệt, hồ sơ training nhân viên',
+      },
+      {
+        id: 'CAPA-005',
+        type: 'PREVENTIVE',
+        typeLabel: 'Hành động phòng ngừa',
+        action:
+          'Thiết lập biểu đồ kiểm soát (Control Chart) cho chỉ tiêu này để phát hiện xu hướng trước khi vượt giới hạn.',
+        responsible: 'QA Team',
+        deadline: '30 ngày',
+        verification: 'Biểu đồ SPC được thiết lập và vận hành trong hệ thống PQM',
+      },
+      {
+        id: 'CAPA-006',
+        type: 'PREVENTIVE',
+        typeLabel: 'Hành động phòng ngừa',
+        action:
+          'Rà soát kế hoạch tái thẩm định quy trình sản xuất, đảm bảo thực hiện đúng hạn theo lịch revalidation.',
+        responsible: 'Validation Team',
+        deadline: '60 ngày',
+        verification: 'Kế hoạch tái thẩm định được phê duyệt và lên lịch thực hiện',
+      },
     ],
 
     recurrenceRisk: {
-      likelihood: input.batchHistory && input.batchHistory.filter(b => b.status === 'REJECTED').length > 1 ? 'HIGH' : 'MEDIUM',
-      likelihoodReason: 'Dựa trên lịch sử lô và tính chất của sai lệch, nguy cơ tái diễn ở mức trung bình nếu không có hành động CAPA kịp thời.',
+      likelihood:
+        input.batchHistory && input.batchHistory.filter((b) => b.status === 'REJECTED').length > 1
+          ? 'HIGH'
+          : 'MEDIUM',
+      likelihoodReason:
+        'Dựa trên lịch sử lô và tính chất của sai lệch, nguy cơ tái diễn ở mức trung bình nếu không có hành động CAPA kịp thời.',
       preventionMeasures: [
         'Tăng cường giám sát trong quá trình sản xuất (IPC) cho chỉ tiêu liên quan',
         'Xem xét lại tiêu chí chấp nhận nguyên liệu đầu vào từ nhà cung cấp',
@@ -222,7 +363,13 @@ export const generateRuleBasedDeviationReport = (input: DeviationReportInput): D
       : input.failedCriteria.length > 2
         ? `Lô cần XEM XÉT TÁI CHẾ (REPROCESS) do có ${input.failedCriteria.length} chỉ tiêu không đạt. Đánh giá khả năng tái chế dựa trên SOP reprocess được phê duyệt.`
         : `Đang chờ điều tra thêm (PENDING). Cần hoàn thành điều tra OOS đầy đủ trước khi đưa ra quyết định cuối cùng.`,
-    conditions: hasCritical ? undefined : ['Hoàn thành điều tra OOS Giai đoạn 1 và 2', 'Xác nhận nguyên nhân gốc rễ', 'Được QA Director phê duyệt'],
+    conditions: hasCritical
+      ? undefined
+      : [
+          'Hoàn thành điều tra OOS Giai đoạn 1 và 2',
+          'Xác nhận nguyên nhân gốc rễ',
+          'Được QA Director phê duyệt',
+        ],
     approvalRequired: 'QA Director',
   };
 };
@@ -246,7 +393,7 @@ export const generateAIDeviationReport = async (
     const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({
       model: getGeminiModel(),
-      generationConfig: { responseMimeType: 'application/json', temperature: 0.3 },
+      generationConfig: { responseMimeType: 'application/json' },
     });
 
     onProgress?.('AI đang phân tích nguyên nhân gốc rễ (RCA)...', 30);
@@ -262,16 +409,21 @@ THÔNG TIN LÔ:
 - Ngày kiểm nghiệm: ${input.testDate || 'N/A'}
 
 CHỈ TIÊU KHÔNG ĐẠT:
-${input.failedCriteria.map(c => `- ${c.name}: Thực tế = ${c.actualValue}${c.unit || ''}, Yêu cầu = ${c.specification}`).join('\n')}
+${input.failedCriteria.map((c) => `- ${c.name}: Thực tế = ${c.actualValue}${c.unit || ''}, Yêu cầu = ${c.specification}`).join('\n')}
 
 CHỈ TIÊU ĐẠT:
-${(input.passedCriteria || []).map(c => `- ${c.name}: ${c.actualValue}`).join('\n') || 'Không có thông tin'}
+${(input.passedCriteria || []).map((c) => `- ${c.name}: ${c.actualValue}`).join('\n') || 'Không có thông tin'}
 
 CÔNG THỨC SẢN PHẨM:
-${(input.formulaIngredients || []).map(i => `- ${i.name}: ${i.declaredContent}`).join('\n') || 'Không có thông tin'}
+${(input.formulaIngredients || []).map((i) => `- ${i.name}: ${i.declaredContent}`).join('\n') || 'Không có thông tin'}
 
 LỊCH SỬ LÔ GẦN ĐÂY (3 LÔ GẦN NHẤT):
-${(input.batchHistory || []).slice(-3).map(b => `- Lô ${b.batchNo}: ${b.status}`).join('\n') || 'Không có thông tin'}
+${
+  (input.batchHistory || [])
+    .slice(-3)
+    .map((b) => `- Lô ${b.batchNo}: ${b.status}`)
+    .join('\n') || 'Không có thông tin'
+}
 
 Hãy trả về JSON với cấu trúc sau (viết bằng tiếng Việt, chuyên nghiệp, cụ thể):
 {
@@ -320,16 +472,24 @@ Hãy trả về JSON với cấu trúc sau (viết bằng tiếng Việt, chuyê
 
     const result = await model.generateContent(prompt);
     const responseText = result.response.text().trim();
-    const cleanJson = responseText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+    const cleanJson = responseText
+      .replace(/```json\n?/g, '')
+      .replace(/```\n?/g, '')
+      .trim();
     const aiData = JSON.parse(cleanJson);
 
     onProgress?.('Hoàn thiện báo cáo...', 90);
 
     const reportId = `DEV-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${input.batchNo}`;
     const firstFail = input.failedCriteria[0];
-    const hasCritical = (input.failedCriteria || []).some(c => {
+    const hasCritical = (input.failedCriteria || []).some((c) => {
       const n = (c.name || '').toLowerCase();
-      return n.includes('vi sinh') || n.includes('nội độc tố') || n.includes('arsenic') || n.includes('chì');
+      return (
+        n.includes('vi sinh') ||
+        n.includes('nội độc tố') ||
+        n.includes('arsenic') ||
+        n.includes('chì')
+      );
     });
 
     return {
@@ -343,16 +503,21 @@ Hãy trả về JSON với cấu trúc sau (viết bằng tiếng Việt, chuyê
       labName: input.labName,
       testDate: input.testDate,
       deviationDate: new Date().toISOString().slice(0, 10),
-      failedCriteria: input.failedCriteria.map(c => {
+      failedCriteria: input.failedCriteria.map((c) => {
         const actual = parseFloat(String(c.actualValue).replace(',', '.'));
         const specMatch = c.specification?.match(/[\d.]+/);
         const specVal = specMatch ? parseFloat(specMatch[0]) : NaN;
-        const pct = (!isNaN(actual) && !isNaN(specVal) && specVal > 0)
-          ? `${Math.abs((actual - specVal) / specVal * 100).toFixed(1)}%`
-          : undefined;
+        const pct =
+          !isNaN(actual) && !isNaN(specVal) && specVal > 0
+            ? `${Math.abs(((actual - specVal) / specVal) * 100).toFixed(1)}%`
+            : undefined;
         const lowerName = (c.name || '').toLowerCase();
         const isCrit = lowerName.includes('vi sinh') || lowerName.includes('nội độc tố');
-        return { ...c, deviationPercent: pct, severity: isCrit ? 'CRITICAL' as const : 'MAJOR' as const };
+        return {
+          ...c,
+          deviationPercent: pct,
+          severity: isCrit ? ('CRITICAL' as const) : ('MAJOR' as const),
+        };
       }),
       immediateImpact: aiData.immediateImpact || {
         patientSafetyRisk: hasCritical ? 'HIGH' : 'MEDIUM',
@@ -378,7 +543,6 @@ Hãy trả về JSON với cấu trúc sau (viết bằng tiếng Việt, chuyê
       conditions: aiData.conditions,
       approvalRequired: aiData.approvalRequired || 'QA Director',
     };
-
   } catch (error) {
     console.warn('[DeviationReport] AI failed, using rule-based fallback:', error);
     return generateRuleBasedDeviationReport(input);

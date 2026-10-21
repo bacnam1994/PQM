@@ -42,11 +42,15 @@ describe('Client Direct Gemini Helpers (Firebase Free Spark Plan)', () => {
     expect(localStorage.getItem('GEMINI_API_KEY')).toBeNull();
   });
 
-  it('tests client direct connection successfully with candidate key', async () => {
-    const res = await testClientGeminiConnection('AQ.CandidateKey987654321', 'gemini-2.5-flash');
+  it('tests client direct connection successfully with candidate key and default model', async () => {
+    const res = await testClientGeminiConnection('AQ.CandidateKey987654321', 'gemini-3.8-flash');
     expect(res).toBeDefined();
-    expect(res.model).toBe('gemini-2.5-flash');
+    expect(res.model).toBe('gemini-3.8-flash');
     expect(res.latencyMs).toBeGreaterThanOrEqual(0);
+
+    // Test when model is omitted (should use DEFAULT_GEMINI_MODEL: gemini-3.8-flash)
+    const resDefault = await testClientGeminiConnection('AQ.CandidateKey987654321');
+    expect(resDefault.model).toBe('gemini-3.8-flash');
   });
 
   it('fails gracefully when key is missing', async () => {

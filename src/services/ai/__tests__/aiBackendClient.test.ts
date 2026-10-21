@@ -28,7 +28,7 @@ describe('AIBackendClient', () => {
         success: true,
         data: {
           service: 'pqm-ai-backend',
-          model: 'gemini-2.5-flash',
+          model: 'gemini-3.8-flash',
           isConfigured: true,
           supportedTypes: ['batch_analysis'],
         },
@@ -62,7 +62,7 @@ describe('AIBackendClient', () => {
           uid: 'user-qa-1',
           userEmail: 'qa@vbiotech.com',
           timestamp: '2026-10-08T00:00:00Z',
-          model: 'gemini-2.5-flash',
+          model: 'gemini-3.8-flash',
           promptVersion: 'BATCH_ANALYSIS_V1',
           analysisType: 'batch_analysis',
           contextHash: 'hash123',

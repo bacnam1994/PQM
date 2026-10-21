@@ -24,9 +24,27 @@ describe('autoLearningService - AI Self-Learning Engine', () => {
   describe('1. Pattern Mining & High-Frequency Mappings', () => {
     it('should detect mappings with frequency >= threshold and sort descending', () => {
       const mockLearnedMappings = [
-        { id: '1', originalName: 'Do am', systemName: 'Độ ẩm', frequency: 5, lastUpdated: '2026-01-01' },
-        { id: '2', originalName: 'Ham luong Fe', systemName: 'Hàm lượng Sắt', frequency: 2, lastUpdated: '2026-01-01' },
-        { id: '3', originalName: 'Loss on drying', systemName: 'Mất khối lượng do làm khô', frequency: 7, lastUpdated: '2026-01-01' },
+        {
+          id: '1',
+          originalName: 'Do am',
+          systemName: 'Độ ẩm',
+          frequency: 5,
+          lastUpdated: '2026-01-01',
+        },
+        {
+          id: '2',
+          originalName: 'Ham luong Fe',
+          systemName: 'Hàm lượng Sắt',
+          frequency: 2,
+          lastUpdated: '2026-01-01',
+        },
+        {
+          id: '3',
+          originalName: 'Loss on drying',
+          systemName: 'Mất khối lượng do làm khô',
+          frequency: 7,
+          lastUpdated: '2026-01-01',
+        },
       ];
 
       const highFreq = detectHighFrequencyMappings(mockLearnedMappings as any, 3);
@@ -39,7 +57,13 @@ describe('autoLearningService - AI Self-Learning Engine', () => {
 
     it('should return empty array if no mappings meet threshold', () => {
       const mockLearnedMappings = [
-        { id: '1', originalName: 'Do am', systemName: 'Độ ẩm', frequency: 1, lastUpdated: '2026-01-01' },
+        {
+          id: '1',
+          originalName: 'Do am',
+          systemName: 'Độ ẩm',
+          frequency: 1,
+          lastUpdated: '2026-01-01',
+        },
       ];
 
       const highFreq = detectHighFrequencyMappings(mockLearnedMappings as any, 3);
@@ -52,7 +76,13 @@ describe('autoLearningService - AI Self-Learning Engine', () => {
       const addMock = vi.fn();
       vi.spyOn(useAppStore, 'getState').mockReturnValue({
         aiLearnedMappings: [
-          { id: '1', originalName: 'Moisture', systemName: 'Độ ẩm', frequency: 1, lastUpdated: '2026-01-01' },
+          {
+            id: '1',
+            originalName: 'Moisture',
+            systemName: 'Độ ẩm',
+            frequency: 1,
+            lastUpdated: '2026-01-01',
+          },
         ],
         addAiLearnedMapping: addMock,
       } as any);
@@ -71,9 +101,7 @@ describe('autoLearningService - AI Self-Learning Engine', () => {
   describe('3. Rule-Based AI Quality Insight Engine', () => {
     it('should detect high fail rate products (>=30% failure rate with >= 3 batches)', () => {
       const appContext = {
-        products: [
-          { id: 'prod_1', name: 'Viên ngậm Hoạt Huyết' },
-        ],
+        products: [{ id: 'prod_1', name: 'Viên ngậm Hoạt Huyết' }],
         batches: [
           { id: 'b_1', productId: 'prod_1', batchNo: 'HH001' },
           { id: 'b_2', productId: 'prod_1', batchNo: 'HH002' },
@@ -88,7 +116,7 @@ describe('autoLearningService - AI Self-Learning Engine', () => {
       };
 
       const insights = generateRuleBasedInsights(appContext);
-      const failInsight = insights.find(i => i.type === 'HIGH_FAIL_RATE');
+      const failInsight = insights.find((i) => i.type === 'HIGH_FAIL_RATE');
 
       expect(failInsight).toBeDefined();
       expect(failInsight?.productId).toBe('prod_1');
@@ -101,14 +129,20 @@ describe('autoLearningService - AI Self-Learning Engine', () => {
       const appContext = {
         products: [{ id: 'prod_1', name: 'Siro Ho' }],
         batches: [
-          { id: 'b_1', productId: 'prod_1', batchNo: 'SH2026-01', expDate: in20Days, status: 'RELEASED' },
+          {
+            id: 'b_1',
+            productId: 'prod_1',
+            batchNo: 'SH2026-01',
+            expDate: in20Days,
+            status: 'RELEASED',
+          },
         ],
         testResults: [],
         aiLearnedMappings: [],
       };
 
       const insights = generateRuleBasedInsights(appContext);
-      const expiryInsight = insights.find(i => i.type === 'EXPIRY_RISK');
+      const expiryInsight = insights.find((i) => i.type === 'EXPIRY_RISK');
 
       expect(expiryInsight).toBeDefined();
       expect(expiryInsight?.title).toContain('1 lo sap het han');
@@ -131,7 +165,7 @@ describe('autoLearningService - AI Self-Learning Engine', () => {
       };
 
       const insights = generateRuleBasedInsights(appContext);
-      const driftInsight = insights.find(i => i.type === 'DRIFT_RISK');
+      const driftInsight = insights.find((i) => i.type === 'DRIFT_RISK');
 
       expect(driftInsight).toBeDefined();
       expect(driftInsight?.criteriaName).toBe('Độ ẩm');
@@ -143,8 +177,16 @@ describe('autoLearningService - AI Self-Learning Engine', () => {
     const userId = 'user_test_123';
 
     it('should save and load session memory correctly up to limit', () => {
-      saveSessionMemory(userId, 'Người dùng đã kiểm tra lô HH001 và hỏi về tiêu chuẩn độ ẩm.', 'gemini-2.5-flash');
-      saveSessionMemory(userId, 'Người dùng đã tạo phiếu kiểm nghiệm cho lô BC02.', 'gemini-2.5-flash');
+      saveSessionMemory(
+        userId,
+        'Người dùng đã kiểm tra lô HH001 và hỏi về tiêu chuẩn độ ẩm.',
+        'gemini-3.8-flash'
+      );
+      saveSessionMemory(
+        userId,
+        'Người dùng đã tạo phiếu kiểm nghiệm cho lô BC02.',
+        'gemini-3.8-flash'
+      );
 
       const loaded = loadSessionMemory(userId);
       expect(loaded).toHaveLength(2);
@@ -191,7 +233,7 @@ describe('autoLearningService - AI Self-Learning Engine', () => {
           title: 'Xu hướng chất lượng ổn định',
           detail: '100% lô đạt tiêu chuẩn trong tuần qua.',
           generatedAt: new Date().toISOString(),
-        }
+        },
       ];
 
       saveCachedInsights(sampleInsights);

@@ -155,19 +155,19 @@ describe('Server-Authoritative AI Configuration & Health API', () => {
         .set('Authorization', `Bearer ${adminToken}`)
         .send({
           apiKey: 'AIzaSyUpdatedKeyFromFrontend987654',
-          model: 'gemini-2.5-pro',
+          model: 'gemini-3.8-flash',
         });
 
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
       expect(res.body.data.isConfigured).toBe(true);
       expect(res.body.data.maskedKey).toBe('AIzaSy...7654');
-      expect(res.body.data.model).toBe('gemini-2.5-pro');
+      expect(res.body.data.model).toBe('gemini-3.8-flash');
       expect(JSON.stringify(res.body)).not.toContain('AIzaSyUpdatedKeyFromFrontend987654');
 
       // Verify AIService state
       expect(AIService.isConfigured()).toBe(true);
-      expect(AIService.getModelName()).toBe('gemini-2.5-pro');
+      expect(AIService.getModelName()).toBe('gemini-3.8-flash');
     });
   });
 
