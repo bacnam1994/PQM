@@ -158,7 +158,7 @@ export const GlobalCommandPalette: React.FC = () => {
               setSelectedIndex(0);
             }}
             onKeyDown={handleKeyDown}
-            placeholder="Tìm nhanh Sản phẩm, Số lô, TCCS, Hoạt chất, CAS, Sai lệch... (Ctrl+K)"
+            placeholder="Tìm nhanh Sản phẩm, Số lô, TCCS, Hoạt chất, Phiếu kiểm nghiệm... (Ctrl+K)"
             className="w-full bg-transparent text-ink placeholder-ink-faint text-sm sm:text-base outline-none font-medium"
           />
           <button

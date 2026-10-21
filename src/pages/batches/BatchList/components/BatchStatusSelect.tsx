@@ -17,7 +17,6 @@ import {
 } from '../../../../types';
 import { useAppStore } from '../../../../store/useAppStore';
 import { BatchStateMachine } from '../../../../domain/workflow/stateMachine';
-import { BatchReleaseProgressService } from '../../../../domain/batch/BatchReleaseProgressService';
 
 interface BatchStatusSelectProps {
   status: string;
@@ -100,23 +99,8 @@ export const BatchStatusSelect: React.FC<BatchStatusSelectProps> = ({
         releaseStage: effectiveBatch.releaseStage,
       };
     }
-    if (effectiveBatch && testResults && testResults.length > 0) {
-      try {
-        const res = BatchReleaseProgressService.resolveReleaseProgress({
-          batch: effectiveBatch,
-          testResults,
-          boundTccs: (effectiveBatch as any)?.tccsSnapshot || (effectiveBatch as any)?.tccs || tccs,
-        });
-        return {
-          gateProgress: res.releaseGateProgress,
-          releaseStage: res.releaseStage,
-        };
-      } catch {
-        return null;
-      }
-    }
     return null;
-  }, [propReleaseGateProgress, propReleaseStage, effectiveBatch, testResults, tccs]);
+  }, [propReleaseGateProgress, propReleaseStage, effectiveBatch]);
 
   const gateProgress = resolvedProgress?.gateProgress ?? effectiveBatch?.releaseGateProgress;
   const releaseStage = resolvedProgress?.releaseStage ?? effectiveBatch?.releaseStage;

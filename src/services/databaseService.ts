@@ -172,24 +172,3 @@ export const deleteTestResultService = async (id: string) => {
     });
   }
 };
-
-/**
- * @deprecated @forbidden VÔ HIỆU HÓA HOÀN TOÀN: Cấm gọi clearDatabaseService
- * Thao tác dọn sạch dữ liệu hệ thống bắt buộc phải thông qua SystemAppService.wipeDatabase
- * có token xác nhận, thẩm tra quyền ADMIN và ghi vết Audit Trail đầy đủ.
- */
-export const clearDatabaseService = async (_confirmToken?: string) => {
-  throw new Error(
-    `[FORBIDDEN ROOT OPERATION] clearDatabaseService đã bị khóa vĩnh viễn. Vui lòng sử dụng systemAppService.wipeDatabase() với xác thực token và Audit Trail.`
-  );
-};
-
-/**
- * @deprecated @forbidden VÔ HIỆU HÓA HOÀN TOÀN: Cấm gọi updateRootService
- * Thao tác ghi đè root bắt buộc phải thông qua SystemAppService.restoreBackup / resetDemoData.
- */
-export const updateRootService = async (_updates: Record<string, any>) => {
-  throw new Error(
-    `[FORBIDDEN ROOT OPERATION] updateRootService đã bị khóa vĩnh viễn. Vui lòng sử dụng SystemAppService để đảm bảo kiểm soát quyền ADMIN và Audit Trail.`
-  );
-};

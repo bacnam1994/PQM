@@ -14,8 +14,6 @@ import {
   normalizeSearch,
 } from '../../../../utils';
 import { fetchTestResultsByBatchId } from '../../../../services/testResultService';
-import { ReleaseRules } from '../../../../domain/rules';
-import { BatchReleaseDecisionService } from '../../../../domain/batch/BatchReleaseDecisionService';
 import { resolveTestResultsForBatch } from '../../../../domain/batch/batchTestResultResolver';
 import { batchAppService } from '../../../../services/app/BatchAppService';
 

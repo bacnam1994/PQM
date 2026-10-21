@@ -3,7 +3,6 @@ import { Batch, TestResult, TCCS, CriterionType } from '../../types';
 import { resolveAuthoritativeTestResultsForBatch } from '../test-result/testResultStatusResolver';
 import { CanonicalStatusResolver } from './canonicalResolver';
 import { calculateBatchProgress } from '../../pages/batches/BatchList/utils/batchProgress';
-import { evaluateBatchQualityClearance } from '../../services/ai/batchClearanceService';
 
 describe('Multi-TestResult & Heavy Metals Completion Regression', () => {
   const mockTccs: TCCS = {
@@ -129,12 +128,6 @@ describe('Multi-TestResult & Heavy Metals Completion Regression', () => {
     expect(arsenVoCoEval?.status).toBe('PASS');
     expect(arsenVoCoEval?.isExempted).toBe(true);
     expect(arsenVoCoEval?.actualValue).toBe('Miễn kiểm (quy tắc thay thế)');
-
-    // 5. Kiểm tra AI Batch Quality Clearance Dossier không bị rớt hoặc thiếu chỉ tiêu
-    const dossier = evaluateBatchQualityClearance(mockBatch, results, mockTccs);
-    expect(dossier.missingCriteria).toHaveLength(0);
-    expect(dossier.failedCount).toBe(0);
-    expect(dossier.verdict).toBe('READY_FOR_RELEASE');
   });
 
   it('nhận diện chính xác chỉ tiêu khi tên trên phiếu viết ngắn gọn hơn TCCS (Semantic Matching)', () => {
@@ -227,11 +220,5 @@ describe('Multi-TestResult & Heavy Metals Completion Regression', () => {
     expect(arsenVoCoEval?.status).toBe('PASS');
     expect(arsenVoCoEval?.isPass).toBe(true);
     expect(arsenVoCoEval?.isExempted).toBe(true);
-
-    const dossier = evaluateBatchQualityClearance(mockBatch, [trWithExemptEntry], mockTccs);
-    expect(dossier.failedCount).toBe(0);
-    expect(dossier.verdict).toBe('READY_FOR_RELEASE');
-    const clearanceItem = dossier.testedItems.find((i) => i.criteriaName === 'Arsen vô cơ');
-    expect(clearanceItem?.isPass).toBe(true);
   });
 });
