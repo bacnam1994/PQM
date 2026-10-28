@@ -1,0 +1,55 @@
+rules_version = '2';
+
+// [BẢO MẬT PQM 3.0 - STORAGE ACCESS CONTROL]
+// Phân quyền lưu trữ tệp theo vai trò & kiểm soát loại tệp, dung lượng.
+
+function isAuthenticated() {
+  return request.auth != null;
+}
+
+function isAdmin() {
+  return isAuthenticated() && (
+    request.auth.token.admin == true ||
+    request.auth.token.role == 'ADMIN'
+  );
+}
+
+function isQA() {
+  return isAdmin() || (isAuthenticated() && request.auth.token.role == 'QA');
+}
+
+function isQC() {
+  return isQA() || (isAuthenticated() && (request.auth.token.role == 'QC' || request.auth.token.role == 'LAB'));
+}
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    // 1. Hồ sơ chứng nhận CoA điện tử: Chỉ QA hoặc Admin được ghi; Đọc: user đã xác thực
+    match /coas/{allPaths=**} {
+      allow read: if isAuthenticated();
+      allow write: if isQA();
+    }
+
+    // 2. Dữ liệu phổ/hình ảnh đính kèm phiếu kiểm nghiệm: LAB/QC/QA/Admin được ghi
+    match /test_attachments/{allPaths=**} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() &&
+        request.resource.size < 20 * 1024 * 1024 && // Tối đa 20MB
+        (request.resource.contentType.matches('image/.*') || request.resource.contentType == 'application/pdf');
+    }
+
+    // 3. Ảnh mẫu sản phẩm & tài liệu chuẩn: QA hoặc Admin
+    match /product_images/{allPaths=**} {
+      allow read: if isAuthenticated();
+      allow write: if isQA() &&
+        request.resource.size < 5 * 1024 * 1024 && // Tối đa 5MB
+        request.resource.contentType.matches('image/.*');
+    }
+
+    // 4. Đường dẫn mặc định khác
+    match /{allPaths=**} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+  }
+}

@@ -1,0 +1,54 @@
+
+# Cấu hình MIME type cho tệp TypeScript và JSON
+AddType application/javascript .tsx
+AddType application/javascript .ts
+AddType application/json .json
+
+# Bật nén Gzip để tải trang nhanh hơn
+<IfModule mod_deflate.c>
+  AddOutputFilterByType DEFLATE text/html text/plain text/xml text/css application/javascript application/json
+</IfModule>
+
+# Cấu hình Cache cho các tài nguyên tĩnh
+<IfModule mod_expires.c>
+  ExpiresActive On
+  ExpiresDefault "access plus 1 month"
+  ExpiresByType text/html "access plus 0 seconds"
+</IfModule>
+
+# Cấu hình Routing cho React SPA (Tránh lỗi 404 khi F5)
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /
+  RewriteRule ^index\.html$ - [L]
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+  RewriteRule . /index.html [L]
+</IfModule>
+
+# Bảo mật: Chống liệt kê thư mục
+Options -Indexes
+
+# Bảo mật: Các HTTP Security Headers
+<IfModule mod_headers.c>
+  # Chống MIME-type sniffing
+  Header always set X-Content-Type-Options "nosniff"
+
+  # Chống Clickjacking
+  Header always set X-Frame-Options "SAMEORIGIN"
+
+  # [ĐÃ XÓA] X-XSS-Protection "1; mode=block" - Header này đã deprecated
+  # và có thể tạo lỗ hổng trên một số trình duyệt. Dùng CSP thay thế.
+
+  # Content Security Policy - chống XSS hiện đại
+  Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://accounts.google.com https://fonts.googleapis.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://*.firebaseio.com wss://*.firebaseio.com https://firebasestorage.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com; frame-src 'none'; object-src 'none'; base-uri 'self'; form-action 'self';"
+
+  # Buộc dùng HTTPS trong 1 năm (HSTS)
+  Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains"
+
+  # Kiểm soát thông tin Referrer
+  Header always set Referrer-Policy "strict-origin-when-cross-origin"
+
+  # Giới hạn quyền truy cập API của trình duyệt
+  Header always set Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()"
+</IfModule>

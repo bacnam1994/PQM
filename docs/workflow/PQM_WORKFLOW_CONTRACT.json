@@ -1,0 +1,154 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "contractVersion": "1.0.0-MASTER",
+  "systemName": "PQM",
+  "systemTitle": "Product Quality Management System",
+  "regulatoryStandards": [
+    "US FDA 21 CFR Part 11",
+    "US FDA 21 CFR Part 211",
+    "GMP-WHO Annex 11",
+    "GMP-WHO Annex 2",
+    "Vietnamese Pharmacopoeia V (DĐVN V)",
+    "USP",
+    "Ph.Eur",
+    "BP",
+    "ICH Q9",
+    "ICH Q10"
+  ],
+  "canonicalPrinciples": [
+    {
+      "id": "PRINCIPLE-001",
+      "name": "SINGLE SOURCE OF TRUTH",
+      "rule": "Every critical entity property must have one authoritative source. No cache, legacy field, or UI state can override it."
+    },
+    {
+      "id": "PRINCIPLE-002",
+      "name": "QUALITY ≠ WORKFLOW DECOUPLING",
+      "rule": "Quality status (PASS/FAIL/PENDING/UNKNOWN) is completely independent of workflow status (DRAFT/IN_REVIEW/FINAL/APPROVED/RELEASED)."
+    },
+    {
+      "id": "PRINCIPLE-003",
+      "name": "NO IMPLICIT PASS",
+      "rule": "Missing, null, empty, or error states must never default to PASS or isPass=true."
+    },
+    {
+      "id": "PRINCIPLE-004",
+      "name": "NO IMPLICIT FAIL",
+      "rule": "Unfinished or unmapped data must remain PENDING or UNKNOWN, never forcibly converted to FAIL."
+    },
+    {
+      "id": "PRINCIPLE-005",
+      "name": "CANONICAL QUALITY EVALUATION",
+      "rule": "Quality conclusions must only be evaluated by Canonical Quality Engine / Resolvers, not by UI components."
+    },
+    {
+      "id": "PRINCIPLE-006",
+      "name": "EVIDENCE BEFORE CONCLUSION",
+      "rule": "Conclusions must be preceded by measurements, criteria results, and cryptographic snapshot sealing."
+    },
+    {
+      "id": "PRINCIPLE-007",
+      "name": "CURRENT DATA BEFORE LEGACY DATA",
+      "rule": "Valid snapshot evaluation takes precedence over re-evaluation; re-evaluation takes precedence over legacy stored fields."
+    },
+    {
+      "id": "PRINCIPLE-008",
+      "name": "FINALIZED DATA PROTECTION",
+      "rule": "Finalized, approved, or released records are strictly locked from direct modification."
+    },
+    {
+      "id": "PRINCIPLE-009",
+      "name": "AI IS ADVISORY",
+      "rule": "AI operates strictly as Human-in-the-Loop advisory (OCR, prediction, proposal). AI cannot directly mutate regulated records."
+    },
+    {
+      "id": "PRINCIPLE-010",
+      "name": "FAIL CLOSED",
+      "rule": "When required data or security conditions are missing, the system denies action immediately instead of guessing or scanning all data."
+    },
+    {
+      "id": "PRINCIPLE-011",
+      "name": "IMMUTABLE AUDIT",
+      "rule": "Audit trails are append-only with SHA-256 hash chaining. Modification or deletion is blocked for all users including ADMIN."
+    },
+    {
+      "id": "PRINCIPLE-012",
+      "name": "TRACEABILITY",
+      "rule": "Every decision must trace from Batch to TestResult, Criterion, Limits, TCCS, Formula, and Raw Material."
+    },
+    {
+      "id": "PRINCIPLE-013",
+      "name": "ATOMIC REGULATED MUTATION",
+      "rule": "Multi-step mutations must be committed as atomic all-or-nothing transactions with rollback on failure."
+    },
+    {
+      "id": "PRINCIPLE-014",
+      "name": "VERSION AWARENESS",
+      "rule": "Optimistic Concurrency Control rejects stale writes where expectedVersion !== currentVersion."
+    },
+    {
+      "id": "PRINCIPLE-015",
+      "name": "UI IS NOT BUSINESS AUTHORITY",
+      "rule": "UI only presents state and invokes authorized services; UI does not determine domain truth."
+    }
+  ],
+  "qualityStates": [
+    {
+      "status": "PASS",
+      "description": "All required criteria met specification limits",
+      "canRelease": true
+    },
+    {
+      "status": "FAIL",
+      "description": "At least one required criterion failed out-of-specification",
+      "canRelease": false
+    },
+    {
+      "status": "PENDING",
+      "description": "Testing is incomplete or measurements are pending",
+      "canRelease": false
+    },
+    {
+      "status": "UNKNOWN",
+      "description": "Empty record or unbound specification",
+      "canRelease": false
+    }
+  ],
+  "batchWorkflowStates": [
+    { "status": "PENDING", "validTransitions": ["TESTING", "REJECTED"] },
+    { "status": "TESTING", "validTransitions": ["RELEASED", "REJECTED", "BLOCKED"] },
+    { "status": "RELEASED", "validTransitions": ["BLOCKED"] },
+    { "status": "REJECTED", "validTransitions": ["PENDING"] },
+    { "status": "BLOCKED", "validTransitions": ["TESTING", "REJECTED"] }
+  ],
+  "testResultWorkflowStates": [
+    { "status": "DRAFT", "validTransitions": ["SUBMITTED", "FINAL"] },
+    { "status": "SUBMITTED", "validTransitions": ["FINAL", "DRAFT"] },
+    { "status": "FINAL", "validTransitions": ["APPROVED", "SUPERSEDED"] },
+    { "status": "APPROVED", "validTransitions": ["RELEASED", "SUPERSEDED"] },
+    { "status": "RELEASED", "validTransitions": ["SUPERSEDED"] },
+    { "status": "SUPERSEDED", "validTransitions": [] }
+  ],
+  "releaseGatePrerequisites": [
+    "validBatchInfo",
+    "validBiologicalDates",
+    "authoritativeTestResultPresent",
+    "canonicalQualityStatusPass",
+    "evaluationSnapshotHashValid",
+    "zeroOpenCriticalDeviations",
+    "authorizedRoleAdminOrQa",
+    "validElectronicSignature"
+  ],
+  "roles": [
+    { "role": "ADMIN", "description": "Full administrative governance and security oversight" },
+    {
+      "role": "QA",
+      "description": "Quality Assurance: Release authorization, TCCS approval, CAPA closure"
+    },
+    { "role": "QC", "description": "Quality Control: Test result verification, trend analysis" },
+    { "role": "LAB", "description": "Lab Analyst: Data entry, OCR ingestion" },
+    { "role": "PRODUCTION", "description": "Manufacturing batch creation and yield logging" },
+    { "role": "VIEWER", "description": "Read-only audit inspection and 360 overview" },
+    { "role": "GUEST", "description": "Unassigned new account awaiting administrative approval" }
+  ]
+}

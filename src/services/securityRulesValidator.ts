@@ -1,0 +1,388 @@
+/**
+ * PQM Security Rules Validator (Client/Application Guard)
+ * Mô phỏng và tiền kiểm soát các ràng buộc an ninh của database.rules.json và storage.rules
+ * Tuân thủ chuẩn GMP & ALCOA+: Phân quyền vai trò, Chống leo thang quyền hạn, Bất biến Audit Trail.
+ */
+
+import { Role } from '../types';
+
+export interface SecurityUserContext {
+  uid: string;
+  email?: string;
+  role: Role | null;
+  isAdmin: boolean;
+}
+
+export type SecurityAction = 'READ' | 'CREATE' | 'UPDATE' | 'DELETE';
+
+export interface SecurityValidationResult {
+  allowed: boolean;
+  reason?: string;
+}
+
+export class SecurityRulesValidator {
+  /**
+   * Kiểm tra quyền truy cập vào đường dẫn dữ liệu
+   */
+  static evaluate(
+    user: SecurityUserContext | null,
+    action: SecurityAction,
+    resourcePath: string,
+    payload?: any,
+    currentData?: any
+  ): SecurityValidationResult {
+    // 1. Chưa đăng nhập: chặn mọi thao tác
+    if (!user || !user.uid) {
+      return { allowed: false, reason: 'Chưa xác thực: Yêu cầu đăng nhập để truy cập tài nguyên.' };
+    }
+
+    // 1.5. Tài khoản GUEST: chỉ được đọc /users/ chính mình, cấm đọc mọi dữ liệu chất lượng sản xuất
+    if (user.role === 'GUEST') {
+      const segments = resourcePath.split('/');
+      if (segments[0] === 'users' && segments[1] === user.uid && action === 'READ') {
+        return { allowed: true };
+      }
+      return {
+        allowed: false,
+        reason: 'Tài khoản GUEST chưa được phê duyệt quyền truy cập dữ liệu chất lượng sản xuất.',
+      };
+    }
+
+    // 2. ADMIN có toàn quyền
+    if (user.isAdmin || user.role === 'ADMIN') {
+      // Ngoại lệ 1 của ADMIN: Không được UPDATE hoặc DELETE Audit Trail (Quy định ALCOA+ bất biến)
+      if (resourcePath.startsWith('audit_logs') && (action === 'UPDATE' || action === 'DELETE')) {
+        return {
+          allowed: false,
+          reason: 'ALCOA+ Violation: Nhật ký kiểm toán là bất biến, không thể sửa đổi hoặc xóa.',
+        };
+      }
+      // Ngoại lệ 2 (GAP-07): Cấm client đặt status = RELEASED (Bắt buộc External Backend Authority)
+      if (resourcePath.startsWith('batches') && (action === 'UPDATE' || action === 'CREATE')) {
+        if (payload?.status === 'RELEASED') {
+          return {
+            allowed: false,
+            reason:
+              'Database Guard Violation (GAP-07) & Server Authority Enforcement: Client không được phép trực tiếp chuyển status thành RELEASED. Lệnh xuất xưởng phải thực hiện qua External Backend Authority (POST /api/batch-release/approve).',
+          };
+        }
+      }
+      return { allowed: true };
+    }
+
+    const segments = resourcePath.split('/');
+    const rootCollection = segments[0];
+
+    // Chốt chặn máy chủ (Server-Only Collections): Cấm client tự ý ghi
+    if (rootCollection === 'release_commands' && action !== 'READ') {
+      return {
+        allowed: false,
+        reason: `Server-Only Collection: Thao tác ghi trên '${rootCollection}' chỉ được thực hiện thông qua Cloud Function máy chủ.`,
+      };
+    }
+
+    // 3. Ràng buộc Audit Trail
+    if (rootCollection === 'audit_logs') {
+      if (action === 'CREATE') {
+        if (!payload?.timestamp && !payload?.createdAt) {
+          return { allowed: false, reason: 'Bản ghi audit log thiếu timestamp.' };
+        }
+        return { allowed: true };
+      }
+      return { allowed: false, reason: 'Nhật ký audit trail chỉ cho phép thêm mới (Append-only).' };
+    }
+
+    // 4. Ràng buộc Users (Chống leo thang đặc quyền)
+    if (rootCollection === 'users') {
+      if (action === 'READ') {
+        const targetUid = segments[1];
+        if (targetUid === user.uid) return { allowed: true };
+        return { allowed: false, reason: 'Chỉ được xem thông tin tài khoản của chính mình.' };
+      }
+      if (action === 'UPDATE' || action === 'CREATE') {
+        // Cho phép tài khoản mới tạo profile tự gán role mặc định là GUEST và isAdmin: false
+        if (action === 'CREATE' && (!currentData || Object.keys(currentData).length === 0)) {
+          if (payload?.isAdmin) {
+            return { allowed: false, reason: 'Không có quyền tự cấp quyền Admin.' };
+          }
+          if (payload?.role && payload.role !== 'GUEST') {
+            return {
+              allowed: false,
+              reason: 'Không có quyền tự cấp quyền (Role Escalation Prevention).',
+            };
+          }
+          return { allowed: true };
+        }
+        if (payload?.role || payload?.isAdmin) {
+          return {
+            allowed: false,
+            reason: 'Không có quyền tự cấp quyền (Role Escalation Prevention).',
+          };
+        }
+        return { allowed: true };
+      }
+      return { allowed: false, reason: 'Chỉ Admin mới có quyền xóa tài khoản.' };
+    }
+
+    // 5. Ràng buộc Sản phẩm & Danh mục Master Data
+    if (rootCollection === 'products' || rootCollection === 'raw_materials') {
+      if (action === 'READ') return { allowed: true };
+      if (user.role === 'QA') return { allowed: true };
+      return {
+        allowed: false,
+        reason: 'Chỉ QA hoặc Admin mới có quyền sửa đổi dữ liệu sản phẩm / danh mục.',
+      };
+    }
+
+    // 5.1. Ràng buộc Công thức Sản phẩm (Bảo mật công nghệ/IP)
+    if (rootCollection === 'product_formulas') {
+      if (action === 'READ') {
+        const canReadFormula =
+          user.isAdmin || user.role === 'QA' || user.role === 'QC' || user.role === 'PRODUCTION';
+        if (!canReadFormula) {
+          return {
+            allowed: false,
+            reason: 'Chỉ QA, QC, Sản xuất hoặc Admin mới có quyền truy cập công thức sản phẩm.',
+          };
+        }
+        return { allowed: true };
+      }
+      if (user.role === 'QA') return { allowed: true };
+      return {
+        allowed: false,
+        reason: 'Chỉ QA hoặc Admin mới có quyền sửa đổi công thức sản phẩm.',
+      };
+    }
+
+    // 6. Ràng buộc TCCS
+    if (rootCollection === 'tccs') {
+      if (action === 'READ') return { allowed: true };
+      if (user.role === 'QA') return { allowed: true };
+      return {
+        allowed: false,
+        reason: 'Chỉ QA hoặc Admin mới có quyền cập nhật Tiêu chuẩn cơ sở.',
+      };
+    }
+
+    // 7. Ràng buộc Lô sản xuất (Batches) (WF-006, WF-009, WF-010, WF-011)
+    if (rootCollection === 'batches') {
+      if (action === 'READ') return { allowed: true };
+
+      const isQaOrAdmin = user.role === 'QA' || (user as any).isAdmin === true;
+
+      // 7.1. Tạo mới lô: Bắt buộc trạng thái ban đầu là PENDING (WF-004)
+      if (action === 'CREATE') {
+        if (payload?.status && payload.status !== 'PENDING') {
+          return {
+            allowed: false,
+            reason: 'Lô sản xuất mới tạo bắt buộc phải có trạng thái PENDING.',
+          };
+        }
+        return { allowed: true };
+      }
+
+      // 7.2. Kiểm tra thay đổi trạng thái (Workflow Status Mutation Guard)
+      if (action === 'UPDATE') {
+        // Chuyển trạng thái sang RELEASED, REJECTED, BLOCKED: BẮT BUỘC QA hoặc ADMIN
+        if (
+          payload?.status === 'RELEASED' ||
+          payload?.status === 'REJECTED' ||
+          payload?.status === 'BLOCKED'
+        ) {
+          if (!isQaOrAdmin) {
+            return {
+              allowed: false,
+              reason:
+                'Chỉ QA mới có thẩm quyền Phê duyệt xuất xưởng (RELEASED) hoặc Từ chối (REJECTED) lô sản xuất. Server Authority Enforcement: Client không được phép trực tiếp chuyển status thành RELEASED.',
+            };
+          }
+        }
+
+        // Chặn client trực tiếp chuyển status thành RELEASED nếu không phải quy trình chuyển đổi hợp lệ TESTING -> RELEASED
+        if (payload?.status === 'RELEASED') {
+          if (currentData?.status !== 'TESTING') {
+            return {
+              allowed: false,
+              reason:
+                'Database Guard Violation (GAP-07) & Server Authority Enforcement: Client không được phép trực tiếp chuyển status thành RELEASED. Lệnh xuất xưởng phải thực hiện qua External Backend Authority (POST /api/batch-release/approve).',
+            };
+          }
+        }
+
+        if (payload?.status && currentData?.status && payload.status !== currentData.status) {
+          const from = currentData.status;
+          const to = payload.status;
+
+          // Bất biến: Chống các chuyển đổi bất hợp pháp bất kể vai trò
+          if (from === 'PENDING' && to === 'RELEASED') {
+            return {
+              allowed: false,
+              reason:
+                'Chuyển trạng thái bất hợp pháp: Không thể chuyển trực tiếp PENDING -> RELEASED.',
+            };
+          }
+          if (from === 'TESTING' && to === 'PENDING') {
+            return {
+              allowed: false,
+              reason: 'Chuyển trạng thái bất hợp pháp: Không thể quay lại PENDING từ TESTING.',
+            };
+          }
+          if (from === 'RELEASED' && (to === 'PENDING' || to === 'TESTING' || to === 'REJECTED')) {
+            return {
+              allowed: false,
+              reason: `Chuyển trạng thái bất hợp pháp: Lô đã RELEASED không thể chuyển sang ${to}.`,
+            };
+          }
+          if (from === 'REJECTED' && (to === 'RELEASED' || to === 'TESTING')) {
+            return {
+              allowed: false,
+              reason: `Chuyển trạng thái bất hợp pháp: Lô đã REJECTED không thể chuyển sang ${to}.`,
+            };
+          }
+
+          if (from === 'REJECTED' && to === 'PENDING') {
+            if (!isQaOrAdmin) {
+              return {
+                allowed: false,
+                reason:
+                  'Chỉ QA hoặc Quản trị viên mới có thẩm quyền mở lại Lô REJECTED sang PENDING theo quy trình CAPA.',
+              };
+            }
+          }
+          if (from === 'BLOCKED' && to === 'TESTING') {
+            if (!isQaOrAdmin) {
+              return {
+                allowed: false,
+                reason: 'Chỉ QA hoặc Quản trị viên mới có thẩm quyền mở khóa BLOCKED sang TESTING.',
+              };
+            }
+          }
+        }
+
+        // 7.3. Lô đã đóng (RELEASED / REJECTED / BLOCKED): Không cho phép người dùng thường sửa đổi
+        if (
+          (currentData?.status === 'RELEASED' ||
+            currentData?.status === 'REJECTED' ||
+            currentData?.status === 'BLOCKED') &&
+          !isQaOrAdmin
+        ) {
+          return {
+            allowed: false,
+            reason: `Lô sản xuất ở trạng thái ${currentData.status} bị khóa, chỉ QA hoặc Quản trị viên mới có quyền cập nhật.`,
+          };
+        }
+      }
+
+      return { allowed: true };
+    }
+
+    // 8. Ràng buộc Phiếu kiểm nghiệm (Test Results)
+    if (rootCollection === 'testResults') {
+      if (action === 'READ') return { allowed: true };
+      // Chuyển workflowStatus sang APPROVED hoặc RELEASED: BẮT BUỘC QA hoặc ADMIN
+      if (
+        (payload?.workflowStatus === 'APPROVED' || payload?.workflowStatus === 'RELEASED') &&
+        user.role !== 'QA'
+      ) {
+        return {
+          allowed: false,
+          reason:
+            'Chỉ QA mới có thẩm quyền Phê duyệt (APPROVED) hoặc Xuất xưởng (RELEASED) phiếu kiểm nghiệm.',
+        };
+      }
+      // Nếu phiếu đã có evaluationSnapshot (đã chốt đánh giá) hoặc LOCKED/APPROVED: chặn LAB/QC/USER sửa đổi
+      if (
+        (currentData?.evaluationSnapshot ||
+          currentData?.overallStatus === 'APPROVED' ||
+          currentData?.workflowStatus === 'APPROVED' ||
+          currentData?.status === 'LOCKED') &&
+        user.role !== 'QA'
+      ) {
+        return {
+          allowed: false,
+          reason:
+            'Phiếu kiểm nghiệm đã được khóa/duyệt hoặc đã có snapshot đánh giá (chốt kết quả), không thể sửa đổi.',
+        };
+      }
+      return { allowed: true };
+    }
+
+    // 9. Ràng buộc Cảnh báo chất lượng (Quality Alerts)
+    if (rootCollection === 'quality_alerts') {
+      return { allowed: true };
+    }
+
+    // 10. Ràng buộc Chữ ký điện tử (FDA 21 CFR Part 11 - Server Authority Only)
+    if (rootCollection === 'electronic_signatures') {
+      if (action === 'READ') return { allowed: true };
+      return {
+        allowed: false,
+        reason:
+          'Server Authority Enforcement: Client cấm ghi vào electronic_signatures (.write=false). Chỉ External Backend Authority mới có quyền tạo bản ghi chữ ký.',
+      };
+    }
+
+    return { allowed: true };
+  }
+
+  /**
+   * Kiểm tra tính hợp lệ của tệp tải lên Firebase Storage
+   */
+  static validateStorageUpload(
+    user: SecurityUserContext | null,
+    folder: string,
+    file: { size: number; type: string }
+  ): SecurityValidationResult {
+    if (!user) {
+      return { allowed: false, reason: 'Chưa đăng nhập: Không thể tải tệp lên hệ thống.' };
+    }
+
+    // 1. Chứng nhận CoA điện tử
+    if (folder === 'coas') {
+      if (user.role !== 'QA' && !user.isAdmin) {
+        return { allowed: false, reason: 'Chỉ QA mới có quyền tải lên chứng nhận CoA.' };
+      }
+      if (file.type !== 'application/pdf') {
+        return { allowed: false, reason: 'Chứng nhận CoA bắt buộc phải là định dạng PDF.' };
+      }
+      if (file.size > 10 * 1024 * 1024) {
+        return { allowed: false, reason: 'Tệp CoA không được vượt quá 10MB.' };
+      }
+      return { allowed: true };
+    }
+
+    // 2. Tài liệu kiểm nghiệm (test_attachments)
+    if (folder === 'test_attachments') {
+      const allowedTypes = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
+      if (!allowedTypes.includes(file.type)) {
+        return {
+          allowed: false,
+          reason: 'Tệp đính kèm chỉ chấp nhận định dạng PDF hoặc hình ảnh (JPEG, PNG, WEBP).',
+        };
+      }
+      if (file.size > 20 * 1024 * 1024) {
+        return { allowed: false, reason: 'Tệp đính kèm không được vượt quá 20MB.' };
+      }
+      return { allowed: true };
+    }
+
+    // 3. Ảnh mẫu sản phẩm
+    if (folder === 'product_images') {
+      if (user.role !== 'QA' && !user.isAdmin) {
+        return {
+          allowed: false,
+          reason: 'Chỉ QA hoặc Admin mới có quyền cập nhật hình ảnh sản phẩm.',
+        };
+      }
+      if (!file.type.startsWith('image/')) {
+        return { allowed: false, reason: 'Tệp tải lên phải là hình ảnh.' };
+      }
+      if (file.size > 5 * 1024 * 1024) {
+        return { allowed: false, reason: 'Ảnh sản phẩm không được vượt quá 5MB.' };
+      }
+      return { allowed: true };
+    }
+
+    return { allowed: user.isAdmin, reason: user.isAdmin ? undefined : 'Đường dẫn không hợp lệ.' };
+  }
+}

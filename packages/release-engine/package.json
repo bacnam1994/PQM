@@ -1,0 +1,11 @@
+{
+  "name": "@pqm/release-engine",
+  "version": "1.0.0",
+  "description": "PQM Canonical Release Engine & Strict Signature Verification",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc"
+  },
+  "private": true
+}

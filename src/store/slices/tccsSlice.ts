@@ -1,0 +1,147 @@
+import { tccsAppService } from '../../services/app/TCCSAppService';
+import { queryClient } from '../../lib/queryClient';
+import { TCCS_QUERY_KEYS } from '../../constants/queryKeys';
+import { TCCSSlice, StoreSlice } from './types';
+import { TCCS, CriteriaAlias } from '../../types';
+import { resolveCurrentIdentity } from '../utils/storeHelpers';
+
+export const createTCCSSlice: StoreSlice<TCCSSlice> = (set, get) => ({
+  // --- INITIAL TCCS STATE ---
+  tccsList: [],
+  criteriaAliases: [],
+  aiLearnedMappings: [],
+
+  // --- TCCS ACTIONS ---
+  addTCCS: async (t: TCCS) => {
+    try {
+      const state = get();
+      await tccsAppService.createTCCS(t, state.tccsList, resolveCurrentIdentity(state));
+      queryClient.invalidateQueries({ queryKey: TCCS_QUERY_KEYS.all });
+      if (t.productId) {
+        queryClient.invalidateQueries({ queryKey: TCCS_QUERY_KEYS.byProduct(t.productId) });
+      }
+    } catch (error: any) {
+      get().notify({ type: 'ERROR', title: 'Lỗi lưu TCCS', message: error.message });
+      throw error;
+    }
+  },
+
+  updateTCCS: async (t: TCCS) => {
+    try {
+      const state = get();
+      const oldTCCS = state.tccsList.find((item: TCCS) => item.id === t.id);
+      await tccsAppService.updateTCCS(
+        t,
+        oldTCCS,
+        state.criteriaAliases,
+        resolveCurrentIdentity(state)
+      );
+      queryClient.invalidateQueries({ queryKey: TCCS_QUERY_KEYS.all });
+      queryClient.invalidateQueries({ queryKey: TCCS_QUERY_KEYS.detail(t.id) });
+      if (t.productId) {
+        queryClient.invalidateQueries({ queryKey: TCCS_QUERY_KEYS.byProduct(t.productId) });
+      }
+    } catch (error: any) {
+      get().notify({ type: 'ERROR', title: 'Lỗi cập nhật TCCS', message: error.message });
+      throw error;
+    }
+  },
+
+  deleteTCCS: async (id: string) => {
+    try {
+      const state = get();
+      const tccs = state.tccsList.find((t: TCCS) => t.id === id);
+      await tccsAppService.deleteTCCS(
+        id,
+        state.batches,
+        resolveCurrentIdentity(state),
+        tccs?.code,
+        state.criteriaAliases
+      );
+      queryClient.invalidateQueries({ queryKey: TCCS_QUERY_KEYS.all });
+    } catch (error: any) {
+      get().notify({ type: 'WARNING', title: 'Không thể xóa', message: error.message });
+      throw error;
+    }
+  },
+
+  // --- AI LEARNED MAPPING ACTIONS ---
+  addAiLearnedMapping: async (originalName: string, systemName: string) => {
+    try {
+      const state = get();
+      await tccsAppService.addAiLearnedMapping(
+        originalName,
+        systemName,
+        state.aiLearnedMappings,
+        resolveCurrentIdentity(state)
+      );
+      queryClient.invalidateQueries({ queryKey: TCCS_QUERY_KEYS.aiMappings });
+    } catch (e: any) {
+      console.error('Lỗi cập nhật AI Learned Mapping:', e);
+    }
+  },
+
+  // --- CRITERIA ALIAS ACTIONS ---
+  addCriteriaAlias: async (alias: CriteriaAlias) => {
+    try {
+      await tccsAppService.addCriteriaAlias(alias, resolveCurrentIdentity(get()));
+      queryClient.invalidateQueries({ queryKey: TCCS_QUERY_KEYS.aliases });
+    } catch (error: any) {
+      get().notify({ type: 'ERROR', title: 'Lỗi tạo Criteria Alias', message: error.message });
+      throw error;
+    }
+  },
+
+  updateCriteriaAlias: async (alias: CriteriaAlias) => {
+    try {
+      await tccsAppService.updateCriteriaAlias(alias, get().user);
+      queryClient.invalidateQueries({ queryKey: TCCS_QUERY_KEYS.aliases });
+    } catch (error: any) {
+      get().notify({ type: 'ERROR', title: 'Lỗi cập nhật Criteria Alias', message: error.message });
+      throw error;
+    }
+  },
+
+  deleteCriteriaAlias: async (id: string) => {
+    try {
+      const alias = get().criteriaAliases.find((a: CriteriaAlias) => a.id === id);
+      await tccsAppService.deleteCriteriaAlias(id, get().user, alias?.canonicalName);
+      queryClient.invalidateQueries({ queryKey: TCCS_QUERY_KEYS.aliases });
+    } catch (error: any) {
+      get().notify({ type: 'ERROR', title: 'Lỗi xóa Criteria Alias', message: error.message });
+      throw error;
+    }
+  },
+
+  confirmCriteriaAlias: async (id: string) => {
+    try {
+      const alias = get().criteriaAliases.find((a: CriteriaAlias) => a.id === id);
+      if (!alias) return;
+      await tccsAppService.confirmCriteriaAlias(alias, get().user);
+      queryClient.invalidateQueries({ queryKey: TCCS_QUERY_KEYS.aliases });
+      get().notify({
+        type: 'SUCCESS',
+        message: `Đã xác nhận alias cho "${alias.canonicalName}"`,
+      });
+    } catch (error: any) {
+      get().notify({ type: 'ERROR', title: 'Lỗi xác nhận Criteria Alias', message: error.message });
+      throw error;
+    }
+  },
+
+  addAliasToExisting: async (aliasId: string, newAlias: string) => {
+    try {
+      const alias = get().criteriaAliases.find((a: CriteriaAlias) => a.id === aliasId);
+      if (!alias) return;
+      await tccsAppService.addAliasToExisting(alias, newAlias, get().user);
+      queryClient.invalidateQueries({ queryKey: TCCS_QUERY_KEYS.aliases });
+      get().notify({
+        type: 'SUCCESS',
+        message: `Đã thêm alias "${newAlias}" cho "${alias.canonicalName}"`,
+      });
+    } catch (error: any) {
+      get().notify({ type: 'ERROR', title: 'Lỗi thêm alias', message: error.message });
+      throw error;
+    }
+  },
+});

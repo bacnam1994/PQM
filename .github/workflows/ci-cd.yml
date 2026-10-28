@@ -1,0 +1,253 @@
+name: PQM Continuous Integration & Deployment (CI/CD)
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ─────────────────────────────────────────────────────────────
+  # JOB 1: Typecheck, Backend Build/Test, Security Rules & Vitest
+  # ─────────────────────────────────────────────────────────────
+  quality-gate:
+    name: Quality Gate & Verification (Typecheck, Backend, Rules & Vitest)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: 1. Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: 1. Root Dependencies (npm ci)
+        run: npm ci
+
+      - name: 2. Frontend & Shared Engine Typecheck
+        run: npm run typecheck
+
+      - name: 3. Backend Dependencies (npm ci & build shared packages)
+        run: |
+          cd packages/release-engine
+          npm run build
+          cd ../../backend
+          npm ci
+          cd ..
+
+      - name: 4. Backend Typecheck
+        run: |
+          cd backend
+          npm run typecheck
+          cd ..
+
+      - name: 5. Backend Build
+        run: |
+          cd backend
+          npm run build
+          cd ..
+
+      - name: 6. Backend Unit & Integration Tests
+        run: |
+          cd backend
+          npm test
+          cd ..
+        env:
+          NODE_ENV: test
+          CI: true
+
+      - name: 7. Firebase Security Rules Tests
+        run: npx vitest run src/services/rulesAudit.test.ts src/services/securityRulesValidator.test.ts tests/security/firebaseRulesSecurity.test.ts
+
+      - name: 8. Full Vitest Test Suite (1889+ tests)
+        run: npm run test -- --run
+
+  # ─────────────────────────────────────────────────────────────
+  # JOB 2: End-to-End Tests with Playwright (Chromium)
+  # ─────────────────────────────────────────────────────────────
+  e2e-tests:
+    name: 9. Playwright End-to-End Tests
+    needs: quality-gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Install Playwright Chromium Browser
+        run: npx playwright install --with-deps chromium
+
+      - name: Run Playwright Tests (Chromium)
+        run: npx playwright test --project=chromium
+        env:
+          CI: true
+          VITE_E2E: 'true'
+          VITE_FIREBASE_API_KEY: 'AIzaSyTestSafeMockApiKeyForVitest001'
+
+      - name: Upload Playwright Report Artifact
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 14
+
+  # ─────────────────────────────────────────────────────────────
+  # JOB 3: Production Build, Backend Deploy & Firebase Hosting
+  # ─────────────────────────────────────────────────────────────
+  build-and-deploy:
+    name: Production Build, Backend Deploy & Hosting Deploy
+    needs: [quality-gate, e2e-tests]
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    # Deploy on push or workflow_dispatch to main or master
+    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+    env:
+      FIREBASE_SA: ${{ secrets['FIREBASE_SERVICE_ACCOUNT_V_BIOTECH'] }}
+      FIREBASE_TOKEN: ${{ secrets['FIREBASE_TOKEN'] }}
+      VITE_BACKEND_API_URL: ${{ secrets['VITE_BACKEND_API_URL'] || 'https://pqm-backend.onrender.com' }}
+      BACKEND_DEPLOY_HOOK_URL: ${{ secrets['BACKEND_DEPLOY_HOOK_URL'] }}
+
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: 11. Verify VITE_BACKEND_API_URL (Production Fail-Fast Guard)
+        run: |
+          if [ -z "$VITE_BACKEND_API_URL" ]; then
+            echo "::error::CRITICAL: VITE_BACKEND_API_URL is missing. Production build forbidden without backend API URL."
+            exit 1
+          fi
+          if echo "$VITE_BACKEND_API_URL" | grep -qE "localhost|127\.0\.0\.1"; then
+            echo "::error::CRITICAL: VITE_BACKEND_API_URL must NOT be localhost or 127.0.0.1 in production!"
+            exit 1
+          fi
+          if ! echo "$VITE_BACKEND_API_URL" | grep -q "^https://"; then
+            echo "::error::CRITICAL: VITE_BACKEND_API_URL must start with https:// in production!"
+            exit 1
+          fi
+          echo "Verified VITE_BACKEND_API_URL format is valid: $VITE_BACKEND_API_URL"
+
+      - name: 10. Build Frontend Production Bundle (Vite)
+        run: npm run build
+        env:
+          VITE_BACKEND_API_URL: ${{ env.VITE_BACKEND_API_URL }}
+
+      - name: 11. Secret Scan Guard (Verify frontend bundle contains NO server secrets)
+        run: |
+          # Detect unauthorized 39-character Google/Gemini API keys (AIzaSy followed by 33 base64url characters)
+          # Exclude the public Firebase client configuration key
+          UNAUTHORIZED_KEYS=$(grep -rnoE "AIzaSy[A-Za-z0-9_-]{33}" dist/ 2>/dev/null | grep -v "AIzaSyD9vhI4dxnj87u_TIrjiu2Z-4Zm_1np6c0" || true)
+          if [ -n "$UNAUTHORIZED_KEYS" ]; then
+            echo "::error::CRITICAL SECURITY BREACH: Unauthorized Google API Key detected in dist/ bundle!"
+            echo "$UNAUTHORIZED_KEYS"
+            exit 1
+          fi
+          echo "Verified: Frontend bundle is 100% clean of unauthorized Google API secrets."
+
+      - name: Build External Backend Artifacts
+        run: |
+          cd backend
+          npm ci
+          npm run build
+          cd ..
+
+      - name: 12 & 13. Deploy Backend & Verify Live Health (/health & /api/ai/health)
+        run: |
+          if [ -n "$BACKEND_DEPLOY_HOOK_URL" ]; then
+            echo "Deploying External Backend via Deploy Hook..."
+            HOOK_STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$BACKEND_DEPLOY_HOOK_URL")
+            if [ "$HOOK_STATUS" -lt 200 ] || [ "$HOOK_STATUS" -ge 400 ]; then
+              echo "::error::Backend deploy hook returned HTTP $HOOK_STATUS. Deploy hook execution failed!"
+              exit 1
+            fi
+            echo "Deploy hook triggered successfully (HTTP $HOOK_STATUS). Waiting for backend to warm up..."
+            HEALTHY=false
+            for i in $(seq 1 24); do
+              HEALTH_RESP=$(curl -fsS --max-time 10 "$VITE_BACKEND_API_URL/health" 2>/dev/null || echo "")
+              AI_HEALTH_RESP=$(curl -fsS --max-time 10 "$VITE_BACKEND_API_URL/api/ai/health" 2>/dev/null || echo "")
+              if echo "$HEALTH_RESP" | grep -q '"status":"healthy"' && echo "$AI_HEALTH_RESP" | grep -q '"service":"pqm-ai-backend"'; then
+                echo "External Backend verified healthy on attempt $i!"
+                echo "Backend Health: $HEALTH_RESP"
+                echo "AI Service Health: $AI_HEALTH_RESP"
+                HEALTHY=true
+                break
+              fi
+              echo "Attempt $i: Backend warming up, retrying in 5s..."
+              sleep 5
+            done
+            if [ "$HEALTHY" != "true" ]; then
+              echo "::error::Backend health check failed at $VITE_BACKEND_API_URL after 120s."
+              exit 1
+            fi
+          else
+            echo "No BACKEND_DEPLOY_HOOK_URL configured. Verifying live production backend health at $VITE_BACKEND_API_URL..."
+            HEALTH_RESP=$(curl -fsS --max-time 10 "$VITE_BACKEND_API_URL/health" 2>/dev/null || echo "")
+            AI_HEALTH_RESP=$(curl -fsS --max-time 10 "$VITE_BACKEND_API_URL/api/ai/health" 2>/dev/null || echo "")
+            if echo "$HEALTH_RESP" | grep -q '"status":"healthy"' && echo "$AI_HEALTH_RESP" | grep -q '"service":"pqm-ai-backend"'; then
+              echo "Production backend is healthy and reachable: $HEALTH_RESP"
+              echo "AI service is reachable: $AI_HEALTH_RESP"
+            else
+              echo "::error::CRITICAL: Production backend at $VITE_BACKEND_API_URL is NOT reachable and BACKEND_DEPLOY_HOOK_URL secret is not configured!"
+              echo "::error::Running backend locally on runner is strictly forbidden as proof of production deployment."
+              echo "::error::Backend deployment is BLOCKED until the external backend service is active and responding."
+              exit 1
+            fi
+          fi
+
+      - name: 14. Deploy to Firebase Hosting (STRICTLY --only hosting, zero functions)
+        if: env.FIREBASE_SA != ''
+        run: |
+          echo '${{ env.FIREBASE_SA }}' > $RUNNER_TEMP/firebase_sa.json
+          GOOGLE_APPLICATION_CREDENTIALS=$RUNNER_TEMP/firebase_sa.json npx firebase-tools deploy --only hosting --project v-biotech
+          rm -f $RUNNER_TEMP/firebase_sa.json
+
+      - name: 14. Deploy to Firebase Hosting (via FIREBASE_TOKEN fallback)
+        if: env.FIREBASE_SA == '' && env.FIREBASE_TOKEN != ''
+        run: npx firebase-tools deploy --only hosting --token "${{ env.FIREBASE_TOKEN }}" --project v-biotech
+
+      - name: 15. Production Smoke Test (Firebase Hosting)
+        if: env.FIREBASE_SA != '' || env.FIREBASE_TOKEN != ''
+        run: |
+          echo "Verifying production Firebase Hosting endpoint..."
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://v-biotech.web.app)
+          if [ "$STATUS" -ge 200 ] && [ "$STATUS" -lt 400 ]; then
+            echo "Production Firebase Hosting is healthy (HTTP $STATUS)"
+          else
+            echo "::warning::Production Hosting returned HTTP $STATUS (CDN may need propagation)"
+          fi
+
+      - name: Informational Notice (If no Firebase secrets configured yet)
+        if: env.FIREBASE_SA == '' && env.FIREBASE_TOKEN == ''
+        run: |
+          echo "ℹ️ Lưu ý: Build hoàn tất thành công 100%!"
+          echo "Để kích hoạt tự động deploy lên Firebase (v-biotech):"
+          echo "Vui lòng cấu hình Secret 'FIREBASE_SERVICE_ACCOUNT_V_BIOTECH' hoặc 'FIREBASE_TOKEN' trong Settings -> Secrets của GitHub Repository."

@@ -1,0 +1,142 @@
+/**
+ * CAPA DOMAIN: APPLICATION SERVICE
+ *
+ * Điều phối quy trình Hành Động Khắc Phục và Phòng Ngừa (CAPA Closed-Loop)
+ * Tuân thủ 100% tài liệu:
+ * - docs/business-rules/BR_10_CAPA_RULES.md (BR-CAP-001 -> BR-CAP-004)
+ * - docs/specs/FRS_13_CAPA_MANAGEMENT.md
+ * - ICH Q10 Pharmaceutical Quality System & Closed-Loop CAPA
+ */
+
+import { QualityDeviation, ElectronicSignature, CreateCapaPlanDto } from '../domain/types';
+import { CAPARules } from '../domain/rules';
+import { deviationAppService } from '../../deviation/application/service';
+import { signatureService } from '../../../services/signatureService';
+import { logAuditAction } from '../../../services/auditService';
+
+export class CAPAService {
+  /**
+   * Tạo kế hoạch hành động CAPA mới gắn với hồ sơ sai lệch (BR-CAP-001)
+   */
+  public async addCapaAction(dto: CreateCapaPlanDto, currentUser: any): Promise<QualityDeviation> {
+    const isAuthorized =
+      currentUser?.isAdmin || currentUser?.role === 'ADMIN' || currentUser?.role === 'QA';
+
+    if (!isAuthorized) {
+      throw new Error('Từ chối quyền: Bạn không có quyền khởi tạo hành động CAPA.');
+    }
+
+    const validation = CAPARules.validatePlanDto(dto);
+    if (!validation.isValid) {
+      throw new Error(validation.error);
+    }
+
+    const updatedDeviation = await deviationAppService.addCAPAItem(
+      dto.deviationId,
+      {
+        type: dto.actionType,
+        action: dto.description.trim(),
+        responsible: dto.assignedTo.trim(),
+        deadline: dto.dueDate,
+        status: 'PENDING',
+      },
+      currentUser
+    );
+
+    await logAuditAction({
+      action: 'UPDATE',
+      collection: 'DEVIATIONS',
+      documentId: dto.deviationId,
+      details: `Bổ sung hành động CAPA (${dto.actionType}): "${dto.description}" [Giao cho: ${dto.assignedTo}, Hạn: ${dto.dueDate}]`,
+      performedBy: currentUser?.email || 'unknown',
+    });
+
+    return updatedDeviation;
+  }
+
+  /**
+   * Hoàn thành hành động CAPA kèm bằng chứng thực thi (BR-CAP-002)
+   */
+  public async completeCapaAction(
+    deviationId: string,
+    capaId: string,
+    currentUser: any,
+    completionEvidence?: string
+  ): Promise<QualityDeviation> {
+    const updated = await deviationAppService.completeCAPAItem(deviationId, capaId, currentUser);
+
+    await logAuditAction({
+      action: 'UPDATE',
+      collection: 'DEVIATIONS',
+      documentId: deviationId,
+      details: `Xác nhận hoàn thành hành động CAPA ${capaId}${
+        completionEvidence ? ` [Bằng chứng: ${completionEvidence}]` : ''
+      }`,
+      performedBy: currentUser?.email || 'unknown',
+    });
+
+    return updated;
+  }
+
+  /**
+   * Đánh giá hiệu quả và phê duyệt đóng CAPA theo chuẩn BR-CAP-002
+   */
+  public async verifyAndCloseCAPA(options: {
+    deviationId: string;
+    effectivenessEvidence: string;
+    currentUser: any;
+    signature?: ElectronicSignature;
+  }): Promise<QualityDeviation> {
+    const { deviationId, effectivenessEvidence, currentUser, signature } = options;
+
+    const isAuthorized =
+      currentUser?.isAdmin || currentUser?.role === 'ADMIN' || currentUser?.role === 'QA';
+
+    if (!isAuthorized) {
+      throw new Error(
+        'Từ chối quyền: Chỉ Trưởng phòng QA hoặc Quản trị viên mới có thẩm quyền thẩm định hiệu quả và đóng CAPA (BR-CAP-002).'
+      );
+    }
+
+    if (!effectivenessEvidence || effectivenessEvidence.trim().length < 20) {
+      throw new Error(
+        'ERR_CAPA_EFFECTIVENESS_MISSING: Bắt buộc phải có báo cáo đánh giá hiệu quả chi tiết (tối thiểu 20 ký tự) trước khi đóng CAPA (BR-CAP-002).'
+      );
+    }
+
+    const deviation = await deviationAppService.findById(deviationId);
+    if (!deviation) {
+      throw new Error(`Không tìm thấy hồ sơ sai lệch/CAPA: ${deviationId}`);
+    }
+
+    const closeCheck = CAPARules.canCloseCAPA(deviation, effectivenessEvidence, currentUser);
+    if (!closeCheck.allowed) {
+      throw new Error(closeCheck.reason);
+    }
+
+    if (signature) {
+      const isSigValid = await signatureService.verifySignatureIntegrity(signature);
+      if (!isSigValid) {
+        throw new Error('Chữ ký điện tử xác nhận đóng CAPA không hợp lệ hoặc đã bị can thiệp.');
+      }
+    }
+
+    const closureNotes = `[CAPA ĐÃ ĐÓNG] Thẩm định hiệu quả đạt: ${effectivenessEvidence.trim()}`;
+    await deviationAppService.updateStatus(deviationId, 'CLOSED', currentUser, {
+      notes: closureNotes,
+    });
+
+    await logAuditAction({
+      action: 'UPDATE',
+      collection: 'DEVIATIONS',
+      documentId: deviationId,
+      details: `Đóng hồ sơ CAPA ${deviation.deviationNo || deviationId} sau khi thẩm định hiệu quả: ${effectivenessEvidence.trim()}`,
+      performedBy: currentUser?.email || 'unknown',
+    });
+
+    const closedDeviation = await deviationAppService.findById(deviationId);
+    return closedDeviation || deviation;
+  }
+}
+
+export const capaService = new CAPAService();
