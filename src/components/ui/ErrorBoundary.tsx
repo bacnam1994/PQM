@@ -3,7 +3,9 @@ import {
   ExclamationTriangleIcon,
   ArrowPathIcon,
   HomeIcon,
+  ArrowDownTrayIcon,
 } from '@heroicons/react/24/outline';
+import { isChunkLoadError, triggerAutoReloadOnce } from '../../utils/lazyWithRetry';
 
 interface Props {
   children?: ReactNode;
@@ -13,6 +15,7 @@ interface State {
   hasError: boolean;
   error: Error | null;
   errorId: string | null;
+  isChunkMismatch: boolean;
 }
 
 export class ErrorBoundary extends Component<Props, State> {
@@ -20,9 +23,11 @@ export class ErrorBoundary extends Component<Props, State> {
     hasError: false,
     error: null,
     errorId: null,
+    isChunkMismatch: false,
   };
 
   public static getDerivedStateFromError(error: Error): State {
+    const isChunkMismatch = isChunkLoadError(error);
     return {
       hasError: true,
       error,
@@ -30,6 +35,7 @@ export class ErrorBoundary extends Component<Props, State> {
         typeof crypto !== 'undefined' && 'randomUUID' in crypto
           ? crypto.randomUUID()
           : `${Date.now()}`,
+      isChunkMismatch,
     };
   }
 
@@ -44,6 +50,13 @@ export class ErrorBoundary extends Component<Props, State> {
       const loader = document.getElementById('app-loader');
       if (loader) loader.remove();
     }
+
+    // Nếu lỗi do phiên bản chunk cũ trên trình duyệt, tự động nạp lại trang 1 lần
+    if (isChunkLoadError(error)) {
+      if (triggerAutoReloadOnce('error-boundary')) {
+        return;
+      }
+    }
   }
 
   private handleRecover = () => {
@@ -51,6 +64,7 @@ export class ErrorBoundary extends Component<Props, State> {
       hasError: false,
       error: null,
       errorId: null,
+      isChunkMismatch: false,
     });
   };
 
@@ -62,6 +76,21 @@ export class ErrorBoundary extends Component<Props, State> {
 
   private handleReload = () => {
     if (typeof window !== 'undefined') {
+      try {
+        sessionStorage.clear();
+      } catch {}
+      window.location.reload();
+    }
+  };
+
+  private handleHardRefresh = () => {
+    if (typeof window !== 'undefined') {
+      try {
+        sessionStorage.clear();
+        if ('caches' in window) {
+          caches.keys().then((keys) => keys.forEach((k) => caches.delete(k)));
+        }
+      } catch {}
       window.location.reload();
     }
   };
@@ -71,6 +100,8 @@ export class ErrorBoundary extends Component<Props, State> {
       return this.props.children;
     }
 
+    const { isChunkMismatch } = this.state;
+
     return (
       <div className="min-h-screen flex items-center justify-center bg-surface-2 p-4 font-sans">
         <div className="bg-surface p-6 sm:p-8 rounded-2xl shadow-xl max-w-md w-full text-center border border-border">
@@ -78,14 +109,23 @@ export class ErrorBoundary extends Component<Props, State> {
             <ExclamationTriangleIcon className="w-6 h-6" />
           </div>
 
-          <h1 className="text-base font-bold text-ink tracking-tight mb-1.5">
-            Đã xảy ra sự cố
-          </h1>
+          <h1 className="text-base font-bold text-ink tracking-tight mb-1.5">Đã xảy ra sự cố</h1>
 
-          <p className="text-xs sm:text-sm text-ink-muted mb-5 leading-relaxed">
-            Giao diện hiện tại không thể hiển thị. Bạn có thể thử khôi phục
-            trước khi tải lại toàn bộ ứng dụng.
+          <p className="text-xs sm:text-sm text-ink-muted mb-4 leading-relaxed">
+            {isChunkMismatch
+              ? 'Hệ thống vừa cập nhật phiên bản mới. Trình duyệt cần làm mới để nạp tài nguyên mới nhất.'
+              : 'Giao diện hiện tại không thể hiển thị. Bạn có thể thử khôi phục trước khi tải lại toàn bộ ứng dụng.'}
           </p>
+
+          {isChunkMismatch && (
+            <div className="mb-4 p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-400 text-xs text-left flex items-start gap-2">
+              <ArrowDownTrayIcon className="w-4 h-4 shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
+              <span>
+                Phát hiện mã nguồn phía máy chủ đã được nâng cấp. Bấm <strong>Tải lại</strong> hoặc{' '}
+                <strong>Xóa bộ nhớ đệm</strong> để đồng bộ.
+              </span>
+            </div>
+          )}
 
           {import.meta.env.DEV && this.state.error?.message && (
             <pre className="mb-5 max-h-32 overflow-auto rounded-xl bg-surface-2 p-3 text-left text-[10px] text-ink-muted whitespace-pre-wrap">
@@ -120,6 +160,16 @@ export class ErrorBoundary extends Component<Props, State> {
               Tải lại
             </button>
           </div>
+
+          {isChunkMismatch && (
+            <button
+              type="button"
+              onClick={this.handleHardRefresh}
+              className="mt-3 w-full py-2 px-3 rounded-xl border border-dashed border-border text-ink-muted hover:text-ink hover:bg-surface-2 transition-colors text-[11px] font-medium cursor-pointer"
+            >
+              Xóa bộ nhớ đệm & Tải lại triệt để
+            </button>
+          )}
         </div>
       </div>
     );

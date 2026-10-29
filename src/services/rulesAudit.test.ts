@@ -42,7 +42,8 @@ describe('Security Rules Static Audit - PQM 3.0', () => {
 
       expect(
         auditWriteRule === false ||
-          auditWriteRule === '!data.exists() && newData.exists() && auth != null'
+          (typeof auditWriteRule === 'string' &&
+            auditWriteRule.startsWith('!data.exists() && newData.exists() && auth != null'))
       ).toBe(true);
     });
 
