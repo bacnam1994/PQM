@@ -33,7 +33,8 @@ service firebase.storage {
     // 2. Dữ liệu phổ/hình ảnh đính kèm phiếu kiểm nghiệm: LAB/QC/QA/Admin được ghi
     match /test_attachments/{allPaths=**} {
       allow read: if isAuthenticated();
-      allow write: if isAuthenticated() &&
+      allow write: if isQC() &&
+        request.resource != null &&
         request.resource.size < 20 * 1024 * 1024 && // Tối đa 20MB
         (request.resource.contentType.matches('image/.*') || request.resource.contentType == 'application/pdf');
     }

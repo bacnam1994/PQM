@@ -44,6 +44,18 @@ const fmtDate = (dateStr: string): string => {
   }
 };
 
+/**
+ * Chống Spreadsheet Formula Injection (CSV/Excel Injection):
+ * Tiền tố hóa dấu nháy đơn (') nếu chuỗi bắt đầu bằng =, +, -, @, Tab hoặc CR.
+ */
+const sanitizeExcelCell = (val: unknown): string => {
+  const str = String(val ?? '');
+  if (/^[=+\-@\t\r]/.test(str)) {
+    return `'${str}`;
+  }
+  return str;
+};
+
 export async function generateQualityReportBackend(
   req: QualityReportRequest,
   storage: admin.storage.Storage,
@@ -127,19 +139,21 @@ export async function generateQualityReportBackend(
     const failCount = results.filter((r: any) => r && !r.isPass).length;
 
     return {
-      'Ngày KN': fmtDate(tr.testDate),
-      'Số phiếu': tr.reportNumber || '---',
-      'Số lô': batch.batchNo || tr.batchId || '---',
-      'Tên sản phẩm': product.name || '---',
-      'Mã sản phẩm': product.code || '---',
-      'Đơn vị KN': tr.labType === 'INTERNAL' ? 'Nội bộ' : tr.externalLabName || 'Thuê ngoài',
+      'Ngày KN': sanitizeExcelCell(fmtDate(tr.testDate)),
+      'Số phiếu': sanitizeExcelCell(tr.reportNumber || '---'),
+      'Số lô': sanitizeExcelCell(batch.batchNo || tr.batchId || '---'),
+      'Tên sản phẩm': sanitizeExcelCell(product.name || '---'),
+      'Mã sản phẩm': sanitizeExcelCell(product.code || '---'),
+      'Đơn vị KN': sanitizeExcelCell(
+        tr.labType === 'INTERNAL' ? 'Nội bộ' : tr.externalLabName || 'Thuê ngoài'
+      ),
       'Kết quả tổng':
         tr.overallStatus === 'PASS' ? 'ĐẠT' : tr.overallStatus === 'FAIL' ? 'KHÔNG ĐẠT' : 'CHỜ',
       'Số CT đạt': passCount,
       'Số CT không đạt': failCount,
-      'Ngày SX': fmtDate(batch.mfgDate),
-      'Hạn dùng': fmtDate(batch.expDate),
-      'Ghi chú': tr.note || '',
+      'Ngày SX': sanitizeExcelCell(fmtDate(batch.mfgDate)),
+      'Hạn dùng': sanitizeExcelCell(fmtDate(batch.expDate)),
+      'Ghi chú': sanitizeExcelCell(tr.note || ''),
     };
   };
 

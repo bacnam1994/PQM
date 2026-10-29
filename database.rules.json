@@ -19,7 +19,7 @@
       ".read": "auth != null && (auth.token.isAdmin === true || auth.token.role === 'ADMIN' || auth.token.role === 'QA' || auth.token.role === 'QC' || root.child('users/admins/' + auth.uid).exists() || root.child('users/' + auth.uid + '/role').val() === 'ADMIN' || root.child('users/' + auth.uid + '/role').val() === 'QA' || root.child('users/' + auth.uid + '/role').val() === 'QC')",
       ".indexOn": ["timestamp", "collection", "action"],
       "$log_id": {
-        ".write": "!data.exists() && newData.exists() && auth != null"
+        ".write": "!data.exists() && newData.exists() && auth != null && (auth.token.isAdmin === true || auth.token.role === 'ADMIN' || root.child('users/admins/' + auth.uid).exists() || (root.child('users/' + auth.uid + '/role').exists() && root.child('users/' + auth.uid + '/role').val() !== 'GUEST')) && (!newData.hasChild('actorUid') || newData.child('actorUid').val() === auth.uid)"
       }
     },
 
@@ -92,7 +92,10 @@
 
     "quality_alerts": {
       ".read": "auth != null && (auth.token.isAdmin === true || auth.token.role === 'ADMIN' || root.child('users/admins/' + auth.uid).exists() || (root.child('users/' + auth.uid + '/role').exists() && root.child('users/' + auth.uid + '/role').val() !== 'GUEST'))",
-      ".write": "auth != null && (auth.token.isAdmin === true || auth.token.role === 'ADMIN' || auth.token.role === 'QA' || auth.token.role === 'QC' || auth.token.role === 'LAB' || auth.token.role === 'PRODUCTION' || auth.token.role === 'USER' || root.child('users/admins/' + auth.uid).exists() || root.child('users/' + auth.uid + '/role').val() !== 'GUEST')"
+      ".indexOn": ["createdAt", "batchId", "severity", "isResolved"],
+      "$alert_id": {
+        ".write": "auth != null && (auth.token.isAdmin === true || auth.token.role === 'ADMIN' || auth.token.role === 'QA' || root.child('users/admins/' + auth.uid).exists() || root.child('users/' + auth.uid + '/role').val() === 'ADMIN' || root.child('users/' + auth.uid + '/role').val() === 'QA' || ((auth.token.role === 'QC' || auth.token.role === 'LAB' || auth.token.role === 'PRODUCTION' || auth.token.role === 'USER' || root.child('users/' + auth.uid + '/role').val() === 'QC' || root.child('users/' + auth.uid + '/role').val() === 'LAB' || root.child('users/' + auth.uid + '/role').val() === 'PRODUCTION' || root.child('users/' + auth.uid + '/role').val() === 'USER') && newData.exists()))"
+      }
     },
 
     "ai_learned_mappings": {

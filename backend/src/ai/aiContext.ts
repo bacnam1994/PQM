@@ -104,9 +104,12 @@ export class AIContextBuilder {
         }
         rawData.testResults = testResults;
 
-        // 3. Load associated TCCS if exists
+        // 3. Load associated TCCS if exists (canonical 'tccs/' with fallback to 'tccsList/')
         if (batchData.tccsId) {
-          const tccsSnap = await db.ref(`tccsList/${batchData.tccsId}`).once('value');
+          let tccsSnap = await db.ref(`tccs/${batchData.tccsId}`).once('value');
+          if (!tccsSnap.exists()) {
+            tccsSnap = await db.ref(`tccsList/${batchData.tccsId}`).once('value');
+          }
           if (tccsSnap.exists()) {
             const tccs = sanitizeObject(tccsSnap.val());
             rawData.specification = tccs;
@@ -115,13 +118,20 @@ export class AIContextBuilder {
           }
         }
 
-        // 4. Load deviations if exists
+        // 4. Load deviations if exists (canonical 'quality_deviations' with fallback to 'deviations')
         try {
-          const devSnap = await db
-            .ref('deviations')
+          let devSnap = await db
+            .ref('quality_deviations')
             .orderByChild('batchId')
             .equalTo(req.batchId)
             .once('value');
+          if (!devSnap.exists()) {
+            devSnap = await db
+              .ref('deviations')
+              .orderByChild('batchId')
+              .equalTo(req.batchId)
+              .once('value');
+          }
           const deviations: any[] = [];
           if (devSnap.exists()) {
             devSnap.forEach((childSnap: any) => {
@@ -174,7 +184,10 @@ export class AIContextBuilder {
         }
         if (trData.tccsId) {
           validRecordIds.add(String(trData.tccsId));
-          const tccsSnap = await db.ref(`tccsList/${trData.tccsId}`).once('value');
+          let tccsSnap = await db.ref(`tccs/${trData.tccsId}`).once('value');
+          if (!tccsSnap.exists()) {
+            tccsSnap = await db.ref(`tccsList/${trData.tccsId}`).once('value');
+          }
           if (tccsSnap.exists()) {
             rawData.specification = sanitizeObject(tccsSnap.val());
           }
@@ -191,7 +204,10 @@ export class AIContextBuilder {
         inputRecordIds.push(devId);
         validRecordIds.add(devId);
 
-        const devSnap = await db.ref(`deviations/${devId}`).once('value');
+        let devSnap = await db.ref(`quality_deviations/${devId}`).once('value');
+        if (!devSnap.exists()) {
+          devSnap = await db.ref(`deviations/${devId}`).once('value');
+        }
         if (devSnap.exists()) {
           const devData = sanitizeObject(devSnap.val());
           rawData.deviation = devData;
@@ -216,7 +232,10 @@ export class AIContextBuilder {
         if (docSnap.exists()) {
           rawData.document = sanitizeObject(docSnap.val());
         } else {
-          const tccsSnap = await db.ref(`tccsList/${docId}`).once('value');
+          let tccsSnap = await db.ref(`tccs/${docId}`).once('value');
+          if (!tccsSnap.exists()) {
+            tccsSnap = await db.ref(`tccsList/${docId}`).once('value');
+          }
           if (tccsSnap.exists()) {
             rawData.document = sanitizeObject(tccsSnap.val());
           } else {

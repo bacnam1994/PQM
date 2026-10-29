@@ -85,7 +85,7 @@ app.use(
 // Explicit preflight OPTIONS handler for all endpoints
 app.options('*', cors());
 
-app.use(express.json());
+app.use(express.json({ limit: '1mb' }));
 
 // Handle CORS error response
 app.use((err: any, req: Request, res: Response, next: NextFunction) => {

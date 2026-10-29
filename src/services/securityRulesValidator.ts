@@ -87,6 +87,12 @@ export class SecurityRulesValidator {
         if (!payload?.timestamp && !payload?.createdAt) {
           return { allowed: false, reason: 'Bản ghi audit log thiếu timestamp.' };
         }
+        if (payload?.actorUid && payload.actorUid !== user.uid) {
+          return {
+            allowed: false,
+            reason: 'Không được phép giả mạo actorUid của người dùng khác trong Audit Trail.',
+          };
+        }
         return { allowed: true };
       }
       return { allowed: false, reason: 'Nhật ký audit trail chỉ cho phép thêm mới (Append-only).' };
@@ -309,6 +315,19 @@ export class SecurityRulesValidator {
 
     // 9. Ràng buộc Cảnh báo chất lượng (Quality Alerts)
     if (rootCollection === 'quality_alerts') {
+      if (action === 'READ') return { allowed: true };
+      if (user.role === 'VIEWER') {
+        return {
+          allowed: false,
+          reason: 'Vai trò VIEWER chỉ có quyền xem, không được ghi hoặc xóa cảnh báo chất lượng.',
+        };
+      }
+      if (action === 'DELETE' && user.role !== 'QA') {
+        return {
+          allowed: false,
+          reason: 'Chỉ QA hoặc Quản trị viên mới có quyền xóa cảnh báo chất lượng.',
+        };
+      }
       return { allowed: true };
     }
 

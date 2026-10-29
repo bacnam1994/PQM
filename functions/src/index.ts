@@ -31,9 +31,22 @@ const auth = admin.auth();
  * 1. Callable Function: Tính toán SPC & 8 quy tắc Nelson trên Server
  */
 export const calculateSPCMetrics = onCall({ cors: true }, async (request) => {
+  if (!request.auth) {
+    throw new HttpsError(
+      'unauthenticated',
+      'Chỉ người dùng đã đăng nhập mới có quyền thực hiện tính toán SPC.'
+    );
+  }
+
   const data = request.data as SPCMetricsRequest;
   if (!data || !Array.isArray(data.values)) {
     throw new HttpsError('invalid-argument', 'Yêu cầu mảng "values" chứa các giá trị kiểm nghiệm.');
+  }
+  if (data.values.length > 10000) {
+    throw new HttpsError(
+      'invalid-argument',
+      'Số lượng điểm dữ liệu SPC vượt quá giới hạn an toàn (tối đa 10,000 điểm).'
+    );
   }
 
   try {
@@ -67,11 +80,25 @@ export const autoHealConsistencyCron = onSchedule(
 export const generateQualityReport = onCall(
   { cors: true, timeoutSeconds: 120 },
   async (request) => {
-    // Chỉ cho phép người dùng đã xác thực
-    if (!request.auth) {
+    // Chỉ cho phép người dùng đã xác thực và không phải tài khoản GUEST
+    if (!request.auth || !request.auth.uid) {
       throw new HttpsError(
         'unauthenticated',
         'Chỉ người dùng đã đăng nhập mới có quyền xuất báo cáo.'
+      );
+    }
+
+    const uid = request.auth.uid;
+    let role = request.auth.token?.role;
+    const isAdminClaim = request.auth.token?.isAdmin === true || role === 'ADMIN';
+    if (!role && !isAdminClaim) {
+      const userSnap = await db.ref(`/users/${uid}/role`).once('value');
+      role = userSnap.val() || 'GUEST';
+    }
+    if (!isAdminClaim && (!role || role === 'GUEST')) {
+      throw new HttpsError(
+        'permission-denied',
+        'Tài khoản GUEST chưa được cấp quyền truy xuất dữ liệu báo cáo chất lượng.'
       );
     }
 

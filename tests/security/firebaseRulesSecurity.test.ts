@@ -190,5 +190,35 @@ describe('Firebase Rules & Security Integration Perimeter', () => {
         "!newData.hasChild('isAdmin') || newData.child('isAdmin').val() === false"
       );
     });
+
+    it('Security Audit Fix: quality_alerts write MUST be scoped to $alert_id and require newData.exists() for non-QA/ADMIN', () => {
+      expect(parsedRules.quality_alerts['.write']).toBeUndefined();
+      expect(parsedRules.quality_alerts['$alert_id']).toBeDefined();
+      const alertWriteRule = parsedRules.quality_alerts['$alert_id']['.write'];
+      expect(alertWriteRule).toContain('newData.exists()');
+      expect(alertWriteRule).not.toContain('VIEWER');
+    });
+
+    it('Security Audit Fix: audit_logs write MUST bind actorUid to auth.uid and deny GUEST', () => {
+      const auditWriteRule = parsedRules.audit_logs['$log_id']['.write'];
+      expect(auditWriteRule).toContain("newData.child('actorUid').val() === auth.uid");
+      expect(auditWriteRule).toContain("!== 'GUEST'");
+    });
+
+    it('Security Audit Fix: storage.rules test_attachments write MUST require isQC() instead of generic isAuthenticated()', () => {
+      const storageRulesPath = path.join(rootDir, 'storage.rules');
+      const storageRulesContent = fs.readFileSync(storageRulesPath, 'utf8');
+      expect(storageRulesContent).toContain('match /test_attachments/{allPaths=**}');
+      expect(storageRulesContent).toContain('allow write: if isQC()');
+    });
+
+    it('Security Audit Fix: firebase.json MUST define security headers for Hosting', () => {
+      expect(firebaseJson.hosting.headers).toBeDefined();
+      expect(Array.isArray(firebaseJson.hosting.headers)).toBe(true);
+      const headerKeys = firebaseJson.hosting.headers[0].headers.map((h: any) => h.key);
+      expect(headerKeys).toContain('X-Frame-Options');
+      expect(headerKeys).toContain('X-Content-Type-Options');
+      expect(headerKeys).toContain('Referrer-Policy');
+    });
   });
 });
