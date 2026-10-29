@@ -341,34 +341,46 @@ VÍ DỤ MAPPING (Cụ thể & Đầy đủ):
 LƯU Ý: Không có danh sách TCCS. Hãy trích xuất tên chỉ tiêu nguyên bản từ phiếu, để "mappedName" = "" và "confidence" = "low" cho tất cả.
 `;
 
-  return `Bạn là một chuyên gia phân tích tài liệu kiểm nghiệm dược phẩm, được giao nhiệm vụ đọc và trích xuất thông tin từ Phiếu Kiểm Nghiệm (Certificate of Analysis - CoA / Phiếu Kết Quả Kiểm Nghiệm) để điền vào Form Nhập Kết Quả.
+  return `Bạn là một chuyên gia phân tích tài liệu kiểm nghiệm dược phẩm, được giao nhiệm vụ đọc và trích xuất thông tin từ Phiếu Kiểm Nghiệm (Certificate of Analysis - CoA / Phiếu Kết Quả Kiểm Nghiệm) bám sát các trường của FORM NHẬP KẾT QUẢ KIỂM NGHIỆM (PKN Form).
 
-CẤU TRÚC JSON YÊU CẦU (Trả về đúng định dạng này, bao gồm đầy đủ các field mới):
+CẤU TRÚC JSON YÊU CẦU (Bắt buộc trả về đúng định dạng này, bao gồm đầy đủ các trường khớp với Form Nhập PKN):
 {
-  "labName": "Tên đơn vị kiểm nghiệm / Phòng thí nghiệm (ví dụ: CASE, Quatest 3, Eurofins, Phòng QC nội bộ...)",
+  "labName": "Tên đơn vị kiểm nghiệm / Phòng thí nghiệm (chuẩn hóa theo Master Data: CASE, Quatest 3, Eurofins, Phòng Kiểm Nghiệm Nội Bộ V-BIOTECH...)",
   "reportNo": "Số hiệu phiếu kiểm nghiệm / Số kết quả phân tích / Report No / Số PKN đọc được từ phiếu (ví dụ: CASE-2024/1234, 24/09/KN-012, PKN/240101...). Để rỗng nếu không có.",
   "documentType": "Loại phiếu: External_Lab | Internal | CoA | Supplier_CoA (xem hướng dẫn VN_LAB_TERMINOLOGY)",
+  "sampleType": "Loại mẫu: FINISHED (Thành phẩm) | RAW_MATERIAL (Nguyên liệu) | PACKAGING (Bao bì) | IN_PROCESS (Bán thành phẩm)",
   "pageCount": 1,
-  "productCode": "Mã số / Mã hàng hóa / Mã sản phẩm / SKU / Mã SP đọc được từ phiếu (ví dụ: VBT-001, SP-GBE-500, GBE500...). Thường xuất hiện ở header phiếu gần tên sản phẩm. Để rỗng nếu không có.",
+  "productCode": "Mã số / Mã hàng hóa / SKU / Mã SP đọc được từ phiếu (ví dụ: VBT-001, GBE-500...). Thường xuất hiện ở header phiếu gần tên sản phẩm. Để rỗng nếu không có.",
   "productName": "Tên sản phẩm / Tên hàng hóa đầy đủ đọc được từ phiếu (ví dụ: Viên nang Ginkgo Biloba 500mg). Để rỗng nếu không có.",
-  "batchNo": "Số lô sản xuất (nếu có, không có thì để rỗng)",
+  "batchNo": "Số lô sản xuất (Batch No / Lot No / Số lô, để rỗng nếu không có)",
   "mfgDate": "Ngày sản xuất (định dạng DD/MM/YYYY, nếu không có để rỗng)",
   "expDate": "Hạn sử dụng (định dạng DD/MM/YYYY, nếu không có để rỗng)",
-  "testDate": "Ngày kiểm nghiệm / Ngày xuất phiếu (định dạng DD/MM/YYYY, nếu không có để rỗng)",
-  "notes": "Ghi chú đặc biệt từ phiếu (ghi chú cuối bảng, phát hiện giá trị sửa tay, ảnh chất lượng thấp...); để rỗng nếu không có",
+  "testDate": "Ngày kiểm nghiệm / Ngày xuất phiếu / Ngày ký (định dạng DD/MM/YYYY, nếu không có để rỗng)",
+  "sampleDate": "Ngày nhận mẫu / Ngày lấy mẫu (định dạng DD/MM/YYYY, nếu không có để rỗng)",
+  "overallStatus": "Đánh giá chung toàn bộ phiếu: PASS (Đạt) | FAIL (Không đạt/OOS) | CONFORM | NOT_CONFORM",
+  "notes": "Ghi chú đặc biệt từ phiếu (tình trạng mẫu khi nhận, bao bì niêm phong, phát hiện giá trị sửa tay, ảnh chất lượng thấp...); để rỗng nếu không có",
   "testResults": [
     {
       "criteriaName": "Tên chỉ tiêu NGUYÊN BẢN từ phiếu (giữ nguyên, không dịch, không thêm bớt)",
       "mappedName": "Tên chỉ tiêu chuẩn trong TCCS nếu map được, để rỗng nếu không chắc",
+      "category": "BẮT BUỘC phân loại chỉ tiêu vào đúng nhóm Form PKN: PHYSICAL | CHEMICAL | MICROBIAL | HEAVY_METAL | SAFETY",
       "confidence": "high | medium | low — mức độ tự tin khi map tên",
       "confidenceScore": 95, // Điểm số từ 0 đến 100 phản ánh độ nét chữ, độ rõ ràng số học và mức độ chắc chắn khi map
-      "value": "Kết quả kiểm nghiệm (ví dụ: 1.5, Đạt, Trắng trong, < 10). Trả về dưới dạng chuỗi.",
-      "unit": "Đơn vị tính (ví dụ: %, mg, CFU/g. Nếu không có để rỗng)",
-      "limit": "Yêu cầu / Mức tiêu chuẩn / Giới hạn cho phép từ phiếu (nếu có, ví dụ: NMT 5.0%, 95.0-105.0%)",
-      "analysisMethod": "Phương pháp thử nghiệm nếu ghi trên phiếu (ví dụ: HPLC, UV-Vis, AAS, TCVN 9632:2013...); để rỗng nếu không có"
+      "value": "Kết quả kiểm nghiệm thực tế (ví dụ: 1.5, Đạt, Trắng trong, < 10, Không phát hiện). Giữ nguyên số 0 và dấu phẩy.",
+      "unit": "Đơn vị tính (ví dụ: %, mg, CFU/g, ppm, mL. Nếu không có để rỗng)",
+      "limit": "Yêu cầu / Mức tiêu chuẩn / Giới hạn cho phép từ phiếu (ví dụ: ≤ 10 ppm, 90.0 - 110.0%, Âm tính)",
+      "analysisMethod": "Phương pháp thử nghiệm nếu ghi trên phiếu (ví dụ: HPLC, UV-Vis, AAS, TCVN, DĐVN V...); để rỗng nếu không có",
+      "status": "Kết luận riêng của chỉ tiêu này nếu có: PASS | FAIL | INDETERMINATE"
     }
   ]
 }
+
+HƯỚNG DẪN PHÂN NHÓM CHỈ TIÊU CHO FORM NHẬP PKN (CRITERIA CATEGORIZATION):
+- "PHYSICAL" (Cảm quan & Lý học): Màu sắc, mùi vị, thể chất, hình thức, độ ẩm, độ rã, khối lượng trung bình, thể tích thực, pH, tỷ trọng, độ khúc xạ, độ trong...
+- "CHEMICAL" (Hóa học & Định lượng): Định tính, định lượng hoạt chất chính, hàm lượng hoạt chất, tạp chất liên quan, tro toàn phần, tro không tan trong acid, cắn sau khi sấy khô...
+- "MICROBIAL" (Vi sinh vật): Tổng số vi sinh vật hiếu khí (TAMC), tổng số nấm men nấm mốc (TYMC), E. coli, Salmonella, Staphylococcus aureus, Pseudomonas aeruginosa, Coliforms...
+- "HEAVY_METAL" (Kim loại nặng): Chì (Pb), Asen (As), Cadmi (Cd), Thủy ngân (Hg)...
+- "SAFETY" (Chỉ tiêu an toàn khác): Độc tố vi nấm (Aflatoxin...), Dư lượng thuốc bảo vệ thực vật, Dung môi tồn dư...
 
 ${ABBREVIATION_GUIDE}
 

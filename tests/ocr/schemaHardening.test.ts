@@ -22,6 +22,11 @@ describe('Gemini Vision Extraction & Schema Hardening (OCR-06)', () => {
       expect(prompt).toContain('"productCode"');
       expect(prompt).toContain('"productName"');
       expect(prompt).toContain('"confidenceScore"');
+      expect(prompt).toContain('"sampleDate"');
+      expect(prompt).toContain('"sampleType"');
+      expect(prompt).toContain('"overallStatus"');
+      expect(prompt).toContain('"category"');
+      expect(prompt).toContain('CRITERIA CATEGORIZATION');
       expect(prompt).toContain('BẢO TOÀN DẤU THẬP PHÂN & SỐ 0');
       expect(prompt).toContain(
         'TUYỆT ĐỐI KHÔNG đưa giá trị mức giới hạn vào ô kết quả thực tế ("value")'

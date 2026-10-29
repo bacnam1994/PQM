@@ -144,6 +144,7 @@ export function useTestResultAIIntegration({
   // Mapping modal states
   const [isMappingModalOpen, setIsMappingModalOpen] = useState(false);
   const [pendingAiRawData, setPendingAiRawData] = useState<any>(null);
+  const [pendingDocumentSummary, setPendingDocumentSummary] = useState<any>(null);
   const [pendingHighItems, setPendingHighItems] = useState<AIExtractedItem[]>([]);
   const [pendingLowItems, setPendingLowItems] = useState<AIExtractedItem[]>([]);
 
@@ -300,9 +301,15 @@ export function useTestResultAIIntegration({
 
       if (normalized.testResults && Array.isArray(normalized.testResults)) {
         normalized.testResults.forEach((r: any, index: number) => {
-          const matchCrit = criteriaToMatch.find((c) =>
-            isCriteriaMatch(r.criteriaName, c.name, aiLearnedMappings)
-          );
+          // Ưu tiên khớp theo mappedName (nếu AI đã map chuẩn), sau đó là criteriaName
+          const searchName = r.mappedName || r.criteriaName;
+          const matchCrit =
+            criteriaToMatch.find((c) => isCriteriaMatch(searchName, c.name, aiLearnedMappings)) ||
+            (r.criteriaName !== searchName
+              ? criteriaToMatch.find((c) =>
+                  isCriteriaMatch(r.criteriaName, c.name, aiLearnedMappings)
+                )
+              : undefined);
 
           if (matchCrit) {
             nextTestResultsMap[matchCrit.name] = r.value;
@@ -318,6 +325,8 @@ export function useTestResultAIIntegration({
               value: r.value,
               unit: r.unit || '',
               limit: r.limit || '',
+              category: r.category,
+              analysisMethod: r.analysisMethod,
             });
             extraCount++;
           }
@@ -333,6 +342,14 @@ export function useTestResultAIIntegration({
         newAiFilled.add('reportNo');
       }
 
+      // Tổng hợp ghi chú từ phiếu (ngày nhận mẫu, đánh giá chung, notes)
+      const notesToAppend = normalized.notes || '';
+      const sampleInfo = normalized.sampleDate ? `Ngày nhận mẫu: ${normalized.sampleDate}` : '';
+      const overallInfo = normalized.overallStatus
+        ? `Đánh giá phiếu: ${normalized.overallStatus}`
+        : '';
+      const combinedNotes = [sampleInfo, overallInfo, notesToAppend].filter(Boolean).join(' | ');
+
       // Atomic form values update
       if (setFormValues) {
         setFormValues((prev: any) => ({
@@ -346,6 +363,9 @@ export function useTestResultAIIntegration({
           ...(labInfo?.labId ? { labId: labInfo.labId } : {}),
           ...(isoDate ? { testDate: isoDate } : {}),
           ...(matchedBatch ? { batchId: matchedBatch.id } : {}),
+          ...(combinedNotes
+            ? { notes: prev?.notes ? `${prev.notes}\n${combinedNotes}` : combinedNotes }
+            : {}),
           testResultsMap: {
             ...(prev?.testResultsMap || {}),
             ...nextTestResultsMap,
@@ -359,6 +379,7 @@ export function useTestResultAIIntegration({
         if (labInfo?.labId) setFieldValue('labId', labInfo.labId);
         if (isoDate) setFieldValue('testDate', isoDate);
         if (matchedBatch) setFieldValue('batchId', matchedBatch.id);
+        if (combinedNotes) setFieldValue('notes', combinedNotes);
         Object.entries(nextTestResultsMap).forEach(([k, v]) => {
           setMapValue('testResultsMap', k, v);
         });
@@ -520,6 +541,12 @@ export function useTestResultAIIntegration({
           value: i.value,
           unit: i.unit,
           limit: i.limit,
+          category: i.category,
+          status: i.status,
+          analysisMethod: i.analysisMethod,
+          confidence: i.confidence,
+          confidenceScore: i.confidenceScore,
+          mappedName: i.mappedName,
         })),
         ...confirmedLowItems.map((m) => ({
           criteriaName: m.systemName || m.originalName,
@@ -527,6 +554,9 @@ export function useTestResultAIIntegration({
           value: m.value,
           unit: m.unit,
           limit: m.limit,
+          category: m.category,
+          status: m.status,
+          analysisMethod: m.analysisMethod,
         })),
       ];
 
@@ -593,10 +623,27 @@ export function useTestResultAIIntegration({
             });
           }
 
+          setPendingDocumentSummary({
+            reportNo: result.reportNo,
+            labName: result.labName,
+            batchNo: result.batchNo,
+            productName: result.productName,
+            productCode: result.productCode,
+            testDate: result.testDate,
+            sampleDate: result.sampleDate,
+            sampleType: result.sampleType,
+            overallStatus: result.overallStatus,
+            notes: result.notes,
+          });
+
           const rawItems: AIExtractedItem[] = (result.testResults || []).map((r: any) => ({
             criteriaName: r.criteriaName || '',
             mappedName: r.mappedName || '',
             confidence: r.confidence || 'low',
+            confidenceScore: r.confidenceScore,
+            category: r.category,
+            status: r.status,
+            analysisMethod: r.analysisMethod,
             value: r.value || '',
             unit: r.unit || '',
             limit: r.limit || '',
@@ -762,10 +809,27 @@ export function useTestResultAIIntegration({
             fileCount: results.length,
           });
 
+          setPendingDocumentSummary({
+            reportNo: mergedData.reportNo || results[0]?.reportNo,
+            labName: mergedData.labName || results[0]?.labName,
+            batchNo: mergedData.batchNo || results[0]?.batchNo,
+            productName: mergedData.productName || results[0]?.productName,
+            productCode: mergedData.productCode || results[0]?.productCode,
+            testDate: mergedData.testDate || results[0]?.testDate,
+            sampleDate: mergedData.sampleDate || results[0]?.sampleDate,
+            sampleType: mergedData.sampleType || results[0]?.sampleType,
+            overallStatus: mergedData.overallStatus || results[0]?.overallStatus,
+            notes: mergedData.notes || results[0]?.notes,
+          });
+
           const rawItems: AIExtractedItem[] = mergedData.testResults.map((r: any) => ({
             criteriaName: r.criteriaName || '',
             mappedName: r.mappedName || '',
             confidence: r.confidence || 'low',
+            confidenceScore: r.confidenceScore,
+            category: r.category,
+            status: r.status,
+            analysisMethod: r.analysisMethod,
             value: r.value || '',
             unit: r.unit || '',
             limit: r.limit || '',
@@ -992,10 +1056,27 @@ export function useTestResultAIIntegration({
           fileCount: 1,
         });
 
+        setPendingDocumentSummary({
+          reportNo: result.reportNo,
+          labName: result.labName,
+          batchNo: result.batchNo,
+          productName: result.productName,
+          productCode: result.productCode,
+          testDate: result.testDate,
+          sampleDate: result.sampleDate,
+          sampleType: result.sampleType,
+          overallStatus: result.overallStatus,
+          notes: result.notes,
+        });
+
         const rawItems: AIExtractedItem[] = (result.testResults || []).map((r: any) => ({
           criteriaName: r.criteriaName || '',
           mappedName: r.mappedName || '',
           confidence: r.confidence || 'low',
+          confidenceScore: r.confidenceScore,
+          category: r.category,
+          status: r.status,
+          analysisMethod: r.analysisMethod,
           value: r.value || '',
           unit: r.unit || '',
           limit: r.limit || '',
@@ -1075,6 +1156,7 @@ export function useTestResultAIIntegration({
       setIsMappingModalOpen,
       pendingHighItems,
       pendingLowItems,
+      pendingDocumentSummary,
       isBatchProgressOpen,
       setIsBatchProgressOpen,
       batchScanFiles,
@@ -1102,6 +1184,7 @@ export function useTestResultAIIntegration({
       isMappingModalOpen,
       pendingHighItems,
       pendingLowItems,
+      pendingDocumentSummary,
       isBatchProgressOpen,
       batchScanFiles,
       isAutoCreateModalOpen,

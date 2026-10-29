@@ -593,6 +593,7 @@ const TestResultFormPage: React.FC = () => {
         highConfidenceItems={ai.pendingHighItems}
         lowConfidenceItems={ai.pendingLowItems}
         tccsNames={allActiveTccsNames}
+        documentSummary={ai.pendingDocumentSummary}
         onConfirm={ai.handleMappingConfirmed}
       />
 

@@ -220,6 +220,8 @@ export interface ExtractedCriterionItem {
   unit?: string;
   limit?: string;
   analysisMethod?: string;
+  category?: 'PHYSICAL' | 'CHEMICAL' | 'MICROBIAL' | 'HEAVY_METAL' | 'SAFETY' | 'OTHER';
+  status?: 'PASS' | 'FAIL' | 'INDETERMINATE';
   sourcePageNumber: number; // 1-indexed, số thứ tự trang tài liệu chứa chỉ tiêu này
   rawText?: string;
 }
@@ -231,6 +233,9 @@ export interface DocumentContext {
   mfgDate?: string;
   expDate?: string;
   testDate?: string;
+  sampleDate?: string;
+  sampleType?: string;
+  overallStatus?: string;
   documentType?: string;
   productCode?: string;
   productName?: string;
@@ -251,6 +256,9 @@ export interface PageExtractionResult {
   mfgDate?: string;
   expDate?: string;
   testDate?: string;
+  sampleDate?: string;
+  sampleType?: string;
+  overallStatus?: string;
   notes?: string;
   testResults: ExtractedCriterionItem[];
   status: 'SUCCESS' | 'PARTIAL' | 'FAILED';
@@ -269,6 +277,9 @@ export interface MultiPageExtractionResult {
   mfgDate: string;
   expDate: string;
   testDate: string;
+  sampleDate?: string;
+  sampleType?: string;
+  overallStatus?: string;
   notes: string;
   testResults: ExtractedCriterionItem[];
   pageResults: PageExtractionResult[];

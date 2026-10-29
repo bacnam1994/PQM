@@ -111,22 +111,22 @@ export function normalizeAIData(input: any): NormalizedAIData | null {
 
   return {
     reportNo: typeof input.reportNo === 'string' ? input.reportNo.trim() : undefined,
-
     labName: typeof input.labName === 'string' ? input.labName.trim() : undefined,
-
+    labId: typeof input.labId === 'string' ? input.labId.trim() : undefined,
     testDate: typeof input.testDate === 'string' ? input.testDate.trim() : undefined,
-
+    sampleDate: typeof input.sampleDate === 'string' ? input.sampleDate.trim() : undefined,
     batchNo: typeof input.batchNo === 'string' ? input.batchNo.trim() : undefined,
-
     batchId: typeof input.batchId === 'string' ? input.batchId.trim() : undefined,
-
     productName: typeof input.productName === 'string' ? input.productName.trim() : undefined,
-
     productCode: typeof input.productCode === 'string' ? input.productCode.trim() : undefined,
-
     mfgDate: typeof input.mfgDate === 'string' ? input.mfgDate.trim() : undefined,
-
     expDate: typeof input.expDate === 'string' ? input.expDate.trim() : undefined,
+    sampleType: typeof input.sampleType === 'string' ? input.sampleType.trim() : undefined,
+    documentType: typeof input.documentType === 'string' ? input.documentType.trim() : undefined,
+    overallStatus: ['PASS', 'FAIL', 'CONFORM', 'NOT_CONFORM'].includes(input.overallStatus)
+      ? input.overallStatus
+      : undefined,
+    notes: typeof input.notes === 'string' ? input.notes.trim() : undefined,
 
     testResults: Array.isArray(input.testResults)
       ? input.testResults
@@ -136,6 +136,14 @@ export function normalizeAIData(input: any): NormalizedAIData | null {
             value: item.value == null ? '' : String(item.value).trim(),
             unit: item.unit == null ? '' : String(item.unit).trim(),
             limit: item.limit == null ? '' : String(item.limit).trim(),
+            category: item.category,
+            status: item.status,
+            analysisMethod:
+              typeof item.analysisMethod === 'string' ? item.analysisMethod.trim() : undefined,
+            confidence: item.confidence,
+            confidenceScore:
+              typeof item.confidenceScore === 'number' ? item.confidenceScore : undefined,
+            mappedName: typeof item.mappedName === 'string' ? item.mappedName.trim() : undefined,
           }))
           .filter((item: any) => item.criteriaName)
       : [],

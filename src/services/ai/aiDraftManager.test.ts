@@ -91,19 +91,41 @@ describe('aiDraftManager', () => {
       expect(normalizeAIData(123)).toBeNull();
     });
 
-    it('normalizes valid AI extraction payload', () => {
+    it('normalizes valid AI extraction payload with full form fields', () => {
       const raw = {
         reportNo: '  KN-2026-999  ',
         labName: '  QUATEST 3  ',
         testDate: '12/09/2026',
+        sampleDate: ' 10/09/2026 ',
         batchNo: '  LO-2026-01  ',
         productName: ' GINKGO BILOBA ',
         productCode: ' SP-001 ',
         mfgDate: ' 01/01/2026 ',
         expDate: ' 01/01/2029 ',
+        sampleType: 'FINISHED',
+        documentType: 'External_Lab',
+        overallStatus: 'PASS',
+        notes: ' Mẫu nguyên bao bì niêm phong ',
         testResults: [
-          { criteriaName: ' pH ', value: 6.8, unit: ' pH ', limit: '6.0 - 7.5' },
-          { criteriaName: ' Độ ẩm ', value: '4.5', unit: '%', limit: '≤ 9.0%' },
+          {
+            criteriaName: ' pH ',
+            value: 6.8,
+            unit: ' pH ',
+            limit: '6.0 - 7.5',
+            category: 'PHYSICAL',
+            status: 'PASS',
+            analysisMethod: 'TCVN 6496:2009',
+            confidence: 'high',
+            confidenceScore: 98,
+            mappedName: 'pH',
+          },
+          {
+            criteriaName: ' Độ ẩm ',
+            value: '4.5',
+            unit: '%',
+            limit: '≤ 9.0%',
+            category: 'PHYSICAL',
+          },
           { criteriaName: '', value: '99' }, // should be filtered out
           null,
         ],
@@ -114,23 +136,40 @@ describe('aiDraftManager', () => {
       expect(normalized?.reportNo).toBe('KN-2026-999');
       expect(normalized?.labName).toBe('QUATEST 3');
       expect(normalized?.testDate).toBe('12/09/2026');
+      expect(normalized?.sampleDate).toBe('10/09/2026');
       expect(normalized?.batchNo).toBe('LO-2026-01');
       expect(normalized?.productName).toBe('GINKGO BILOBA');
       expect(normalized?.productCode).toBe('SP-001');
       expect(normalized?.mfgDate).toBe('01/01/2026');
       expect(normalized?.expDate).toBe('01/01/2029');
+      expect(normalized?.sampleType).toBe('FINISHED');
+      expect(normalized?.documentType).toBe('External_Lab');
+      expect(normalized?.overallStatus).toBe('PASS');
+      expect(normalized?.notes).toBe('Mẫu nguyên bao bì niêm phong');
       expect(normalized?.testResults).toHaveLength(2);
       expect(normalized?.testResults[0]).toEqual({
         criteriaName: 'pH',
         value: '6.8',
         unit: 'pH',
         limit: '6.0 - 7.5',
+        category: 'PHYSICAL',
+        status: 'PASS',
+        analysisMethod: 'TCVN 6496:2009',
+        confidence: 'high',
+        confidenceScore: 98,
+        mappedName: 'pH',
       });
       expect(normalized?.testResults[1]).toEqual({
         criteriaName: 'Độ ẩm',
         value: '4.5',
         unit: '%',
         limit: '≤ 9.0%',
+        category: 'PHYSICAL',
+        status: undefined,
+        analysisMethod: undefined,
+        confidence: undefined,
+        confidenceScore: undefined,
+        mappedName: undefined,
       });
     });
 
@@ -139,12 +178,19 @@ describe('aiDraftManager', () => {
       expect(normalized).toEqual({
         reportNo: undefined,
         labName: undefined,
+        labId: undefined,
         testDate: undefined,
+        sampleDate: undefined,
         batchNo: undefined,
+        batchId: undefined,
         productName: undefined,
         productCode: undefined,
         mfgDate: undefined,
         expDate: undefined,
+        sampleType: undefined,
+        documentType: undefined,
+        overallStatus: undefined,
+        notes: undefined,
         testResults: [],
       });
     });

@@ -80,17 +80,29 @@ export interface NormalizedAITestResultItem {
   value: string;
   unit: string;
   limit: string;
+  category?: 'PHYSICAL' | 'CHEMICAL' | 'MICROBIAL' | 'HEAVY_METAL' | 'SAFETY' | 'OTHER';
+  status?: 'PASS' | 'FAIL' | 'INDETERMINATE';
+  analysisMethod?: string;
+  confidence?: 'high' | 'medium' | 'low';
+  confidenceScore?: number;
+  mappedName?: string;
 }
 
 export interface NormalizedAIData {
   reportNo?: string;
   labName?: string;
+  labId?: string;
   testDate?: string;
+  sampleDate?: string;
   batchNo?: string;
   batchId?: string;
   productName?: string;
   productCode?: string;
   mfgDate?: string;
   expDate?: string;
+  sampleType?: string;
+  documentType?: string;
+  overallStatus?: 'PASS' | 'FAIL' | 'CONFORM' | 'NOT_CONFORM';
+  notes?: string;
   testResults: NormalizedAITestResultItem[];
 }

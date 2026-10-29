@@ -20,6 +20,9 @@ export interface AIExtractedItem {
   value: string; // Kết quả thực đo (Rule 1, 5)
   unit?: string; // Đơn vị đo (Rule 4)
   limit?: string; // Mức giới hạn TIÊU CHUẨN (Rule 5)
+  category?: 'PHYSICAL' | 'CHEMICAL' | 'MICROBIAL' | 'HEAVY_METAL' | 'SAFETY' | 'OTHER' | string;
+  status?: string;
+  analysisMethod?: string;
   sourcePageNumber?: number; // Trang nguồn (Rule 7)
   warningMessages?: string[]; // Cảnh báo OCR nghi ngờ (Rule 12)
   isSuspicious?: boolean;
@@ -36,6 +39,22 @@ export interface ConfirmedMapping {
   value: string;
   unit?: string;
   limit?: string;
+  category?: string;
+  status?: string;
+  analysisMethod?: string;
+}
+
+export interface DocumentSummary {
+  reportNo?: string;
+  labName?: string;
+  batchNo?: string;
+  productName?: string;
+  productCode?: string;
+  testDate?: string;
+  sampleDate?: string;
+  sampleType?: string;
+  overallStatus?: string;
+  notes?: string;
 }
 
 interface MappingConfirmModalProps {
@@ -47,6 +66,8 @@ interface MappingConfirmModalProps {
   lowConfidenceItems: AIExtractedItem[];
   /** Danh sách tên chỉ tiêu chuẩn từ TCCS để hiện trong dropdown */
   tccsNames: string[];
+  /** Thông tin tóm tắt Header từ phiếu kiểm nghiệm */
+  documentSummary?: DocumentSummary | null;
   /** Callback khi user xác nhận xong */
   onConfirm: (confirmedMappings: ConfirmedMapping[], rememberMappings: boolean) => void;
 }
@@ -112,6 +133,115 @@ function EvaluationStatusBadge({ value, limit }: { value?: string; limit?: strin
   return <span className="text-ink-muted text-[10px]">—</span>;
 }
 
+function CategoryBadge({ category }: { category?: string }) {
+  if (!category) return null;
+  const config: Record<string, { label: string; style: string }> = {
+    PHYSICAL: { label: 'Lý hóa', style: 'bg-cyan-500/15 text-cyan-700 dark:text-cyan-300' },
+    CHEMICAL: {
+      label: 'Định lượng',
+      style: 'bg-indigo-500/15 text-indigo-700 dark:text-indigo-300',
+    },
+    MICROBIAL: {
+      label: 'Vi sinh',
+      style: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300',
+    },
+    HEAVY_METAL: {
+      label: 'Kim loại nặng',
+      style: 'bg-amber-500/15 text-amber-700 dark:text-amber-300',
+    },
+    SAFETY: { label: 'An toàn', style: 'bg-rose-500/15 text-rose-700 dark:text-rose-300' },
+  };
+  const item = config[category.toUpperCase()] || {
+    label: category,
+    style: 'bg-surface-3 text-ink-muted',
+  };
+  return (
+    <span
+      className={`inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold ${item.style}`}
+    >
+      {item.label}
+    </span>
+  );
+}
+
+function DocumentSummaryCard({ summary }: { summary?: DocumentSummary | null }) {
+  if (
+    !summary ||
+    (!summary.reportNo && !summary.labName && !summary.batchNo && !summary.productName)
+  ) {
+    return null;
+  }
+  const isPass = summary.overallStatus === 'PASS' || summary.overallStatus === 'CONFORM';
+  const isFail = summary.overallStatus === 'FAIL' || summary.overallStatus === 'NOT_CONFORM';
+
+  return (
+    <div className="bg-surface-2 p-3.5 rounded-xl border border-border text-xs grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3 shrink-0">
+      <div>
+        <span className="text-[10px] text-ink-muted block uppercase font-semibold">
+          Số phiếu (Report No)
+        </span>
+        <span className="font-bold text-ink truncate block" title={summary.reportNo || '—'}>
+          {summary.reportNo || '—'}
+        </span>
+      </div>
+      <div>
+        <span className="text-[10px] text-ink-muted block uppercase font-semibold">
+          Đơn vị kiểm nghiệm
+        </span>
+        <span className="font-bold text-ink truncate block" title={summary.labName || '—'}>
+          {summary.labName || '—'}
+        </span>
+      </div>
+      <div>
+        <span className="text-[10px] text-ink-muted block uppercase font-semibold">
+          Số lô (Batch No)
+        </span>
+        <span
+          className="font-bold text-emerald-600 dark:text-emerald-400 truncate block"
+          title={summary.batchNo || '—'}
+        >
+          {summary.batchNo || '—'}
+        </span>
+      </div>
+      <div>
+        <span className="text-[10px] text-ink-muted block uppercase font-semibold">
+          Sản phẩm / Mẫu
+        </span>
+        <span
+          className="font-bold text-ink truncate block"
+          title={summary.productName || summary.productCode || '—'}
+        >
+          {summary.productName || summary.productCode || '—'}
+        </span>
+      </div>
+      <div>
+        <span className="text-[10px] text-ink-muted block uppercase font-semibold">
+          Ngày kiểm nghiệm
+        </span>
+        <span className="font-bold text-ink truncate block">{summary.testDate || '—'}</span>
+      </div>
+      <div>
+        <span className="text-[10px] text-ink-muted block uppercase font-semibold">
+          Kết luận phiếu
+        </span>
+        {isPass ? (
+          <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/15 text-emerald-700 dark:text-emerald-400">
+            ✓ ĐẠT TIÊU CHUẨN
+          </span>
+        ) : isFail ? (
+          <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-black bg-rose-500/20 text-rose-700 dark:text-rose-400 border border-rose-500/30">
+            ⚠ KHÔNG ĐẠT (OOS)
+          </span>
+        ) : (
+          <span className="text-ink-muted text-[11px] font-medium">
+            {summary.overallStatus || '—'}
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export const MappingConfirmModal: React.FC<MappingConfirmModalProps> = ({
@@ -120,6 +250,7 @@ export const MappingConfirmModal: React.FC<MappingConfirmModalProps> = ({
   highConfidenceItems,
   lowConfidenceItems,
   tccsNames,
+  documentSummary,
   onConfirm,
 }) => {
   const [userMappings, setUserMappings] = useState<Record<string, string>>(() => {
@@ -148,6 +279,9 @@ export const MappingConfirmModal: React.FC<MappingConfirmModalProps> = ({
         value: item.value,
         unit: item.unit,
         limit: item.limit,
+        category: item.category,
+        status: item.status,
+        analysisMethod: item.analysisMethod,
       });
     });
     lowConfidenceItems.forEach((item) => {
@@ -159,6 +293,9 @@ export const MappingConfirmModal: React.FC<MappingConfirmModalProps> = ({
           value: item.value,
           unit: item.unit,
           limit: item.limit,
+          category: item.category,
+          status: item.status,
+          analysisMethod: item.analysisMethod,
         });
       }
     });
@@ -218,6 +355,9 @@ export const MappingConfirmModal: React.FC<MappingConfirmModalProps> = ({
 
         {/* ── Body ───────────────────────────────────────────────────────── */}
         <div className="flex-1 overflow-y-auto p-5 space-y-5">
+          {/* Thông tin tóm tắt phiếu kiểm nghiệm */}
+          <DocumentSummaryCard summary={documentSummary} />
+
           {/* HIGH confidence — bảng gọn */}
           {highConfidenceItems.length > 0 && (
             <div>
@@ -250,11 +390,14 @@ export const MappingConfirmModal: React.FC<MappingConfirmModalProps> = ({
                       return (
                         <tr key={idx} className="hover:bg-emerald-500/5 transition-colors">
                           <td className="px-3 py-2.5">
-                            <div
-                              className="font-semibold text-ink truncate max-w-[150px]"
-                              title={item.criteriaName}
-                            >
-                              {item.criteriaName}
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span
+                                className="font-semibold text-ink truncate max-w-[140px]"
+                                title={item.criteriaName}
+                              >
+                                {item.criteriaName}
+                              </span>
+                              <CategoryBadge category={item.category} />
                             </div>
                             {item.resolvedDictionaryTerm &&
                               item.resolvedDictionaryTerm !== item.criteriaName && (
@@ -336,6 +479,7 @@ export const MappingConfirmModal: React.FC<MappingConfirmModalProps> = ({
                         <span className="font-black text-ink text-sm" title={item.criteriaName}>
                           {item.criteriaName}
                         </span>
+                        <CategoryBadge category={item.category} />
                         {item.resolvedDictionaryTerm &&
                           item.resolvedDictionaryTerm !== item.criteriaName && (
                             <span className="text-[10px] text-ink-muted bg-surface px-1.5 py-0.5 rounded border border-border">
