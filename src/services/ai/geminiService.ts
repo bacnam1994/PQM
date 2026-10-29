@@ -191,6 +191,21 @@ const OCR_RESPONSE_SCHEMA = {
       description:
         'Ngày kiểm nghiệm / Ngày xuất phiếu kết quả (định dạng DD/MM/YYYY, nếu không có để rỗng)',
     },
+    sampleDate: {
+      type: SchemaType.STRING,
+      description:
+        'Ngày lấy mẫu / Ngày nhận mẫu ghi trên phiếu (định dạng DD/MM/YYYY, nếu không có để rỗng)',
+    },
+    sampleType: {
+      type: SchemaType.STRING,
+      description:
+        'Phân loại mẫu kiểm nghiệm: FINISHED (Thành phẩm) | RAW_MATERIAL (Nguyên liệu) | PACKAGING (Bao bì) | IN_PROCESS (Bán thành phẩm); để rỗng nếu không rõ',
+    },
+    overallStatus: {
+      type: SchemaType.STRING,
+      description:
+        'Kết luận / Đánh giá chung toàn bộ phiếu: PASS (Đạt) | FAIL (Không đạt/OOS) | CONFORM | NOT_CONFORM; để rỗng nếu không có',
+    },
     notes: {
       type: SchemaType.STRING,
       description:
@@ -208,6 +223,16 @@ const OCR_RESPONSE_SCHEMA = {
           mappedName: {
             type: SchemaType.STRING,
             description: 'Tên chỉ tiêu chuẩn trong TCCS nếu map được, để rỗng nếu không chắc',
+          },
+          category: {
+            type: SchemaType.STRING,
+            description:
+              'Phân nhóm chỉ tiêu cho Form PKN: PHYSICAL | CHEMICAL | MICROBIAL | HEAVY_METAL | SAFETY (để rỗng nếu không rõ)',
+          },
+          status: {
+            type: SchemaType.STRING,
+            description:
+              'Kết luận riêng của chỉ tiêu này nếu có ghi trên phiếu: PASS | FAIL | INDETERMINATE (để rỗng nếu không rõ)',
           },
           confidence: {
             type: SchemaType.STRING,
@@ -504,13 +529,13 @@ export const geminiService = {
                     mimeType: (page.mimeType as any) || 'image/jpeg',
                   },
                 };
-                return await executeGeminiOcrCall(
-                  genAI,
-                  decoratedPrompt,
-                  [imagePart],
-                  onProgress,
-                  35
-                );
+                const parts: any[] = [imagePart];
+                if (page.textContent) {
+                  parts.push(
+                    `\n\n[TEXT LAYER HỖ TRỢ ĐỐI CHIẾU TRANG ${page.pageNumber}]:\n${page.textContent}`
+                  );
+                }
+                return await executeGeminiOcrCall(genAI, decoratedPrompt, parts, onProgress, 35);
               }
             },
             {
@@ -532,6 +557,100 @@ export const geminiService = {
             mergedFinalResult.documentType = docType;
             onProgress?.('Hoàn tất!', 100);
             return mergedFinalResult;
+          }
+
+          // CƠ CHẾ TỰ PHỤC HỒI CAO CẤP (Self-Recovery via High-DPI Vision):
+          // Nếu nhánh trích xuất text thuần túy trả về 0 kết quả (do bảng biểu PDF bị vỡ cấu trúc cột hoặc font subset),
+          // tự động kích hoạt High-DPI Canvas Rendering (200 DPI JPEG) để Gemini Vision đọc trực quan layout bảng.
+          if (pageInputs.some((p) => p.isNativeText || !p.base64)) {
+            onProgress?.(
+              'Text layer không chứa đủ cấu trúc bảng, đang kích hoạt Vision Engine kết xuất ảnh High-DPI...',
+              25
+            );
+            try {
+              const { convertPdfToImages } = await import('../../utils/pdfProcessor');
+              const renderedPages = await convertPdfToImages(file, {
+                targetDpi: 200,
+                format: 'image/jpeg',
+                quality: 0.9,
+                maxPages: 50,
+                onProgress: (current, total) => {
+                  onProgress?.(
+                    `Đang kết xuất ảnh trang PDF ${current}/${total}...`,
+                    Math.round(25 + (current / total) * 15)
+                  );
+                },
+              });
+
+              if (renderedPages.length > 0) {
+                const visionPageInputs: import('../ocr/types').PageExtractionInput[] =
+                  renderedPages.map((r) => {
+                    const textPage = analysisReport?.pages.find(
+                      (p) => p.pageNumber === r.pageNumber
+                    );
+                    return {
+                      pageNumber: r.pageNumber,
+                      isNativeText: false,
+                      base64: r.base64,
+                      mimeType: r.mimeType || 'image/jpeg',
+                      width: r.width,
+                      height: r.height,
+                      textContent: textPage?.fullText || textPage?.sampleText || '',
+                    };
+                  });
+
+                const visionMergedResult = await extractAllPagesSequentially(
+                  visionPageInputs,
+                  systemPrompt,
+                  async (decoratedPrompt, page) => {
+                    const contentParts: any[] = [
+                      {
+                        inlineData: {
+                          data: page.base64 || '',
+                          mimeType: (page.mimeType as any) || 'image/jpeg',
+                        },
+                      },
+                    ];
+                    if (page.textContent) {
+                      contentParts.push(
+                        `\n\n[TEXT LAYER THAM KHẢO TRANG ${page.pageNumber}]:\n${page.textContent}`
+                      );
+                    }
+                    return await executeGeminiOcrCall(
+                      genAI,
+                      decoratedPrompt,
+                      contentParts,
+                      onProgress,
+                      45
+                    );
+                  },
+                  {
+                    continueOnPageError: true,
+                    maxRetriesPerPage: 2,
+                    maxConcurrency: 2,
+                    onPageProgress: (current, total, stepText) => {
+                      const percent = Math.round(40 + (current / total) * 55);
+                      onProgress?.(stepText, percent);
+                    },
+                  }
+                );
+
+                if (
+                  visionMergedResult &&
+                  Array.isArray(visionMergedResult.testResults) &&
+                  visionMergedResult.testResults.length > 0
+                ) {
+                  visionMergedResult.documentType = 'SCANNED_IMAGE';
+                  onProgress?.('Hoàn tất!', 100);
+                  return visionMergedResult;
+                }
+              }
+            } catch (renderRetryError) {
+              console.warn(
+                '[PDF Pipeline] Tự phục hồi qua High-DPI Vision thất bại:',
+                renderRetryError
+              );
+            }
           }
 
           console.warn(

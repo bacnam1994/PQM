@@ -134,3 +134,74 @@ Mỗi chỉ tiêu trong bảng được AI phân loại sâu vào 1 trong 5 nhó
   - **Evaluation Badges**: Tự động so sánh giá trị thực đo với mức tiêu chuẩn để gắn badge `✓ Đạt` hoặc `⚠ OOS`.
 - `useTestResultAIIntegration.ts`:
   - Tự động điền `reportNo`, `labName`, `labId`, `testDate`, `notes`, chọn Lô `batchNo`, điền `testResultsMap` theo TCCS và thêm các chỉ tiêu ngoài TCCS vào `extraCriteria`.
+
+---
+
+## 🛡️ Rào Chắn Chống Sai Lệch Chỉ Tiêu & Tự Phục Hồi Quét PDF (PDF & Criteria Invariants)
+
+1. **Rule 16: Category Isolation & Negative Guards (Bất Biến Phân Lập Danh Mục)**:
+   - Các nhóm chỉ tiêu `HEAVY_METAL` (Kim loại nặng: Chì Pb, Asen As, Cadmi Cd, Thủy ngân Hg...) và `MICROBIAL` (Vi sinh vật: E. coli, Salmonella, TAMC, TYMC...) hoặc `PHYSICAL` (Lý học: Độ ẩm, Cảm quan...) là **hoàn toàn loại trừ lẫn nhau (Mutually Exclusive)**.
+   - Tuyệt đối không thực hiện so khớp chuỗi con không phân cách từ (`normSystem.includes(normAi)`). Toàn bộ so khớp từ điển và tên chuẩn phải thông qua `tokenizeWords` và `containsPhraseTokens` (Whole Word/Phrase Tokens) để tránh hiện tượng cắt vụn ký tự (như chuỗi `"chi"` trong tên vi khuẩn la-tinh `"escherichia"`).
+   - Nếu cả 2 bên đều quy về thuật ngữ trong từ điển nhưng khác nhóm (`dictAi !== dictSystem`), lập tức từ chối so khớp.
+
+2. **Rule 17: Visual Ground Truth for PDF Tables (Bảo Toàn Hình Học Bảng Biểu PDF)**:
+   - Phiếu kiểm nghiệm là tài liệu dạng bảng biểu phức tạp. Lớp văn bản thô (Text Stream) từ PDF điện tử thường bị xáo trộn thứ tự cột hoặc lỗi font subset tiếng Việt.
+   - Nếu trích xuất văn bản từ Text Layer trả về 0 chỉ tiêu hoặc vỡ cấu trúc, hệ thống **bắt buộc tự động kích hoạt cơ chế Self-Recovery**: Chuyển đổi toàn bộ trang sang ảnh Canvas High-DPI (200 DPI JPEG) và gửi ảnh trực quan kết hợp với Text Layer bổ trợ lên Gemini Vision để nhận diện bảng chuẩn xác 100%.
+
+---
+
+## 📑 Cấu trúc Nhận diện Khớp Chuẩn Form Nhập Phiếu Kiểm Nghiệm (PKN Form-Aligned Schema)
+
+Để tự động điền chính xác 100% vào Form Nhập PKN (`TestResultFormPage.tsx` / `useTestResultForm`), pipeline AI Vision bóc tách toàn diện 2 khối thông tin bám sát cấu trúc Form:
+
+### 1. Khối Thông tin Hành chính & Tổng quan (Header Metadata)
+
+- `reportNo`: Số hiệu phiếu kiểm nghiệm / Số KQPT / Report No (đối chiếu lưu trữ và truy vết CoA).
+- `labName` / `labId`: Đơn vị kiểm nghiệm (chuẩn hóa theo danh mục Master Data Testing Laboratories: CASE, Quatest 3, Eurofins, NIFC, Phòng Kiểm Nghiệm Nội Bộ V-BIOTECH...).
+- `batchNo`: Số lô sản xuất (tự động khớp Lô trong hệ thống hoặc kích hoạt modal tạo Lô mới `AutoCreateBatchModal`).
+- `productCode` & `productName`: Mã và Tên sản phẩm/mẫu (truy vấn nhanh TCCS hiệu lực của sản phẩm).
+- `testDate`: Ngày kiểm nghiệm / ngày xuất phiếu / ngày ký (định dạng `YYYY-MM-DD` khớp với `<DSDateInput>`).
+- `sampleDate`: Ngày nhận mẫu / ngày lấy mẫu (lưu vết thời gian lưu mẫu).
+- `mfgDate` & `expDate`: Ngày sản xuất và Hạn sử dụng (hỗ trợ tự động tạo Lô).
+- `sampleType`: Phân loại mẫu (`FINISHED` - Thành phẩm, `RAW_MATERIAL` - Nguyên liệu, `PACKAGING` - Bao bì, `IN_PROCESS` - Bán thành phẩm).
+- `overallStatus`: Kết luận chung toàn bộ phiếu (`PASS` - Đạt / `FAIL` - Không đạt / OOS).
+- `notes`: Ghi chú về tình trạng mẫu (niêm phong, bao bì, nhiệt độ nhận mẫu).
+
+### 2. Khối Chỉ tiêu Kiểm nghiệm & Phân nhóm Form (Criteria & Grouping)
+
+Mỗi chỉ tiêu trong bảng được AI phân loại sâu vào 1 trong 5 nhóm của Form PKN:
+
+- `category`:
+  - `PHYSICAL` (Lý học & Cảm quan): Màu sắc, mùi vị, thể chất, hình thức, độ ẩm, độ rã, khối lượng trung bình, thể tích thực, pH, tỷ trọng, độ khúc xạ, độ trong...
+  - `CHEMICAL` (Hóa học & Định lượng): Định tính, định lượng hoạt chất chính, hàm lượng hoạt chất, tạp chất liên quan, tro toàn phần, tro không tan trong acid, cắn khô...
+  - `MICROBIAL` (Vi sinh vật): Tổng số vi sinh vật hiếu khí (TAMC), tổng số nấm men nấm mốc (TYMC), E. coli, Salmonella, S. aureus, P. aeruginosa, Coliforms...
+  - `HEAVY_METAL` (Kim loại nặng): Chì (Pb), Asen (As), Cadmi (Cd), Thủy ngân (Hg)...
+  - `SAFETY` (Chỉ tiêu an toàn khác): Độc tố vi nấm (Aflatoxin...), Dư lượng thuốc BVTV, Dung môi tồn dư...
+- `value`: Kết quả thực đo (bảo toàn số 0, số thập phân, ký hiệu so sánh `<`, `≤`, `KPH`, `Âm tính`).
+- `unit`: Đơn vị tính (`%`, `mg/viên`, `CFU/g`, `ppm`, `mL`...).
+- `limit`: Mức yêu cầu/giới hạn tiêu chuẩn.
+- `analysisMethod`: Phương pháp thử nghiệm (HPLC, UV-Vis, AAS, TCVN, DĐVN V...).
+- `status`: Đánh giá riêng của từng chỉ tiêu trên phiếu (`PASS` | `FAIL` | `INDETERMINATE`).
+- `confidenceScore` (0-100) & `confidence` (high/medium/low).
+
+### 3. Giao diện Xác nhận & Tự động Ingestion
+
+- `MappingConfirmModal.tsx`:
+  - **Header Summary Card**: Hiển thị bảng tổng hợp thông tin hành chính (Số phiếu, Đơn vị KN, Số lô, Tên sản phẩm, Ngày KN, Đánh giá chung) ngay trên đầu modal.
+  - **Category Badges**: Gắn nhãn màu phân loại (`Lý hóa`, `Định lượng`, `Vi sinh`, `Kim loại nặng`, `An toàn`) cạnh tên từng chỉ tiêu.
+  - **Evaluation Badges**: Tự động so sánh giá trị thực đo với mức tiêu chuẩn để gắn badge `✓ Đạt` hoặc `⚠ OOS`.
+- `useTestResultAIIntegration.ts`:
+  - Tự động điền `reportNo`, `labName`, `labId`, `testDate`, `notes`, chọn Lô `batchNo`, điền `testResultsMap` theo TCCS và thêm các chỉ tiêu ngoài TCCS vào `extraCriteria`.
+
+---
+
+## 🛡️ Rào Chắn Chống Sai Lệch Chỉ Tiêu & Tự Phục Hồi Quét PDF (PDF & Criteria Invariants)
+
+1. **Rule 16: Category Isolation & Negative Guards (Bất Biến Phân Lập Danh Mục)**:
+   - Các nhóm chỉ tiêu `HEAVY_METAL` (Kim loại nặng: Chì Pb, Asen As, Cadmi Cd, Thủy ngân Hg...) và `MICROBIAL` (Vi sinh vật: E. coli, Salmonella, TAMC, TYMC...) hoặc `PHYSICAL` (Lý học: Độ ẩm, Cảm quan...) là **hoàn toàn loại trừ lẫn nhau (Mutually Exclusive)**.
+   - Tuyệt đối không thực hiện so khớp chuỗi con không phân cách từ (`normSystem.includes(normAi)`). Toàn bộ so khớp từ điển và tên chuẩn phải thông qua `tokenizeWords` và `containsPhraseTokens` (Whole Word/Phrase Tokens) để tránh hiện tượng cắt vụn ký tự (như chuỗi `"chi"` trong tên vi khuẩn la-tinh `"escherichia"`).
+   - Nếu cả 2 bên đều quy về thuật ngữ trong từ điển nhưng khác nhóm (`dictAi !== dictSystem`), lập tức từ chối so khớp.
+
+2. **Rule 17: Visual Ground Truth for PDF Tables (Bảo Toàn Hình Học Bảng Biểu PDF)**:
+   - Phiếu kiểm nghiệm là tài liệu dạng bảng biểu phức tạp. Lớp văn bản thô (Text Stream) từ PDF điện tử thường bị xáo trộn thứ tự cột hoặc lỗi font subset tiếng Việt.
+   - Nếu trích xuất văn bản từ Text Layer trả về 0 chỉ tiêu hoặc vỡ cấu trúc, hệ thống **bắt buộc tự động kích hoạt cơ chế Self-Recovery**: Chuyển đổi toàn bộ trang sang ảnh Canvas High-DPI (200 DPI JPEG) và gửi ảnh trực quan kết hợp với Text Layer bổ trợ lên Gemini Vision để nhận diện bảng chuẩn xác 100%.

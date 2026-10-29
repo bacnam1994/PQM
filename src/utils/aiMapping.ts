@@ -801,9 +801,188 @@ export const normalizeString = (str: string) => {
 };
 
 /**
+ * Tách chuỗi thành mảng các từ (tokens) viết thường, không dấu, bỏ ký tự đặc biệt.
+ * Phục vụ so khớp nguyên từ (Whole Word Match), ngăn ngừa triệt để hiện tượng
+ * cắt vụn ký tự trong từ la-tinh (ví dụ: 'chi' trong 'escherichia').
+ */
+export const tokenizeWords = (str: string): string[] => {
+  return str
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/g, 'd')
+    .replace(/[^a-z0-9]/g, ' ')
+    .split(/\s+/)
+    .filter((w) => w.length > 0);
+};
+
+/**
+ * Kiểm tra xem chuỗi nguồn có chứa cụm từ mục tiêu dưới dạng chuỗi các từ liên tiếp hay không.
+ */
+export const containsPhraseTokens = (source: string, targetPhrase: string): boolean => {
+  const sourceWords = tokenizeWords(source);
+  const targetWords = tokenizeWords(targetPhrase);
+  if (targetWords.length === 0 || sourceWords.length < targetWords.length) return false;
+
+  for (let i = 0; i <= sourceWords.length - targetWords.length; i++) {
+    let match = true;
+    for (let j = 0; j < targetWords.length; j++) {
+      if (sourceWords[i + j] !== targetWords[j]) {
+        match = false;
+        break;
+      }
+    }
+    if (match) return true;
+  }
+  return false;
+};
+
+/**
+ * Nhận diện nhóm kiểm nghiệm dược điển của chỉ tiêu để thực thi Rào chắn An toàn (Negative Guard).
+ * Các nhóm kiểm nghiệm sau đây là LOẠI TRỪ LẪN NHAU (Mutually Exclusive):
+ * - HEAVY_METAL (Kim loại nặng: Pb, As, Cd, Hg...)
+ * - MICROBIAL (Vi sinh vật: E. coli, Salmonella, TVKHK, TSNM...)
+ * - PHYSICAL (Lý học & Cảm quan: Cảm quan, Độ ẩm, pH, Tỷ trọng...)
+ */
+export const getCriterionCategory = (
+  name: string
+): 'HEAVY_METAL' | 'MICROBIAL' | 'PHYSICAL' | 'UNKNOWN' => {
+  if (!name) return 'UNKNOWN';
+  const words = tokenizeWords(name);
+  const norm = normalizeString(name);
+
+  // 1. Vi sinh vật & Men vi sinh
+  const microbialTokens = new Set([
+    'ecoli',
+    'escherichia',
+    'coli',
+    'coliform',
+    'coliforms',
+    'salmonella',
+    'staphylococcus',
+    'aureus',
+    'pseudomonas',
+    'aeruginosa',
+    'candida',
+    'albicans',
+    'clostridium',
+    'bacillus',
+    'lactobacillus',
+    'bifidobacterium',
+    'saccharomyces',
+    'tamc',
+    'tymc',
+    'tvkhk',
+    'tsnm',
+    'visinh',
+    'microbial',
+    'microbiology',
+    'yeast',
+    'mold',
+    'mould',
+    'nammen',
+    'nammoc',
+    'khuanlac',
+    'cfu',
+    'probiotic',
+    'probiotics',
+    'loikhuan',
+    'baotu',
+  ]);
+  if (
+    words.some((w) => microbialTokens.has(w)) ||
+    norm.includes('visinh') ||
+    norm.includes('aerobiccount')
+  ) {
+    return 'MICROBIAL';
+  }
+
+  // 2. Kim loại nặng
+  // Chú ý: Các ký hiệu 2 ký tự (pb, cd, as, hg, cu, zn, fe, ni, cr) hoặc từ ngắn (chi)
+  // BẮT BUỘC chỉ được match khi là 1 token độc lập trong danh sách words.
+  const heavyMetalExactTokens = new Set([
+    'pb',
+    'lead',
+    'chi',
+    'as',
+    'asen',
+    'arsenic',
+    'arsen',
+    'hg',
+    'thuyngan',
+    'mercury',
+    'cd',
+    'cadmi',
+    'cadmium',
+    'cu',
+    'copper',
+    'zn',
+    'zinc',
+    'fe',
+    'iron',
+    'ni',
+    'nickel',
+    'cr',
+    'chromium',
+    'heavymetal',
+    'heavymetals',
+    'kimloainang',
+  ]);
+  if (
+    words.some((w) => heavyMetalExactTokens.has(w)) ||
+    norm.includes('kimloainang') ||
+    norm.includes('heavymetal')
+  ) {
+    return 'HEAVY_METAL';
+  }
+
+  // 3. Cảm quan & Lý học
+  const physicalTokens = new Set([
+    'camquan',
+    'appearance',
+    'description',
+    'doam',
+    'moisture',
+    'lod',
+    'ph',
+    'tytrong',
+    'density',
+    'dora',
+    'disintegration',
+    'docung',
+    'hardness',
+    'domaimon',
+    'friability',
+    'thetichthuc',
+    'khoiluongtrungbinh',
+    'uniformity',
+    'chisoacid',
+    'chisoiod',
+    'khucxa',
+    'refraction',
+    'donhot',
+    'viscosity',
+  ]);
+  if (
+    words.some((w) => physicalTokens.has(w)) ||
+    norm.includes('camquan') ||
+    norm.includes('doam') ||
+    norm.includes('lossondrying') ||
+    norm.includes('khoiluongtrungbinh') ||
+    norm.includes('thetichthuc') ||
+    norm.includes('tytrong') ||
+    norm.includes('tanra')
+  ) {
+    return 'PHYSICAL';
+  }
+
+  return 'UNKNOWN';
+};
+
+/**
  * Tra cứu thuật ngữ trong PHARMA_TERM_DICTIONARY.
  * Trả về tên chuẩn trong hệ thống nếu tìm thấy, hoặc null nếu không.
- * Ưu tiên: Khớp chính xác 100% → Khớp chuỗi dài nhất (Longest Substring Match).
+ * Ưu tiên: Khớp chính xác 100% → Khớp nguyên cụm từ hoàn chỉnh (Phrase Token Match).
  */
 export const lookupPharmaTerm = (aiName: string): string | null => {
   const normAi = normalizeString(aiName);
@@ -818,24 +997,35 @@ export const lookupPharmaTerm = (aiName: string): string | null => {
     }
   }
 
-  // 2. Khớp bao hàm: Tìm ứng viên có độ dài chuỗi khớp dài nhất (Longest Substring Match)
-  // để tránh các từ ngắn (như 'iot' dài 3 ký tự) vô tình bắt nhầm từ dài (như 'probiotics')
+  // 2. Khớp theo word tokens hoặc cụm từ hoàn chỉnh (tránh cắt vụn từ)
+  const aiWords = tokenizeWords(aiName);
   let bestMatch: { systemName: string; matchLength: number } | null = null;
 
   for (const [systemName, aliases] of Object.entries(PHARMA_TERM_DICTIONARY)) {
-    const normSystem = normalizeString(systemName);
-    if (normSystem.length >= 3 && normAi.includes(normSystem)) {
-      if (!bestMatch || normSystem.length > bestMatch.matchLength) {
-        bestMatch = { systemName, matchLength: normSystem.length };
+    const systemWords = tokenizeWords(systemName);
+    if (containsPhraseTokens(aiName, systemName)) {
+      const len = systemWords.join('').length;
+      if (!bestMatch || len > bestMatch.matchLength) {
+        bestMatch = { systemName, matchLength: len };
       }
     }
 
     for (const alias of aliases) {
-      const normAlias = normalizeString(alias);
-      if (!normAlias || normAlias.length < 3) continue;
-      if (normAi.includes(normAlias)) {
-        if (!bestMatch || normAlias.length > bestMatch.matchLength) {
-          bestMatch = { systemName, matchLength: normAlias.length };
+      const aliasWords = tokenizeWords(alias);
+      if (aliasWords.length === 0) continue;
+
+      // Nếu alias chỉ có 1 từ ngắn (<= 3 ký tự như pb, cd, as, fe, zn, chi, iod):
+      // BẮT BUỘC phải là 1 token độc lập trong aiWords!
+      if (aliasWords.length === 1 && aliasWords[0].length <= 3) {
+        if (aiWords.includes(aliasWords[0])) {
+          if (!bestMatch || aliasWords[0].length > bestMatch.matchLength) {
+            bestMatch = { systemName, matchLength: aliasWords[0].length };
+          }
+        }
+      } else if (containsPhraseTokens(aiName, alias)) {
+        const len = aliasWords.join('').length;
+        if (!bestMatch || len > bestMatch.matchLength) {
+          bestMatch = { systemName, matchLength: len };
         }
       }
     }
@@ -846,7 +1036,11 @@ export const lookupPharmaTerm = (aiName: string): string | null => {
 
 /**
  * Kiểm tra mức độ tương đồng giữa 2 chuỗi tên chỉ tiêu.
- * Thứ tự ưu tiên: Learned Mappings → Pharma Dictionary → Fuzzy String Match
+ * Thứ tự ưu tiên:
+ * 1. Learned Mappings
+ * 2. Pharma Category Negative Guard (Tuyệt đối không map Kim loại nặng vs Vi sinh vs Lý tính)
+ * 3. Pharma Dictionary (Song phương & Phân tách rõ ràng)
+ * 4. Word-token Sequence Match
  */
 export const isCriteriaMatch = (
   aiCriteriaName: string,
@@ -861,7 +1055,6 @@ export const isCriteriaMatch = (
 
   // RÀO CHẮN NGHIỆP VỤ DƯỢC KHOA (PHARMA TEST TYPE GUARD):
   // Định tính (Identification) và Định lượng/Hàm lượng (Assay/Content) là 2 loại phép thử hoàn toàn khác nhau.
-  // Tuyệt đối không tự động map giữa Định tính và Định lượng dù có cùng tên hoạt chất trong từ điển.
   const isIdentity1 = norm1.includes('dinhtinh') || norm1.includes('identification');
   const isIdentity2 = norm2.includes('dinhtinh') || norm2.includes('identification');
   const isAssay1 =
@@ -870,6 +1063,15 @@ export const isCriteriaMatch = (
     norm2.includes('dinhluong') || norm2.includes('assay') || norm2.includes('hamluong');
 
   if ((isIdentity1 && isAssay2) || (isAssay1 && isIdentity2)) {
+    return false;
+  }
+
+  // RÀO CHẮN LOẠI TRỪ DANH MỤC KIỂM NGHIỆM (CATEGORY NEGATIVE GUARD):
+  // Kim loại nặng (Pb, Cd, As, Hg...) TUYỆT ĐỐI KHÔNG BAO GIỜ được khớp với Vi sinh vật (E. coli, TAMC, Salmonella...)
+  // hoặc Lý học (Độ ẩm, Cảm quan...) và ngược lại!
+  const cat1 = getCriterionCategory(aiCriteriaName);
+  const cat2 = getCriterionCategory(systemCriteriaName);
+  if (cat1 !== 'UNKNOWN' && cat2 !== 'UNKNOWN' && cat1 !== cat2) {
     return false;
   }
 
@@ -888,44 +1090,39 @@ export const isCriteriaMatch = (
   const dictAi = lookupPharmaTerm(aiCriteriaName);
   const dictSystem = lookupPharmaTerm(systemCriteriaName);
 
-  // 2.1. Cả 2 bên đều quy về cùng một nhóm hoạt chất / nguyên tố trong từ điển (Ví dụ: "Hàm lượng Kẽm (Zn)" và "Kẽm (Kẽm gluconat)")
-  if (dictAi && dictSystem && dictAi === dictSystem) {
-    return true;
+  // 2.1. Cả 2 bên đều quy về cùng một nhóm hoạt chất / nguyên tố trong từ điển
+  if (dictAi && dictSystem) {
+    return dictAi === dictSystem;
   }
 
-  // 2.2. Nhóm từ điển của AI trùng với tên hệ thống hoặc nằm trong tên hệ thống
+  // 2.2. Nhóm từ điển của AI nằm trong tên hệ thống (dưới dạng từ/cụm từ hoàn chỉnh)
   if (dictAi) {
-    const normDictAi = normalizeString(dictAi);
-    const normSystem = normalizeString(systemCriteriaName);
-    if (normDictAi === normSystem || (normDictAi.length >= 3 && normSystem.includes(normDictAi))) {
-      return true;
-    }
-  }
-
-  // 2.3. Nhóm từ điển của System chứa trong AI name
-  if (dictSystem) {
-    const normDictSystem = normalizeString(dictSystem);
-    const normAI = normalizeString(aiCriteriaName);
     if (
-      normDictSystem === normAI ||
-      (normDictSystem.length >= 3 && normAI.includes(normDictSystem))
+      containsPhraseTokens(systemCriteriaName, dictAi) ||
+      containsPhraseTokens(systemCriteriaName, aiCriteriaName)
     ) {
       return true;
     }
   }
 
-  // 3. Fallback về phương pháp so khớp chuỗi truyền thống
-  const normAI = normalizeString(aiCriteriaName);
-  const normSystem = normalizeString(systemCriteriaName);
+  // 2.3. Nhóm từ điển của System chứa trong AI name (dưới dạng từ/cụm từ hoàn chỉnh)
+  if (dictSystem) {
+    if (
+      containsPhraseTokens(aiCriteriaName, dictSystem) ||
+      containsPhraseTokens(aiCriteriaName, systemCriteriaName)
+    ) {
+      return true;
+    }
+  }
 
-  if (!normAI || !normSystem) return false;
+  // 3. Fallback về so khớp cụm từ (Word Token Matching) — chỉ chấp nhận khi là cụm từ hoàn chỉnh
+  if (norm1 === norm2) return true;
 
-  // Khớp chính xác
-  if (normAI === normSystem) return true;
-
-  // Khớp bao hàm (chứa nhau) — chỉ áp dụng khi chuỗi đủ dài để tránh false positive
-  if (normAI.length >= 4 && normSystem.length >= 4) {
-    if (normAI.includes(normSystem) || normSystem.includes(normAI)) return true;
+  if (
+    containsPhraseTokens(aiCriteriaName, systemCriteriaName) ||
+    containsPhraseTokens(systemCriteriaName, aiCriteriaName)
+  ) {
+    return true;
   }
 
   return false;

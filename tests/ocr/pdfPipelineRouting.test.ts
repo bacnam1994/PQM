@@ -146,6 +146,110 @@ describe('PDF Pipeline Routing & Concurrency Hardening (VIBECODE-AI-PDF-01)', ()
       expect(result.testResults[1].value).toBe('502.5');
     });
 
+    it('NATIVE_TEXT self-recovery: khi text layer trích xuất trả về 0 kết quả, tự động chuyển sang High-DPI Canvas Rendering', async () => {
+      const mockReport: PdfAnalysisReport = {
+        pageCount: 1,
+        totalPages: 1,
+        documentType: 'NATIVE_TEXT',
+        docType: 'DIGITAL_TEXT',
+        hasTextLayer: true,
+        pageTypes: [
+          { pageNumber: 1, type: 'TEXT', usableText: true, charCount: 300, wordCount: 50 },
+        ],
+        processingStrategy: 'EXTRACT_TEXT_DIRECT',
+        pages: [
+          {
+            pageNumber: 1,
+            geometry: {
+              pageNumber: 1,
+              widthPt: 595,
+              heightPt: 842,
+              rotation: 0,
+              aspectRatio: 0.707,
+              paperFormat: 'A4',
+            },
+            charCount: 300,
+            wordCount: 50,
+            sampleText: 'PHIẾU KIỂM NGHIỆM',
+            fullText: 'Bảng kết quả kiểm nghiệm rỗng do font subset lỗi',
+            hasTableKeywords: true,
+            isTextUsable: true,
+            pageType: 'TEXT',
+            recommendedPipeline: 'NATIVE_TEXT',
+          },
+        ],
+        totalChars: 300,
+        totalWords: 50,
+        canUseNativeText: true,
+        summaryReason: 'PDF điện tử đầy đủ text layer',
+      };
+
+      vi.spyOn(pdfAnalyzerModule, 'analyzePdf').mockResolvedValue(mockReport);
+      const convertSpy = vi.spyOn(pdfProcessorModule, 'convertPdfToImages').mockResolvedValue([
+        {
+          pageNumber: 1,
+          base64: 'mock-rendered-page-base64',
+          dataUrl: 'data:image/jpeg;base64,mock',
+          width: 1654,
+          height: 2339,
+          mimeType: 'image/jpeg',
+        },
+      ]);
+
+      const fakePdfFile = new File(['%PDF-1.4 mock content'], 'broken-text.pdf', {
+        type: 'application/pdf',
+      });
+
+      let callCount = 0;
+      const fakeGenAI = {
+        getGenerativeModel: vi.fn().mockReturnValue({
+          generateContent: vi.fn().mockImplementation(async () => {
+            callCount++;
+            if (callCount === 1) {
+              // Lần 1 (Text Stream): Trả về 0 chỉ tiêu
+              return {
+                response: {
+                  text: () => JSON.stringify({ testResults: [] }),
+                },
+              };
+            } else {
+              // Lần 2 (Vision Retry): Nhận diện thành công từ ảnh Canvas High-DPI
+              return {
+                response: {
+                  text: () =>
+                    JSON.stringify({
+                      reportNo: 'KN-2026-001',
+                      labName: 'Trung tâm Quatest 3',
+                      testResults: [
+                        {
+                          criteriaName: 'Chì (Pb)',
+                          mappedName: 'Chì (Pb)',
+                          category: 'HEAVY_METAL',
+                          confidence: 'high',
+                          value: '< 0.05',
+                          unit: 'ppm',
+                        },
+                      ],
+                    }),
+                },
+              };
+            }
+          }),
+        }),
+      };
+
+      const clientLoaderModule = await import('../../src/services/ai/geminiClientLoader');
+      vi.spyOn(clientLoaderModule, 'createGoogleGenerativeAI').mockResolvedValue(fakeGenAI as any);
+
+      const result = await geminiService.extractDataFromDocument(fakePdfFile, 'Prompt');
+
+      // Tự động kích hoạt convertPdfToImages sau khi lần text thuần trả về 0 kết quả
+      expect(convertSpy).toHaveBeenCalledTimes(1);
+      expect(result.testResults).toHaveLength(1);
+      expect(result.testResults[0].criteriaName).toBe('Chì (Pb)');
+      expect(result.documentType).toBe('SCANNED_IMAGE');
+    });
+
     it('SCANNED_IMAGE: tự động gọi convertPdfToImages để render ảnh Canvas High-DPI', async () => {
       const mockReport: PdfAnalysisReport = {
         pageCount: 1,
