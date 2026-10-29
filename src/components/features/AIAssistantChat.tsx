@@ -261,14 +261,14 @@ export const AIAssistantChat: React.FC<AIAssistantChatProps> = ({
     if (currentContext.type === 'AUDIT_LOGS') {
       return [
         {
-          icon: '🛡️',
-          text: 'Rà soát ALCOA+',
-          prompt: 'Đánh giá mức độ tuân thủ toàn vẹn dữ liệu ALCOA+',
+          icon: '🔍',
+          text: 'Tra cứu sửa đổi',
+          prompt: 'Tìm các thao tác sửa đổi dữ liệu quan trọng gần đây',
         },
         {
           icon: '🔄',
-          text: 'Phiếu sửa nhiều lần',
-          prompt: 'Tìm các phiếu kiểm nghiệm bị sửa đổi nhiều lần',
+          text: 'Nhật ký phiếu KN',
+          prompt: 'Xem các hoạt động liên quan đến phiếu kiểm nghiệm gần nhất',
         },
       ];
     }
@@ -276,26 +276,31 @@ export const AIAssistantChat: React.FC<AIAssistantChatProps> = ({
       return [
         {
           icon: '🧪',
-          text: 'Soát lỗi TCCS',
-          prompt: 'Kiểm tra các quy chuẩn Min/Max và đơn vị đo trong TCCS',
+          text: 'Soát chỉ tiêu TCCS',
+          prompt: 'Kiểm tra danh mục chỉ tiêu và mức tiêu chuẩn trong TCCS',
         },
         {
-          icon: '📖',
-          text: 'Tra cứu Dược điển',
-          prompt: 'Gợi ý các chỉ tiêu kiểm nghiệm theo Dược điển Việt Nam V',
+          icon: '📋',
+          text: 'Chỉ tiêu an toàn',
+          prompt: 'Tóm tắt các chỉ tiêu an toàn vi sinh và kim loại nặng của TCCS này',
         },
       ];
     }
     return [
       {
-        icon: '⚠️',
-        text: 'Cảnh báo chất lượng',
-        prompt: 'Kiểm tra xem có bất thường chất lượng nào không?',
+        icon: '⏳',
+        text: 'Lô chờ duyệt',
+        prompt: 'Danh sách các lô đang ở trạng thái PENDING hoặc TESTING',
       },
       {
-        icon: '📦',
-        text: 'Tổng quan lô hàng',
-        prompt: 'Tóm tắt ngắn gọn tình trạng các lô hàng hiện tại',
+        icon: '⚠️',
+        text: 'Lô cận hạn / Không đạt',
+        prompt: 'Kiểm tra lô sắp hết hạn trong 30 ngày hoặc có kết quả không đạt',
+      },
+      {
+        icon: '🔬',
+        text: 'Đối chiếu Lab',
+        prompt: 'Tìm các lô có từ 2 phiếu kiểm nghiệm trở lên để so sánh',
       },
       {
         icon: '📥',

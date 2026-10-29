@@ -206,11 +206,12 @@ XỬ LÝ PHIẾU ĐA CỘT VÀ BỐ CỤC PHỨC TẠP:
    - Ô trống bỏ trống → bỏ qua chỉ tiêu đó (không tạo record)
 
 5. Format phòng lab phổ biến tại Việt Nam:
-   - **Quatest 3 (TP.HCM)**: Header có "Trung tâm Kỹ thuật Tiêu chuẩn Đo lường Chất lượng 3", bảng kết quả theo chuẩn TCVN, có ký hiệu phiếu dạng "KN-YYYY-XXXXXX"
-   - **CASE (Hà Nội)**: Header có "Trung tâm Phân tích và Kiểm nghiệm Thực phẩm Quốc gia" hoặc "CASE", số phiếu dạng "CASE-YYYY/XXX"
-   - **Eurofins (Sắc Ký Hà Nội)**: Header tiếng Anh, cột "Specification" = Giới hạn, "Result" = Kết quả, "Conclusion" = Đạt/KĐ
-   - **Phòng QC nội bộ**: Thường có tem/logo công ty, cột đơn giản, chữ viết tay kết quả
-   - **Vimedimex / VQC**: Phiếu kiểm nghiệm dược phẩm chuẩn GMP, có số hiệu TCCS rõ ràng
+   - **Quatest 3 (TP.HCM) / Quatest 1 (Hà Nội)**: Header có "Trung tâm Kỹ thuật Tiêu chuẩn Đo lường Chất lượng", bảng kết quả theo chuẩn TCVN/ISO 17025, có ký hiệu phiếu dạng "KN-YYYY-XXXXXX" hoặc "Số KQPT".
+   - **CASE (TP.HCM)**: Header có "Trung tâm Dịch vụ Phân tích Thí nghiệm TP.HCM" (CASE), số phiếu dạng "CASE-YYYY/XXX" hoặc "Số: MM/YY/CASE".
+   - **Eurofins (Sắc Ký Hải Đăng)**: Header "Eurofins Sắc Ký Hải Đăng", cột "Test parameter / Chỉ tiêu", "Method / Phương pháp", "Specification / Mức tiêu chuẩn", "Result / Kết quả".
+   - **NIFC (Hà Nội)**: "Viện Kiểm Nghiệm Thuốc Trung Ương" - National Institute of Drug Quality Control, bảng chuẩn Dược điển Việt Nam / TCVN.
+   - **TT Kiểm Nghiệm Thuốc - Mỹ Phẩm**: Trung tâm kiểm nghiệm các tỉnh/thành phố (ví dụ: TTKN Dược - Mỹ phẩm TP.HCM, Hà Nội...).
+   - **Phòng QC Nội bộ**: Thường có logo công ty, tiêu đề "PHIẾU KIỂM NGHIỆM", có mục TCCS số..., số lô, ngày sản xuất và hạn dùng rõ ràng.
 `;
 
 /**
