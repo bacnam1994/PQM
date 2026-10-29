@@ -16,6 +16,7 @@ import {
 } from '../../types';
 import { IBatchRepository } from '../BatchRepository';
 import { BaseFirebaseRepository } from './BaseFirebaseRepository';
+import { testResultRepository } from './FirebaseTestResultRepository';
 import { deleteBatchService } from '../../services/databaseService';
 import { removeUndefined } from '../../utils';
 
@@ -40,7 +41,6 @@ export class FirebaseBatchRepository
   }
 
   async findTestResultsByBatchId(batchId: string): Promise<import('../../types').TestResult[]> {
-    const { testResultRepository } = await import('./FirebaseTestResultRepository');
     return testResultRepository.findByRelation('batchId', batchId);
   }
 

@@ -26,6 +26,7 @@ import { Batch, TestResult, TCCS, ElectronicSignature } from '../../types';
 import { QualityDeviation as Deviation } from '../../types';
 import { BatchReleaseProgressService, BatchReleaseProgress } from './BatchReleaseProgressService';
 import { IBatchRepository } from '../../repositories/BatchRepository';
+import { testResultRepository } from '../../repositories/firebase/FirebaseTestResultRepository';
 import { DataFreshnessState } from './batchIntegrityValidator';
 
 export interface SyncReleaseProgressParams {
@@ -92,8 +93,6 @@ export class BatchReleaseWorkflowSynchronizer {
           testResults = await (this.repo as any).findTestResultsByBatchId(batchId);
         } else {
           try {
-            const { testResultRepository } =
-              await import('../../repositories/firebase/FirebaseTestResultRepository');
             if (testResultRepository && typeof testResultRepository.findByRelation === 'function') {
               testResults = await testResultRepository.findByRelation('batchId', batchId);
             }

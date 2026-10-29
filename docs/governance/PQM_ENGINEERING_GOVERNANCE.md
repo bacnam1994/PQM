@@ -114,13 +114,13 @@ Mọi commit, pull request hoặc bàn giao mã nguồn phải vượt qua 5 c�
 
 Bộ quy tắc quản trị kỹ thuật PQM bao gồm các tài liệu chuyên đề chi tiết:
 
-- [`PQM_VIBECODE_RULES.md`](file:///d:/26%20Kiem%20nghiem/PQM/docs/governance/PQM_VIBECODE_RULES.md): Sổ tay bắt buộc dành cho AI & kỹ sư phát triển trước mỗi task.
-- [`PQM_ARCHITECTURE_RULES.md`](file:///d:/26%20Kiem%20nghiem/PQM/docs/governance/PQM_ARCHITECTURE_RULES.md): Ranh giới phân tầng và hướng phụ thuộc Clean Architecture.
-- [`PQM_WORKFLOW_RULES.md`](file:///d:/26%20Kiem%20nghiem/PQM/docs/governance/PQM_WORKFLOW_RULES.md): Quy chuẩn Kernel 12 bước, Action Registry và Outbox Audit.
-- [`PQM_STATE_MACHINE_RULES.md`](file:///d:/26%20Kiem%20nghiem/PQM/docs/governance/PQM_STATE_MACHINE_RULES.md): Máy trạng thái FSM, tính Fail-Closed và 7 Release Gates.
-- [`PQM_DATA_MUTATION_RULES.md`](file:///d:/26%20Kiem%20nghiem/PQM/docs/governance/PQM_DATA_MUTATION_RULES.md): Quy tắc ghi dữ liệu, OCC, Idempotency và Repository Boundary.
-- [`PQM_AI_RULES.md`](file:///d:/26%20Kiem%20nghiem/PQM/docs/governance/PQM_AI_RULES.md): Ranh giới an toàn AI Advisory, Proposal Pattern và cách ly bản thảo.
-- [`PQM_UI_RULES.md`](file:///d:/26%20Kiem%20nghiem/PQM/docs/governance/PQM_UI_RULES.md): Ranh giới UI Components và React Hooks.
-- [`PQM_TESTING_RULES.md`](file:///d:/26%20Kiem%20nghiem/PQM/docs/governance/PQM_TESTING_RULES.md): Tiêu chuẩn kiểm thử đa tầng và bảo vệ chống hồi quy.
-- [`PQM_SECURITY_RULES.md`](file:///d:/26%20Kiem%20nghiem/PQM/docs/governance/PQM_SECURITY_RULES.md): Rào chắn RBAC, 21 CFR Part 11, Chữ ký số và Confirmation Tokens.
-- [`PQM_CHANGE_MANAGEMENT.md`](file:///d:/26%20Kiem%20nghiem/PQM/docs/governance/PQM_CHANGE_MANAGEMENT.md): Giao thức quản lý thay đổi tính năng, sửa lỗi, refactor và schema migration.
+- [`PQM_VIBECODE_RULES.md`](file:///e:/7%20PQM/docs/governance/PQM_VIBECODE_RULES.md): Sổ tay bắt buộc dành cho AI & kỹ sư phát triển trước mỗi task.
+- [`PQM_ARCHITECTURE_RULES.md`](file:///e:/7%20PQM/docs/governance/PQM_ARCHITECTURE_RULES.md): Ranh giới phân tầng và hướng phụ thuộc Clean Architecture.
+- [`PQM_WORKFLOW_RULES.md`](file:///e:/7%20PQM/docs/governance/PQM_WORKFLOW_RULES.md): Quy chuẩn Kernel 12 bước, Action Registry và Outbox Audit.
+- [`PQM_STATE_MACHINE_RULES.md`](file:///e:/7%20PQM/docs/governance/PQM_STATE_MACHINE_RULES.md): Máy trạng thái FSM, tính Fail-Closed và 7 Release Gates.
+- [`PQM_DATA_MUTATION_RULES.md`](file:///e:/7%20PQM/docs/governance/PQM_DATA_MUTATION_RULES.md): Quy tắc ghi dữ liệu, OCC, Idempotency và Repository Boundary.
+- [`PQM_AI_RULES.md`](file:///e:/7%20PQM/docs/governance/PQM_AI_RULES.md): Ranh giới an toàn AI Advisory, Proposal Pattern và cách ly bản thảo.
+- [`PQM_UI_RULES.md`](file:///e:/7%20PQM/docs/governance/PQM_UI_RULES.md): Ranh giới UI Components và React Hooks.
+- [`PQM_TESTING_RULES.md`](file:///e:/7%20PQM/docs/governance/PQM_TESTING_RULES.md): Tiêu chuẩn kiểm thử đa tầng và bảo vệ chống hồi quy.
+- [`PQM_SECURITY_RULES.md`](file:///e:/7%20PQM/docs/governance/PQM_SECURITY_RULES.md): Rào chắn RBAC, 21 CFR Part 11, Chữ ký số và Confirmation Tokens.
+- [`PQM_CHANGE_MANAGEMENT.md`](file:///e:/7%20PQM/docs/governance/PQM_CHANGE_MANAGEMENT.md): Giao thức quản lý thay đổi tính năng, sửa lỗi, refactor và schema migration.

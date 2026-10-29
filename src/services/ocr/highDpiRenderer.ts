@@ -9,6 +9,7 @@
  */
 
 import type { HighDpiRenderOptions, RenderedPageResult } from './types';
+import { preprocessCanvasImage } from './imagePreprocessor';
 
 /** Lazy loader cho pdfjs-dist */
 async function getPdfJs() {
@@ -153,7 +154,6 @@ export async function renderPdfHighDpi(
     // Nếu có yêu cầu tiền xử lý ảnh (OCR-04: Giữ cả bản gốc và bản enhancedVariant)
     let enhancedVariant: RenderedPageResult['enhancedVariant'];
     if (applyPreprocessing) {
-      const { preprocessCanvasImage } = await import('./imagePreprocessor');
       const processed = preprocessCanvasImage(canvas, {
         grayscale: true,
         autoContrast: true,

@@ -22,7 +22,7 @@ Hệ thống PQM đã vượt qua 12 Gates của **Rebuild Readiness Audit** (`R
 
 ### 2.1. Danh mục 92 Canonical Action IDs & Entity Types
 
-Toàn bộ danh bạ `CANONICAL_ACTION_REGISTRY` tại [`src/workflow/definitions/index.ts`](file:///D:/26%20Kiem%20nghiem/PQM/src/workflow/definitions/index.ts) được đóng băng.
+Toàn bộ danh bạ `CANONICAL_ACTION_REGISTRY` tại [`src/workflow/definitions/index.ts`](file:///e:/7%20PQM/src/workflow/definitions/index.ts) được đóng băng.
 15 Canonical Entities:
 `PRODUCT`, `MATERIAL`, `TCCS`, `FORMULA`, `BATCH`, `TEST_RESULT`, `QUALITY_SNAPSHOT`, `OOS`, `DEVIATION`, `CAPA`, `CHANGE_REQUEST`, `APPROVAL_TASK`, `COA`, `MASTER_DATA`, `SYSTEM`.
 

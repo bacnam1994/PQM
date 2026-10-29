@@ -4,7 +4,7 @@
 > **Thư mục**: `docs/contracts/SCREEN_CONTRACTS.md`  
 > **Phạm vi**: 25 Hợp đồng giao diện màn hình chuẩn hóa của hệ thống PQM.  
 > **Quy tắc bất biến**: UI chỉ là tầng trình bày (Presentation Layer), nhận State đã giải quyết từ Domain Engine để render, tuyệt đối không chứa Business Authority hay tự ý tính toán kết quả kiểm nghiệm.  
-> **Single Source of Truth về Mã màn hình**: Đối chiếu 1:1 với [`docs/screen-contracts/SCREEN_INVENTORY.md`](file:///d:/26%20Kiem%20nghiem/PQM/docs/screen-contracts/SCREEN_INVENTORY.md).
+> **Single Source of Truth về Mã màn hình**: Đối chiếu 1:1 với [`docs/screen-contracts/SCREEN_INVENTORY.md`](file:///e:/7%20PQM/docs/screen-contracts/SCREEN_INVENTORY.md).
 
 ---
 

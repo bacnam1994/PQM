@@ -3,7 +3,7 @@
 > **Mã tài liệu**: `REGISTRY-SCREEN-02`  
 > **Thư mục**: `docs/screen-contracts/SCREEN_ID_REGISTRY.md`  
 > **Phiên bản chuẩn hóa**: V2.1 — Screen ID SSoT Freeze  
-> **Căn cứ nguồn chuẩn tắc (SSoT)**: [`docs/screen-contracts/SCREEN_INVENTORY.md`](file:///d:/26%20Kiem%20nghiem/PQM/docs/screen-contracts/SCREEN_INVENTORY.md)  
+> **Căn cứ nguồn chuẩn tắc (SSoT)**: [`docs/screen-contracts/SCREEN_INVENTORY.md`](file:///e:/7%20PQM/docs/screen-contracts/SCREEN_INVENTORY.md)  
 > **Quy tắc tuyệt đối**: Toàn bộ hệ thống (đặc tả, hợp đồng, test, route, UI) chỉ sử dụng duy nhất hệ thống Screen ID từ `SC-01` đến `SC-25`. Tuyệt đối không hoán đổi vị trí hay tự định nghĩa lại Screen ID.
 
 ---

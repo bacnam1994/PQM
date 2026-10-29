@@ -17,6 +17,7 @@
  */
 
 import { Batch, TestResult } from '../../types';
+import { testResultRepository } from '../../repositories/firebase/FirebaseTestResultRepository';
 
 export type BatchTestRelationshipType =
   | 'TRUE_ORPHAN'
@@ -626,8 +627,6 @@ export function resolveTestResultsForBatch(
 export async function fetchOnlineTestResultsForBatch(batch: Batch): Promise<TestResult[]> {
   if (!batch || !batch.id) return [];
   try {
-    const { testResultRepository } =
-      await import('../../repositories/firebase/FirebaseTestResultRepository');
     const results = await testResultRepository.findByBatchId(batch.id);
     if (results && results.length > 0) return results;
 

@@ -4,7 +4,7 @@
 > **Phiên bản:** `1.0.0-CANONICAL`  
 > **Cập nhật lần cuối:** 2026-09-25  
 > **Thực thể áp dụng:** `TEST_RESULT` (`TestResultFormPage.tsx`, `CriteriaInputGroup.tsx`)  
-> **Giải quyết lỗ hổng:** [`GAP-05`](file:///d:/26%20Kiem%20nghiem/PQM/docs/workflow/WORKFLOW_GAP_REGISTER.md)
+> **Giải quyết lỗ hổng:** [`GAP-05`](file:///e:/7%20PQM/docs/workflow/WORKFLOW_GAP_REGISTER.md)
 
 ---
 

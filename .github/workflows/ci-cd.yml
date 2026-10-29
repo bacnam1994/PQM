@@ -34,7 +34,7 @@ jobs:
         run: npm ci
 
       - name: 2. Frontend & Shared Engine Typecheck
-        run: npm run typecheck
+        run: npm run workflow:guard && npm run typecheck
 
       - name: 3. Backend Dependencies (npm ci & build shared packages)
         run: |
@@ -227,12 +227,12 @@ jobs:
         if: env.FIREBASE_SA != ''
         run: |
           echo '${{ env.FIREBASE_SA }}' > $RUNNER_TEMP/firebase_sa.json
-          GOOGLE_APPLICATION_CREDENTIALS=$RUNNER_TEMP/firebase_sa.json npx firebase-tools deploy --only hosting --project v-biotech
+          GOOGLE_APPLICATION_CREDENTIALS=$RUNNER_TEMP/firebase_sa.json npx firebase-tools deploy --only hosting,database --project v-biotech
           rm -f $RUNNER_TEMP/firebase_sa.json
 
       - name: 14. Deploy to Firebase Hosting (via FIREBASE_TOKEN fallback)
         if: env.FIREBASE_SA == '' && env.FIREBASE_TOKEN != ''
-        run: npx firebase-tools deploy --only hosting --token "${{ env.FIREBASE_TOKEN }}" --project v-biotech
+        run: npx firebase-tools deploy --only hosting,database --token "${{ env.FIREBASE_TOKEN }}" --project v-biotech
 
       - name: 15. Production Smoke Test (Firebase Hosting)
         if: env.FIREBASE_SA != '' || env.FIREBASE_TOKEN != ''

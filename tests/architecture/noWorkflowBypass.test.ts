@@ -10,11 +10,7 @@
 import { describe, it, expect } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
-import {
-  BatchStateMachine,
-  TestResultStateMachine,
-  DeviationStateMachine,
-} from '../../src/domain/workflow/stateMachine';
+import { BatchStateMachine, TestResultStateMachine } from '../../src/domain/workflow/stateMachine';
 import { ReleaseRules } from '../../src/domains/batch/domain/rules';
 
 describe('Architecture Gate: No Workflow Bypass', () => {

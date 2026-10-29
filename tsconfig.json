@@ -19,6 +19,6 @@
     "allowImportingTsExtensions": true,
     "noEmit": true
   },
-  "include": ["src", "packages"],
+  "include": ["src", "packages", "tests/architecture", "tests/benchmarks"],
   "exclude": ["node_modules", "dist", "functions", "backend"]
 }
