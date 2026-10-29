@@ -16,7 +16,7 @@ export const DSFilterBar: React.FC<{ children: React.ReactNode; className?: stri
   className = '',
 }) => (
   <div
-    className={`glass-panel bg-surface/90 dark:bg-surface/80 backdrop-blur-md p-3 sm:p-3.5 rounded-2xl border border-border/80 shadow-xs flex flex-col md:flex-row gap-3 items-center transition-all ${className}`}
+    className={`glass-panel bg-surface/90 dark:bg-surface/80 backdrop-blur-md p-3 sm:p-3.5 rounded-2xl border border-border/80 shadow-xs flex flex-col md:flex-row gap-3 items-center transition-[border-color,box-shadow,background-color] duration-200 ${className}`}
   >
     {children}
   </div>
@@ -27,19 +27,20 @@ export const DSSearchInput = memo(
   forwardRef<
     HTMLInputElement,
     React.InputHTMLAttributes<HTMLInputElement> & { onClear?: () => void }
-  >((props, ref) => (
+  >(({ onClear, className = '', ...props }, ref) => (
     <div className="relative flex-1 w-full group">
-      <MagnifyingGlassIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-faint group-focus-within:text-emerald-600 dark:group-focus-within:text-emerald-400 group-focus-within:scale-110 transition-all pointer-events-none" />
+      <MagnifyingGlassIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-faint group-focus-within:text-emerald-600 dark:group-focus-within:text-emerald-400 group-focus-within:scale-110 transition-[transform,color] duration-200 pointer-events-none" />
       <input
         ref={ref}
+        type="search"
         {...props}
-        className={`w-full pl-10 pr-9 py-2 bg-surface-2/80 hover:bg-surface-2 border border-border/80 focus:border-emerald-500 dark:focus:border-emerald-500 focus:bg-surface rounded-xl text-sm font-medium text-ink outline-none focus:ring-2 focus:ring-emerald-500/15 transition-all placeholder:text-ink-faint shadow-2xs ${props.className || ''}`}
+        className={`w-full pl-10 pr-9 py-2 bg-surface-2/80 hover:bg-surface-2 border border-border/80 focus:border-emerald-500 dark:focus:border-emerald-500 focus:bg-surface rounded-xl text-sm font-medium text-ink outline-none focus:ring-2 focus:ring-emerald-500/15 transition-[border-color,background-color,box-shadow] duration-150 placeholder:text-ink-faint shadow-2xs ${className}`}
       />
-      {props.value && props.onClear && (
+      {props.value && onClear && (
         <button
           type="button"
-          onClick={props.onClear}
-          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-ink-faint hover:text-ink p-1 rounded-lg hover:bg-surface-3/80 active:scale-95 transition-all cursor-pointer"
+          onClick={onClear}
+          className="absolute right-2 top-1/2 -translate-y-1/2 text-ink-faint hover:text-ink p-1.5 rounded-lg hover:bg-surface-3/80 active:scale-95 transition-[transform,color,background-color] cursor-pointer"
           aria-label="Xóa nội dung tìm kiếm"
         >
           <XMarkIcon className="w-3.5 h-3.5" />
@@ -58,7 +59,7 @@ interface DSSelectProps extends React.SelectHTMLAttributes<HTMLSelectElement> {
 export const DSSelect = forwardRef<HTMLSelectElement, DSSelectProps>(
   ({ icon: Icon, containerClassName = '', className = '', children, ...props }, ref) => (
     <div
-      className={`flex items-center gap-2 bg-surface-2/80 hover:bg-surface-2 rounded-xl px-3 border border-border/80 hover:border-emerald-500/35 focus-within:border-emerald-500 focus-within:bg-surface focus-within:ring-2 focus-within:ring-emerald-500/15 shadow-2xs transition-all ${containerClassName}`}
+      className={`flex items-center gap-2 bg-surface-2/80 hover:bg-surface-2 rounded-xl px-3 border border-border/80 hover:border-emerald-500/35 focus-within:border-emerald-500 focus-within:bg-surface focus-within:ring-2 focus-within:ring-emerald-500/15 shadow-2xs transition-[border-color,background-color,box-shadow] duration-150 ${containerClassName}`}
     >
       {Icon &&
         (typeof Icon === 'function' || typeof Icon === 'object' ? (
@@ -96,11 +97,16 @@ export const DSViewToggle: React.FC<{
   };
 
   return (
-    <div className="inline-flex items-center rounded-xl p-1 bg-surface-2/90 border border-border/80 shrink-0 shadow-2xs">
+    <div
+      role="group"
+      aria-label="Chế độ hiển thị"
+      className="inline-flex items-center rounded-xl p-1 bg-surface-2/90 border border-border/80 shrink-0 shadow-2xs"
+    >
       <button
         type="button"
         onClick={() => setViewMode('grid')}
-        className={`relative p-1.5 rounded-lg transition-colors cursor-pointer ${
+        aria-pressed={viewMode === 'grid'}
+        className={`relative min-w-[32px] min-h-[32px] p-1.5 rounded-lg inline-flex items-center justify-center transition-colors cursor-pointer ${
           viewMode === 'grid'
             ? 'text-emerald-700 dark:text-emerald-300 font-semibold'
             : 'text-ink-faint hover:text-ink'
@@ -123,7 +129,8 @@ export const DSViewToggle: React.FC<{
       <button
         type="button"
         onClick={() => setViewMode('list')}
-        className={`relative p-1.5 rounded-lg transition-colors cursor-pointer ${
+        aria-pressed={viewMode === 'list'}
+        className={`relative min-w-[32px] min-h-[32px] p-1.5 rounded-lg inline-flex items-center justify-center transition-colors cursor-pointer ${
           viewMode === 'list'
             ? 'text-emerald-700 dark:text-emerald-300 font-semibold'
             : 'text-ink-faint hover:text-ink'
@@ -154,7 +161,7 @@ export const DSCard: React.FC<{
   isExpanded?: boolean;
 }> = ({ children, className = '', isExpanded = false }) => (
   <div
-    className={`bg-surface/95 dark:bg-surface/90 rounded-2xl border transition-all duration-200 overflow-hidden ${
+    className={`bg-surface/95 dark:bg-surface/90 rounded-2xl border transition-[transform,border-color,box-shadow,background-color] duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] overflow-hidden ${
       isExpanded
         ? 'border-emerald-500/60 ring-2 ring-emerald-500/15 shadow-md'
         : 'border-border/80 shadow-xs hover:border-emerald-500/35 hover:shadow-md hover:-translate-y-[1px]'
@@ -164,35 +171,48 @@ export const DSCard: React.FC<{
   </div>
 );
 
-// 6. Table Container chuẩn
-export const DSTable: React.FC<{ children: React.ReactNode; className?: string }> = ({
-  children,
-  className = '',
-}) => (
+// 6. Table Container chuẩn (Modern Web Guidance: responsive-table + interactions-in-complex-layouts)
+export const DSTable: React.FC<{
+  children: React.ReactNode;
+  className?: string;
+  ariaLabel?: string;
+}> = ({ children, className = '', ariaLabel = 'Bảng dữ liệu' }) => (
   <div
-    className={`bg-surface/95 dark:bg-surface/90 rounded-2xl border border-border/80 shadow-xs overflow-hidden ${className}`}
+    className={`contain-layout-section bg-surface/95 dark:bg-surface/90 rounded-2xl border border-border/80 shadow-xs overflow-hidden ${className}`}
   >
-    <div className="overflow-x-auto">
-      <table className="w-full text-left border-collapse">{children}</table>
+    <div
+      tabIndex={0}
+      role="region"
+      aria-label={ariaLabel}
+      className="overflow-x-auto custom-scrollbar [scrollbar-gutter:stable] focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-500/35"
+    >
+      <table className="w-full text-left border-separate border-spacing-0">{children}</table>
     </div>
   </div>
 );
 
-// 7. Input Form chuẩn (Tailwind UI Form Field)
+// 7. Input Form chuẩn (Tailwind UI Form Field with accessible label linkage)
 export const DSFormInput = memo(
   forwardRef<HTMLInputElement, React.InputHTMLAttributes<HTMLInputElement> & { label?: string }>(
-    ({ label, className = '', ...props }, ref) => (
-      <div className="space-y-1.5">
-        {label && (
-          <label className="text-xs font-semibold text-ink-soft pl-0.5 block">{label}</label>
-        )}
-        <input
-          ref={ref}
-          {...props}
-          className={`w-full px-3.5 py-2.5 bg-surface-2/80 hover:bg-surface-2 border border-border/80 focus:border-emerald-500 focus:bg-surface rounded-xl font-medium outline-none text-sm text-ink transition-all placeholder:text-ink-faint focus:ring-2 focus:ring-emerald-500/15 shadow-2xs ${className}`}
-        />
-      </div>
-    )
+    ({ label, id, className = '', ...props }, ref) => {
+      const generatedId = useId();
+      const inputId = id || generatedId;
+      return (
+        <div className="space-y-1.5">
+          {label && (
+            <label htmlFor={inputId} className="text-xs font-semibold text-ink-soft pl-0.5 block">
+              {label}
+            </label>
+          )}
+          <input
+            id={inputId}
+            ref={ref}
+            {...props}
+            className={`w-full px-3.5 py-2.5 bg-surface-2/80 hover:bg-surface-2 border border-border/80 focus:border-emerald-500 focus:bg-surface rounded-xl font-medium outline-none text-sm text-ink transition-[border-color,background-color,box-shadow] duration-150 placeholder:text-ink-faint focus:ring-2 focus:ring-emerald-500/15 shadow-2xs ${className}`}
+          />
+        </div>
+      );
+    }
   )
 );
 
@@ -234,6 +254,7 @@ interface DSDateInputProps {
   required?: boolean;
   className?: string;
   name?: string;
+  id?: string;
 }
 
 export const DSDateInput: React.FC<DSDateInputProps> = ({
@@ -243,7 +264,10 @@ export const DSDateInput: React.FC<DSDateInputProps> = ({
   required,
   className = '',
   name,
+  id,
 }) => {
+  const generatedId = useId();
+  const inputId = id || generatedId;
   const dateFormat = useUIStore((s) => s.dateFormat) || 'DD/MM/YYYY';
   const hiddenInputRef = React.useRef<HTMLInputElement>(null);
   const [displayText, setDisplayText] = React.useState('');
@@ -300,21 +324,26 @@ export const DSDateInput: React.FC<DSDateInputProps> = ({
 
   return (
     <div className="space-y-1.5 w-full">
-      {label && <label className="text-xs font-semibold text-ink-soft pl-0.5 block">{label}</label>}
+      {label && (
+        <label htmlFor={inputId} className="text-xs font-semibold text-ink-soft pl-0.5 block">
+          {label}
+        </label>
+      )}
       <div className="relative flex items-center w-full">
         <input
+          id={inputId}
           type="text"
           value={displayText}
           onChange={handleTextChange}
           onBlur={handleBlur}
           placeholder={dateFormat.toLowerCase()}
           required={required}
-          className={`w-full pl-3.5 pr-10 py-2.5 bg-surface-2/80 hover:bg-surface-2 border border-border/80 focus:border-emerald-500 focus:bg-surface rounded-xl font-medium outline-none text-sm text-ink transition-all placeholder:text-ink-faint focus:ring-2 focus:ring-emerald-500/15 shadow-2xs ${className}`}
+          className={`w-full pl-3.5 pr-10 py-2.5 bg-surface-2/80 hover:bg-surface-2 border border-border/80 focus:border-emerald-500 focus:bg-surface rounded-xl font-medium outline-none text-sm text-ink transition-[border-color,background-color,box-shadow] duration-150 placeholder:text-ink-faint focus:ring-2 focus:ring-emerald-500/15 shadow-2xs ${className}`}
         />
         <button
           type="button"
           onClick={handleIconClick}
-          className="absolute right-3 text-ink-faint hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors p-1 cursor-pointer"
+          className="absolute right-2.5 text-ink-faint hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors p-1.5 rounded-lg hover:bg-surface-3/60 cursor-pointer"
           aria-label="Chọn ngày từ lịch"
         >
           <CalendarIcon className="w-4 h-4" />
@@ -325,6 +354,8 @@ export const DSDateInput: React.FC<DSDateInputProps> = ({
           value={value || ''}
           onChange={(e) => onChange(e.target.value)}
           name={name}
+          tabIndex={-1}
+          aria-hidden="true"
           className="absolute opacity-0 w-0 h-0 pointer-events-none"
         />
       </div>

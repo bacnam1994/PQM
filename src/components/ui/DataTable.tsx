@@ -26,10 +26,13 @@ export interface DataTableProps<T> {
   onRowClick?: (item: T) => void;
   striped?: boolean;
   className?: string;
+  ariaLabel?: string;
 }
 
 /**
- * DataTable - Enterprise Glassmorphic Data Table with Animate UI Density Toggle
+ * DataTable - Enterprise Glassmorphic Data Table
+ * Compliant with Modern Web Guidance (responsive-table & interactions-in-complex-layouts)
+ * and Impeccable Craft Floor (keyboard scrolling, ARIA semantics, tabular-nums).
  */
 export function DataTable<T>({
   data,
@@ -42,6 +45,7 @@ export function DataTable<T>({
   onRowClick,
   striped = false,
   className = '',
+  ariaLabel = 'Bảng dữ liệu',
 }: DataTableProps<T>) {
   const [density, setDensity] = useState<TableDensity>(initialDensity);
   const densityToggleId = useId();
@@ -52,7 +56,7 @@ export function DataTable<T>({
 
   return (
     <div
-      className={`flex flex-col rounded-2xl border border-border/80 bg-surface/95 dark:bg-surface/90 shadow-xs overflow-hidden ${className}`}
+      className={`contain-layout-section flex flex-col rounded-2xl border border-border/80 bg-surface/95 dark:bg-surface/90 shadow-xs overflow-hidden ${className}`}
     >
       {allowDensityToggle && (
         <div className="flex items-center justify-between px-4 py-2.5 border-b border-border/80 bg-surface-2/50 text-xs text-ink-muted">
@@ -63,15 +67,20 @@ export function DataTable<T>({
           </span>
           <div className="flex items-center gap-2">
             <span className="text-[11px] text-ink-muted hidden sm:inline">Mật độ:</span>
-            <div className="inline-flex rounded-xl p-0.5 bg-surface-3/60 border border-border/60">
+            <div
+              role="group"
+              aria-label="Mật độ bảng dữ liệu"
+              className="inline-flex rounded-xl p-0.5 bg-surface-3/60 border border-border/60"
+            >
               {(['compact', 'comfortable'] as const).map((mode) => {
                 const isActive = density === mode;
                 return (
                   <button
                     key={mode}
                     type="button"
+                    aria-pressed={isActive}
                     onClick={() => setDensity(mode)}
-                    className={`relative px-2.5 py-0.5 rounded-lg text-[11px] font-medium transition-colors cursor-pointer ${
+                    className={`relative px-2.5 py-1 rounded-lg text-[11px] font-medium transition-colors cursor-pointer ${
                       isActive
                         ? 'text-emerald-700 dark:text-emerald-300 font-semibold'
                         : 'text-ink-soft hover:text-ink'
@@ -98,15 +107,21 @@ export function DataTable<T>({
         </div>
       )}
 
-      <div className="overflow-x-auto">
-        <table className="w-full text-left border-collapse">
-          <thead className="sticky top-0 z-10 bg-surface-2/85 dark:bg-surface-3/85 backdrop-blur-xs text-ink-muted font-semibold border-b border-border/80">
+      <div
+        tabIndex={0}
+        role="region"
+        aria-label={ariaLabel}
+        className="overflow-x-auto custom-scrollbar [scrollbar-gutter:stable] focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-500/35"
+      >
+        <table className="w-full text-left border-separate border-spacing-0">
+          <thead className="sticky top-0 z-10 bg-surface-2/90 dark:bg-surface-3/90 backdrop-blur-xs text-ink-muted font-semibold">
             <tr>
               {columns.map((col) => (
                 <th
                   key={col.key}
+                  scope="col"
                   style={col.width ? { width: col.width } : undefined}
-                  className={`${headerPadding} text-[11px] font-bold tracking-wider uppercase ${
+                  className={`${headerPadding} border-b border-border/80 text-[11px] font-bold tracking-wider uppercase ${
                     col.align === 'right'
                       ? 'text-right'
                       : col.align === 'center'
@@ -139,8 +154,23 @@ export function DataTable<T>({
                 return (
                   <tr
                     key={key}
+                    tabIndex={isClickable ? 0 : undefined}
                     onClick={() => onRowClick && onRowClick(item)}
-                    className={`transition-colors ${isClickable ? 'cursor-pointer' : ''} ${
+                    onKeyDown={
+                      isClickable
+                        ? (e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault();
+                              onRowClick?.(item);
+                            }
+                          }
+                        : undefined
+                    }
+                    className={`transition-colors ${
+                      isClickable
+                        ? 'cursor-pointer focus:outline-none focus-visible:bg-emerald-500/10'
+                        : ''
+                    } ${
                       striped && index % 2 === 1
                         ? 'bg-surface-2/30 dark:bg-surface-3/20'
                         : 'bg-surface/60'
@@ -152,9 +182,9 @@ export function DataTable<T>({
                       return (
                         <td
                           key={`${key}-${col.key}`}
-                          className={`${cellPadding} text-ink leading-relaxed ${
+                          className={`${cellPadding} text-ink leading-relaxed border-b border-border/50 last:border-b-0 ${
                             col.align === 'right'
-                              ? 'text-right'
+                              ? 'text-right tabular-nums'
                               : col.align === 'center'
                                 ? 'text-center'
                                 : 'text-left'

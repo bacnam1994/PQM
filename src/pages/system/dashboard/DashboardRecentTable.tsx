@@ -140,7 +140,7 @@ export const DashboardRecentTable: React.FC<DashboardRecentTableProps> = ({
   return (
     <section
       aria-label="Hoạt động kiểm nghiệm và lô sản xuất gần đây"
-      className="p-5 sm:p-6 rounded-2xl bg-surface/90 dark:bg-surface/85 backdrop-blur-md border border-border/80 space-y-4 shadow-xs"
+      className="contain-layout-section p-5 sm:p-6 rounded-2xl bg-surface/90 dark:bg-surface/85 backdrop-blur-md border border-border/80 space-y-4 shadow-xs"
     >
       {/* Table Navigation & Main Tabs */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3.5 border-b border-border/70">
@@ -262,7 +262,12 @@ export const DashboardRecentTable: React.FC<DashboardRecentTableProps> = ({
 
       {/* ================= TAB 1: BATCHES TABLE ================= */}
       {activeTab === 'batches' && (
-        <div className="overflow-x-auto [scrollbar-gutter:stable] -mx-1 px-1">
+        <div
+          tabIndex={0}
+          role="region"
+          aria-label="Bảng lô sản xuất gần đây"
+          className="overflow-x-auto custom-scrollbar [scrollbar-gutter:stable] -mx-1 px-1 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/35 rounded-xl"
+        >
           <table className="w-full text-left text-xs">
             <thead>
               <tr className="border-b border-border/80 bg-surface-2/50 text-xs font-medium text-ink-muted">
