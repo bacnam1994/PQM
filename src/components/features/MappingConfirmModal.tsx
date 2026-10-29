@@ -8,6 +8,7 @@ import {
   DocumentTextIcon,
   ShieldExclamationIcon,
 } from '@heroicons/react/24/outline';
+import { checkRange } from '../../utils/criteriaEvaluation';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -91,6 +92,26 @@ function MappingLevelBadge({ level }: { level?: string }) {
   );
 }
 
+function EvaluationStatusBadge({ value, limit }: { value?: string; limit?: string }) {
+  if (!value || !limit) return <span className="text-ink-muted text-[10px]">—</span>;
+  const result = checkRange(limit, value);
+  if (result === true) {
+    return (
+      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-500/15 text-emerald-700 dark:text-emerald-400">
+        ✓ Đạt
+      </span>
+    );
+  }
+  if (result === false) {
+    return (
+      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-black bg-rose-500/20 text-rose-700 dark:text-rose-400 border border-rose-500/30">
+        ⚠ OOS
+      </span>
+    );
+  }
+  return <span className="text-ink-muted text-[10px]">—</span>;
+}
+
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export const MappingConfirmModal: React.FC<MappingConfirmModalProps> = ({
@@ -159,6 +180,7 @@ export const MappingConfirmModal: React.FC<MappingConfirmModalProps> = ({
     'Kết quả',
     'Đơn vị',
     'Giới hạn TC',
+    'Đánh giá',
   ];
 
   return (
@@ -274,6 +296,9 @@ export const MappingConfirmModal: React.FC<MappingConfirmModalProps> = ({
                           <td className="px-3 py-2.5 text-ink-muted font-mono text-[10px]">
                             {item.limit || '—'}
                           </td>
+                          <td className="px-3 py-2.5 text-center">
+                            <EvaluationStatusBadge value={item.value} limit={item.limit} />
+                          </td>
                         </tr>
                       );
                     })}
@@ -347,8 +372,8 @@ export const MappingConfirmModal: React.FC<MappingConfirmModalProps> = ({
                         </div>
                       )}
 
-                      {/* Dữ liệu đo — 3 cột */}
-                      <div className="grid grid-cols-3 gap-2">
+                      {/* Dữ liệu đo — 4 cột kèm Đánh giá */}
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                         {[
                           { label: 'Kết quả', val: item.value || '—', highlight: !!hasSuspicion },
                           { label: 'Đơn vị', val: item.unit || '—', highlight: false },
@@ -370,6 +395,14 @@ export const MappingConfirmModal: React.FC<MappingConfirmModalProps> = ({
                             </p>
                           </div>
                         ))}
+                        <div className="bg-surface border border-border rounded-lg px-2.5 py-2 flex flex-col justify-center">
+                          <p className="text-[9px] text-ink-muted uppercase tracking-widest font-bold mb-0.5">
+                            Đánh giá sơ bộ
+                          </p>
+                          <div className="mt-0.5">
+                            <EvaluationStatusBadge value={item.value} limit={item.limit} />
+                          </div>
+                        </div>
                       </div>
 
                       {/* Dropdown ghép TCCS */}
