@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import {
   ShieldCheckIcon,
   XMarkIcon,
@@ -30,7 +31,6 @@ export const InspectionEvaluationModal: React.FC<InspectionEvaluationModalProps>
 }) => {
   const evaluateInspection = useAppStore((state) => state.evaluateInspection);
   const user = useAppStore((state) => state.user);
-  const notify = useAppStore((state) => state.notify);
 
   const [decision, setDecision] = useState<'PASS' | 'FAIL'>(
     calculation.hasFailures ? 'FAIL' : 'PASS'
@@ -39,7 +39,27 @@ export const InspectionEvaluationModal: React.FC<InspectionEvaluationModalProps>
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
+  // Khóa cuộn trang khi modal mở & xử lý phím Escape
+  useEffect(() => {
+    if (!isOpen) return;
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !isSubmitting) {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.body.style.overflow = originalOverflow;
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isOpen, isSubmitting, onClose]);
+
   if (!isOpen) return null;
+  if (typeof document === 'undefined') return null;
 
   const userRole = (user?.role || '').trim().toUpperCase();
   const isAuthorized = ['QA', 'QC', 'ADMIN'].includes(userRole);
@@ -78,25 +98,31 @@ export const InspectionEvaluationModal: React.FC<InspectionEvaluationModalProps>
     }
   };
 
-  return (
+  const modalContent = (
     <div
-      className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4"
+      className="fixed inset-0 z-[9999] overflow-y-auto bg-slate-950/75 backdrop-blur-sm flex items-center justify-center p-4 sm:p-6"
+      style={{ zIndex: 9999 }}
       onClick={(e) => {
         if (e.target === e.currentTarget && !isSubmitting) onClose();
       }}
     >
-      <div className="bg-surface border border-border rounded-2xl max-w-lg w-full shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+      <div
+        className="relative z-10 w-full max-w-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Header */}
-        <div className="px-6 py-4 border-b border-border flex items-center justify-between bg-surface-2/40">
-          <div className="flex items-center gap-2.5">
+        <div className="px-6 py-4 border-b border-border/80 flex items-center justify-between bg-surface-2/60 dark:bg-slate-800/60">
+          <div className="flex items-center gap-3">
             <div className="p-2 rounded-xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20">
               <ShieldCheckIcon className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="font-semibold text-ink text-base">Đánh giá chất lượng kiểm nghiệm</h3>
+              <h3 className="font-bold text-ink text-base tracking-tight">
+                Đánh giá chất lượng kiểm nghiệm
+              </h3>
               <p className="text-xs text-ink-muted">
-                Lô: <span className="font-mono font-medium text-ink">{batch.batchNo}</span> ·{' '}
-                {(batch as any).product?.name || 'Sản phẩm'}
+                Lô: <span className="font-mono font-bold text-ink">{batch.batchNo}</span> ·{' '}
+                {(batch as any).product?.name || (batch as any).productName || 'Sản phẩm'}
               </p>
             </div>
           </div>
@@ -104,7 +130,7 @@ export const InspectionEvaluationModal: React.FC<InspectionEvaluationModalProps>
             type="button"
             onClick={onClose}
             disabled={isSubmitting}
-            className="p-1 rounded-lg text-ink-muted hover:text-ink hover:bg-surface-3 transition-colors"
+            className="p-1.5 rounded-xl text-ink-muted hover:text-ink hover:bg-surface-3 transition-colors cursor-pointer"
           >
             <XMarkIcon className="w-5 h-5" />
           </button>
@@ -112,16 +138,32 @@ export const InspectionEvaluationModal: React.FC<InspectionEvaluationModalProps>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           {/* Summary Criteria Stats */}
-          <div className="p-3.5 rounded-xl bg-surface-2 border border-border space-y-2 text-xs">
+          <div className="p-4 rounded-xl bg-surface-2/80 dark:bg-slate-800/40 border border-border/80 space-y-2.5 text-xs">
             <div className="flex items-center justify-between">
-              <span className="text-ink-muted flex items-center gap-1.5">
+              <span className="text-ink-muted flex items-center gap-1.5 font-medium">
                 <BeakerIcon className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
                 Tiến độ chỉ tiêu bắt buộc:
               </span>
-              <span className="font-bold text-ink">
-                {calculation.progress.completedCount} / {calculation.progress.requiredCount} (
-                {calculation.progress.percentage}%)
+              <span className="font-mono font-bold text-ink text-sm">
+                {calculation.progress.completedCount} / {calculation.progress.requiredCount}{' '}
+                <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">
+                  ({calculation.progress.percentage}%)
+                </span>
               </span>
+            </div>
+
+            {/* Progress Bar */}
+            <div className="w-full h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+              <div
+                className={`h-full rounded-full transition-all duration-300 ${
+                  calculation.hasFailures
+                    ? 'bg-rose-500'
+                    : calculation.isComplete
+                      ? 'bg-emerald-500'
+                      : 'bg-amber-500'
+                }`}
+                style={{ width: `${Math.min(100, calculation.progress.percentage)}%` }}
+              />
             </div>
 
             {calculation.hasFailures ? (
@@ -148,15 +190,15 @@ export const InspectionEvaluationModal: React.FC<InspectionEvaluationModalProps>
 
           {/* Decision Selection */}
           <div className="space-y-2">
-            <label className="text-xs font-semibold text-ink uppercase tracking-wider block">
+            <label className="text-xs font-bold text-ink uppercase tracking-wider block">
               Kết luận kiểm nghiệm chính thức
             </label>
             <div className="grid grid-cols-2 gap-3">
               <label
-                className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all ${
+                className={`flex items-center gap-3 p-3.5 rounded-xl border cursor-pointer transition-all ${
                   decision === 'PASS'
-                    ? 'border-emerald-500 bg-emerald-500/10 text-emerald-900 dark:text-emerald-100 ring-2 ring-emerald-500/20'
-                    : 'border-border bg-surface hover:bg-surface-2 text-ink-muted'
+                    ? 'border-emerald-500 bg-emerald-500/10 text-emerald-900 dark:text-emerald-100 ring-2 ring-emerald-500/20 shadow-sm'
+                    : 'border-border/80 bg-surface hover:bg-surface-2 text-ink-muted'
                 } ${!canPass ? 'opacity-40 cursor-not-allowed' : ''}`}
               >
                 <input
@@ -176,10 +218,10 @@ export const InspectionEvaluationModal: React.FC<InspectionEvaluationModalProps>
               </label>
 
               <label
-                className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all ${
+                className={`flex items-center gap-3 p-3.5 rounded-xl border cursor-pointer transition-all ${
                   decision === 'FAIL'
-                    ? 'border-rose-500 bg-rose-500/10 text-rose-900 dark:text-rose-100 ring-2 ring-rose-500/20'
-                    : 'border-border bg-surface hover:bg-surface-2 text-ink-muted'
+                    ? 'border-rose-500 bg-rose-500/10 text-rose-900 dark:text-rose-100 ring-2 ring-rose-500/20 shadow-sm'
+                    : 'border-border/80 bg-surface hover:bg-surface-2 text-ink-muted'
                 }`}
               >
                 <input
@@ -219,12 +261,12 @@ export const InspectionEvaluationModal: React.FC<InspectionEvaluationModalProps>
                   ? 'Nhập lý do chi tiết (OOS, chỉ tiêu không đạt, vi phạm quy trình)...'
                   : 'Ghi chú kiểm tra đánh giá (nếu có)...'
               }
-              className="w-full px-3 py-2 text-xs bg-surface-2 border border-border rounded-xl text-ink placeholder:text-ink-faint focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none resize-none"
+              className="w-full px-3 py-2 text-xs bg-surface-2/60 dark:bg-slate-800/60 border border-border rounded-xl text-ink placeholder:text-ink-faint focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none resize-none"
             />
           </div>
 
           {/* Audit Notice */}
-          <div className="p-3 bg-indigo-500/5 border border-indigo-500/20 rounded-xl flex items-start gap-2.5 text-[11px] text-ink-muted">
+          <div className="p-3 bg-indigo-500/5 dark:bg-indigo-950/20 border border-indigo-500/20 rounded-xl flex items-start gap-2.5 text-[11px] text-ink-muted">
             <LockClosedIcon className="w-4 h-4 text-indigo-500 shrink-0 mt-0.5" />
             <div>
               <span className="font-semibold text-ink">Dấu vết kiểm toán ALCOA+: </span>
@@ -244,7 +286,7 @@ export const InspectionEvaluationModal: React.FC<InspectionEvaluationModalProps>
           )}
 
           {/* Actions */}
-          <div className="pt-2 flex items-center justify-end gap-2 border-t border-border">
+          <div className="pt-3 flex items-center justify-end gap-2 border-t border-border">
             <button
               type="button"
               onClick={onClose}
@@ -256,7 +298,7 @@ export const InspectionEvaluationModal: React.FC<InspectionEvaluationModalProps>
             <button
               type="submit"
               disabled={isSubmitting || (decision === 'PASS' && !canPass)}
-              className={`px-4 py-2 text-xs font-semibold rounded-xl text-white shadow-xs transition-colors cursor-pointer flex items-center gap-1.5 ${
+              className={`px-4 py-2 text-xs font-semibold rounded-xl text-white shadow-sm transition-all cursor-pointer flex items-center gap-1.5 active:scale-95 ${
                 decision === 'PASS'
                   ? 'bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50'
                   : 'bg-rose-600 hover:bg-rose-700 disabled:opacity-50'
@@ -273,4 +315,6 @@ export const InspectionEvaluationModal: React.FC<InspectionEvaluationModalProps>
       </div>
     </div>
   );
+
+  return createPortal(modalContent, document.body);
 };
