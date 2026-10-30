@@ -31,6 +31,7 @@ import {
   ensureArray,
   formatDateStandard,
   normalizeSearch,
+  generateDefaultReportNo,
 } from '../../utils';
 const CoAReport = lazy(() => import('../../components/features/CoAReport'));
 import {
@@ -126,7 +127,19 @@ const TestResultGridItem = memo(
               </h3>
             )}
             <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
-              <span className="text-xs font-mono text-ink-muted">Phiếu số: {res.id.slice(-6)}</span>
+              <span
+                className="text-xs font-mono text-ink-muted font-medium"
+                title={`Số phiếu: ${(res as any).reportNo || (res as any).code || res.id}`}
+              >
+                Phiếu số:{' '}
+                {(res as any).reportNo ||
+                  (res as any).code ||
+                  generateDefaultReportNo({
+                    batchNo: res.batch?.batchNo,
+                    labName: res.labName,
+                    testDate: res.testDate,
+                  })}
+              </span>
               {res.tccs && (
                 <Link
                   to={`/tccs/detail/${res.tccs.id}`}
@@ -224,14 +237,28 @@ const TestResultListItem = memo(
                 {res.batch?.batchNo || `Lô ${res.batchId || 'N/A'}`}
               </span>
             )}
-            {res.tccs && (
-              <Link
-                to={`/tccs/detail/${res.tccs.id}`}
-                className="text-xs text-ink-muted hover:text-emerald-600 transition-colors inline-flex items-center gap-1 font-mono"
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span
+                className="text-xs font-mono text-ink-muted"
+                title={`Số phiếu: ${(res as any).reportNo || (res as any).code || res.id}`}
               >
-                <DocumentTextIcon className="w-3 h-3" /> {res.tccs.code}
-              </Link>
-            )}
+                {(res as any).reportNo ||
+                  (res as any).code ||
+                  generateDefaultReportNo({
+                    batchNo: res.batch?.batchNo,
+                    labName: res.labName,
+                    testDate: res.testDate,
+                  })}
+              </span>
+              {res.tccs && (
+                <Link
+                  to={`/tccs/detail/${res.tccs.id}`}
+                  className="text-xs text-ink-muted hover:text-emerald-600 transition-colors inline-flex items-center gap-1 font-mono"
+                >
+                  <DocumentTextIcon className="w-3 h-3" /> {res.tccs.code}
+                </Link>
+              )}
+            </div>
           </div>
         </td>
         <td className="px-4 py-3 text-xs font-normal">
@@ -487,7 +514,10 @@ const TestResultList: React.FC = () => {
         const matchesSearch =
           !searchNormalized ||
           normalizeSearch(r.batch?.batchNo).includes(searchNormalized) ||
-          normalizeSearch(r.product?.name).includes(searchNormalized);
+          normalizeSearch(r.product?.name).includes(searchNormalized) ||
+          normalizeSearch((r as any).reportNo).includes(searchNormalized) ||
+          normalizeSearch((r as any).code).includes(searchNormalized) ||
+          normalizeSearch(r.labName).includes(searchNormalized);
         const matchesProduct = filterProductId === '' || r.batch?.productId === filterProductId;
 
         let matchesYear = true;
@@ -563,7 +593,7 @@ const TestResultList: React.FC = () => {
       {/* Filter Bar */}
       <DSFilterBar>
         <DSSearchInput
-          placeholder="Tìm theo số lô hoặc tên sản phẩm..."
+          placeholder="Tìm theo số lô, số phiếu, tên sản phẩm..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           onClear={() => setSearchTerm('')}

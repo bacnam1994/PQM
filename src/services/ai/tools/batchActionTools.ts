@@ -173,7 +173,7 @@ export const exportCoAReportAction = (args: { batchNo: string }, appContext: any
     productName: product?.name || '',
     testCount: batchTests.length,
     latestTestDate: latestTest.testDate,
-    message: `📄 Tìm thấy **${batchTests.length} phiếu kiểm nghiệm** cho lô **${batch.batchNo}** (${product?.name || ''}).\n\nBạn có thể xem hoặc in Certificate of Analysis (CoA) theo 2 định dạng:\n1. 👉 [Xem CoA Tổng hợp Lô ${batch.batchNo}](/test-results/coa-batch/${batch.id})\n2. 👉 [In Phiếu kiểm nghiệm mới nhất (${latestTest.id.slice(-6)})](/test-results/print/${latestTest.id})`,
+    message: `📄 Tìm thấy **${batchTests.length} phiếu kiểm nghiệm** cho lô **${batch.batchNo}** (${product?.name || ''}).\n\nBạn có thể xem hoặc in Certificate of Analysis (CoA) theo 2 định dạng:\n1. 👉 [Xem CoA Tổng hợp Lô ${batch.batchNo}](/test-results/coa-batch/${batch.id})\n2. 👉 [In Phiếu kiểm nghiệm mới nhất (${latestTest.reportNo || (latestTest as any).code || latestTest.id.slice(-6)})](/test-results/print/${latestTest.id})`,
     action: 'REDIRECT',
     path: `/test-results/coa-batch/${batch.id}`,
   };
