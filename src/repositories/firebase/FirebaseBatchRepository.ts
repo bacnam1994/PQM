@@ -41,7 +41,17 @@ export class FirebaseBatchRepository
   }
 
   async findTestResultsByBatchId(batchId: string): Promise<import('../../types').TestResult[]> {
-    return testResultRepository.findByRelation('batchId', batchId);
+    const byId = await testResultRepository.findByRelation('batchId', batchId);
+    const batch = await this.findById(batchId);
+    if (batch && batch.batchNo && batch.batchNo !== batchId) {
+      const byNo = await testResultRepository.findByRelation('batchId', batch.batchNo);
+      const merged = new Map<string, any>();
+      [...byId, ...byNo].forEach((r) => {
+        if (r && r.id) merged.set(r.id, r);
+      });
+      return Array.from(merged.values());
+    }
+    return byId;
   }
 
   async findRecent(limitCount: number): Promise<Batch[]> {

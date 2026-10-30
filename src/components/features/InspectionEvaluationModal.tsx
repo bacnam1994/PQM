@@ -7,7 +7,7 @@ import {
   BeakerIcon,
   LockClosedIcon,
 } from '@heroicons/react/24/outline';
-import { Batch } from '../../types';
+import { Batch, TestResult } from '../../types';
 import { BatchInspectionCalculationResult } from '../../domain/batch/BatchInspectionProgressService';
 import { useAppStore } from '../../store/useAppStore';
 
@@ -16,6 +16,7 @@ interface InspectionEvaluationModalProps {
   onClose: () => void;
   batch: Batch;
   calculation: BatchInspectionCalculationResult;
+  testResults?: TestResult[];
   onSuccess?: () => void;
 }
 
@@ -24,6 +25,7 @@ export const InspectionEvaluationModal: React.FC<InspectionEvaluationModalProps>
   onClose,
   batch,
   calculation,
+  testResults,
   onSuccess,
 }) => {
   const evaluateInspection = useAppStore((state) => state.evaluateInspection);
@@ -66,7 +68,7 @@ export const InspectionEvaluationModal: React.FC<InspectionEvaluationModalProps>
 
     try {
       setIsSubmitting(true);
-      await evaluateInspection(batch.id, decision, reason.trim() || undefined);
+      await evaluateInspection(batch.id, decision, reason.trim() || undefined, testResults);
       if (onSuccess) onSuccess();
       onClose();
     } catch (err: any) {

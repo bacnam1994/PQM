@@ -16,10 +16,11 @@ import { createSyncStoragePersister } from '@tanstack/query-sync-storage-persist
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 5 * 60 * 1000, // 5 phút
-      gcTime: 24 * 60 * 60 * 1000, // 24 giờ cho offline cache
+      staleTime: 15 * 1000, // 15 giây - Ưu tiên nạp bản mới từ Server (Server-First)
+      gcTime: 24 * 60 * 60 * 1000, // 24 giờ cho offline cache dự phòng
       networkMode: 'offlineFirst',
-      refetchOnWindowFocus: false,
+      refetchOnWindowFocus: true, // Tự động làm mới khi người dùng quay lại ứng dụng
+      refetchOnReconnect: true,
       retry: 2,
     },
     mutations: {
@@ -37,16 +38,19 @@ if (typeof window !== 'undefined' && window.localStorage) {
       key: 'PQM_OFFLINE_REACT_QUERY_CACHE',
     });
 
+    const activeAppVersion = (import.meta as any).env?.VITE_APP_VERSION || 'v11.102.0';
+
     persistQueryClient({
       queryClient,
       persister: localStoragePersister,
       maxAge: 24 * 60 * 60 * 1000, // 24 giờ
-      buster: 'v5.3.1-offline-first',
+      buster: activeAppVersion, // Tự động dọn dẹp cache cũ khi deploy phiên bản mới
     });
 
     // Lắng nghe khi có mạng trở lại -> Tự động phát lại các mutations đang tạm dừng
     window.addEventListener('online', () => {
       queryClient.resumePausedMutations();
+      queryClient.invalidateQueries();
     });
   } catch (e) {
     console.warn('[QueryClient] Không thể khởi tạo localStorage persister:', e);

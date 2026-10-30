@@ -993,13 +993,29 @@ export class BatchWorkflowHandlers {
       );
     }
 
-    // 6. Lấy testResults và TCCS
+    // 6. Lấy testResults và TCCS: Server-First & Fail-Safe
     let testResults = options?.testResults;
-    if (!testResults && this.repo.findTestResultsByBatchId) {
-      testResults = await this.repo.findTestResultsByBatchId(batchId);
+    if ((!testResults || testResults.length === 0) && this.repo.findTestResultsByBatchId) {
+      try {
+        const serverResults = await this.repo.findTestResultsByBatchId(batchId);
+        if (serverResults && serverResults.length > 0) {
+          testResults = serverResults;
+        }
+      } catch (err) {
+        console.warn('[Workflow] findTestResultsByBatchId error:', err);
+      }
     }
     testResults = testResults || [];
-    const boundTccs = options?.tccs || currentBatch.tccsSnapshot;
+    let boundTccs = options?.tccs || currentBatch.tccsSnapshot || (currentBatch as any)?.tccs;
+    if (!boundTccs && currentBatch.tccsId) {
+      try {
+        const { tccsRepository } =
+          await import('../../repositories/firebase/FirebaseTCCSRepository');
+        boundTccs = await tccsRepository.findById(currentBatch.tccsId);
+      } catch (err) {
+        console.warn('[Workflow] findById for tccsId error:', err);
+      }
+    }
 
     // 7. Tính tiến độ chuẩn qua Domain Service SSoT
     const progressResult = calculateInspectionProgress({

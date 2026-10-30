@@ -82,7 +82,14 @@ export function useQAQCActionQueue(): QAQCActionQueueReturn {
       const batchNo = batch?.batchNo || r.batchId;
       const productName = product?.name || 'Sản phẩm';
       const labName = r.labName || 'Đơn vị kiểm nghiệm';
-      const testDate = r.testDate || (r.createdAt ? r.createdAt.slice(0, 10) : 'N/A');
+      const rawCreated = r.createdAt;
+      const safeCreatedDate =
+        typeof rawCreated === 'string'
+          ? rawCreated.slice(0, 10)
+          : typeof rawCreated === 'number' && !isNaN(rawCreated)
+            ? new Date(rawCreated).toISOString().slice(0, 10)
+            : 'N/A';
+      const testDate = r.testDate || safeCreatedDate;
 
       items.push({
         id: `action_tr_${r.id}`,

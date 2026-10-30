@@ -254,6 +254,7 @@ export const BatchStatusSelect: React.FC<BatchStatusSelectProps> = ({
           onClose={() => setIsEvaluationModalOpen(false)}
           batch={effectiveBatch}
           calculation={inspectionCalc}
+          testResults={testResults}
         />
       )}
     </>

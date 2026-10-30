@@ -130,7 +130,12 @@ export interface BatchSliceActions {
   approveBpr: (id: string, comment?: string) => Promise<Batch>;
   rejectBpr: (id: string, reason: string) => Promise<Batch>;
   updateBatchProgress: (id: string, progressPercent: number) => Promise<void>;
-  evaluateInspection: (id: string, status: 'PASS' | 'FAIL', reason?: string) => Promise<Batch>;
+  evaluateInspection: (
+    id: string,
+    status: 'PASS' | 'FAIL',
+    reason?: string,
+    testResultsOverride?: TestResult[]
+  ) => Promise<Batch>;
 }
 
 export type BatchSlice = BatchSliceState & BatchSliceActions;

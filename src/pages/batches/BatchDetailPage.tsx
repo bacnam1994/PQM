@@ -754,6 +754,7 @@ export const BatchDetailPage: React.FC = () => {
           onClose={() => setIsEvaluationModalOpen(false)}
           batch={batch}
           calculation={inspectionCalc}
+          testResults={viewBatchResults}
           onSuccess={() => {
             if (batch?.id) {
               fetchTestResultsByBatchId(batch.id).then((res) => {

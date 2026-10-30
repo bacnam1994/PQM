@@ -119,6 +119,9 @@ function resolveTccsForBatch(
   if ((batch as any).tccs) {
     return (batch as any).tccs;
   }
+  if ((batch as any).tccsSnapshot) {
+    return (batch as any).tccsSnapshot;
+  }
   return undefined;
 }
 

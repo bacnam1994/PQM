@@ -227,16 +227,54 @@ export const createBatchSlice: StoreSlice<BatchSlice> = (set, get) => ({
     }
   },
 
-  evaluateInspection: async (id: string, status: 'PASS' | 'FAIL', reason?: string) => {
+  evaluateInspection: async (
+    id: string,
+    status: 'PASS' | 'FAIL',
+    reason?: string,
+    testResultsOverride?: TestResult[]
+  ) => {
     try {
       const state = get();
       const currentUser = resolveCurrentIdentity(state);
       const targetBatch = state.batches.find((b: Batch) => b.id === id);
-      const activeTccs = state.tccsList.find((t: any) => t.id === targetBatch?.tccsId);
-      const allResults =
-        state.allTestResults && state.allTestResults.length > 0
-          ? state.allTestResults
-          : state.testResults;
+      const activeTccs =
+        (targetBatch as any)?.tccs ||
+        (targetBatch as any)?.tccsSnapshot ||
+        state.tccsList.find(
+          (t: any) => t.id === targetBatch?.tccsId || t.id === (targetBatch as any)?.tccs?.id
+        );
+
+      let batchResults: TestResult[] = testResultsOverride || [];
+      if (batchResults.length === 0) {
+        try {
+          const { fetchTestResultsByBatchId } = await import('../../services/testResultService');
+          const serverResults = await fetchTestResultsByBatchId(id);
+          if (serverResults && serverResults.length > 0) {
+            batchResults = serverResults;
+          }
+        } catch (fetchErr) {
+          console.warn('[BatchSlice] Lỗi nạp kết quả kiểm nghiệm từ server:', fetchErr);
+        }
+      }
+
+      if (batchResults.length === 0) {
+        const allResults =
+          state.allTestResults && state.allTestResults.length > 0
+            ? state.allTestResults
+            : state.testResults;
+        const normalizedBatchNo = (targetBatch?.batchNo || '').trim().toLowerCase();
+        batchResults = allResults.filter((r: any) => {
+          if (!r) return false;
+          const trBatchId = (r.batchId || '').trim();
+          const trBatchNo = (r.batchNo || (r.batch as any)?.batchNo || '').trim().toLowerCase();
+          return (
+            trBatchId === id ||
+            (normalizedBatchNo && trBatchId.toLowerCase() === normalizedBatchNo) ||
+            (normalizedBatchNo && trBatchNo === normalizedBatchNo)
+          );
+        });
+      }
+
       const result = await batchAppService.evaluateInspection({
         batchId: id,
         status,
@@ -244,10 +282,12 @@ export const createBatchSlice: StoreSlice<BatchSlice> = (set, get) => ({
         reason,
         expectedVersion: targetBatch?.version,
         tccs: activeTccs,
-        testResults: allResults,
+        testResults: batchResults,
       });
       queryClient.invalidateQueries({ queryKey: BATCH_QUERY_KEYS.all });
       queryClient.invalidateQueries({ queryKey: BATCH_QUERY_KEYS.detail(id) });
+      queryClient.invalidateQueries({ queryKey: TEST_RESULT_QUERY_KEYS.all });
+      queryClient.invalidateQueries({ queryKey: TEST_RESULT_QUERY_KEYS.byBatch(id) });
       get().notify({
         type: 'SUCCESS',
         title: 'Đánh giá kiểm nghiệm thành công',

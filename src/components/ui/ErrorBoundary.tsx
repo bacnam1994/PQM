@@ -78,6 +78,7 @@ export class ErrorBoundary extends Component<Props, State> {
     if (typeof window !== 'undefined') {
       try {
         sessionStorage.clear();
+        localStorage.removeItem('PQM_OFFLINE_REACT_QUERY_CACHE');
       } catch {}
       window.location.reload();
     }
@@ -87,6 +88,7 @@ export class ErrorBoundary extends Component<Props, State> {
     if (typeof window !== 'undefined') {
       try {
         sessionStorage.clear();
+        localStorage.removeItem('PQM_OFFLINE_REACT_QUERY_CACHE');
         if ('caches' in window) {
           caches.keys().then((keys) => keys.forEach((k) => caches.delete(k)));
         }
@@ -161,15 +163,14 @@ export class ErrorBoundary extends Component<Props, State> {
             </button>
           </div>
 
-          {isChunkMismatch && (
-            <button
-              type="button"
-              onClick={this.handleHardRefresh}
-              className="mt-3 w-full py-2 px-3 rounded-xl border border-dashed border-border text-ink-muted hover:text-ink hover:bg-surface-2 transition-colors text-[11px] font-medium cursor-pointer"
-            >
-              Xóa bộ nhớ đệm & Tải lại triệt để
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={this.handleHardRefresh}
+            className="mt-3 w-full py-2 px-3 rounded-xl border border-dashed border-border text-ink-muted hover:text-ink hover:bg-surface-2 transition-colors text-[11px] font-medium cursor-pointer flex items-center justify-center gap-1.5"
+          >
+            <ArrowPathIcon className="w-3.5 h-3.5 text-amber-500" />
+            Xóa bộ nhớ đệm & Tải lại từ máy chủ
+          </button>
         </div>
       </div>
     );

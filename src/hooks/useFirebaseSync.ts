@@ -263,7 +263,9 @@ export const useFirebaseSync = () => {
 
           // Cập nhật TanStack Query Cache một lần duy nhất
           queryClient.setQueryData(config.queryKey, list);
+          // Đồng bộ Server-First trực tiếp vào Zustand Store (SSoT)
           useAppStore.getState().setAppState({
+            [config.key]: list,
             lastSync: new Date().toISOString(),
           });
 
@@ -322,6 +324,10 @@ export const useFirebaseSync = () => {
           return next;
         });
 
+        useAppStore.getState().setAppState({
+          [config.key]: queryClient.getQueryData(config.queryKey) || [],
+        });
+
         // Lưu vi mô vào IndexedDB (KHÔNG xóa bảng)
         saveItemToCache(config.storeName, updatedEntity);
 
@@ -355,6 +361,10 @@ export const useFirebaseSync = () => {
           return next;
         });
 
+        useAppStore.getState().setAppState({
+          [config.key]: queryClient.getQueryData(config.queryKey) || [],
+        });
+
         saveItemToCache(config.storeName, newEntity);
         config.getScopedInvalidations?.(newEntity, id);
       });
@@ -372,6 +382,10 @@ export const useFirebaseSync = () => {
         queryClient.setQueryData<any[]>(config.queryKey, (old = []) =>
           old.filter((item) => item.id !== id)
         );
+
+        useAppStore.getState().setAppState({
+          [config.key]: queryClient.getQueryData(config.queryKey) || [],
+        });
 
         deleteItemFromCache(config.storeName, id);
         config.getScopedInvalidations?.(null, id);
@@ -402,13 +416,21 @@ export const useFirebaseSync = () => {
 
         if (!isMounted) return;
 
-        if (cachedProducts?.length > 0)
+        if (cachedProducts?.length > 0) {
           queryClient.setQueryData(PRODUCT_QUERY_KEYS.all, cachedProducts);
-        if (cachedBatches?.length > 0)
+          useAppStore.getState().setAppState({ products: cachedProducts });
+        }
+        if (cachedBatches?.length > 0) {
           queryClient.setQueryData(BATCH_QUERY_KEYS.all, cachedBatches);
-        if (cachedTccs?.length > 0) queryClient.setQueryData(TCCS_QUERY_KEYS.all, cachedTccs);
+          useAppStore.getState().setAppState({ batches: cachedBatches });
+        }
+        if (cachedTccs?.length > 0) {
+          queryClient.setQueryData(TCCS_QUERY_KEYS.all, cachedTccs);
+          useAppStore.getState().setAppState({ tccsList: cachedTccs });
+        }
         if (cachedTestingLaboratories?.length > 0) {
           queryClient.setQueryData(LABORATORY_QUERY_KEYS.all, cachedTestingLaboratories);
+          useAppStore.getState().setAppState({ testingLaboratories: cachedTestingLaboratories });
         } else {
           queryClient.setQueryData(LABORATORY_QUERY_KEYS.all, DEFAULT_TESTING_LABORATORIES);
         }
@@ -438,16 +460,26 @@ export const useFirebaseSync = () => {
 
             if (!isMounted) return;
 
-            if (cachedFormulas?.length > 0)
+            if (cachedFormulas?.length > 0) {
               queryClient.setQueryData(PRODUCT_QUERY_KEYS.formulas, cachedFormulas);
-            if (cachedMaterials?.length > 0)
+              useAppStore.getState().setAppState({ productFormulas: cachedFormulas });
+            }
+            if (cachedMaterials?.length > 0) {
               queryClient.setQueryData(PRODUCT_QUERY_KEYS.materials, cachedMaterials);
-            if (cachedTestResults?.length > 0)
+              useAppStore.getState().setAppState({ rawMaterials: cachedMaterials });
+            }
+            if (cachedTestResults?.length > 0) {
               queryClient.setQueryData(TEST_RESULT_QUERY_KEYS.all, cachedTestResults);
-            if (cachedCriteriaAliases?.length > 0)
+              useAppStore.getState().setAppState({ testResults: cachedTestResults });
+            }
+            if (cachedCriteriaAliases?.length > 0) {
               queryClient.setQueryData(TCCS_QUERY_KEYS.aliases, cachedCriteriaAliases);
-            if (cachedAiMappings?.length > 0)
+              useAppStore.getState().setAppState({ criteriaAliases: cachedCriteriaAliases });
+            }
+            if (cachedAiMappings?.length > 0) {
               queryClient.setQueryData(TCCS_QUERY_KEYS.aiMappings, cachedAiMappings);
+              useAppStore.getState().setAppState({ aiLearnedMappings: cachedAiMappings });
+            }
           } catch (e) {
             console.warn('[SyncEngine] Lỗi nạp cache tầng 2:', e);
           }

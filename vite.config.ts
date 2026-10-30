@@ -3,6 +3,7 @@
 import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
+import fs from 'fs';
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
@@ -37,7 +38,38 @@ export default defineConfig(({ mode }) => {
         '@pqm/release-engine': path.resolve(__dirname, './packages/release-engine/src/index.ts'),
       },
     },
-    plugins: [react()],
+    define: {
+      'import.meta.env.VITE_APP_VERSION': JSON.stringify(
+        process.env.VITE_APP_VERSION || `v11.102.${Math.floor(Date.now() / 1000)}`
+      ),
+      'import.meta.env.VITE_BUILD_TIME': JSON.stringify(new Date().toISOString()),
+    },
+    plugins: [
+      react(),
+      {
+        name: 'vite-plugin-generate-version',
+        buildStart() {
+          const appVersion =
+            process.env.VITE_APP_VERSION || `v11.102.${Math.floor(Date.now() / 1000)}`;
+          const versionPayload = JSON.stringify(
+            {
+              version: appVersion,
+              buildTime: new Date().toISOString(),
+            },
+            null,
+            2
+          );
+          try {
+            const publicDir = path.resolve(__dirname, 'public');
+            if (fs.existsSync(publicDir)) {
+              fs.writeFileSync(path.join(publicDir, 'version.json'), versionPayload, 'utf8');
+            }
+          } catch (e) {
+            console.warn('[Vite] Không thể ghi public/version.json:', e);
+          }
+        },
+      },
+    ],
     build: {
       minify: 'esbuild',
       chunkSizeWarningLimit: 1000,
