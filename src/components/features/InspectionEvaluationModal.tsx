@@ -88,7 +88,14 @@ export const InspectionEvaluationModal: React.FC<InspectionEvaluationModalProps>
 
     try {
       setIsSubmitting(true);
-      await evaluateInspection(batch.id, decision, reason.trim() || undefined, testResults);
+      const boundTccs = (batch as any).tccs || (batch as any).tccsSnapshot;
+      await evaluateInspection(
+        batch.id,
+        decision,
+        reason.trim() || undefined,
+        testResults,
+        boundTccs
+      );
       if (onSuccess) onSuccess();
       onClose();
     } catch (err: any) {

@@ -1016,12 +1016,22 @@ export class BatchWorkflowHandlers {
         console.warn('[Workflow] findById for tccsId error:', err);
       }
     }
+    if (!boundTccs && currentBatch.productId) {
+      try {
+        const { tccsRepository } =
+          await import('../../repositories/firebase/FirebaseTCCSRepository');
+        boundTccs = await tccsRepository.findActiveByProductId(currentBatch.productId);
+      } catch (err) {
+        console.warn('[Workflow] findActiveByProductId error:', err);
+      }
+    }
 
     // 7. Tính tiến độ chuẩn qua Domain Service SSoT
     const progressResult = calculateInspectionProgress({
       batch: currentBatch,
       testResults,
       boundTccs,
+      tccs: boundTccs,
     });
 
     // 8. Thẩm định điều kiện đánh giá qua Domain Service
@@ -1123,12 +1133,13 @@ export class BatchWorkflowHandlers {
       testResults = await this.repo.findTestResultsByBatchId(batchId);
     }
     testResults = testResults || [];
-    const boundTccs = options?.tccs || currentBatch.tccsSnapshot;
+    const boundTccs = options?.tccs || currentBatch.tccsSnapshot || (currentBatch as any)?.tccs;
 
     const progressResult = calculateInspectionProgress({
       batch: currentBatch,
       testResults,
       boundTccs,
+      tccs: boundTccs,
     });
 
     if (progressResult.isEvaluationStale) {

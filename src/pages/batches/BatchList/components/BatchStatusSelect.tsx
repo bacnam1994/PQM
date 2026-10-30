@@ -252,7 +252,15 @@ export const BatchStatusSelect: React.FC<BatchStatusSelectProps> = ({
         <InspectionEvaluationModal
           isOpen={isEvaluationModalOpen}
           onClose={() => setIsEvaluationModalOpen(false)}
-          batch={effectiveBatch}
+          batch={
+            {
+              ...effectiveBatch,
+              tccs:
+                (effectiveBatch as any).tccs ||
+                tccs ||
+                tccsList.find((t) => t.id === effectiveBatch.tccsId),
+            } as any
+          }
           calculation={inspectionCalc}
           testResults={testResults}
         />

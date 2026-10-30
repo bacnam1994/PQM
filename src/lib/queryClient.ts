@@ -16,16 +16,16 @@ import { createSyncStoragePersister } from '@tanstack/query-sync-storage-persist
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 15 * 1000, // 15 giây - Ưu tiên nạp bản mới từ Server (Server-First)
+      staleTime: 5 * 60 * 1000, // 5 phút - Dữ liệu đã được đồng bộ Realtime qua Firebase WebSockets
       gcTime: 24 * 60 * 60 * 1000, // 24 giờ cho offline cache dự phòng
       networkMode: 'offlineFirst',
-      refetchOnWindowFocus: true, // Tự động làm mới khi người dùng quay lại ứng dụng
+      refetchOnWindowFocus: false, // Chống bão refetch làm đơ Main Thread khi chuyển tab/trang
       refetchOnReconnect: true,
-      retry: 2,
+      retry: 1,
     },
     mutations: {
       networkMode: 'offlineFirst',
-      retry: 2,
+      retry: 1,
     },
   },
 });
@@ -36,6 +36,7 @@ if (typeof window !== 'undefined' && window.localStorage) {
     const localStoragePersister = createSyncStoragePersister({
       storage: window.localStorage,
       key: 'PQM_OFFLINE_REACT_QUERY_CACHE',
+      throttleTime: 2000, // Giới hạn ghi đĩa tối đa 1 lần mỗi 2s, giải phóng Main Thread
     });
 
     const activeAppVersion = (import.meta as any).env?.VITE_APP_VERSION || 'v11.102.0';

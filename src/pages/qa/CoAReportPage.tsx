@@ -454,18 +454,36 @@ const CoAReportPage = () => {
             không tự tính toán lại hoặc fallback khi thiếu Evaluation Snapshot hoặc khi tính toàn
             vẹn bị vi phạm.
           </div>
-          <button
-            onClick={() => {
-              if (window.history.state && window.history.state.idx > 0) {
-                navigate(-1);
-              } else {
-                navigate('/test-results');
-              }
-            }}
-            className="mt-2 px-6 py-2.5 bg-slate-800 dark:bg-slate-700 text-white rounded-xl font-bold text-sm hover:bg-slate-900 transition-all shadow-sm"
-          >
-            Quay lại an toàn
-          </button>
+          <div className="flex items-center gap-3 mt-2">
+            <button
+              onClick={() => {
+                if (window.history.state && window.history.state.idx > 0) {
+                  navigate(-1);
+                } else {
+                  navigate('/test-results');
+                }
+              }}
+              className="px-5 py-2.5 bg-slate-800 dark:bg-slate-700 text-white rounded-xl font-bold text-sm hover:bg-slate-900 transition-all shadow-sm cursor-pointer"
+            >
+              Quay lại an toàn
+            </button>
+            {['QA', 'QC', 'ADMIN'].includes(
+              (useAppStore.getState().user?.role || '').trim().toUpperCase()
+            ) && (
+              <button
+                onClick={() => {
+                  setFailClosedReason(null);
+                  setLoading(true);
+                  // Reload lại để verify với thuật toán mới
+                  window.location.reload();
+                }}
+                className="px-5 py-2.5 bg-emerald-600 text-white rounded-xl font-bold text-sm hover:bg-emerald-700 transition-all shadow-sm cursor-pointer flex items-center gap-1.5"
+              >
+                <ArrowPathIcon className="w-4 h-4" />
+                Kiểm tra & Tải lại
+              </button>
+            )}
+          </div>
         </div>
       </div>
     );

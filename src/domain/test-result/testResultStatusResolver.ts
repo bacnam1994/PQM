@@ -923,7 +923,14 @@ export function resolveAuthoritativeTestResultsForBatch(
     }
   });
 
-  const candidates = primaryCandidates.length > 0 ? primaryCandidates : legacyCandidates;
+  const candidateMap = new Map<string, TestResult>();
+  primaryCandidates.forEach((tr) => candidateMap.set(tr.id, tr));
+  legacyCandidates.forEach((tr) => {
+    if (!candidateMap.has(tr.id)) {
+      candidateMap.set(tr.id, tr);
+    }
+  });
+  const candidates = Array.from(candidateMap.values());
   if (candidates.length === 0) return [];
 
   // Helper kiểm tra phiếu đã hoàn tất phê duyệt

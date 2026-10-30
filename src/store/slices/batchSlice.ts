@@ -2,7 +2,7 @@ import { batchAppService } from '../../services/app/BatchAppService';
 import { queryClient } from '../../lib/queryClient';
 import { BATCH_QUERY_KEYS, TEST_RESULT_QUERY_KEYS } from '../../constants/queryKeys';
 import { BatchSlice, StoreSlice } from './types';
-import { Batch, ElectronicSignature, TestResult } from '../../types';
+import { Batch, ElectronicSignature, TestResult, TCCS } from '../../types';
 import { resolveCurrentIdentity } from '../utils/storeHelpers';
 import { testResultRepository } from '../../repositories/firebase/FirebaseTestResultRepository';
 
@@ -231,18 +231,21 @@ export const createBatchSlice: StoreSlice<BatchSlice> = (set, get) => ({
     id: string,
     status: 'PASS' | 'FAIL',
     reason?: string,
-    testResultsOverride?: TestResult[]
+    testResultsOverride?: TestResult[],
+    tccsOverride?: TCCS
   ) => {
     try {
       const state = get();
       const currentUser = resolveCurrentIdentity(state);
       const targetBatch = state.batches.find((b: Batch) => b.id === id);
       const activeTccs =
+        tccsOverride ||
         (targetBatch as any)?.tccs ||
         (targetBatch as any)?.tccsSnapshot ||
         state.tccsList.find(
           (t: any) => t.id === targetBatch?.tccsId || t.id === (targetBatch as any)?.tccs?.id
-        );
+        ) ||
+        state.tccsList.find((t: any) => t.productId === targetBatch?.productId && t.isActive);
 
       let batchResults: TestResult[] = testResultsOverride || [];
       if (batchResults.length === 0) {
@@ -273,6 +276,22 @@ export const createBatchSlice: StoreSlice<BatchSlice> = (set, get) => ({
             (normalizedBatchNo && trBatchNo === normalizedBatchNo)
           );
         });
+      } else {
+        // Nếu truyền danh sách tổng hợp (sourceResults), lọc chuẩn xác theo Lô hiện tại
+        const normalizedBatchNo = (targetBatch?.batchNo || '').trim().toLowerCase();
+        const filteredForBatch = batchResults.filter((r: any) => {
+          if (!r) return false;
+          const trBatchId = (r.batchId || '').trim();
+          const trBatchNo = (r.batchNo || (r.batch as any)?.batchNo || '').trim().toLowerCase();
+          return (
+            trBatchId === id ||
+            (normalizedBatchNo && trBatchId.toLowerCase() === normalizedBatchNo) ||
+            (normalizedBatchNo && trBatchNo === normalizedBatchNo)
+          );
+        });
+        if (filteredForBatch.length > 0) {
+          batchResults = filteredForBatch;
+        }
       }
 
       const result = await batchAppService.evaluateInspection({

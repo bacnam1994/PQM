@@ -134,7 +134,8 @@ export interface BatchSliceActions {
     id: string,
     status: 'PASS' | 'FAIL',
     reason?: string,
-    testResultsOverride?: TestResult[]
+    testResultsOverride?: TestResult[],
+    tccsOverride?: TCCS
   ) => Promise<Batch>;
 }
 

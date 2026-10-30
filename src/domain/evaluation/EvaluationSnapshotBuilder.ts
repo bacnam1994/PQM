@@ -80,31 +80,42 @@ export function verifyEvaluationSnapshotIntegrity(
 ): boolean {
   if (!snapshot || !snapshot.evaluationHash) return false;
 
-  // 1. Kiểm tra với chuẩn SHA-256 mới (12 trường cốt lõi)
-  const fullPayload = buildEvaluationHashPayload(snapshot, testResultId, batchId);
-  const calculatedSha256 = createEvaluationHash(fullPayload);
-  if (snapshot.evaluationHash === calculatedSha256) {
-    return true;
-  }
+  const targetHash = snapshot.evaluationHash.trim();
 
-  // 2. Tương thích ngược: Kiểm tra với legacy format (6 trường)
-  const legacyPayload = {
-    testResultId,
-    batchId: batchId || '',
-    overallStatus: snapshot.overallStatus,
-    criterionResults: snapshot.criterionResults,
-    evaluatedAt: snapshot.evaluatedAt,
-    evaluatedBy: snapshot.evaluatedBy,
-  };
+  // Danh sách các cặp định danh khả dĩ để bao phủ cả trường hợp snapshot lưu ID gốc hoặc route truyền mã
+  const idPairs: Array<[string, string]> = [
+    [snapshot.testResultId || testResultId, snapshot.batchId ?? batchId ?? ''],
+    [testResultId, batchId ?? ''],
+    [snapshot.testResultId || testResultId, ''],
+    [testResultId, snapshot.batchId ?? ''],
+  ];
 
-  // Thử hash mới cho legacy payload
-  if (snapshot.evaluationHash === createEvaluationHash(legacyPayload)) {
-    return true;
-  }
+  for (const [tId, bId] of idPairs) {
+    // 1. Kiểm tra với chuẩn SHA-256 mới (12 trường cốt lõi)
+    const fullPayload = buildEvaluationHashPayload(snapshot, tId, bId);
+    if (targetHash === createEvaluationHash(fullPayload)) {
+      return true;
+    }
 
-  // Thử legacy hash (eval_...)
-  if (snapshot.evaluationHash.startsWith('eval_')) {
-    return snapshot.evaluationHash === createLegacyEvaluationHash(legacyPayload);
+    // 2. Tương thích ngược: Kiểm tra với legacy format (6 trường)
+    const legacyPayload = {
+      testResultId: tId,
+      batchId: bId || '',
+      overallStatus: snapshot.overallStatus,
+      criterionResults: snapshot.criterionResults,
+      evaluatedAt: snapshot.evaluatedAt,
+      evaluatedBy: snapshot.evaluatedBy,
+    };
+
+    if (targetHash === createEvaluationHash(legacyPayload)) {
+      return true;
+    }
+
+    if (targetHash.startsWith('eval_')) {
+      if (targetHash === createLegacyEvaluationHash(legacyPayload)) {
+        return true;
+      }
+    }
   }
 
   return false;
