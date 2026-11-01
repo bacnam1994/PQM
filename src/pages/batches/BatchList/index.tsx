@@ -32,7 +32,11 @@ import {
   DSEmptyState,
   VirtualizedTableBody,
 } from '../../../components';
-import { ESignatureModal } from '../../../components/features/ESignatureModal';
+const LazyESignatureModal = React.lazy(() =>
+  import('../../../components/features/ESignatureModal').then((m) => ({
+    default: m.ESignatureModal,
+  }))
+);
 import { BATCH_STATUS } from '../../../utils';
 import { useBatchList } from './hooks/useBatchList';
 import { BatchGridItem } from './components/BatchGridItem';
@@ -552,15 +556,17 @@ export const BatchList: React.FC = () => {
 
       {/* Modal Ký duyệt Điện tử (FDA 21 CFR Part 11) cho Xuất xưởng Lô */}
       {eSignatureTarget && (
-        <ESignatureModal
-          isOpen={!!eSignatureTarget}
-          onClose={() => setESignatureTarget(null)}
-          documentType="BATCH_RELEASE"
-          documentId={eSignatureTarget.batchId}
-          documentTitle={`Lô sản xuất: ${eSignatureTarget.batch?.batchNo || eSignatureTarget.batchId}${(eSignatureTarget.batch as any)?.product?.name ? ` - ${(eSignatureTarget.batch as any).product.name}` : ''}`}
-          documentVersion={eSignatureTarget.batch?.version}
-          onSuccess={handleESignatureSuccess}
-        />
+        <React.Suspense fallback={null}>
+          <LazyESignatureModal
+            isOpen={!!eSignatureTarget}
+            onClose={() => setESignatureTarget(null)}
+            documentType="BATCH_RELEASE"
+            documentId={eSignatureTarget.batchId}
+            documentTitle={`Lô sản xuất: ${eSignatureTarget.batch?.batchNo || eSignatureTarget.batchId}${(eSignatureTarget.batch as any)?.product?.name ? ` - ${(eSignatureTarget.batch as any).product.name}` : ''}`}
+            documentVersion={eSignatureTarget.batch?.version}
+            onSuccess={handleESignatureSuccess}
+          />
+        </React.Suspense>
       )}
     </div>
   );

@@ -29,8 +29,6 @@ import { useCriteriaResolver } from '../../hooks/useCriteriaResolver';
 import { fetchTestResultsByBatchId } from '../../services/testResultService';
 import { Batch, TestResult } from '../../types';
 import { CircularProgress, BatchCriteriaHistory } from '../../components';
-import { OOSInvestigationModal } from '../../components/features/OOSInvestigationModal';
-import { LabComparisonModal } from '../../components/features/LabComparisonModal';
 import { Surface, PageHeader, StatusBadge } from '../../components/ui';
 import {
   normalizeCriterionPassStatus,
@@ -38,7 +36,22 @@ import {
 } from '../../domain/test-result/testResultStatusResolver';
 import { calculateBatchProgress } from './BatchList/utils/batchProgress';
 import { BatchInspectionProgressService } from '../../domain/batch/BatchInspectionProgressService';
-import { InspectionEvaluationModal } from '../../components/features/InspectionEvaluationModal';
+
+const OOSInvestigationModal = React.lazy(() =>
+  import('../../components/features/OOSInvestigationModal').then((m) => ({
+    default: m.OOSInvestigationModal,
+  }))
+);
+const LabComparisonModal = React.lazy(() =>
+  import('../../components/features/LabComparisonModal').then((m) => ({
+    default: m.LabComparisonModal,
+  }))
+);
+const InspectionEvaluationModal = React.lazy(() =>
+  import('../../components/features/InspectionEvaluationModal').then((m) => ({
+    default: m.InspectionEvaluationModal,
+  }))
+);
 
 export const BatchDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -727,42 +740,48 @@ export const BatchDetailPage: React.FC = () => {
 
       {/* Modal Điều tra OOS */}
       {isOOSOpen && oosModalData && (
-        <OOSInvestigationModal
-          isOpen={isOOSOpen}
-          onClose={() => setIsOOSOpen(false)}
-          initialData={oosModalData}
-        />
+        <React.Suspense fallback={null}>
+          <OOSInvestigationModal
+            isOpen={isOOSOpen}
+            onClose={() => setIsOOSOpen(false)}
+            initialData={oosModalData}
+          />
+        </React.Suspense>
       )}
 
       {/* Modal Đối chiếu Lab Nội bộ vs Ngoại kiểm */}
       {isComparisonOpen && batch && (
-        <LabComparisonModal
-          isOpen={isComparisonOpen}
-          onClose={() => setIsComparisonOpen(false)}
-          batch={batch}
-          initialResult1={internalResults[0]}
-          initialResult2={
-            externalResults[0] || (internalResults.length > 1 ? internalResults[1] : undefined)
-          }
-        />
+        <React.Suspense fallback={null}>
+          <LabComparisonModal
+            isOpen={isComparisonOpen}
+            onClose={() => setIsComparisonOpen(false)}
+            batch={batch}
+            initialResult1={internalResults[0]}
+            initialResult2={
+              externalResults[0] || (internalResults.length > 1 ? internalResults[1] : undefined)
+            }
+          />
+        </React.Suspense>
       )}
 
       {/* Modal Đánh giá chất lượng kiểm nghiệm */}
       {isEvaluationModalOpen && batch && inspectionCalc && (
-        <InspectionEvaluationModal
-          isOpen={isEvaluationModalOpen}
-          onClose={() => setIsEvaluationModalOpen(false)}
-          batch={batch}
-          calculation={inspectionCalc}
-          testResults={viewBatchResults}
-          onSuccess={() => {
-            if (batch?.id) {
-              fetchTestResultsByBatchId(batch.id).then((res) => {
-                setViewBatchResults(ensureArray(res));
-              });
-            }
-          }}
-        />
+        <React.Suspense fallback={null}>
+          <InspectionEvaluationModal
+            isOpen={isEvaluationModalOpen}
+            onClose={() => setIsEvaluationModalOpen(false)}
+            batch={batch}
+            calculation={inspectionCalc}
+            testResults={viewBatchResults}
+            onSuccess={() => {
+              if (batch?.id) {
+                fetchTestResultsByBatchId(batch.id).then((res) => {
+                  setViewBatchResults(ensureArray(res));
+                });
+              }
+            }}
+          />
+        </React.Suspense>
       )}
     </div>
   );

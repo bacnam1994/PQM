@@ -15,7 +15,12 @@ import {
 } from '../../../../types';
 import { useAppStore } from '../../../../store/useAppStore';
 import { BatchInspectionProgressService } from '../../../../domain/batch/BatchInspectionProgressService';
-import { InspectionEvaluationModal } from '../../../../components/features/InspectionEvaluationModal';
+
+const LazyInspectionEvaluationModal = React.lazy(() =>
+  import('../../../../components/features/InspectionEvaluationModal').then((m) => ({
+    default: m.InspectionEvaluationModal,
+  }))
+);
 
 interface BatchStatusSelectProps {
   status: string;
@@ -249,21 +254,23 @@ export const BatchStatusSelect: React.FC<BatchStatusSelectProps> = ({
 
       {/* Modal đánh giá kiểm nghiệm */}
       {isEvaluationModalOpen && effectiveBatch && inspectionCalc && (
-        <InspectionEvaluationModal
-          isOpen={isEvaluationModalOpen}
-          onClose={() => setIsEvaluationModalOpen(false)}
-          batch={
-            {
-              ...effectiveBatch,
-              tccs:
-                (effectiveBatch as any).tccs ||
-                tccs ||
-                tccsList.find((t) => t.id === effectiveBatch.tccsId),
-            } as any
-          }
-          calculation={inspectionCalc}
-          testResults={testResults}
-        />
+        <React.Suspense fallback={null}>
+          <LazyInspectionEvaluationModal
+            isOpen={isEvaluationModalOpen}
+            onClose={() => setIsEvaluationModalOpen(false)}
+            batch={
+              {
+                ...effectiveBatch,
+                tccs:
+                  (effectiveBatch as any).tccs ||
+                  tccs ||
+                  tccsList.find((t) => t.id === effectiveBatch.tccsId),
+              } as any
+            }
+            calculation={inspectionCalc}
+            testResults={testResults}
+          />
+        </React.Suspense>
       )}
     </>
   );

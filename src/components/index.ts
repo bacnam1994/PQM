@@ -9,14 +9,9 @@ export { default as SpecialCharToolbar } from './ui/SpecialCharToolbar';
 export { default as ErrorBoundary } from './ui/ErrorBoundary';
 export { default as CookieConsentBanner } from './ui/CookieConsentBanner';
 
-export { default as Layout } from './layout/Layout';
-
 export { default as BatchCriteriaHistory } from './features/BatchCriteriaHistory';
 export { default as CriteriaInputGroup } from './features/CriteriaInputGroup';
-export { default as MappingConfirmModal } from './features/MappingConfirmModal';
-export type { AIExtractedItem, ConfirmedMapping } from './features/MappingConfirmModal';
 export {
   BatchTestingQABadge,
   default as BatchTestingQABadgeDefault,
 } from './features/BatchTestingQABadge';
-export { InspectionEvaluationModal } from './features/InspectionEvaluationModal';

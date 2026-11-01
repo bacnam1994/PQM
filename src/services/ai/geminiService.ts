@@ -390,6 +390,34 @@ export const geminiService = {
     if (!validation.valid) {
       throw new Error(validation.error);
     }
+
+    // ─── KIỂM TRA BỘ ĐỆM OCR THEO FILE CHECKSUM SHA-256 (0.1s Fast Path) ────────
+    let fileHash = '';
+    try {
+      const { ocrDocumentCache } = await import('../ocr/ocrDocumentCache');
+      fileHash = await ocrDocumentCache.computeFileChecksum(file);
+      const cached = await ocrDocumentCache.get(fileHash);
+      if (cached && Array.isArray(cached.testResults) && cached.testResults.length > 0) {
+        onProgress?.('Đã nạp kết quả trích xuất từ bộ đệm cục bộ (0.1s)...', 100);
+        return cached;
+      }
+    } catch (cacheErr) {
+      console.warn('[OCR Cache] Lỗi đọc bộ đệm, tiếp tục quét trực tiếp:', cacheErr);
+    }
+
+    const saveToOcrCache = async (data: any) => {
+      if (fileHash && data && Array.isArray(data.testResults) && data.testResults.length > 0) {
+        try {
+          const { ocrDocumentCache } = await import('../ocr/ocrDocumentCache');
+          await ocrDocumentCache.set(fileHash, data, {
+            fileName: file.name,
+            fileSize: file.size,
+          });
+        } catch {}
+      }
+      return data;
+    };
+
     const genAI = await getGenAI();
 
     // ─── Outer try: bắt mọi lỗi mạng để kích hoạt Tesseract.js fallback ────────
@@ -556,7 +584,7 @@ export const geminiService = {
           ) {
             mergedFinalResult.documentType = docType;
             onProgress?.('Hoàn tất!', 100);
-            return mergedFinalResult;
+            return await saveToOcrCache(mergedFinalResult);
           }
 
           // CƠ CHẾ TỰ PHỤC HỒI CAO CẤP (Self-Recovery via High-DPI Vision):
@@ -642,7 +670,7 @@ export const geminiService = {
                 ) {
                   visionMergedResult.documentType = 'SCANNED_IMAGE';
                   onProgress?.('Hoàn tất!', 100);
-                  return visionMergedResult;
+                  return await saveToOcrCache(visionMergedResult);
                 }
               }
             } catch (renderRetryError) {
@@ -701,7 +729,7 @@ export const geminiService = {
 
       if (Array.isArray(result?.testResults) && result.testResults.length > 0) {
         onProgress?.('Hoàn tất!', 100);
-        return result;
+        return await saveToOcrCache(result);
       }
 
       // Nếu cả hai phương thức đều không tìm thấy chỉ tiêu

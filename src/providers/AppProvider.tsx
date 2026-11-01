@@ -16,6 +16,7 @@ import { useAuthSync } from '../hooks/useAuthSync';
 import { useFirebaseSync } from '../hooks/useFirebaseSync';
 import { useIsMutating, useIsFetching, QueryClientProvider } from '@tanstack/react-query';
 import { queryClient } from '../lib/queryClient';
+import { versionSyncService } from '../services/core/versionSyncService';
 
 // --- TOAST NOTIFICATION COMPONENT ---
 const GlobalToastContainer = () => {
@@ -246,6 +247,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Lắng nghe và đồng bộ ngầm thông qua các Hook đã được tách
   useAuthSync();
   useFirebaseSync();
+
+  const notify = useAppStore((s) => s.notify);
+
+  // Cơ chế Server-First Version Sync: Tự động phát hiện khi máy chủ có bản cập nhật mới
+  useEffect(() => {
+    versionSyncService.init((serverVersion) => {
+      notify({
+        type: 'INFO',
+        title: 'Máy chủ đã cập nhật phiên bản mới',
+        message: `Phiên bản ${serverVersion.version} đã sẵn sàng trên máy chủ. Nhấn F5 hoặc tải lại trang để áp dụng.`,
+      });
+    });
+  }, [notify]);
 
   return (
     <QueryClientProvider client={queryClient}>

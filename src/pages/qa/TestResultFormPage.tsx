@@ -24,15 +24,34 @@ import { BatchLabSelector } from './test-result-form/components/BatchLabSelector
 import { TccsCriteriaSection } from './test-result-form/components/TccsCriteriaSection';
 import { ExtraCriteriaSection } from './test-result-form/components/ExtraCriteriaSection';
 import { AttachmentSection } from './test-result-form/components/AttachmentSection';
-import { GDFileSelectorModal } from './test-result-form/components/GDFileSelectorModal';
-import { BatchScanProgressModal } from './test-result-form/components/BatchScanProgressModal';
 import { useTestResultAIIntegration } from './test-result-form/hooks/useTestResultAIIntegration';
 import { useMasterCriteriaActiveQuery } from '../../hooks/queries/useMasterCriterionQueries';
 
-// Common Modals & Tools
-import { MappingConfirmModal } from '../../components/features/MappingConfirmModal';
-import { LabComparisonModal } from '../../components/features/LabComparisonModal';
-import AutoCreateBatchModal from '../../components/features/AutoCreateBatchModal';
+// Common Modals & Tools (Lazy-loaded for optimal initial chunk size)
+const MappingConfirmModal = React.lazy(() =>
+  import('../../components/features/MappingConfirmModal').then((m) => ({
+    default: m.MappingConfirmModal,
+  }))
+);
+const LabComparisonModal = React.lazy(() =>
+  import('../../components/features/LabComparisonModal').then((m) => ({
+    default: m.LabComparisonModal,
+  }))
+);
+const AutoCreateBatchModal = React.lazy(
+  () => import('../../components/features/AutoCreateBatchModal')
+);
+const GDFileSelectorModal = React.lazy(() =>
+  import('./test-result-form/components/GDFileSelectorModal').then((m) => ({
+    default: m.GDFileSelectorModal,
+  }))
+);
+const BatchScanProgressModal = React.lazy(() =>
+  import('./test-result-form/components/BatchScanProgressModal').then((m) => ({
+    default: m.BatchScanProgressModal,
+  }))
+);
+
 import { SpecialCharToolbar } from '../../components';
 import { Surface, WorkflowSteps, ActionBar, WorkflowStep } from '../../components/ui';
 
@@ -587,53 +606,63 @@ const TestResultFormPage: React.FC = () => {
         </form>
       </div>
 
-      <MappingConfirmModal
-        isOpen={ai.isMappingModalOpen}
-        onClose={() => ai.setIsMappingModalOpen(false)}
-        highConfidenceItems={ai.pendingHighItems}
-        lowConfidenceItems={ai.pendingLowItems}
-        tccsNames={allActiveTccsNames}
-        documentSummary={ai.pendingDocumentSummary}
-        onConfirm={ai.handleMappingConfirmed}
-      />
+      <React.Suspense fallback={null}>
+        {ai.isMappingModalOpen && (
+          <MappingConfirmModal
+            isOpen={ai.isMappingModalOpen}
+            onClose={() => ai.setIsMappingModalOpen(false)}
+            highConfidenceItems={ai.pendingHighItems}
+            lowConfidenceItems={ai.pendingLowItems}
+            tccsNames={allActiveTccsNames}
+            documentSummary={ai.pendingDocumentSummary}
+            onConfirm={ai.handleMappingConfirmed}
+          />
+        )}
 
-      <LabComparisonModal
-        isOpen={isComparisonModalOpen}
-        onClose={() => setIsComparisonModalOpen(false)}
-        batch={hydratedBatches.find((b) => b.id === formValues.batchId)}
-      />
+        {isComparisonModalOpen && (
+          <LabComparisonModal
+            isOpen={isComparisonModalOpen}
+            onClose={() => setIsComparisonModalOpen(false)}
+            batch={hydratedBatches.find((b) => b.id === formValues.batchId)}
+          />
+        )}
 
-      <GDFileSelectorModal
-        isOpen={ai.isGDModalOpen}
-        onClose={() => ai.setIsGDModalOpen(false)}
-        files={ai.gdFiles}
-        onSelectFile={ai.handleSelectGoogleDriveFile}
-        isLoading={ai.isLoadingGDFiles}
-        folderUrl={ai.googleDriveFolderUrl}
-      />
+        {ai.isGDModalOpen && (
+          <GDFileSelectorModal
+            isOpen={ai.isGDModalOpen}
+            onClose={() => ai.setIsGDModalOpen(false)}
+            files={ai.gdFiles}
+            onSelectFile={ai.handleSelectGoogleDriveFile}
+            isLoading={ai.isLoadingGDFiles}
+            folderUrl={ai.googleDriveFolderUrl}
+          />
+        )}
 
-      <BatchScanProgressModal
-        isOpen={ai.isBatchProgressOpen}
-        files={ai.batchScanFiles}
-        totalDone={
-          ai.batchScanFiles.filter((f) => f.status === 'done' || f.status === 'error').length
-        }
-        onClose={() => ai.setIsBatchProgressOpen(false)}
-      />
+        {ai.isBatchProgressOpen && (
+          <BatchScanProgressModal
+            isOpen={ai.isBatchProgressOpen}
+            files={ai.batchScanFiles}
+            totalDone={
+              ai.batchScanFiles.filter((f) => f.status === 'done' || f.status === 'error').length
+            }
+            onClose={() => ai.setIsBatchProgressOpen(false)}
+          />
+        )}
 
-      {ai.pendingAutoCreateData && (
-        <AutoCreateBatchModal
-          isOpen={ai.isAutoCreateModalOpen}
-          onClose={() => {
-            ai.setIsAutoCreateModalOpen(false);
-            ai.setPendingAutoCreateData(null);
-          }}
-          onConfirm={ai.handleAutoCreateBatchConfirm}
-          aiData={ai.pendingAutoCreateData}
-          products={products}
-          tccsList={tccsList}
-        />
-      )}
+        {ai.pendingAutoCreateData && (
+          <AutoCreateBatchModal
+            isOpen={ai.isAutoCreateModalOpen}
+            onClose={() => {
+              ai.setIsAutoCreateModalOpen(false);
+              ai.setPendingAutoCreateData(null);
+            }}
+            onConfirm={ai.handleAutoCreateBatchConfirm}
+            aiData={ai.pendingAutoCreateData}
+            products={products}
+            tccsList={tccsList}
+          />
+        )}
+      </React.Suspense>
     </>
   );
 };
