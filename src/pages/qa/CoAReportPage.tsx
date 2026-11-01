@@ -9,6 +9,7 @@ import {
   ArrowPathIcon,
   ExclamationTriangleIcon,
   ShieldExclamationIcon,
+  ShieldCheckIcon,
 } from '@heroicons/react/24/outline';
 import { fetchTestResultsByBatchId, fetchTestResultById } from '../../services/testResultService';
 import { ensureArray } from '../../utils';
@@ -32,6 +33,47 @@ const CoAReportPage = () => {
   const [notFound, setNotFound] = useState(false);
   const [failClosedReason, setFailClosedReason] = useState<string | null>(null);
   const [formula, setFormula] = useState<any>(null);
+
+  const handleResealSnapshot = async () => {
+    try {
+      const confirmed = window.confirm(
+        'Xác nhận tái niêm phong mã băm ALCOA+ SHA-256 cho bản ghi này dựa trên TCCS và kết quả đo lường hiện tại?'
+      );
+      if (!confirmed) return;
+      setLoading(true);
+      const currentUser = useAppStore.getState().user;
+      if (id) {
+        const rawResult = await fetchTestResultById(id);
+        if (rawResult) {
+          const appState = useAppStore.getState();
+          const matchedBatch = appState.batches.find((b) => b.id === rawResult.batchId);
+          const matchedTccs =
+            (rawResult.tccsId ? appState.tccsList.find((t) => t.id === rawResult.tccsId) : null) ||
+            (matchedBatch as any)?.tccs ||
+            (matchedBatch?.productId
+              ? appState.tccsList.find((t) => t.productId === matchedBatch.productId && t.isActive)
+              : null);
+
+          const freshSnapshot = QualityEvaluationEngine.evaluate(
+            rawResult,
+            matchedTccs,
+            currentUser
+          );
+          const updated = {
+            ...rawResult,
+            evaluationSnapshot: freshSnapshot,
+            evaluationHash: freshSnapshot.evaluationHash,
+          };
+          await useAppStore.getState().updateTestResult(updated);
+          setFailClosedReason(null);
+          window.location.reload();
+        }
+      }
+    } catch (err: any) {
+      alert('Không thể tái niêm phong: ' + (err.message || String(err)));
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     let isMounted = true;
@@ -470,18 +512,27 @@ const CoAReportPage = () => {
             {['QA', 'QC', 'ADMIN'].includes(
               (useAppStore.getState().user?.role || '').trim().toUpperCase()
             ) && (
-              <button
-                onClick={() => {
-                  setFailClosedReason(null);
-                  setLoading(true);
-                  // Reload lại để verify với thuật toán mới
-                  window.location.reload();
-                }}
-                className="px-5 py-2.5 bg-emerald-600 text-white rounded-xl font-bold text-sm hover:bg-emerald-700 transition-all shadow-sm cursor-pointer flex items-center gap-1.5"
-              >
-                <ArrowPathIcon className="w-4 h-4" />
-                Kiểm tra & Tải lại
-              </button>
+              <>
+                <button
+                  onClick={() => {
+                    setFailClosedReason(null);
+                    setLoading(true);
+                    // Reload lại để verify với thuật toán mới
+                    window.location.reload();
+                  }}
+                  className="px-4 py-2.5 bg-slate-700 text-white rounded-xl font-bold text-sm hover:bg-slate-800 transition-all shadow-sm cursor-pointer flex items-center gap-1.5"
+                >
+                  <ArrowPathIcon className="w-4 h-4" />
+                  Kiểm tra lại
+                </button>
+                <button
+                  onClick={handleResealSnapshot}
+                  className="px-4 py-2.5 bg-emerald-600 text-white rounded-xl font-bold text-sm hover:bg-emerald-700 transition-all shadow-sm cursor-pointer flex items-center gap-1.5"
+                >
+                  <ShieldCheckIcon className="w-4 h-4" />
+                  Tái niêm phong ALCOA+
+                </button>
+              </>
             )}
           </div>
         </div>

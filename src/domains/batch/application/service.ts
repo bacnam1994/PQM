@@ -265,6 +265,7 @@ export class BatchAppService {
     idempotencyKey?: string;
     testResults?: TestResult[];
     tccs?: TCCS;
+    calculation?: any;
   }): Promise<Batch> {
     return this.workflowHandlers.evaluateInspection(
       params.batchId,
@@ -276,6 +277,7 @@ export class BatchAppService {
         idempotencyKey: params.idempotencyKey,
         testResults: params.testResults,
         tccs: params.tccs,
+        calculation: params.calculation,
       }
     );
   }

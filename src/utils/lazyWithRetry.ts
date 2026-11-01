@@ -1,4 +1,4 @@
-import { lazy, ComponentType } from 'react';
+import { lazy, ComponentType, LazyExoticComponent } from 'react';
 
 /**
  * Kiểm tra xem lỗi có phải do không nạp được chunk JS (thường xảy ra khi vừa deploy bản mới)
@@ -53,73 +53,89 @@ export const triggerAutoReloadOnce = (reasonKey: string): boolean => {
   }
 };
 
+export type PreloadableLazyComponent<T extends ComponentType<any> = ComponentType<any>> =
+  LazyExoticComponent<T> & {
+    preload: () => Promise<{ default: T } | any>;
+  };
+
 /**
- * Enhanced lazy loader with bounded, per-module retry strategy.
- * Prevents chunk loading failures from crashing the app without retry,
- * while preventing infinite reload loops and cross-module failure poisoning.
+ * Enhanced lazy loader with bounded, per-module retry strategy and PRELOAD capability.
+ * Cho phép prefetch trước chunk khi hover chuột / focus, loại bỏ 100% độ trễ chuyển trang.
  */
 export const lazyWithRetry = <T extends ComponentType<any> = ComponentType<any>>(
   componentImport: () => Promise<{ default: T } | any>,
   moduleKey: string
-) => {
-  return lazy(async () => {
-    const buildId = import.meta.env.VITE_APP_VERSION ?? 'v1';
-    const retryKey = `pqm:lazy-retry:${buildId}:${moduleKey}`;
+): PreloadableLazyComponent<T> => {
+  let cachedPromise: Promise<any> | null = null;
 
-    try {
-      const result = await componentImport();
-      try {
-        if (typeof sessionStorage !== 'undefined') {
-          sessionStorage.removeItem(retryKey);
-        }
-      } catch {}
-      return result;
-    } catch (firstError) {
-      let alreadyRetried = false;
-
-      try {
-        if (typeof sessionStorage !== 'undefined') {
-          alreadyRetried = sessionStorage.getItem(retryKey) === '1';
-        }
-      } catch {}
-
-      if (alreadyRetried) {
-        console.error(`[Lazy] Retry thất bại cho module "${moduleKey}".`, firstError);
-        if (isChunkLoadError(firstError)) {
-          if (triggerAutoReloadOnce(`chunk:${moduleKey}`)) {
-            return new Promise<any>(() => {});
-          }
-        }
-        throw firstError;
-      }
-
-      try {
-        if (typeof sessionStorage !== 'undefined') {
-          sessionStorage.setItem(retryKey, '1');
-        }
-      } catch {}
-
-      console.warn(`[Lazy] Import lỗi cho "${moduleKey}", thử import lại.`, firstError);
-
-      try {
-        const retryResult = await componentImport();
+  const loadModule = () => {
+    if (!cachedPromise) {
+      cachedPromise = (async () => {
+        const buildId = import.meta.env.VITE_APP_VERSION ?? 'v1';
+        const retryKey = `pqm:lazy-retry:${buildId}:${moduleKey}`;
 
         try {
-          if (typeof sessionStorage !== 'undefined') {
-            sessionStorage.removeItem(retryKey);
-          }
-        } catch {}
+          const result = await componentImport();
+          try {
+            if (typeof sessionStorage !== 'undefined') {
+              sessionStorage.removeItem(retryKey);
+            }
+          } catch {}
+          return result;
+        } catch (firstError) {
+          cachedPromise = null; // Cho phép retry nếu lỗi
+          let alreadyRetried = false;
 
-        return retryResult;
-      } catch (secondError) {
-        console.error(`[Lazy] Import lần 2 thất bại cho "${moduleKey}".`, secondError);
-        if (isChunkLoadError(secondError)) {
-          if (triggerAutoReloadOnce(`chunk:${moduleKey}`)) {
-            return new Promise<any>(() => {});
+          try {
+            if (typeof sessionStorage !== 'undefined') {
+              alreadyRetried = sessionStorage.getItem(retryKey) === '1';
+            }
+          } catch {}
+
+          if (alreadyRetried) {
+            console.error(`[Lazy] Retry thất bại cho module "${moduleKey}".`, firstError);
+            if (isChunkLoadError(firstError)) {
+              if (triggerAutoReloadOnce(`chunk:${moduleKey}`)) {
+                return new Promise<any>(() => {});
+              }
+            }
+            throw firstError;
+          }
+
+          try {
+            if (typeof sessionStorage !== 'undefined') {
+              sessionStorage.setItem(retryKey, '1');
+            }
+          } catch {}
+
+          console.warn(`[Lazy] Import lỗi cho "${moduleKey}", thử import lại.`, firstError);
+
+          try {
+            const retryResult = await componentImport();
+
+            try {
+              if (typeof sessionStorage !== 'undefined') {
+                sessionStorage.removeItem(retryKey);
+              }
+            } catch {}
+
+            return retryResult;
+          } catch (secondError) {
+            console.error(`[Lazy] Import lần 2 thất bại cho "${moduleKey}".`, secondError);
+            if (isChunkLoadError(secondError)) {
+              if (triggerAutoReloadOnce(`chunk:${moduleKey}`)) {
+                return new Promise<any>(() => {});
+              }
+            }
+            throw secondError;
           }
         }
-        throw secondError;
-      }
+      })();
     }
-  });
+    return cachedPromise;
+  };
+
+  const Component = lazy(loadModule) as PreloadableLazyComponent<T>;
+  Component.preload = loadModule;
+  return Component;
 };

@@ -64,7 +64,28 @@ export const BatchDetailPage: React.FC = () => {
   const tccsList = useAppStore((state) => state.tccsList);
   const user = useAppStore((state) => state.user);
 
-  const [viewBatchResults, setViewBatchResults] = useState<TestResult[]>([]);
+  const [viewBatchResults, setViewBatchResults] = useState<TestResult[]>(() => {
+    if (!id) return [];
+    const appState = useAppStore.getState();
+    const allStoreResults =
+      appState.allTestResults && appState.allTestResults.length > 0
+        ? appState.allTestResults
+        : appState.testResults;
+    const currentBatchNo = appState.batches
+      .find((b) => b.id === id)
+      ?.batchNo?.trim()
+      .toLowerCase();
+    return (allStoreResults || []).filter((r: any) => {
+      if (!r) return false;
+      const trBatchId = (r.batchId || '').trim();
+      const trBatchNo = (r.batchNo || (r.batch as any)?.batchNo || '').trim().toLowerCase();
+      return (
+        trBatchId === id ||
+        (currentBatchNo && trBatchId.toLowerCase() === currentBatchNo) ||
+        (currentBatchNo && trBatchNo === currentBatchNo)
+      );
+    });
+  });
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [showHistoryTable, setShowHistoryTable] = useState(false);
   const [isOOSOpen, setIsOOSOpen] = useState(false);
@@ -75,7 +96,13 @@ export const BatchDetailPage: React.FC = () => {
   const userRole = (user?.role || '').trim().toUpperCase();
   const canEvaluate = ['QA', 'QC', 'ADMIN'].includes(userRole);
 
-  const batch = useMemo(() => batches.find((b) => b.id === id), [batches, id]);
+  const storeBatches = useAppStore((state) => state.batches);
+  const rawBatch = useMemo(() => storeBatches.find((b) => b.id === id), [storeBatches, id]);
+  const batch = useMemo(
+    () =>
+      (batches.find((b) => b.id === id) || (rawBatch as any)) as (typeof batches)[0] | undefined,
+    [batches, rawBatch, id]
+  );
   const resolver = useCriteriaResolver((batch as any)?.tccs);
 
   const boundTccs = useMemo(() => {

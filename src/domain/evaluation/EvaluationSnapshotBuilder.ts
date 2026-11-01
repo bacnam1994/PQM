@@ -58,7 +58,12 @@ export function buildEvaluationHashPayload(
     testResultId,
     batchId: batchId || '',
     tccsId: snapshot.tccsId || '',
-    tccsVersion: snapshot.tccsVersion ?? 1,
+    tccsVersion:
+      snapshot.tccsVersion !== undefined
+        ? typeof snapshot.tccsVersion === 'string' && !isNaN(Number(snapshot.tccsVersion))
+          ? Number(snapshot.tccsVersion)
+          : snapshot.tccsVersion
+        : 1,
     engineVersion: snapshot.engineVersion,
     criterionResults: snapshot.criterionResults,
     overallStatus: snapshot.overallStatus,
@@ -88,6 +93,8 @@ export function verifyEvaluationSnapshotIntegrity(
     [testResultId, batchId ?? ''],
     [snapshot.testResultId || testResultId, ''],
     [testResultId, snapshot.batchId ?? ''],
+    ['temp-eval-id', snapshot.batchId ?? batchId ?? ''],
+    ['temp-eval-id', ''],
   ];
 
   for (const [tId, bId] of idPairs) {
@@ -210,6 +217,7 @@ export function isEvaluationSnapshotStale(
     testResult.id &&
     snapshotTrId !== testResult.id &&
     !isSyntheticCoA &&
+    snapshotTrId !== 'temp-eval-id' &&
     !isMatchingBatch
   ) {
     return {

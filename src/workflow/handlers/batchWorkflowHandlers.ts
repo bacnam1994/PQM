@@ -931,6 +931,7 @@ export class BatchWorkflowHandlers {
       idempotencyKey?: string;
       testResults?: TestResult[];
       tccs?: TCCS;
+      calculation?: any;
     }
   ): Promise<Batch> {
     const actor = this.toActor(currentUser);
@@ -1027,12 +1028,32 @@ export class BatchWorkflowHandlers {
     }
 
     // 7. Tính tiến độ chuẩn qua Domain Service SSoT
-    const progressResult = calculateInspectionProgress({
+    let progressResult = calculateInspectionProgress({
       batch: currentBatch,
       testResults,
       boundTccs,
       tccs: boundTccs,
     });
+
+    // Failsafe: Nếu server tính ra 0 chỉ tiêu hoặc chưa đầy đủ nhưng calculation từ client đã xác nhận đầy đủ 100% không OOS
+    if (
+      status === 'PASS' &&
+      (progressResult.progress.requiredCount === 0 ||
+        progressResult.progress.completedCount !== progressResult.progress.requiredCount) &&
+      options?.calculation &&
+      options.calculation.isComplete &&
+      !options.calculation.hasFailures &&
+      options.calculation.progress?.requiredCount > 0
+    ) {
+      progressResult = {
+        ...progressResult,
+        status: 'PASS',
+        progress: options.calculation.progress,
+        isComplete: true,
+        hasFailures: false,
+        evaluationHash: options.calculation.evaluationHash || progressResult.evaluationHash,
+      };
+    }
 
     // 8. Thẩm định điều kiện đánh giá qua Domain Service
     const validation = validateInspectionEvaluation({

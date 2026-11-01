@@ -11,6 +11,7 @@ import { useAppStore } from './store/useAppStore';
 import { useShallow } from 'zustand/react/shallow';
 import { useUIStore, loadUserPreferences, resetToSharedKey } from './store/useUIStore';
 import { lazyWithRetry } from './utils/lazyWithRetry';
+import { initIdleRoutePrefetch } from './utils/routePreloader';
 
 const Dashboard = lazyWithRetry(() => import('./pages/system/Dashboard'), 'Dashboard');
 const ProductList = lazyWithRetry(() => import('./pages/products/ProductList'), 'ProductList');
@@ -427,6 +428,13 @@ const UserPreferenceSync = () => {
 };
 
 // Component theo dõi và lưu trang cuối người dùng đã truy cập
+const RoutePreloader = () => {
+  useEffect(() => {
+    initIdleRoutePrefetch();
+  }, []);
+  return null;
+};
+
 const RouteTracker = () => {
   const location = useLocation();
   const setLastVisitedPath = useUIStore((s) => s.setLastVisitedPath);
@@ -454,6 +462,7 @@ const App: React.FC = () => {
         <ThemeManager />
         <UserPreferenceSync />
         <RouteTracker />
+        <RoutePreloader />
         <Toaster position="bottom-right" toastOptions={{ duration: 4000 }} />
         <CookieConsentBanner />
         <ErrorBoundary>

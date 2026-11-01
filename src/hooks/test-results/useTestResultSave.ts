@@ -427,11 +427,15 @@ export const useTestResultSave = ({
           resultData.labId = finalLabId;
         }
 
-        // Tạo niêm phong EvaluationSnapshot ALCOA+
+        // Chuẩn hóa targetId trước khi tạo niêm phong ALCOA+ để mã băm SHA-256 luôn toàn vẹn
+        const targetId =
+          crud.mode === 'EDIT' && crud.selectedItem?.id ? crud.selectedItem.id : generateId('res');
+
+        // Tạo niêm phong EvaluationSnapshot ALCOA+ với chính xác targetId
         const evaluationSnapshot = QualityEvaluationEngine.evaluate(
           {
             ...resultData,
-            id: crud.selectedItem?.id || 'temp-eval-id',
+            id: targetId,
           },
           activeTCCS,
           user
@@ -444,11 +448,11 @@ export const useTestResultSave = ({
           await updateTestResult({
             ...cleanResult,
             ...resultData,
+            id: targetId,
           });
         } else {
-          const newId = generateId('res');
           await addTestResult({
-            id: newId,
+            id: targetId,
             ...resultData,
             createdAt: new Date().toISOString(),
           });

@@ -232,7 +232,8 @@ export const createBatchSlice: StoreSlice<BatchSlice> = (set, get) => ({
     status: 'PASS' | 'FAIL',
     reason?: string,
     testResultsOverride?: TestResult[],
-    tccsOverride?: TCCS
+    tccsOverride?: TCCS,
+    calculationOverride?: any
   ) => {
     try {
       const state = get();
@@ -302,6 +303,7 @@ export const createBatchSlice: StoreSlice<BatchSlice> = (set, get) => ({
         expectedVersion: targetBatch?.version,
         tccs: activeTccs,
         testResults: batchResults,
+        calculation: calculationOverride,
       });
       queryClient.invalidateQueries({ queryKey: BATCH_QUERY_KEYS.all });
       queryClient.invalidateQueries({ queryKey: BATCH_QUERY_KEYS.detail(id) });

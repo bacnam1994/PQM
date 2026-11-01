@@ -17,6 +17,7 @@ import { formatDateStandard } from '../../../../utils';
 import { calculateBatchProgress } from '../utils/batchProgress';
 import { BatchStatusSelect } from './BatchStatusSelect';
 import { BatchInspectionProgressService } from '../../../../domain/batch/BatchInspectionProgressService';
+import { preloadRoute } from '../../../../utils/routePreloader';
 import { useAppStore } from '../../../../store/useAppStore';
 
 interface BatchGridItemProps {

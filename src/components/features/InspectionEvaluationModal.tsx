@@ -30,6 +30,7 @@ export const InspectionEvaluationModal: React.FC<InspectionEvaluationModalProps>
   onSuccess,
 }) => {
   const evaluateInspection = useAppStore((state) => state.evaluateInspection);
+  const tccsList = useAppStore((state) => state.tccsList);
   const user = useAppStore((state) => state.user);
 
   const [decision, setDecision] = useState<'PASS' | 'FAIL'>(
@@ -88,13 +89,20 @@ export const InspectionEvaluationModal: React.FC<InspectionEvaluationModalProps>
 
     try {
       setIsSubmitting(true);
-      const boundTccs = (batch as any).tccs || (batch as any).tccsSnapshot;
+      const boundTccs =
+        (batch as any).tccs ||
+        (batch as any).tccsSnapshot ||
+        tccsList.find((t) => t.id === batch.tccsId) ||
+        tccsList.find((t) => t.productId === batch.productId && t.isActive) ||
+        tccsList.find((t) => t.productId === batch.productId);
+
       await evaluateInspection(
         batch.id,
         decision,
         reason.trim() || undefined,
         testResults,
-        boundTccs
+        boundTccs,
+        calculation
       );
       if (onSuccess) onSuccess();
       onClose();
