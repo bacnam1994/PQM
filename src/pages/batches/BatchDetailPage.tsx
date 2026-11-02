@@ -21,11 +21,9 @@ import {
   ShieldCheckIcon,
   LockClosedIcon,
 } from '@heroicons/react/24/outline';
-import { useDataGraph } from '../../hooks/useDataGraph';
 import { useAppStore } from '../../store/useAppStore';
 import { formatDateStandard, ensureArray } from '../../utils';
 import { resolveDeclaredBasis, calculateRelativePercentage } from '../../utils/basisCalculation';
-import { useCriteriaResolver } from '../../hooks/useCriteriaResolver';
 import { fetchTestResultsByBatchId } from '../../services/testResultService';
 import { Batch, TestResult } from '../../types';
 import { CircularProgress, BatchCriteriaHistory } from '../../components';
@@ -56,12 +54,13 @@ const InspectionEvaluationModal = React.lazy(() =>
 export const BatchDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { batches } = useDataGraph();
+  const storeBatches = useAppStore((state) => state.batches);
+  const products = useAppStore((state) => state.products);
+  const tccsList = useAppStore((state) => state.tccsList);
   const productFormulas = useAppStore((state) => (state as any).productFormulas || []);
   const notify = useAppStore((state) => state.notify);
   const isAdmin = useAppStore((state) => state.isAdmin);
   const role = useAppStore((state) => state.role);
-  const tccsList = useAppStore((state) => state.tccsList);
   const user = useAppStore((state) => state.user);
 
   const [viewBatchResults, setViewBatchResults] = useState<TestResult[]>(() => {
@@ -96,18 +95,71 @@ export const BatchDetailPage: React.FC = () => {
   const userRole = (user?.role || '').trim().toUpperCase();
   const canEvaluate = ['QA', 'QC', 'ADMIN'].includes(userRole);
 
-  const storeBatches = useAppStore((state) => state.batches);
-  const rawBatch = useMemo(() => storeBatches.find((b) => b.id === id), [storeBatches, id]);
-  const batch = useMemo(
+  const rawBatch = useMemo(
     () =>
-      (batches.find((b) => b.id === id) || (rawBatch as any)) as (typeof batches)[0] | undefined,
-    [batches, rawBatch, id]
+      storeBatches.find(
+        (b) => b.id === id || b.batchNo === id || (b.id && id && b.id.endsWith(id))
+      ),
+    [storeBatches, id]
   );
-  const resolver = useCriteriaResolver((batch as any)?.tccs);
 
-  const boundTccs = useMemo(() => {
-    return (batch as any)?.tccs || tccsList.find((t: any) => t.id === batch?.tccsId);
-  }, [batch, tccsList]);
+  const [fetchedBatch, setFetchedBatch] = useState<Batch | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+    if (!rawBatch && id) {
+      import('../../services/app/BatchAppService')
+        .then(({ batchAppService }) => batchAppService.getBatchById(id))
+        .then((b) => {
+          if (isMounted && b) setFetchedBatch(b);
+        })
+        .catch(console.warn);
+    }
+    return () => {
+      isMounted = false;
+    };
+  }, [rawBatch, id]);
+
+  const effectiveRawBatch = rawBatch || fetchedBatch;
+
+  const product = useMemo(
+    () =>
+      effectiveRawBatch?.productId
+        ? products.find((p) => p.id === effectiveRawBatch.productId)
+        : undefined,
+    [products, effectiveRawBatch?.productId]
+  );
+
+  const boundTccs = useMemo(
+    () =>
+      effectiveRawBatch?.tccsSnapshot ||
+      (effectiveRawBatch?.tccsId
+        ? tccsList.find((t) => t.id === effectiveRawBatch.tccsId)
+        : undefined) ||
+      (effectiveRawBatch?.productId
+        ? tccsList.find((t) => t.productId === effectiveRawBatch.productId && t.isActive) ||
+          tccsList.find((t) => t.productId === effectiveRawBatch.productId)
+        : undefined),
+    [effectiveRawBatch, tccsList]
+  );
+
+  const formula = useMemo(
+    () =>
+      effectiveRawBatch?.productId
+        ? productFormulas.find((f: any) => f.productId === effectiveRawBatch.productId)
+        : undefined,
+    [productFormulas, effectiveRawBatch?.productId]
+  );
+
+  const batch = useMemo(() => {
+    if (!effectiveRawBatch) return undefined;
+    return {
+      ...effectiveRawBatch,
+      product: (effectiveRawBatch as any).product || product,
+      tccs: (effectiveRawBatch as any).tccs || boundTccs,
+      formula: (effectiveRawBatch as any).formula || formula,
+    } as any;
+  }, [effectiveRawBatch, product, boundTccs, formula]);
 
   const inspectionCalc = useMemo(() => {
     if (!batch) return null;
@@ -642,7 +694,7 @@ export const BatchDetailPage: React.FC = () => {
             </Surface>
           ) : (
             <div className="space-y-4">
-              {isLoadingHistory ? (
+              {isLoadingHistory && viewBatchResults.length === 0 ? (
                 <div className="p-10 text-center text-ink-muted italic text-sm flex justify-center items-center gap-3 bg-surface rounded-xl border border-border shadow-xs">
                   <ArrowPathIcon className="animate-spin h-5 w-5 text-emerald-600" />
                   Đang tải dữ liệu kiểm nghiệm...

@@ -118,6 +118,18 @@ const LoadingFallback = () => (
   </div>
 );
 
+const InnerPageFallback = () => (
+  <div className="p-6 max-w-7xl mx-auto space-y-6 animate-pulse">
+    <div className="h-8 bg-slate-200 dark:bg-slate-700/60 rounded-xl w-1/3"></div>
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="h-32 bg-slate-200 dark:bg-slate-700/50 rounded-2xl"></div>
+      <div className="h-32 bg-slate-200 dark:bg-slate-700/50 rounded-2xl"></div>
+      <div className="h-32 bg-slate-200 dark:bg-slate-700/50 rounded-2xl"></div>
+    </div>
+    <div className="h-64 bg-slate-200 dark:bg-slate-700/40 rounded-2xl"></div>
+  </div>
+);
+
 const ProtectedRoute: React.FC = () => {
   const { user, role, isAdmin, authLoading } = useAppStore(
     useShallow((s) => ({
@@ -137,7 +149,9 @@ const ProtectedRoute: React.FC = () => {
 
   return (
     <Layout>
-      <Outlet />
+      <Suspense fallback={<InnerPageFallback />}>
+        <Outlet />
+      </Suspense>
     </Layout>
   );
 };

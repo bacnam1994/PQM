@@ -88,14 +88,35 @@ export function verifyEvaluationSnapshotIntegrity(
   const targetHash = snapshot.evaluationHash.trim();
 
   // Danh sách các cặp định danh khả dĩ để bao phủ cả trường hợp snapshot lưu ID gốc hoặc route truyền mã
-  const idPairs: Array<[string, string]> = [
-    [snapshot.testResultId || testResultId, snapshot.batchId ?? batchId ?? ''],
-    [testResultId, batchId ?? ''],
-    [snapshot.testResultId || testResultId, ''],
-    [testResultId, snapshot.batchId ?? ''],
-    ['temp-eval-id', snapshot.batchId ?? batchId ?? ''],
-    ['temp-eval-id', ''],
-  ];
+  const candidateTestIds = Array.from(
+    new Set(
+      [
+        snapshot.testResultId,
+        testResultId,
+        testResultId.length > 6 ? testResultId.slice(-6) : '',
+        snapshot.testResultId && snapshot.testResultId.length > 6
+          ? snapshot.testResultId.slice(-6)
+          : '',
+        'temp-eval-id',
+        '',
+      ].filter((x): x is string => typeof x === 'string')
+    )
+  );
+
+  const candidateBatchIds = Array.from(
+    new Set(
+      [snapshot.batchId, batchId, (snapshot as any).batchNo, ''].filter(
+        (x): x is string => typeof x === 'string'
+      )
+    )
+  );
+
+  const idPairs: Array<[string, string]> = [];
+  for (const tId of candidateTestIds) {
+    for (const bId of candidateBatchIds) {
+      idPairs.push([tId, bId]);
+    }
+  }
 
   for (const [tId, bId] of idPairs) {
     // 1. Kiểm tra với chuẩn SHA-256 mới (12 trường cốt lõi)

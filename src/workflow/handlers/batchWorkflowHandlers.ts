@@ -1048,9 +1048,16 @@ export class BatchWorkflowHandlers {
       progressResult = {
         ...progressResult,
         status: 'PASS',
-        progress: options.calculation.progress,
+        progress: {
+          ...options.calculation.progress,
+          completedCount: options.calculation.progress.requiredCount,
+          percentage: 100,
+          missingCriteria: [],
+        },
         isComplete: true,
         hasFailures: false,
+        failedCriteria: [],
+        missingCriteria: [],
         evaluationHash: options.calculation.evaluationHash || progressResult.evaluationHash,
       };
     }

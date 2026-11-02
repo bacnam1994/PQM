@@ -286,6 +286,9 @@ export const BatchGridItem = memo<BatchGridItemProps>(
             </button>
             <button
               onClick={() => onView(batch)}
+              onMouseEnter={() => preloadRoute('/batches/' + batch.id)}
+              onFocus={() => preloadRoute('/batches/' + batch.id)}
+              onTouchStart={() => preloadRoute('/batches/' + batch.id)}
               className="flex items-center gap-1 px-2.5 py-1 rounded-lg font-medium text-xs bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/20 transition-colors cursor-pointer"
             >
               Chi tiết

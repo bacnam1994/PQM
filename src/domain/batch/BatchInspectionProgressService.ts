@@ -594,7 +594,7 @@ export class BatchInspectionProgressService {
       if (
         progress.requiredCount <= 0 ||
         progress.completedCount !== progress.requiredCount ||
-        progress.missingCriteria.length > 0
+        (Array.isArray(progress.missingCriteria) && progress.missingCriteria.length > 0)
       ) {
         return {
           valid: false,

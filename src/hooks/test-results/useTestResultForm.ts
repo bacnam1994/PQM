@@ -409,7 +409,7 @@ export const useTestResultForm = (onInitialBatchSelect?: (batchNo: string) => vo
 
       setFormValues({
         batchId: res.batchId,
-        reportNo: (res as any).reportNo || '',
+        reportNo: (res as any).reportNo || (res as any).code || '',
         labId: res.labId || '',
         labName: res.labName,
         testDate: parseDateToISO(res.testDate),

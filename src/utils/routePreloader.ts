@@ -66,8 +66,8 @@ export function initIdleRoutePrefetch(): void {
   };
 
   if ('requestIdleCallback' in window) {
-    (window as any).requestIdleCallback(schedulePrefetch, { timeout: 3000 });
+    (window as any).requestIdleCallback(schedulePrefetch, { timeout: 500 });
   } else {
-    setTimeout(schedulePrefetch, 2000);
+    setTimeout(schedulePrefetch, 200);
   }
 }

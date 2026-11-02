@@ -1,3 +1,4 @@
+import { preloadRoute } from '../../utils/routePreloader';
 import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
@@ -328,6 +329,9 @@ export const AnimatedSidebarContent: React.FC<AnimatedSidebarProps> = ({
         >
           <Link
             to="/"
+            onMouseEnter={() => preloadRoute('/')}
+            onFocus={() => preloadRoute('/')}
+            onTouchStart={() => preloadRoute('/')}
             onClick={onMobileItemClick}
             className={`group relative flex items-center rounded-xl text-xs font-medium transition-colors z-10 ${
               effectiveCollapsed ? 'w-10 h-10 mx-auto justify-center' : 'gap-x-2.5 px-3 py-2'
@@ -502,6 +506,9 @@ export const AnimatedSidebarContent: React.FC<AnimatedSidebarProps> = ({
                             <Link
                               key={child.path}
                               to={child.path}
+                              onMouseEnter={() => preloadRoute(child.path)}
+                              onFocus={() => preloadRoute(child.path)}
+                              onTouchStart={() => preloadRoute(child.path)}
                               onClick={() => setHoveredRailGroupId(null)}
                               className={`flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-xs font-medium transition-all ${
                                 isChildActive
