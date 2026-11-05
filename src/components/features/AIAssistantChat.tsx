@@ -429,13 +429,31 @@ export const AIAssistantChat: React.FC<AIAssistantChatProps> = ({
     }
   };
 
+  const escapeHtml = (unsafe: string): string => {
+    return (unsafe || '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  };
+
+  const sanitizeUrl = (url: string): string => {
+    const trimmed = (url || '').trim();
+    if (/^(https?:|\/|#)/i.test(trimmed)) {
+      return trimmed;
+    }
+    return '#';
+  };
+
   const formatMessageText = (text: string) => {
-    return text
+    const escaped = escapeHtml(text || '');
+    return escaped
       .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-      .replace(
-        /\[(.*?)\]\((.*?)\)/g,
-        '<a href="$2" class="text-emerald-600 dark:text-emerald-400 hover:underline font-bold">$1</a>'
-      );
+      .replace(/\[(.*?)\]\((.*?)\)/g, (_match, label, url) => {
+        const safeUrl = sanitizeUrl(url);
+        return `<a href="${safeUrl}" class="text-emerald-600 dark:text-emerald-400 hover:underline font-bold">${label}</a>`;
+      });
   };
 
   const { data: activeMasterCriteria = [] } = useMasterCriteriaActiveQuery();

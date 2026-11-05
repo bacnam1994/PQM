@@ -7,6 +7,7 @@ import {
   CheckCircleIcon,
 } from '@heroicons/react/24/outline';
 import { useSystemMaintenance } from '../../hooks/useSystemMaintenance';
+import { ConfirmationModal } from '../ui/CommonUI';
 
 export const MaintenanceBanner: React.FC = () => {
   const {
@@ -18,6 +19,7 @@ export const MaintenanceBanner: React.FC = () => {
   } = useSystemMaintenance();
 
   const [isDisabling, setIsDisabling] = useState(false);
+  const [showDisableConfirm, setShowDisableConfirm] = useState(false);
 
   if (!isMaintenanceActive || (!isBlockedForCurrentUser && !isAdminInMaintenance)) {
     return null;
@@ -103,26 +105,33 @@ export const MaintenanceBanner: React.FC = () => {
             <button
               type="button"
               disabled={isDisabling}
-              onClick={async () => {
-                if (
-                  window.confirm(
-                    'Bạn có chắc chắn muốn TẮT chế độ bảo trì để mở lại hệ thống cho toàn bộ nhân sự?'
-                  )
-                ) {
-                  try {
-                    setIsDisabling(true);
-                    await setMaintenanceMode(false);
-                  } finally {
-                    setIsDisabling(false);
-                  }
-                }
-              }}
+              onClick={() => setShowDisableConfirm(true)}
               className="flex items-center gap-1.5 px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-semibold text-[11px] shadow-xs transition-all cursor-pointer active:scale-95 disabled:opacity-50"
             >
               <CheckCircleIcon className="w-3.5 h-3.5" />
               <span>{isDisabling ? 'Đang mở lại...' : 'Tắt bảo trì & Mở hệ thống'}</span>
             </button>
           </div>
+
+          <ConfirmationModal
+            isOpen={showDisableConfirm}
+            onClose={() => setShowDisableConfirm(false)}
+            onConfirm={async () => {
+              setShowDisableConfirm(false);
+              try {
+                setIsDisabling(true);
+                await setMaintenanceMode(false);
+              } finally {
+                setIsDisabling(false);
+              }
+            }}
+            title="Xác nhận Tắt Chế Độ Bảo Trì"
+            message="Bạn có chắc chắn muốn TẮT chế độ bảo trì để mở lại hệ thống cho toàn bộ nhân sự thao tác bình thường?"
+            confirmText="Tắt bảo trì & Mở hệ thống"
+            cancelText="Hủy bỏ"
+            confirmButtonColor="bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] text-white"
+            icon={CheckCircleIcon}
+          />
         </div>
       </div>
     );

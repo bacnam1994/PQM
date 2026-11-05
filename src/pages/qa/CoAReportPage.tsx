@@ -22,6 +22,7 @@ import {
 import { QualityEvaluationEngine } from '../../domain/evaluation/QualityEvaluationEngine';
 import { coaService } from '../../services/app/CoAService';
 import { AnatomyVerificationRig } from '../../components/system/AnatomyVerificationRig';
+import { ConfirmationModal } from '../../components/ui/CommonUI';
 
 const CoAReportPage = () => {
   const { batchId, id } = useParams();
@@ -36,13 +37,15 @@ const CoAReportPage = () => {
   const [failClosedReason, setFailClosedReason] = useState<string | null>(null);
   const [formula, setFormula] = useState<any>(null);
   const [showRig, setShowRig] = useState(false);
+  const [isResealConfirmOpen, setIsResealConfirmOpen] = useState(false);
 
-  const handleResealSnapshot = async () => {
+  const handleResealSnapshot = () => {
+    setIsResealConfirmOpen(true);
+  };
+
+  const executeResealSnapshot = async () => {
+    setIsResealConfirmOpen(false);
     try {
-      const confirmed = window.confirm(
-        'Xác nhận tái niêm phong mã băm ALCOA+ SHA-256 cho bản ghi này dựa trên TCCS và kết quả đo lường hiện tại?'
-      );
-      if (!confirmed) return;
       setLoading(true);
       const currentUser = useAppStore.getState().user;
       if (id) {
@@ -575,6 +578,18 @@ const CoAReportPage = () => {
               </>
             )}
           </div>
+
+          <ConfirmationModal
+            isOpen={isResealConfirmOpen}
+            onClose={() => setIsResealConfirmOpen(false)}
+            onConfirm={executeResealSnapshot}
+            title="Xác nhận Tái Niêm Phong ALCOA+ SHA-256"
+            message="Hành động này sẽ tính toán lại mã băm toàn vẹn SHA-256 cho Evaluation Snapshot dựa trên TCCS và kết quả kiểm nghiệm hiện tại của lô. Bạn có chắc chắn muốn tiếp tục?"
+            confirmText="Tái niêm phong ngay"
+            cancelText="Hủy bỏ"
+            confirmButtonColor="bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] text-white"
+            icon={ShieldCheckIcon}
+          />
         </div>
       </div>
     );

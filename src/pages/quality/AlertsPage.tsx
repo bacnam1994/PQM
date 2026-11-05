@@ -90,8 +90,18 @@ const TYPE_CONFIG: Record<string, { label: string; icon: React.ReactNode; desc: 
   },
 };
 
+const escapeHtml = (unsafe: string): string => {
+  return (unsafe || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+};
+
 const renderMarkdown = (text: string) => {
-  return text.replace(/\*\*(.+?)\*\*/g, '<strong class="font-bold text-ink">$1</strong>');
+  const escaped = escapeHtml(text || '');
+  return escaped.replace(/\*\*(.+?)\*\*/g, '<strong class="font-bold text-ink">$1</strong>');
 };
 
 type FilterType = 'ALL' | 'HIGH' | 'MEDIUM' | 'LOW';

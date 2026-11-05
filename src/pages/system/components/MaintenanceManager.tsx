@@ -9,6 +9,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { useSystemMaintenance } from '../../../hooks/useSystemMaintenance';
 import { formatDateStandard } from '../../../utils';
+import { ConfirmationModal } from '../../../components/ui/CommonUI';
 
 export const MaintenanceManager: React.FC = () => {
   const { isMaintenanceActive, maintenanceConfig, setMaintenanceMode } = useSystemMaintenance();
@@ -17,6 +18,7 @@ export const MaintenanceManager: React.FC = () => {
   const [message, setMessage] = useState('');
   const [scheduledEndTime, setScheduledEndTime] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
 
   // Đồng bộ form với cấu hình hiện tại khi nạp xong
   useEffect(() => {
@@ -31,17 +33,13 @@ export const MaintenanceManager: React.FC = () => {
     }
   }, [maintenanceConfig]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    setShowConfirmModal(true);
+  };
 
-    const actionText = enabled
-      ? 'KÍCH HOẠT chế độ bảo trì (Người dùng thông thường sẽ chỉ có quyền Đọc)'
-      : 'TẮT chế độ bảo trì (Hệ thống mở lại bình thường cho toàn bộ nhân sự)';
-
-    if (!window.confirm(`Bạn có chắc chắn muốn ${actionText}?`)) {
-      return;
-    }
-
+  const handleConfirmSubmit = async () => {
+    setShowConfirmModal(false);
     try {
       setIsSubmitting(true);
       await setMaintenanceMode(enabled, {
@@ -186,6 +184,42 @@ export const MaintenanceManager: React.FC = () => {
           </button>
         </div>
       </form>
+
+      <ConfirmationModal
+        isOpen={showConfirmModal}
+        onClose={() => setShowConfirmModal(false)}
+        onConfirm={handleConfirmSubmit}
+        title={enabled ? 'Xác nhận Bật Chế Độ Bảo Trì' : 'Xác nhận Tắt Chế Độ Bảo Trì'}
+        message={
+          enabled ? (
+            <div className="space-y-2">
+              <p>
+                Bạn đang chuẩn bị <strong>KÍCH HOẠT chế độ bảo trì</strong>. Toàn bộ người dùng
+                không có quyền quản trị (QA, QC, Kỹ thuật viên, Sản xuất) sẽ bị khóa quyền ghi và
+                chỉ có thể xem dữ liệu.
+              </p>
+              {message && (
+                <div className="p-2.5 bg-surface-2 rounded-lg text-xs font-mono border border-border">
+                  Thông điệp phát thanh: "{message}"
+                </div>
+              )}
+            </div>
+          ) : (
+            <p>
+              Bạn có chắc chắn muốn <strong>TẮT chế độ bảo trì</strong> để mở lại hệ thống cho toàn
+              bộ nhân sự thao tác bình thường?
+            </p>
+          )
+        }
+        confirmText={enabled ? 'Bật bảo trì ngay' : 'Tắt bảo trì & Mở hệ thống'}
+        cancelText="Hủy bỏ"
+        confirmButtonColor={
+          enabled
+            ? 'bg-amber-600 hover:bg-amber-700 active:scale-[0.98] text-white'
+            : 'bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] text-white'
+        }
+        icon={enabled ? ExclamationTriangleIcon : ShieldCheckIcon}
+      />
     </section>
   );
 };
