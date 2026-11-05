@@ -112,6 +112,9 @@ describe('System Domain: Canonical Unit Tests (VS-14)', () => {
         restoreDatabase: vi.fn().mockResolvedValue(undefined),
         wipeDatabase: vi.fn().mockResolvedValue(undefined),
         resetDemoData: vi.fn().mockResolvedValue(undefined),
+        getMaintenanceConfig: vi.fn().mockResolvedValue(null),
+        setMaintenanceConfig: vi.fn().mockResolvedValue(undefined),
+        listenMaintenanceConfig: vi.fn().mockReturnValue(() => {}),
       };
       service = new SystemAppService(mockRepo);
     });
@@ -163,6 +166,50 @@ describe('System Domain: Canonical Unit Tests (VS-14)', () => {
       );
       expect(res.success).toBe(true);
       expect(mockRepo.resetDemoData).toHaveBeenCalledTimes(1);
+    });
+
+    it('setMaintenanceMode: ADMIN bật và tắt chế độ bảo trì thành công', async () => {
+      // 1. Bật bảo trì
+      const resOn = await service.setMaintenanceMode(
+        true,
+        { message: 'Bảo trì máy chủ', scheduledEndTime: '11:00' },
+        adminContext
+      );
+      expect(resOn.success).toBe(true);
+      expect(resOn.action).toBe('SYSTEM_CONFIG_UPDATE');
+      expect(mockRepo.setMaintenanceConfig).toHaveBeenCalledWith(
+        expect.objectContaining({
+          enabled: true,
+          message: 'Bảo trì máy chủ',
+          scheduledEndTime: '11:00',
+          allowedRoles: ['ADMIN'],
+        })
+      );
+
+      // 2. Tắt bảo trì
+      const resOff = await service.setMaintenanceMode(false, {}, adminContext);
+      expect(resOff.success).toBe(true);
+      expect(mockRepo.setMaintenanceConfig).toHaveBeenCalledWith(
+        expect.objectContaining({
+          enabled: false,
+        })
+      );
+    });
+
+    it('setMaintenanceMode: chặn người dùng không phải ADMIN', async () => {
+      await expect(
+        service.setMaintenanceMode(true, { message: 'Bảo trì trái phép' }, nonAdminContext)
+      ).rejects.toThrow(/Thao tác SYSTEM_CONFIG_UPDATE bắt buộc quyền Quản trị viên/);
+      expect(mockRepo.setMaintenanceConfig).not.toHaveBeenCalled();
+    });
+
+    it('getMaintenanceConfig & listenMaintenanceConfig: hoạt động chính xác', async () => {
+      await service.getMaintenanceConfig();
+      expect(mockRepo.getMaintenanceConfig).toHaveBeenCalledTimes(1);
+
+      const cb = vi.fn();
+      service.listenMaintenanceConfig(cb);
+      expect(mockRepo.listenMaintenanceConfig).toHaveBeenCalledWith(cb);
     });
   });
 

@@ -134,6 +134,7 @@ const TestResultGridItem = memo(
                 Phiếu số:{' '}
                 {(res as any).reportNo ||
                   (res as any).code ||
+                  (res.id && res.id.length > 6 ? res.id.slice(-6) : res.id) ||
                   generateDefaultReportNo({
                     batchNo: res.batch?.batchNo,
                     labName: res.labName,
@@ -244,6 +245,7 @@ const TestResultListItem = memo(
               >
                 {(res as any).reportNo ||
                   (res as any).code ||
+                  (res.id && res.id.length > 6 ? res.id.slice(-6) : res.id) ||
                   generateDefaultReportNo({
                     batchNo: res.batch?.batchNo,
                     labName: res.labName,

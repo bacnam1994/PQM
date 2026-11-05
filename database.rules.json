@@ -160,6 +160,11 @@
       "$task_id": {
         ".write": "auth != null && (auth.token.isAdmin === true || auth.token.role === 'ADMIN' || auth.token.role === 'QA' || auth.token.role === 'QC' || root.child('users/admins/' + auth.uid).exists() || root.child('users/' + auth.uid + '/role').val() === 'ADMIN' || root.child('users/' + auth.uid + '/role').val() === 'QA' || root.child('users/' + auth.uid + '/role').val() === 'QC')"
       }
+    },
+
+    "system_config": {
+      ".read": "auth != null",
+      ".write": "auth != null && (auth.token.isAdmin === true || auth.token.role === 'ADMIN' || root.child('users/admins/' + auth.uid).exists() || root.child('users/' + auth.uid + '/role').val() === 'ADMIN')"
     }
   }
 }

@@ -26,6 +26,9 @@ describe('SystemAppService', () => {
       restoreDatabase: vi.fn().mockResolvedValue(undefined),
       wipeDatabase: vi.fn().mockResolvedValue(undefined),
       resetDemoData: vi.fn().mockResolvedValue(undefined),
+      getMaintenanceConfig: vi.fn().mockResolvedValue(null),
+      setMaintenanceConfig: vi.fn().mockResolvedValue(undefined),
+      listenMaintenanceConfig: vi.fn().mockReturnValue(() => {}),
     };
     service = new SystemAppService(mockRepo);
   });

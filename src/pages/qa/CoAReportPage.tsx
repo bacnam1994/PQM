@@ -13,6 +13,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { fetchTestResultsByBatchId, fetchTestResultById } from '../../services/testResultService';
 import { ensureArray } from '../../utils';
+import { resolveCurrentIdentity } from '../../store/utils/storeHelpers';
 import { TestResult, TestResultEntry, TCCS } from '../../types';
 import {
   verifyEvaluationSnapshotIntegrity,
@@ -111,25 +112,7 @@ const CoAReportPage = () => {
             return;
           }
 
-          // [ALCOA+ TAMPER DETECTION]
-          // Nếu phiếu đã có Bản chụp thẩm định niêm phong (EvaluationSnapshot), bắt buộc kiểm tra mã băm SHA-256
-          if (rawResult.evaluationSnapshot) {
-            const isSnapValid = verifyEvaluationSnapshotIntegrity(
-              rawResult.evaluationSnapshot,
-              rawResult.id,
-              rawResult.batchId
-            );
-            if (!isSnapValid) {
-              if (isMounted) {
-                setFailClosedReason(
-                  'CẢNH BÁO BẢO MẬT ALCOA+: Chữ ký băm toàn vẹn (SHA-256 Hash) của Evaluation Snapshot không khớp. Dữ liệu đã bị can thiệp trái phép!'
-                );
-              }
-              return;
-            }
-          }
-
-          // Bước 2: Hydrate Batch, Product, TCCS đầy đủ
+          // Bước 2: Hydrate Batch, Product, TCCS đầy đủ trước khi thẩm tra niêm phong
           let hydratedBatch: HydratedBatch | undefined = undefined;
           let batchProduct = undefined;
           let batchTccs: TCCS | undefined = undefined;
@@ -217,20 +200,54 @@ const CoAReportPage = () => {
             hydratedBatch.tccs = batchTccs;
           }
 
-          // Khi thông tin Phiếu kiểm nghiệm có thay đổi, tự động tái thẩm định và cập nhật snapshot
+          // [ALCOA+ TAMPER DETECTION & GxP INTEGRITY GATE]
+          // Nếu phiếu đã có Bản chụp thẩm định niêm phong (EvaluationSnapshot):
           if (rawResult.evaluationSnapshot) {
-            const validation = validateEvaluationSnapshot(
+            const isSnapValid = verifyEvaluationSnapshotIntegrity(
               rawResult.evaluationSnapshot,
-              rawResult,
-              batchTccs
+              rawResult.id,
+              rawResult.batchId
             );
-            if (!validation.isValid) {
-              const updatedSnapshot = QualityEvaluationEngine.evaluate(rawResult, batchTccs, {
-                email:
-                  (rawResult as any).testedBy || (rawResult as any).approvedBy || 'qa@vbiotech.vn',
-              });
-              rawResult.evaluationSnapshot = updatedSnapshot;
-              rawResult.overallStatus = updatedSnapshot.overallStatus;
+
+            const isOfficiallySealed =
+              rawResult.workflowStatus === 'APPROVED' || rawResult.workflowStatus === 'RELEASED';
+
+            if (!isSnapValid) {
+              if (isOfficiallySealed) {
+                if (isMounted) {
+                  setFailClosedReason(
+                    'CẢNH BÁO BẢO MẬT ALCOA+: Chữ ký băm toàn vẹn (SHA-256 Hash) của Evaluation Snapshot không khớp. Dữ liệu đã bị can thiệp trái phép!'
+                  );
+                }
+                return;
+              } else {
+                // Phiếu đang soạn thảo hoặc chưa niêm phong chính thức -> Tự động tái tính toán snapshot nội bộ
+                const updatedSnapshot = QualityEvaluationEngine.evaluate(rawResult, batchTccs, {
+                  email:
+                    (rawResult as any).testedBy ||
+                    (rawResult as any).approvedBy ||
+                    'qa@vbiotech.vn',
+                });
+                rawResult.evaluationSnapshot = updatedSnapshot;
+                rawResult.overallStatus = updatedSnapshot.overallStatus;
+              }
+            } else {
+              // Khi thông tin Phiếu kiểm nghiệm có thay đổi, tự động tái thẩm định và cập nhật snapshot nếu chưa niêm phong chính thức
+              const validation = validateEvaluationSnapshot(
+                rawResult.evaluationSnapshot,
+                rawResult,
+                batchTccs
+              );
+              if (!validation.isValid && !isOfficiallySealed) {
+                const updatedSnapshot = QualityEvaluationEngine.evaluate(rawResult, batchTccs, {
+                  email:
+                    (rawResult as any).testedBy ||
+                    (rawResult as any).approvedBy ||
+                    'qa@vbiotech.vn',
+                });
+                rawResult.evaluationSnapshot = updatedSnapshot;
+                rawResult.overallStatus = updatedSnapshot.overallStatus;
+              }
             }
           }
 
@@ -364,13 +381,17 @@ const CoAReportPage = () => {
               batchSnapshot.testResultId || latestResult?.id || batchId,
               batchId
             );
+
+            const isBatchReleased = batch.status === 'RELEASED';
             if (!isBatchSnapValid) {
-              if (isMounted) {
-                setFailClosedReason(
-                  'CẢNH BÁO BẢO MẬT ALCOA+: Chữ ký băm toàn vẹn (SHA-256 Hash) của Evaluation Snapshot trên Lô không khớp. Dữ liệu Lô đã bị can thiệp trái phép!'
-                );
+              if (isBatchReleased) {
+                if (isMounted) {
+                  setFailClosedReason(
+                    'CẢNH BÁO BẢO MẬT ALCOA+: Chữ ký băm toàn vẹn (SHA-256 Hash) của Evaluation Snapshot trên Lô không khớp. Dữ liệu Lô đã bị can thiệp trái phép!'
+                  );
+                }
+                return;
               }
-              return;
             }
 
             // [PHASE 8 & 12] Toàn diện Validation cho EvaluationSnapshot trên Lô
@@ -390,8 +411,8 @@ const CoAReportPage = () => {
               tccsForEvaluation
             );
 
-            if (!batchSnapValidation.isValid) {
-              // Khi dữ liệu Phiếu kiểm nghiệm của Lô có thay đổi, tự động cập nhật snapshot theo PKN mới nhất
+            if (!batchSnapValidation.isValid || !isBatchSnapValid) {
+              // Khi dữ liệu Phiếu kiểm nghiệm của Lô có thay đổi hoặc chưa niêm phong chính thức, cập nhật snapshot theo PKN mới nhất
               effectiveBatchSnapshot = QualityEvaluationEngine.evaluate(
                 targetTestResultForBatch,
                 tccsForEvaluation,
@@ -509,9 +530,17 @@ const CoAReportPage = () => {
             >
               Quay lại an toàn
             </button>
-            {['QA', 'QC', 'ADMIN'].includes(
-              (useAppStore.getState().user?.role || '').trim().toUpperCase()
-            ) && (
+            {(() => {
+              const appState = useAppStore.getState();
+              const identity = resolveCurrentIdentity(appState);
+              const role = (identity?.role || appState.role || (identity as any)?.user?.role || '')
+                .trim()
+                .toUpperCase();
+              return (
+                Boolean(appState.isAdmin || identity?.isAdmin) ||
+                ['QA', 'QC', 'ADMIN'].includes(role)
+              );
+            })() && (
               <>
                 <button
                   onClick={() => {

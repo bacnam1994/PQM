@@ -7,4 +7,8 @@
 
 export { SystemAppService, systemAppService } from '../../domains/system';
 
-export type { SystemActionContext, SystemActionResult } from '../../domains/system';
+export type {
+  SystemActionContext,
+  SystemActionResult,
+  SystemMaintenanceConfig,
+} from '../../domains/system';

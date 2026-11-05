@@ -34,6 +34,7 @@ import { useQualityAlerts } from '../../hooks/useQualityAlerts';
 import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcuts';
 import { GlobalCommandPalette } from './GlobalCommandPalette';
 import { ConfirmationModal } from '../ui/CommonUI';
+import { MaintenanceBanner } from '../system/MaintenanceBanner';
 
 import { useAIChatHostStore } from '../../store/useAIChatHostStore';
 
@@ -689,6 +690,9 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
             </Menu>
           </div>
         </header>
+
+        {/* Real-time System Maintenance Banner */}
+        <MaintenanceBanner />
 
         {/* Main Content Area */}
         <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 bg-transparent">

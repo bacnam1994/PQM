@@ -68,3 +68,12 @@ export interface SystemHealthStatus {
   activeUsersCount?: number;
   lastBackupTimestamp?: string;
 }
+
+export interface SystemMaintenanceConfig {
+  enabled: boolean;
+  message?: string;
+  scheduledEndTime?: string;
+  allowedRoles?: UserRole[];
+  updatedAt?: string;
+  updatedBy?: string;
+}

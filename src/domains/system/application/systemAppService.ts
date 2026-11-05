@@ -10,7 +10,7 @@
  */
 
 import { ISystemRepository, firebaseSystemRepository } from '../infrastructure/repository';
-import { SystemActionContext, SystemActionResult } from '../domain/types';
+import { SystemActionContext, SystemActionResult, SystemMaintenanceConfig } from '../domain/types';
 import { SystemRules } from '../domain/rules';
 import { SYSTEM_WORKFLOW_ACTIONS } from '../workflow/definitions';
 import { WorkflowFacade } from '../../../workflow/WorkflowFacade';
@@ -169,6 +169,75 @@ export class SystemAppService {
       timestamp: execution.timestamp,
       message: 'Khởi tạo dữ liệu mẫu hoàn tất.',
     };
+  }
+
+  /**
+   * SYSTEM_CONFIG_UPDATE: Bật / Tắt hoặc cập nhật Chế độ Bảo trì (Maintenance Mode)
+   */
+  async setMaintenanceMode(
+    enabled: boolean,
+    options: {
+      message?: string;
+      scheduledEndTime?: string;
+    },
+    context: SystemActionContext
+  ): Promise<SystemActionResult> {
+    SystemRules.validateAdminAuthorization(context, 'SYSTEM_CONFIG_UPDATE');
+
+    const config: SystemMaintenanceConfig = {
+      enabled,
+      message: options.message?.trim() || undefined,
+      scheduledEndTime: options.scheduledEndTime?.trim() || undefined,
+      allowedRoles: ['ADMIN'],
+      updatedAt: new Date().toISOString(),
+      updatedBy: context.actorEmail || context.actorId,
+    };
+
+    const execution = await WorkflowFacade.dispatch<SystemMaintenanceConfig>(
+      {
+        actionId: SYSTEM_WORKFLOW_ACTIONS.CONFIG_UPDATE,
+        entityType: 'SYSTEM',
+        entityId: 'MAINTENANCE_CONFIG',
+        actor: this.toActor(context),
+        reason:
+          context.reason ||
+          (enabled ? 'Bật chế độ bảo trì hệ thống' : 'Tắt chế độ bảo trì hệ thống'),
+        payload: config,
+      },
+      async () => {
+        await this.repo.setMaintenanceConfig(config);
+        return config;
+      }
+    );
+
+    if (!execution.success) {
+      throw new Error(execution.failureReason || 'Cập nhật cấu hình bảo trì thất bại.');
+    }
+
+    return {
+      executionId: execution.executionId,
+      success: true,
+      action: 'SYSTEM_CONFIG_UPDATE',
+      timestamp: execution.timestamp,
+      message: enabled
+        ? 'Đã kích hoạt chế độ bảo trì hệ thống (Chỉ đọc cho người dùng thông thường).'
+        : 'Đã hủy chế độ bảo trì, hệ thống hoạt động trở lại bình thường.',
+      data: execution.data,
+    };
+  }
+
+  /**
+   * Đọc cấu hình bảo trì hiện tại
+   */
+  async getMaintenanceConfig(): Promise<SystemMaintenanceConfig | null> {
+    return await this.repo.getMaintenanceConfig();
+  }
+
+  /**
+   * Lắng nghe thời gian thực thay đổi cấu hình bảo trì
+   */
+  listenMaintenanceConfig(callback: (config: SystemMaintenanceConfig | null) => void): () => void {
+    return this.repo.listenMaintenanceConfig(callback);
   }
 }
 

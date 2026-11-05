@@ -50,6 +50,7 @@ const CookieIcon = ({ className = 'w-4 h-4' }: { className?: string }) => (
 import { ConfirmationModal } from '../../components';
 import { DataConsistencyCenter } from '../../components/features/DataConsistencyCenter';
 import { PharmacopoeiaManager } from './components/PharmacopoeiaManager';
+import { MaintenanceManager } from './components/MaintenanceManager';
 import { FilterStatusPanel } from './components/FilterStatusPanel';
 import { generateId } from '../../utils';
 import { ProductFormula, FormulaIngredient } from '../../types';
@@ -1082,6 +1083,9 @@ const SettingsPage: React.FC = () => {
         <div className="lg:col-span-2">
           <DataConsistencyCenter />
         </div>
+
+        {/* Chế độ Bảo trì Hệ thống (Chỉ hiển thị cho ADMIN) */}
+        {isAdmin && <MaintenanceManager />}
 
         {/* Backup & Restore */}
         <section className="bg-surface p-5 rounded-xl border border-border shadow-xs space-y-4">

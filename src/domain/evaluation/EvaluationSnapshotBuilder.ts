@@ -54,6 +54,13 @@ export function buildEvaluationHashPayload(
   testResultId: string,
   batchId?: string
 ): Record<string, any> {
+  const rawCriteria = snapshot.criterionResults;
+  const criterionResults = Array.isArray(rawCriteria)
+    ? rawCriteria
+    : rawCriteria && typeof rawCriteria === 'object'
+      ? Object.values(rawCriteria)
+      : [];
+
   return {
     testResultId,
     batchId: batchId || '',
@@ -65,7 +72,7 @@ export function buildEvaluationHashPayload(
           : snapshot.tccsVersion
         : 1,
     engineVersion: snapshot.engineVersion,
-    criterionResults: snapshot.criterionResults,
+    criterionResults,
     overallStatus: snapshot.overallStatus,
     alternateUsed: !!snapshot.alternateUsed,
     reasons: snapshot.reasons || [],
@@ -87,16 +94,18 @@ export function verifyEvaluationSnapshotIntegrity(
 
   const targetHash = snapshot.evaluationHash.trim();
 
-  // Danh sách các cặp định danh khả dĩ để bao phủ cả trường hợp snapshot lưu ID gốc hoặc route truyền mã
+  // Danh sách các cặp định danh khả dĩ để bao phủ cả trường hợp snapshot lưu ID gốc, mã phiếu, hoặc route truyền mã
   const candidateTestIds = Array.from(
     new Set(
       [
         snapshot.testResultId,
         testResultId,
-        testResultId.length > 6 ? testResultId.slice(-6) : '',
+        testResultId && testResultId.length > 6 ? testResultId.slice(-6) : '',
         snapshot.testResultId && snapshot.testResultId.length > 6
           ? snapshot.testResultId.slice(-6)
           : '',
+        (snapshot as any).reportNo,
+        (snapshot as any).code,
         'temp-eval-id',
         '',
       ].filter((x): x is string => typeof x === 'string')
@@ -105,9 +114,14 @@ export function verifyEvaluationSnapshotIntegrity(
 
   const candidateBatchIds = Array.from(
     new Set(
-      [snapshot.batchId, batchId, (snapshot as any).batchNo, ''].filter(
-        (x): x is string => typeof x === 'string'
-      )
+      [
+        snapshot.batchId,
+        batchId,
+        (snapshot as any).batchNo,
+        batchId && batchId.length > 6 ? batchId.slice(-6) : '',
+        snapshot.batchId && snapshot.batchId.length > 6 ? snapshot.batchId.slice(-6) : '',
+        '',
+      ].filter((x): x is string => typeof x === 'string')
     )
   );
 
@@ -118,30 +132,59 @@ export function verifyEvaluationSnapshotIntegrity(
     }
   }
 
+  const rawCriteria = snapshot.criterionResults;
+  const criteriaVariants = [
+    Array.isArray(rawCriteria)
+      ? rawCriteria
+      : rawCriteria && typeof rawCriteria === 'object'
+        ? Object.values(rawCriteria)
+        : [],
+  ];
+  if (rawCriteria && typeof rawCriteria === 'object' && !Array.isArray(rawCriteria)) {
+    criteriaVariants.push(rawCriteria);
+  }
+
   for (const [tId, bId] of idPairs) {
-    // 1. Kiểm tra với chuẩn SHA-256 mới (12 trường cốt lõi)
-    const fullPayload = buildEvaluationHashPayload(snapshot, tId, bId);
-    if (targetHash === createEvaluationHash(fullPayload)) {
-      return true;
-    }
-
-    // 2. Tương thích ngược: Kiểm tra với legacy format (6 trường)
-    const legacyPayload = {
-      testResultId: tId,
-      batchId: bId || '',
-      overallStatus: snapshot.overallStatus,
-      criterionResults: snapshot.criterionResults,
-      evaluatedAt: snapshot.evaluatedAt,
-      evaluatedBy: snapshot.evaluatedBy,
-    };
-
-    if (targetHash === createEvaluationHash(legacyPayload)) {
-      return true;
-    }
-
-    if (targetHash.startsWith('eval_')) {
-      if (targetHash === createLegacyEvaluationHash(legacyPayload)) {
+    for (const critList of criteriaVariants) {
+      // 1. Kiểm tra với chuẩn SHA-256 mới (12 trường cốt lõi)
+      const fullPayload = buildEvaluationHashPayload(
+        { ...snapshot, criterionResults: critList as any },
+        tId,
+        bId
+      );
+      if (targetHash === createEvaluationHash(fullPayload)) {
         return true;
+      }
+
+      // 1b. Thử biến thể tccsVersion dạng string nếu gốc lưu string
+      if (snapshot.tccsVersion !== undefined) {
+        const fullPayloadStrVersion = {
+          ...fullPayload,
+          tccsVersion: String(snapshot.tccsVersion),
+        };
+        if (targetHash === createEvaluationHash(fullPayloadStrVersion)) {
+          return true;
+        }
+      }
+
+      // 2. Tương thích ngược: Kiểm tra với legacy format (6 trường)
+      const legacyPayload = {
+        testResultId: tId,
+        batchId: bId || '',
+        overallStatus: snapshot.overallStatus,
+        criterionResults: critList,
+        evaluatedAt: snapshot.evaluatedAt,
+        evaluatedBy: snapshot.evaluatedBy,
+      };
+
+      if (targetHash === createEvaluationHash(legacyPayload)) {
+        return true;
+      }
+
+      if (targetHash.startsWith('eval_')) {
+        if (targetHash === createLegacyEvaluationHash(legacyPayload)) {
+          return true;
+        }
       }
     }
   }
