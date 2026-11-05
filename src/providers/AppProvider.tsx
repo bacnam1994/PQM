@@ -248,18 +248,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useAuthSync();
   useFirebaseSync();
 
-  const notify = useAppStore((s) => s.notify);
-
-  // Cơ chế Server-First Version Sync: Tự động phát hiện khi máy chủ có bản cập nhật mới
+  // Khởi tạo VersionSync ngầm (không hiển thị popup làm phiền người dùng)
   useEffect(() => {
-    versionSyncService.init((serverVersion) => {
-      notify({
-        type: 'INFO',
-        title: 'Máy chủ đã cập nhật phiên bản mới',
-        message: `Phiên bản ${serverVersion.version} đã sẵn sàng trên máy chủ. Nhấn F5 hoặc tải lại trang để áp dụng.`,
-      });
-    });
-  }, [notify]);
+    versionSyncService.init();
+  }, []);
 
   return (
     <QueryClientProvider client={queryClient}>
