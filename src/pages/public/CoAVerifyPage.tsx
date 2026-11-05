@@ -24,6 +24,7 @@ import { TestResult, Batch, Product, TCCS } from '../../types';
 import { ElectronicSignature } from '../../types/signature';
 import { formatDateStandard, calculateOverallStatus, TEST_RESULT_STATUS } from '../../utils';
 import { resolveTestResultStatus } from '../../domain/test-result/testResultStatusResolver';
+import { AnatomyVerificationRig } from '../../components/system/AnatomyVerificationRig';
 
 export const CoAVerifyPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -250,6 +251,12 @@ export const CoAVerifyPage: React.FC = () => {
             )}
           </div>
         )}
+
+        {/* Trạm Cơ Khí Đo Kiểm & Niêm Phong 7 Cửa ALCOA+ (Anatomy Standard) */}
+        <AnatomyVerificationRig
+          batchNo={batch?.batchNo || testResult.batchId}
+          initialState={isPassed ? 'VERIFIED_RELEASE' : 'OOS_BLOCKED'}
+        />
 
         {/* Bảng Chỉ tiêu Kết quả Tóm tắt */}
         <div className="bg-surface rounded-xl p-5 shadow-xs border border-border space-y-4">

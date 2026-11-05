@@ -21,6 +21,7 @@ import {
 } from '../../domain/evaluation/EvaluationSnapshotBuilder';
 import { QualityEvaluationEngine } from '../../domain/evaluation/QualityEvaluationEngine';
 import { coaService } from '../../services/app/CoAService';
+import { AnatomyVerificationRig } from '../../components/system/AnatomyVerificationRig';
 
 const CoAReportPage = () => {
   const { batchId, id } = useParams();
@@ -34,6 +35,7 @@ const CoAReportPage = () => {
   const [notFound, setNotFound] = useState(false);
   const [failClosedReason, setFailClosedReason] = useState<string | null>(null);
   const [formula, setFormula] = useState<any>(null);
+  const [showRig, setShowRig] = useState(false);
 
   const handleResealSnapshot = async () => {
     try {
@@ -501,7 +503,7 @@ const CoAReportPage = () => {
   if (failClosedReason) {
     return (
       <div className="min-h-[80vh] flex items-center justify-center p-4">
-        <div className="bg-surface max-w-lg p-8 rounded-2xl shadow-lg border-2 border-red-500/30 flex flex-col items-center gap-4 text-center">
+        <div className="bg-surface max-w-3xl w-full p-6 sm:p-8 rounded-2xl shadow-lg border-2 border-red-500/30 flex flex-col items-center gap-4 text-center">
           <div className="w-14 h-14 rounded-full bg-red-500/10 text-red-600 flex items-center justify-center">
             <ShieldExclamationIcon className="w-8 h-8" />
           </div>
@@ -512,6 +514,15 @@ const CoAReportPage = () => {
             </p>
           </div>
           <p className="text-sm text-ink-muted leading-relaxed">{failClosedReason}</p>
+
+          {/* Mô hình Trạm Cơ Khí Isometric Khóa An Toàn (Anatomy Standard) */}
+          <div className="w-full text-left">
+            <AnatomyVerificationRig
+              batchNo={batchId || result?.batchId || 'ALERT-GXP'}
+              initialState="HASH_TAMPERED"
+            />
+          </div>
+
           <div className="p-3 bg-surface-2 rounded-xl text-xs text-ink-soft text-left w-full border border-border">
             <strong>Bất biến quy chuẩn:</strong> Theo Section 15 Master Workflow, CoA tuyệt đối
             không tự tính toán lại hoặc fallback khi thiếu Evaluation Snapshot hoặc khi tính toàn
@@ -595,20 +606,43 @@ const CoAReportPage = () => {
   return (
     <div className="min-h-screen bg-surface-3 py-8 transition-colors duration-300 print:bg-white print:py-0">
       {/* Thanh công cụ (Sẽ tự động ẩn đi khi nhấn In) */}
-      <div className="coa-page-toolbar max-w-[21cm] mx-auto mb-4 flex justify-between items-center print:hidden bg-surface p-4 rounded-xl shadow-sm border border-border">
+      <div className="coa-page-toolbar max-w-[21cm] mx-auto mb-4 flex flex-wrap justify-between items-center gap-3 print:hidden bg-surface p-4 rounded-xl shadow-sm border border-border">
         <button
           onClick={handleBack}
-          className="flex items-center gap-2 text-ink-soft hover:text-emerald-600 dark:hover:text-emerald-400 font-bold transition-all text-sm"
+          className="flex items-center gap-2 text-ink-soft hover:text-emerald-600 dark:hover:text-emerald-400 font-bold transition-all text-sm cursor-pointer"
         >
           <ArrowLeftIcon className="w-4 h-4" /> Đóng / Quay lại
         </button>
-        <button
-          onClick={() => window.print()}
-          className="flex items-center gap-2 px-6 py-2.5 bg-emerald-600 text-white rounded-xl font-bold shadow-sm hover:bg-emerald-700 transition-all text-sm"
-        >
-          <PrinterIcon className="w-4 h-4" /> In CoA
-        </button>
+        <div className="flex items-center gap-2.5">
+          <button
+            onClick={() => setShowRig(!showRig)}
+            className={`flex items-center gap-2 px-3.5 py-2 rounded-xl font-bold text-xs transition-all border cursor-pointer ${
+              showRig
+                ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30'
+                : 'bg-surface-2 text-ink-muted hover:text-ink border-border'
+            }`}
+          >
+            <ShieldCheckIcon className="w-4 h-4" />
+            {showRig ? 'Ẩn Trạm Đo Kiểm' : 'Trạm Kiểm Định (Anatomy)'}
+          </button>
+          <button
+            onClick={() => window.print()}
+            className="flex items-center gap-2 px-6 py-2.5 bg-emerald-600 text-white rounded-xl font-bold shadow-sm hover:bg-emerald-700 transition-all text-sm cursor-pointer"
+          >
+            <PrinterIcon className="w-4 h-4" /> In CoA
+          </button>
+        </div>
       </div>
+
+      {/* Trạm Cơ Khí Isometric Kiểm Định & Niêm Phong 7 Cửa ALCOA+ (Anatomy Standard) */}
+      {showRig && (
+        <div className="max-w-[21cm] mx-auto mb-6 print:hidden">
+          <AnatomyVerificationRig
+            batchNo={result.batch?.batchNo || result.batchId}
+            initialState={result.overallStatus === 'PASS' ? 'VERIFIED_RELEASE' : 'OOS_BLOCKED'}
+          />
+        </div>
+      )}
 
       {/* Khung hiển thị CoA — trên màn hình: shadow + viền trắng; khi in: bỏ hết */}
       <div className="shadow-2xl mx-auto w-fit print:shadow-none print:m-0 print:w-full">
