@@ -142,13 +142,12 @@ export const useTestResultForm = (onInitialBatchSelect?: (batchNo: string) => vo
   }, [formValues.batchId, fetchTestResultsByBatchId]);
 
   const skipSave = useCallback((vals: any) => {
-    return (
-      !vals.batchId &&
-      !vals.labName &&
-      !vals.notes &&
-      Object.keys(vals.testResultsMap || {}).length === 0 &&
-      (vals.extraCriteria || []).length === 0
+    const hasMeaningfulCriteria = Object.values(vals?.testResultsMap || {}).some(
+      (v) => v !== undefined && v !== null && String(v).trim() !== '' && v !== 'Miễn kiểm'
     );
+    const hasExtra = Array.isArray(vals?.extraCriteria) && vals.extraCriteria.length > 0;
+    const hasNotes = Boolean(vals?.notes && String(vals.notes).trim() !== '');
+    return !hasMeaningfulCriteria && !hasExtra && !hasNotes;
   }, []);
 
   const onDraftLoaded = useCallback(

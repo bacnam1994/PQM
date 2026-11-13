@@ -99,6 +99,13 @@ export const useTestResultSave = ({
 
         // Phát hiện phiếu trùng (Duplicate Test Result Detection)
         if (crud.mode !== 'EDIT' && existingResultsForBatch && existingResultsForBatch.length > 0) {
+          const submittedCriteriaNames = Object.entries(formValues.testResultsMap || {})
+            .filter(
+              ([_, v]) =>
+                v !== undefined && v !== null && String(v).trim() !== '' && v !== 'Miễn kiểm'
+            )
+            .map(([k]) => k.trim().toLowerCase());
+
           const isDuplicate = existingResultsForBatch.some((existing: any) => {
             if (
               rawReportNo &&
@@ -107,11 +114,25 @@ export const useTestResultSave = ({
             ) {
               return true;
             }
+            // Nếu người dùng không nhập số phiếu khác biệt mà trùng cả Lab + Ngày thử + trùng toàn bộ tập chỉ tiêu đang nhập
             if (
+              !rawReportNo &&
               existing.labName?.trim().toLowerCase() === finalLabName.trim().toLowerCase() &&
               existing.testDate === testDate
             ) {
-              return true;
+              const existingCriteriaSet = new Set(
+                ensureArray(existing.results).map((r: any) =>
+                  String(r?.criteriaName || '')
+                    .trim()
+                    .toLowerCase()
+                )
+              );
+              if (
+                submittedCriteriaNames.length > 0 &&
+                submittedCriteriaNames.every((cName) => existingCriteriaSet.has(cName))
+              ) {
+                return true;
+              }
             }
             return false;
           });
@@ -121,7 +142,7 @@ export const useTestResultSave = ({
             return notify({
               type: 'ERROR',
               title: 'Phiếu kiểm nghiệm trùng lặp',
-              message: `Đã tồn tại phiếu kiểm nghiệm từ "${finalLabName}" ngày ${testDate} hoặc trùng số hiệu "${rawReportNo || finalReportNo}" cho lô này!`,
+              message: `Đã tồn tại phiếu kiểm nghiệm từ "${finalLabName}" ngày ${testDate} với cùng các chỉ tiêu hoặc trùng số hiệu "${rawReportNo || finalReportNo}" cho lô này!`,
             });
           }
         }
@@ -301,8 +322,8 @@ export const useTestResultSave = ({
           const vA = a.version || a.revision || 0;
           const vB = b.version || b.revision || 0;
           if (vA !== vB) return vA - vB;
-          const dateA = a.updatedAt || a.testDate || a.createdAt || '';
-          const dateB = b.updatedAt || b.testDate || b.createdAt || '';
+          const dateA = String(a.updatedAt || a.testDate || a.createdAt || '');
+          const dateB = String(b.updatedAt || b.testDate || b.createdAt || '');
           return dateA.localeCompare(dateB);
         });
 

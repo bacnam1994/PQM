@@ -395,6 +395,11 @@ const TestResultDataList = ({
 const TestResultList: React.FC = () => {
   const products = useAppStore((state) => state.products);
   const isAdmin = useAppStore((state) => state.isAdmin);
+  const role = useAppStore((state) => state.role);
+  const user = useAppStore((state) => state.user);
+  const canManageTestResults =
+    isAdmin ||
+    ['QA', 'QC', 'LAB', 'ADMIN'].includes((user?.role || role || '').trim().toUpperCase());
   const notify = useAppStore((state) => state.notify);
   const productFormulas = useAppStore((state) => state.productFormulas);
   const loadMoreTestResults = useAppStore((state) => state.loadMoreTestResults);
@@ -586,7 +591,9 @@ const TestResultList: React.FC = () => {
                 <ScaleIcon className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
                 Đối chiếu Lab (AI)
               </button>
-              {isAdmin && <AddButton onClick={handleOpenAdd} label="Nhập kết quả mới" />}
+              {canManageTestResults && (
+                <AddButton onClick={handleOpenAdd} label="Nhập kết quả mới" />
+              )}
             </div>
           }
         />
@@ -674,7 +681,7 @@ const TestResultList: React.FC = () => {
         onDelete={handleDeleteClick}
         onPrint={handlePrint}
         onOOS={handleOpenOOS}
-        isAdmin={isAdmin}
+        isAdmin={canManageTestResults}
         isLoading={hydratedResults.length === 0 && syncStatus === 'SAVING'}
       />
 

@@ -299,17 +299,42 @@ export const DSDateInput: React.FC<DSDateInputProps> = ({
   }, [value, dateFormat]);
 
   const handleTextChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setDisplayText(e.target.value);
-  };
-
-  const handleBlur = () => {
-    if (!displayText) {
+    const raw = e.target.value;
+    setDisplayText(raw);
+    const trimmed = raw.trim();
+    if (!trimmed) {
       onChange('');
       return;
     }
-    const isoDate = parseDateToISO(displayText);
+    if (/^\d{2}[/-]\d{2}[/-]\d{4}$/.test(trimmed) || /^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+      const isoDate = parseDateToISO(trimmed);
+      if (/^\d{4}-\d{2}-\d{2}$/.test(isoDate)) {
+        onChange(isoDate);
+      }
+    }
+  };
+
+  const handleBlur = () => {
+    if (!displayText.trim()) {
+      onChange('');
+      return;
+    }
+    const isoDate = parseDateToISO(displayText.trim());
     onChange(isoDate);
   };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' && displayText.trim()) {
+      const isoDate = parseDateToISO(displayText.trim());
+      onChange(isoDate);
+    }
+  };
+
+  const normalizedIsoValue = React.useMemo(() => {
+    if (!value) return '';
+    const iso = parseDateToISO(value);
+    return /^\d{4}-\d{2}-\d{2}$/.test(iso) ? iso : '';
+  }, [value]);
 
   const handleIconClick = () => {
     if (hiddenInputRef.current) {
@@ -336,6 +361,7 @@ export const DSDateInput: React.FC<DSDateInputProps> = ({
           value={displayText}
           onChange={handleTextChange}
           onBlur={handleBlur}
+          onKeyDown={handleKeyDown}
           placeholder={dateFormat.toLowerCase()}
           required={required}
           className={`w-full pl-3.5 pr-10 py-2.5 bg-surface-2/80 hover:bg-surface-2 border border-border/80 focus:border-emerald-500 focus:bg-surface rounded-xl font-medium outline-none text-sm text-ink transition-[border-color,background-color,box-shadow] duration-150 placeholder:text-ink-faint focus:ring-2 focus:ring-emerald-500/15 shadow-2xs ${className}`}
@@ -351,7 +377,7 @@ export const DSDateInput: React.FC<DSDateInputProps> = ({
         <input
           type="date"
           ref={hiddenInputRef}
-          value={value || ''}
+          value={normalizedIsoValue}
           onChange={(e) => onChange(e.target.value)}
           name={name}
           tabIndex={-1}

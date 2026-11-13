@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeftIcon,
@@ -51,18 +51,24 @@ const ProductFormPage = () => {
   } = useUIStore();
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const isInitializedRef = useRef<string | null>(null);
 
-  // 2. Nạp dữ liệu khi ở chế độ Edit
+  // 2. Nạp dữ liệu khi ở chế độ Edit (chỉ nạp imageUrl 1 lần cho mỗi id, tránh ghi đè khi store đồng bộ ngầm)
   useEffect(() => {
-    if (id) {
-      const prod = products.find((p) => p.id === id);
-      if (prod) {
-        setProductToEdit(prod);
+    if (!id) {
+      isInitializedRef.current = null;
+      return;
+    }
+    const prod = products.find((p) => p.id === id);
+    if (prod) {
+      setProductToEdit(prod);
+      if (isInitializedRef.current !== id) {
+        isInitializedRef.current = id;
         setImageUrl(prod.imageUrl || '');
-      } else {
-        notify({ type: 'ERROR', message: 'Không tìm thấy sản phẩm!' });
-        navigate('/products');
       }
+    } else if (products.length > 0) {
+      notify({ type: 'ERROR', message: 'Không tìm thấy sản phẩm!' });
+      navigate('/products');
     }
   }, [id, products, navigate, notify]);
 

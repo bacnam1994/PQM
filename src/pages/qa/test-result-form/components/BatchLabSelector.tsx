@@ -12,6 +12,7 @@ import {
   ShieldCheckIcon,
   ChevronUpDownIcon,
   SparklesIcon,
+  XMarkIcon,
 } from '@heroicons/react/24/outline';
 import { DSDateInput } from '../../../../components';
 import { formatDateStandard, TEST_RESULT_STATUS, getAppUrl } from '../../../../utils';
@@ -166,18 +167,34 @@ export const BatchLabSelector: React.FC<BatchLabSelectorProps> = ({
               onBlur={() => setTimeout(() => setShowBatchDropdown(false), 200)}
               placeholder="Tìm kiếm Lô hàng (Số lô hoặc Tên SP)..."
               disabled={isEditMode}
-              className="w-full pl-10 pr-10 py-2.5 bg-surface border border-border rounded-xl font-medium text-ink placeholder:text-ink-muted outline-none text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 disabled:opacity-60 transition-all"
+              className="w-full pl-10 pr-16 py-2.5 bg-surface border border-border rounded-xl font-medium text-ink placeholder:text-ink-muted outline-none text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 disabled:opacity-60 transition-all"
             />
-            {batchId && (
-              <CheckCircleIcon className="absolute right-3.5 top-1/2 -translate-y-1/2 text-emerald-600 w-5 h-5" />
-            )}
+            <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1">
+              {!isEditMode && (batchSearch || batchId) && (
+                <button
+                  type="button"
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    setBatchSearch('');
+                    setFieldValue('batchId', '');
+                    setShowBatchDropdown(true);
+                  }}
+                  title="Xóa chọn Lô để tìm lô khác"
+                  className="p-1 text-ink-muted hover:text-rose-500 rounded-md hover:bg-surface-2 transition-colors cursor-pointer"
+                >
+                  <XMarkIcon className="w-4 h-4" />
+                </button>
+              )}
+              {batchId && <CheckCircleIcon className="text-emerald-600 w-5 h-5" />}
+            </div>
 
             {showBatchDropdown && (
               <div className="absolute z-20 w-full mt-2 bg-surface rounded-xl shadow-xl border border-border max-h-60 overflow-y-auto divide-y divide-border">
                 {availableBatchesForDropdown.map((b) => (
                   <div
                     key={b.id}
-                    onClick={() => {
+                    onMouseDown={(e) => {
+                      e.preventDefault();
                       handleBatchSelect(b.id);
                       setBatchSearch(`${b.batchNo} - ${b.product?.name}`);
                       setShowBatchDropdown(false);

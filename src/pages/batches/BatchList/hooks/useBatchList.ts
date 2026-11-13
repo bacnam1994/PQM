@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '../../../../store/useAppStore';
 import { useUIStore } from '../../../../store/useUIStore';
@@ -183,6 +183,19 @@ export function useBatchList() {
     sortConfig,
     sourceResults,
     tccsList,
+  ]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [
+    debouncedSearchTerm,
+    filterStatus,
+    filterProductId,
+    filterYear,
+    filterMonth,
+    dateRange,
+    sortConfig,
+    viewMode,
   ]);
 
   const totalPages = Math.max(1, Math.ceil(filteredBatches.length / itemsPerPage));

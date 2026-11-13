@@ -92,8 +92,9 @@ export const BatchDetailPage: React.FC = () => {
   const [isComparisonOpen, setIsComparisonOpen] = useState(false);
   const [isEvaluationModalOpen, setIsEvaluationModalOpen] = useState(false);
 
-  const userRole = (user?.role || '').trim().toUpperCase();
-  const canEvaluate = ['QA', 'QC', 'ADMIN'].includes(userRole);
+  const userRole = (user?.role || role || '').trim().toUpperCase();
+  const canEvaluate = isAdmin || ['QA', 'QC', 'ADMIN'].includes(userRole);
+  const canEditTestResult = isAdmin || ['QA', 'QC', 'LAB', 'ADMIN'].includes(userRole);
 
   const rawBatch = useMemo(
     () =>
@@ -181,7 +182,7 @@ export const BatchDetailPage: React.FC = () => {
     });
   }, [batch, viewBatchResults, boundTccs, tccsList]);
 
-  // Tải danh sách kết quả kiểm nghiệm của Lô
+  // Tải danh sách kết quả kiểm nghiệm của Lô và hợp nhất với Store
   useEffect(() => {
     let isMounted = true;
     if (batch?.id) {
@@ -189,7 +190,19 @@ export const BatchDetailPage: React.FC = () => {
       fetchTestResultsByBatchId(batch.id)
         .then((res) => {
           if (isMounted) {
-            setViewBatchResults(ensureArray(res));
+            const fetched = ensureArray(res);
+            setViewBatchResults((prev) => {
+              const merged = new Map<string, TestResult>();
+              prev.forEach((r) => {
+                if (r?.id) merged.set(r.id, r);
+              });
+              fetched.forEach((r) => {
+                if (r?.id) merged.set(r.id, r);
+              });
+              return Array.from(merged.values()).sort((a, b) =>
+                String(b.testDate || '').localeCompare(String(a.testDate || ''))
+              );
+            });
           }
         })
         .catch((err) => {
@@ -229,14 +242,20 @@ export const BatchDetailPage: React.FC = () => {
     return calculateBatchProgress(batch, viewBatchResults);
   }, [batch, viewBatchResults]);
 
-  // Tra cứu định lượng thành phần hoạt chất
+  // Tra cứu định lượng thành phần hoạt chất & mức yêu cầu từ TCCS
   const allCriteriaMap = useMemo(() => {
     const map = new Map<string, any>();
-    ensureArray((batch as any)?.tccs?.criteria).forEach((c) => {
+    const tccsSource = (batch as any)?.tccs || boundTccs;
+    const combinedCriteria = [
+      ...ensureArray(tccsSource?.mainQualityCriteria),
+      ...ensureArray(tccsSource?.safetyCriteria),
+      ...ensureArray(tccsSource?.criteria),
+    ];
+    combinedCriteria.forEach((c) => {
       if (c && c.name) map.set(c.name.trim().toLowerCase(), c);
     });
     return map;
-  }, [batch]);
+  }, [batch, boundTccs]);
 
   const getContentPercent = useCallback(
     (critName: string, actualVal: string | number) => {
@@ -573,6 +592,23 @@ export const BatchDetailPage: React.FC = () => {
                     </div>
                   </div>
                 )}
+
+                {canEvaluate && batch.status !== 'RELEASED' && (
+                  <button
+                    type="button"
+                    onClick={() => setIsEvaluationModalOpen(true)}
+                    className={`w-full py-2 px-3 rounded-lg font-semibold text-xs transition-colors cursor-pointer flex items-center justify-center gap-1.5 shadow-2xs ${
+                      inspectionCalc?.isEvaluationStale
+                        ? 'bg-amber-600 hover:bg-amber-700 text-white'
+                        : 'bg-surface-2 hover:bg-surface-3 text-ink border border-border'
+                    }`}
+                  >
+                    <ShieldCheckIcon className="w-4 h-4" />
+                    {inspectionCalc?.isEvaluationStale
+                      ? 'Thẩm định lại kết luận ngay'
+                      : 'Cập nhật / Thẩm định lại kết luận'}
+                  </button>
+                )}
               </div>
             ) : (
               <div className="space-y-3 text-xs">
@@ -713,16 +749,21 @@ export const BatchDetailPage: React.FC = () => {
                       <div className="flex items-center gap-3">
                         <StatusBadge status={resolveTestResultStatus(res)} />
                         <div>
-                          <p className="text-sm font-semibold text-ink flex items-center gap-1.5">
+                          <p className="text-sm font-semibold text-ink flex items-center gap-1.5 flex-wrap">
                             <BuildingOffice2Icon className="w-4 h-4 text-ink-muted" />
-                            {res.labName || 'QC Nội bộ'}
+                            <span>{res.labName || 'QC Nội bộ'}</span>
+                            {(res as any).reportNo && (
+                              <span className="text-[11px] font-mono font-normal px-2 py-0.5 rounded bg-surface border border-border text-ink-muted">
+                                Số phiếu: {(res as any).reportNo}
+                              </span>
+                            )}
                           </p>
                           <p className="text-xs text-ink-muted mt-0.5">
                             Ngày thử: {formatDateStandard(res.testDate)}
                           </p>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         {resolveTestResultStatus(res) !== 'PASS' && (
                           <button
                             type="button"
@@ -731,6 +772,16 @@ export const BatchDetailPage: React.FC = () => {
                           >
                             <ShieldExclamationIcon className="h-3.5 w-3.5 text-rose-500" />
                             Ghi chú OOS
+                          </button>
+                        )}
+                        {canEditTestResult && batch.status !== 'RELEASED' && (
+                          <button
+                            type="button"
+                            onClick={() => navigate(`/test-results/edit/${res.id}`)}
+                            className="text-xs font-medium text-ink-soft bg-surface border border-border px-2.5 py-1.5 rounded-lg hover:bg-surface-2 hover:text-ink transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                            title="Chỉnh sửa phiếu kiểm nghiệm này"
+                          >
+                            <PencilSquareIcon className="h-3.5 w-3.5 text-emerald-600" /> Sửa phiếu
                           </button>
                         )}
                         <button
@@ -760,17 +811,20 @@ export const BatchDetailPage: React.FC = () => {
                             const cDef = allCriteriaMap.get(
                               item.criteriaName?.trim().toLowerCase()
                             );
-                            const reqText = cDef
-                              ? cDef.type === 'NUMBER'
-                                ? cDef.min != null && cDef.max != null
-                                  ? `${cDef.min} ~ ${cDef.max}`
-                                  : cDef.min != null
-                                    ? `≥ ${cDef.min}`
-                                    : cDef.max != null
-                                      ? `≤ ${cDef.max}`
-                                      : ''
-                                : cDef.expectedText || ''
-                              : '';
+                            const reqText =
+                              (cDef
+                                ? cDef.type === 'NUMBER'
+                                  ? cDef.min != null && cDef.max != null
+                                    ? `${cDef.min} ~ ${cDef.max}`
+                                    : cDef.min != null
+                                      ? `≥ ${cDef.min}`
+                                      : cDef.max != null
+                                        ? `≤ ${cDef.max}`
+                                        : ''
+                                  : cDef.expectedText || ''
+                                : '') ||
+                              (item as any).limit ||
+                              '';
                             const isPass = normalizeCriterionPassStatus(item.isPass);
 
                             return (
@@ -790,7 +844,7 @@ export const BatchDetailPage: React.FC = () => {
                                   )}
                                 </td>
                                 <td className="px-3 py-2.5 text-center text-ink-muted">
-                                  {item.unit || '—'}
+                                  {item.unit || cDef?.unit || '—'}
                                 </td>
                                 <td className="px-3 py-2.5 text-center">
                                   {isPass === true ? (

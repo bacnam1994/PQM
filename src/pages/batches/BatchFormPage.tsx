@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeftIcon,
@@ -44,22 +44,28 @@ const BatchFormPage = () => {
   const [showProductDropdown, setShowProductDropdown] = useState(false);
   const [mfgDate, setMfgDate] = useState('');
   const [expDate, setExpDate] = useState('');
+  const isInitializedRef = useRef<string | null>(null);
 
-  // 2. Nạp dữ liệu khi ở chế độ Edit
+  // 2. Nạp dữ liệu khi ở chế độ Edit (chỉ nạp 1 lần cho mỗi id, tránh ghi đè khi store đồng bộ ngầm)
   useEffect(() => {
-    if (id) {
-      const batch = batches.find((b) => b.id === id);
-      if (batch) {
-        setBatchToEdit(batch);
+    if (!id) {
+      isInitializedRef.current = null;
+      return;
+    }
+    const batch = batches.find((b) => b.id === id);
+    if (batch) {
+      setBatchToEdit(batch);
+      if (isInitializedRef.current !== id) {
+        isInitializedRef.current = id;
         setSelectedProductId(batch.productId);
         const p = products.find((prod) => prod.id === batch.productId);
         setProductSearch(p ? `${p.code} - ${p.name}` : '');
         setMfgDate(batch.mfgDate ? parseDateToISO(batch.mfgDate) : '');
         setExpDate(batch.expDate ? parseDateToISO(batch.expDate) : '');
-      } else {
-        notify({ type: 'ERROR', message: 'Không tìm thấy Lô hàng!' });
-        navigate('/batches');
       }
+    } else if (batches.length > 0) {
+      notify({ type: 'ERROR', message: 'Không tìm thấy Lô hàng!' });
+      navigate('/batches');
     }
   }, [id, batches, products, navigate, notify]);
 

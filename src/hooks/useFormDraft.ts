@@ -104,9 +104,9 @@ export function useFormDraft<T>({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoDetect, isEnabled, key]);
 
-  // Tự động lưu nháp sau mỗi 500ms khi form thay đổi
+  // Tự động lưu nháp sau mỗi 500ms khi form thay đổi (Không ghi đè khi đang hiện banner chờ người dùng chọn Khôi phục/Bỏ qua)
   useEffect(() => {
-    if (isEnabled && getConsentStatus() !== 'DECLINED') {
+    if (isEnabled && !hasDraft && getConsentStatus() !== 'DECLINED') {
       if (skipSave && skipSave(formValues)) {
         try {
           localStorage.removeItem(key);
@@ -133,7 +133,7 @@ export function useFormDraft<T>({
         clearTimeout(timeout);
       };
     }
-  }, [formValues, isEnabled, key, metaKey, skipSave]);
+  }, [formValues, isEnabled, hasDraft, key, metaKey, skipSave]);
 
   // Khôi phục bản nháp chủ động (Dành cho DraftBanner declarative UI)
   const restoreDraft = useCallback((): boolean => {

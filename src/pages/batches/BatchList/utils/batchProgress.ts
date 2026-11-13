@@ -21,13 +21,27 @@ export const calculateBatchProgress = (batch: any, batchResults: TestResult[]) =
   const latestResultsMap = new Map<string, { value: any; isPass: boolean }>();
 
   // Sắp xếp tăng dần theo thời gian để kết quả mới nhất ghi đè kết quả cũ
-  if (batchResults.length > 0) {
+  if (batchResults.length > 0 && batch) {
+    const batchNoNormalized = String(batch.batchNo || '')
+      .trim()
+      .toLowerCase();
     const sortedBatchResults = [...batchResults]
-      .filter((r) => r.batchId === batch.id)
+      .filter((r) => {
+        if (!r) return false;
+        const rBatchId = String(r.batchId || '').trim();
+        const rBatchNo = String((r as any).batchNo || (r as any).batch?.batchNo || '')
+          .trim()
+          .toLowerCase();
+        return (
+          rBatchId === batch.id ||
+          (batchNoNormalized !== '' &&
+            (rBatchId.toLowerCase() === batchNoNormalized || rBatchNo === batchNoNormalized))
+        );
+      })
       .sort((a, b) => {
-        const dateCmp = a.testDate.localeCompare(b.testDate);
+        const dateCmp = String(a.testDate || '').localeCompare(String(b.testDate || ''));
         if (dateCmp !== 0) return dateCmp;
-        return (a.createdAt || '').localeCompare(b.createdAt || '');
+        return String(a.createdAt || '').localeCompare(String(b.createdAt || ''));
       });
     sortedBatchResults.forEach((r) => {
       ensureArray(r.results).forEach((res) => {
