@@ -10,6 +10,7 @@ import { AIScanInfo } from '../components/TestResultHeader';
 import {
   AIExtractedItem,
   ConfirmedMapping,
+  DocumentSummary,
 } from '../../../../components/features/MappingConfirmModal';
 import { ParsedVoiceCriteria } from '../../../../services/ai/voiceParserService';
 import { useUIStore } from '../../../../store/useUIStore';
@@ -78,6 +79,123 @@ function applyConfidenceGuard(enrichedItems: AIExtractedItem[]): {
   });
 
   return { highItems, lowItems, hasCriticalSuspicion: report.hasCriticalSuspicion };
+}
+
+/**
+ * Chuẩn hóa chuỗi ngày tháng đa định dạng từ OCR (DD/MM/YYYY, DD-MM-YYYY, DD.MM.YYYY,
+ * YYYY-MM-DD, "Ngày DD tháng MM năm YYYY", MM/YYYY) sang chuẩn ISO YYYY-MM-DD cho <DSDateInput>.
+ */
+export function parseFlexibleOcrDate(rawDate?: string): string {
+  if (!rawDate || typeof rawDate !== 'string') return '';
+  const cleaned = rawDate.trim();
+  if (!cleaned) return '';
+
+  // 1. Đã ở dạng chuẩn YYYY-MM-DD
+  const isoMatch = cleaned.match(/^(\d{4})[/-](\d{1,2})[/-](\d{1,2})$/);
+  if (isoMatch) {
+    return `${isoMatch[1]}-${isoMatch[2].padStart(2, '0')}-${isoMatch[3].padStart(2, '0')}`;
+  }
+
+  // 2. Dạng văn bản tiếng Việt: "Ngày 05 tháng 11 năm 2026"
+  const vnTextMatch = cleaned.match(
+    /ng[àa]y\s*(\d{1,2})\s*th[áa]ng\s*(\d{1,2})\s*n[ăa]m\s*(\d{4})/i
+  );
+  if (vnTextMatch) {
+    return `${vnTextMatch[3]}-${vnTextMatch[2].padStart(2, '0')}-${vnTextMatch[1].padStart(2, '0')}`;
+  }
+
+  // 3. Dạng DD/MM/YYYY, DD-MM-YYYY, DD.MM.YYYY (hoặc có chuỗi phụ phía trước/sau)
+  const dmyMatch = cleaned.match(/(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{4})/);
+  if (dmyMatch) {
+    const d = parseInt(dmyMatch[1], 10);
+    const m = parseInt(dmyMatch[2], 10);
+    const y = dmyMatch[3];
+    if (m >= 1 && m <= 12 && d >= 1 && d <= 31) {
+      return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    }
+  }
+
+  // 4. Dạng DD/MM/YY (năm 2 chữ số)
+  const shortYearMatch = cleaned.match(/^(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{2})$/);
+  if (shortYearMatch) {
+    const d = parseInt(shortYearMatch[1], 10);
+    const m = parseInt(shortYearMatch[2], 10);
+    const y = `20${shortYearMatch[3]}`;
+    if (m >= 1 && m <= 12 && d >= 1 && d <= 31) {
+      return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    }
+  }
+
+  // 5. Dạng MM/YYYY (cho NSX/HD chỉ ghi tháng/năm)
+  const myMatch = cleaned.match(/^(\d{1,2})[/\-.](\d{4})$/);
+  if (myMatch) {
+    const m = parseInt(myMatch[1], 10);
+    if (m >= 1 && m <= 12) {
+      return `${myMatch[2]}-${String(m).padStart(2, '0')}-01`;
+    }
+  }
+
+  return '';
+}
+
+/**
+ * Làm sạch chuỗi Số lô trích xuất từ OCR (bóc bỏ tiền tố "Số lô:", "Lô SX:", "Batch No:", v.v.)
+ */
+export function cleanExtractedBatchNo(rawBatchNo?: string): string {
+  if (!rawBatchNo || typeof rawBatchNo !== 'string') return '';
+  let cleaned = rawBatchNo
+    .trim()
+    .replace(
+      /^(số\s*lô(\s*sx|\s*sản\s*xuất)?|lô\s*(sx|sản\s*xuất)|mã\s*lô|batch(\s*no\.?|\s*number)?|lot(\s*no\.?|\s*number)?|lô)\s*[:.\-#]?\s*/i,
+      ''
+    )
+    .trim();
+  // Nếu có ghi chú ngoặc đơn phía sau như "682605 (NSX: 01/2026)" thì tách phần mã lô chính
+  const parenIdx = cleaned.indexOf('(');
+  if (parenIdx > 1) {
+    cleaned = cleaned.slice(0, parenIdx).trim();
+  }
+  return cleaned;
+}
+
+/**
+ * Tìm Lô sản xuất trong hệ thống khớp với dữ liệu OCR (hỗ trợ khớp chính xác, khớp chữ-số và khớp chứa token)
+ */
+export function findMatchingBatchFromOcr(
+  normalized: { batchId?: string; batchNo?: string },
+  hydratedBatches: HydratedBatch[]
+): HydratedBatch | undefined {
+  if (normalized.batchId) {
+    const byId = hydratedBatches.find((b) => b.id === normalized.batchId);
+    if (byId) return byId;
+  }
+  const cleanedBatchNo = cleanExtractedBatchNo(normalized.batchNo);
+  if (!cleanedBatchNo) return undefined;
+
+  const upperClean = cleanedBatchNo.toUpperCase();
+  // 1. Khớp chính xác
+  let match = hydratedBatches.find((b) => b.batchNo?.trim().toUpperCase() === upperClean);
+  if (match) return match;
+
+  // 2. Khớp chuẩn hóa chữ-số
+  const normClean = upperClean.replace(/[^A-Z0-9]/g, '');
+  if (normClean.length >= 2) {
+    match = hydratedBatches.find((b) => {
+      const norm = (b.batchNo || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+      return norm && norm === normClean;
+    });
+    if (match) return match;
+  }
+
+  // 3. Khớp chứa (nếu mã lô trong hệ thống >= 3 ký tự và nằm trọn trong chuỗi OCR hoặc ngược lại)
+  if (normClean.length >= 3) {
+    match = hydratedBatches.find((b) => {
+      const bNo = (b.batchNo || '').trim().toUpperCase();
+      if (bNo.length < 3) return false;
+      return upperClean.includes(bNo) || bNo.includes(upperClean);
+    });
+  }
+  return match;
 }
 
 interface UseTestResultAIIntegrationProps {
@@ -187,42 +305,25 @@ export function useTestResultAIIntegration({
   }, []);
 
   const handleDataExtracted = useCallback(
-    (data: any) => {
+    (data: any, options?: { headerOnly?: boolean }) => {
       const normalized = normalizeAIData(data);
       if (!normalized) {
         toast.error('Dữ liệu AI không hợp lệ.');
         return;
       }
 
-      let isoDate = normalized.testDate;
-      if (isoDate && isoDate.includes('/')) {
-        const parts = isoDate.split('/');
-        if (parts.length === 3) {
-          isoDate = `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
-        }
+      if (normalized.batchNo) {
+        normalized.batchNo = cleanExtractedBatchNo(normalized.batchNo);
       }
 
-      let matchedBatch: HydratedBatch | undefined;
-      if (normalized.batchId) {
-        matchedBatch = hydratedBatches.find((b) => b.id === normalized.batchId);
-      }
-      if (!matchedBatch && normalized.batchNo) {
-        const cleanNo = normalized.batchNo.trim().toUpperCase();
-        matchedBatch = hydratedBatches.find((b) => b.batchNo?.trim().toUpperCase() === cleanNo);
-
-        if (!matchedBatch) {
-          const normCleanNo = cleanNo.replace(/[^A-Z0-9]/g, '');
-          matchedBatch = hydratedBatches.find((b) => {
-            const norm = (b.batchNo || '').replace(/[^A-Z0-9]/g, '');
-            return norm && norm === normCleanNo;
-          });
-        }
-      }
+      const isoDate = parseFlexibleOcrDate(normalized.testDate);
+      const matchedBatch = findMatchingBatchFromOcr(normalized, hydratedBatches);
 
       // Resolve criteria to match against
       let criteriaToMatch: any[] = allCriteria;
       if (criteriaToMatch.length === 0 && matchedBatch) {
         const batchTccs =
+          (matchedBatch as any).tccsSnapshot ||
           (matchedBatch.tccsId ? tccsList.find((t: any) => t.id === matchedBatch.tccsId) : null) ||
           (matchedBatch.mfgDate
             ? tccsList
@@ -250,16 +351,23 @@ export function useTestResultAIIntegration({
       if (criteriaToMatch.length === 0) {
         let targetProduct = null;
         if (normalized.productCode) {
+          const normCode = normalized.productCode.trim().toLowerCase();
           targetProduct = products.find(
             (p: any) =>
-              p.code?.trim().toLowerCase() === normalized.productCode?.trim().toLowerCase()
+              p.code?.trim().toLowerCase() === normCode ||
+              p.code?.trim().toLowerCase().includes(normCode)
           );
         }
         if (!targetProduct && normalized.productName) {
-          targetProduct = products.find(
-            (p: any) =>
-              p.name?.trim().toLowerCase() === normalized.productName?.trim().toLowerCase()
-          );
+          const normName = normalized.productName.trim().toLowerCase();
+          targetProduct =
+            products.find((p: any) => p.name?.trim().toLowerCase() === normName) ||
+            products.find(
+              (p: any) =>
+                p.name &&
+                (normName.includes(p.name.trim().toLowerCase()) ||
+                  p.name.trim().toLowerCase().includes(normName))
+            );
         }
         if (targetProduct) {
           const prodTccs =
@@ -276,20 +384,18 @@ export function useTestResultAIIntegration({
 
       if (criteriaToMatch.length === 0) {
         const activeCriteriaMap = new Map<string, any>();
-        tccsList
-          .filter((t: any) => t.isActive)
-          .forEach((tccs: any) => {
-            (tccs.mainQualityCriteria || []).forEach((c: any) => {
-              if (c?.name && !activeCriteriaMap.has(c.name.trim().toLowerCase())) {
-                activeCriteriaMap.set(c.name.trim().toLowerCase(), c);
-              }
-            });
-            (tccs.safetyCriteria || []).forEach((c: any) => {
-              if (c?.name && !activeCriteriaMap.has(c.name.trim().toLowerCase())) {
-                activeCriteriaMap.set(c.name.trim().toLowerCase(), c);
-              }
-            });
+        tccsList.forEach((tccs: any) => {
+          (tccs.mainQualityCriteria || []).forEach((c: any) => {
+            if (c?.name && !activeCriteriaMap.has(c.name.trim().toLowerCase())) {
+              activeCriteriaMap.set(c.name.trim().toLowerCase(), c);
+            }
           });
+          (tccs.safetyCriteria || []).forEach((c: any) => {
+            if (c?.name && !activeCriteriaMap.has(c.name.trim().toLowerCase())) {
+              activeCriteriaMap.set(c.name.trim().toLowerCase(), c);
+            }
+          });
+        });
         criteriaToMatch = Array.from(activeCriteriaMap.values());
       }
 
@@ -299,7 +405,7 @@ export function useTestResultAIIntegration({
       let matchCount = 0;
       let extraCount = 0;
 
-      if (normalized.testResults && Array.isArray(normalized.testResults)) {
+      if (!options?.headerOnly && normalized.testResults && Array.isArray(normalized.testResults)) {
         normalized.testResults.forEach((r: any, index: number) => {
           // Ưu tiên khớp theo mappedName (nếu AI đã map chuẩn), sau đó là criteriaName
           const searchName = r.mappedName || r.criteriaName;
@@ -352,26 +458,52 @@ export function useTestResultAIIntegration({
 
       // Atomic form values update
       if (setFormValues) {
-        setFormValues((prev: any) => ({
-          ...prev,
-          ...(normalized.reportNo ? { reportNo: normalized.reportNo } : {}),
-          ...(labInfo?.labName
-            ? { labName: labInfo.labName }
-            : normalized.labName
-              ? { labName: normalized.labName }
-              : {}),
-          ...(labInfo?.labId ? { labId: labInfo.labId } : {}),
-          ...(isoDate ? { testDate: isoDate } : {}),
-          ...(matchedBatch ? { batchId: matchedBatch.id } : {}),
-          ...(combinedNotes
-            ? { notes: prev?.notes ? `${prev.notes}\n${combinedNotes}` : combinedNotes }
-            : {}),
-          testResultsMap: {
-            ...(prev?.testResultsMap || {}),
-            ...nextTestResultsMap,
-          },
-          extraCriteria: [...(prev?.extraCriteria || []), ...nextExtraCriteria],
-        }));
+        setFormValues((prev: any) => {
+          const prevNotes = String(prev?.notes || '').trim();
+          const nextNotes =
+            combinedNotes && !prevNotes.includes(combinedNotes)
+              ? prevNotes
+                ? `${prevNotes}\n${combinedNotes}`
+                : combinedNotes
+              : prevNotes;
+
+          const existingExtras = Array.isArray(prev?.extraCriteria) ? prev.extraCriteria : [];
+          const existingExtraKeys = new Set(
+            existingExtras.map(
+              (e: any) =>
+                `${String(e?.name || '')
+                  .trim()
+                  .toLowerCase()}|${String(e?.value || '').trim()}`
+            )
+          );
+          const deduplicatedNewExtras = nextExtraCriteria.filter(
+            (e) =>
+              !existingExtraKeys.has(
+                `${String(e?.name || '')
+                  .trim()
+                  .toLowerCase()}|${String(e?.value || '').trim()}`
+              )
+          );
+
+          return {
+            ...prev,
+            ...(normalized.reportNo ? { reportNo: normalized.reportNo } : {}),
+            ...(labInfo?.labName
+              ? { labName: labInfo.labName }
+              : normalized.labName
+                ? { labName: normalized.labName }
+                : {}),
+            ...(labInfo?.labId ? { labId: labInfo.labId } : {}),
+            ...(isoDate ? { testDate: isoDate } : {}),
+            ...(matchedBatch ? { batchId: matchedBatch.id } : {}),
+            ...(nextNotes ? { notes: nextNotes } : {}),
+            testResultsMap: {
+              ...(prev?.testResultsMap || {}),
+              ...nextTestResultsMap,
+            },
+            extraCriteria: [...existingExtras, ...deduplicatedNewExtras],
+          };
+        });
       } else {
         if (normalized.reportNo) setFieldValue('reportNo', normalized.reportNo);
         if (labInfo?.labName) setFieldValue('labName', labInfo.labName);
@@ -396,20 +528,22 @@ export function useTestResultAIIntegration({
             ? `${matchedBatch.batchNo} - ${matchedBatch.product.name}`
             : matchedBatch.batchNo
         );
-        toast.success(`Đã tự động chọn lô hàng: ${matchedBatch.batchNo}`);
-      } else if (normalized.batchNo) {
+        if (!options?.headerOnly) {
+          toast.success(`Đã tự động chọn lô hàng: ${matchedBatch.batchNo}`);
+        }
+      } else if (!options?.headerOnly && normalized.batchNo) {
         setPendingAutoCreateData({
           batchNo: normalized.batchNo,
           productName: normalized.productName,
           productCode: normalized.productCode,
-          mfgDate: normalized.mfgDate,
-          expDate: normalized.expDate,
+          mfgDate: parseFlexibleOcrDate(normalized.mfgDate) || normalized.mfgDate,
+          expDate: parseFlexibleOcrDate(normalized.expDate) || normalized.expDate,
         });
         setIsAutoCreateModalOpen(true);
       }
 
       setAiFilledFields(newAiFilled);
-      if (matchCount > 0 || extraCount > 0) {
+      if (!options?.headerOnly && (matchCount > 0 || extraCount > 0)) {
         toast.success(
           `AI: Đã điền ${matchCount} chỉ tiêu theo TCCS` +
             (extraCount > 0 ? `, ${extraCount} chỉ tiêu bổ sung.` : '.')
@@ -430,6 +564,7 @@ export function useTestResultAIIntegration({
       setAiFilledFields,
       tccsList,
       products,
+      testingLaboratories,
     ]
   );
 
@@ -566,19 +701,36 @@ export function useTestResultAIIntegration({
   );
 
   const handleMappingConfirmed = useCallback(
-    (confirmedMappings: ConfirmedMapping[], rememberMappings: boolean) => {
+    (
+      confirmedMappings: ConfirmedMapping[],
+      rememberMappings: boolean,
+      updatedSummary?: DocumentSummary
+    ) => {
       setIsMappingModalOpen(false);
       if (!pendingAiRawData) return;
 
       if (rememberMappings) {
         confirmedMappings.forEach((m) => {
-          if (m.originalName !== m.systemName) {
+          if (!m.isKeepOriginal && m.systemName && m.originalName !== m.systemName) {
             addAiLearnedMapping(m.originalName, m.systemName);
           }
         });
       }
 
-      finalizeAiMapping(pendingAiRawData, pendingHighItems, confirmedMappings);
+      const mergedRawData = updatedSummary
+        ? {
+            ...pendingAiRawData,
+            ...(updatedSummary.reportNo !== undefined ? { reportNo: updatedSummary.reportNo } : {}),
+            ...(updatedSummary.labName !== undefined ? { labName: updatedSummary.labName } : {}),
+            ...(updatedSummary.batchNo !== undefined ? { batchNo: updatedSummary.batchNo } : {}),
+            ...(updatedSummary.productName !== undefined
+              ? { productName: updatedSummary.productName }
+              : {}),
+            ...(updatedSummary.testDate !== undefined ? { testDate: updatedSummary.testDate } : {}),
+          }
+        : pendingAiRawData;
+
+      finalizeAiMapping(mergedRawData, pendingHighItems, confirmedMappings);
     },
     [pendingAiRawData, pendingHighItems, addAiLearnedMapping, finalizeAiMapping]
   );
@@ -607,6 +759,12 @@ export function useTestResultAIIntegration({
               pageCount: result.sheetCount,
               notes: result.notes,
               fileCount: 1,
+              reportNo: result.reportNo,
+              labName: result.labName,
+              batchNo: cleanExtractedBatchNo(result.batchNo),
+              productName: result.productName,
+              testDate: result.testDate,
+              criteriaCount: Array.isArray(result.testResults) ? result.testResults.length : 0,
             });
           } else {
             const prompt = buildExtractionPrompt(
@@ -620,13 +778,22 @@ export function useTestResultAIIntegration({
               pageCount: result.pageCount,
               notes: result.notes,
               fileCount: 1,
+              reportNo: result.reportNo,
+              labName: result.labName,
+              batchNo: cleanExtractedBatchNo(result.batchNo),
+              productName: result.productName,
+              testDate: result.testDate,
+              criteriaCount: Array.isArray(result.testResults) ? result.testResults.length : 0,
             });
           }
+
+          // Điền ngay thông tin hành chính của phiếu (Số phiếu, Phòng Lab, Ngày phiếu, Lô hàng, Ghi chú) vào Form
+          handleDataExtracted(result, { headerOnly: true });
 
           setPendingDocumentSummary({
             reportNo: result.reportNo,
             labName: result.labName,
-            batchNo: result.batchNo,
+            batchNo: cleanExtractedBatchNo(result.batchNo) || result.batchNo,
             productName: result.productName,
             productCode: result.productCode,
             testDate: result.testDate,
@@ -777,9 +944,21 @@ export function useTestResultAIIntegration({
 
         try {
           const mergedData: any = {
-            batchNo: results.find((r) => r.batchNo)?.batchNo || '',
+            reportNo: results.find((r) => r.reportNo)?.reportNo || '',
+            batchNo: cleanExtractedBatchNo(results.find((r) => r.batchNo)?.batchNo || ''),
             labName: results.find((r) => r.labName)?.labName || '',
+            productName: results.find((r) => r.productName)?.productName || '',
+            productCode: results.find((r) => r.productCode)?.productCode || '',
+            mfgDate: results.find((r) => r.mfgDate)?.mfgDate || '',
+            expDate: results.find((r) => r.expDate)?.expDate || '',
             testDate: results.find((r) => r.testDate)?.testDate || '',
+            sampleDate: results.find((r) => r.sampleDate)?.sampleDate || '',
+            sampleType: results.find((r) => r.sampleType)?.sampleType || '',
+            overallStatus: results.find((r) => r.overallStatus)?.overallStatus || '',
+            notes: results
+              .map((r) => r.notes)
+              .filter(Boolean)
+              .join('; '),
             testResults: [],
           };
 
@@ -802,12 +981,18 @@ export function useTestResultAIIntegration({
           setAiScanInfo({
             documentType: results[0]?.documentType,
             pageCount: totalPages,
-            notes: results
-              .map((r) => r.notes)
-              .filter(Boolean)
-              .join('; '),
+            notes: mergedData.notes,
             fileCount: results.length,
+            reportNo: mergedData.reportNo,
+            labName: mergedData.labName,
+            batchNo: mergedData.batchNo,
+            productName: mergedData.productName,
+            testDate: mergedData.testDate,
+            criteriaCount: mergedData.testResults.length,
           });
+
+          // Điền ngay thông tin hành chính của phiếu vào Form
+          handleDataExtracted(mergedData, { headerOnly: true });
 
           setPendingDocumentSummary({
             reportNo: mergedData.reportNo || results[0]?.reportNo,
@@ -1054,12 +1239,21 @@ export function useTestResultAIIntegration({
           pageCount: result.pageCount,
           notes: result.notes,
           fileCount: 1,
+          reportNo: result.reportNo,
+          labName: result.labName,
+          batchNo: cleanExtractedBatchNo(result.batchNo),
+          productName: result.productName,
+          testDate: result.testDate,
+          criteriaCount: Array.isArray(result.testResults) ? result.testResults.length : 0,
         });
+
+        // Điền ngay thông tin hành chính của phiếu vào Form
+        handleDataExtracted(result, { headerOnly: true });
 
         setPendingDocumentSummary({
           reportNo: result.reportNo,
           labName: result.labName,
-          batchNo: result.batchNo,
+          batchNo: cleanExtractedBatchNo(result.batchNo) || result.batchNo,
           productName: result.productName,
           productCode: result.productCode,
           testDate: result.testDate,

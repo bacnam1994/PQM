@@ -228,6 +228,7 @@ export interface ExtractedCriterionItem {
 
 /** Ngữ cảnh tài liệu được truyền giữa các trang để bảo tồn tính liên tục */
 export interface DocumentContext {
+  reportNo?: string;
   labName?: string;
   batchNo?: string;
   mfgDate?: string;
@@ -249,6 +250,7 @@ export interface DocumentContext {
 export interface PageExtractionResult {
   pageNumber: number;
   totalPages: number;
+  reportNo?: string;
   labName?: string;
   productCode?: string;
   productName?: string;
@@ -268,6 +270,7 @@ export interface PageExtractionResult {
 
 /** Kết quả tổng hợp từ trích xuất từng trang */
 export interface MultiPageExtractionResult {
+  reportNo?: string;
   labName: string;
   documentType: string;
   pageCount: number;

@@ -35,13 +35,14 @@ export interface AIExtractedItem {
 
 export interface ConfirmedMapping {
   originalName: string; // Tên gốc từ phiếu
-  systemName: string; // Tên chuẩn trong TCCS
+  systemName: string; // Tên chuẩn trong TCCS (hoặc tên gốc nếu giữ nguyên)
   value: string;
   unit?: string;
   limit?: string;
   category?: string;
   status?: string;
   analysisMethod?: string;
+  isKeepOriginal?: boolean;
 }
 
 export interface DocumentSummary {
@@ -69,7 +70,11 @@ interface MappingConfirmModalProps {
   /** Thông tin tóm tắt Header từ phiếu kiểm nghiệm */
   documentSummary?: DocumentSummary | null;
   /** Callback khi user xác nhận xong */
-  onConfirm: (confirmedMappings: ConfirmedMapping[], rememberMappings: boolean) => void;
+  onConfirm: (
+    confirmedMappings: ConfirmedMapping[],
+    rememberMappings: boolean,
+    updatedSummary?: DocumentSummary
+  ) => void;
 }
 
 // ─── Helper components ────────────────────────────────────────────────────────
@@ -164,65 +169,21 @@ function CategoryBadge({ category }: { category?: string }) {
   );
 }
 
-function DocumentSummaryCard({ summary }: { summary?: DocumentSummary | null }) {
-  if (
-    !summary ||
-    (!summary.reportNo && !summary.labName && !summary.batchNo && !summary.productName)
-  ) {
-    return null;
-  }
+function DocumentSummaryCard({
+  summary,
+  onChange,
+}: {
+  summary: DocumentSummary;
+  onChange: (field: keyof DocumentSummary, value: string) => void;
+}) {
   const isPass = summary.overallStatus === 'PASS' || summary.overallStatus === 'CONFORM';
   const isFail = summary.overallStatus === 'FAIL' || summary.overallStatus === 'NOT_CONFORM';
 
   return (
-    <div className="bg-surface-2 p-3.5 rounded-xl border border-border text-xs grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3 shrink-0">
-      <div>
-        <span className="text-[10px] text-ink-muted block uppercase font-semibold">
-          Số phiếu (Report No)
-        </span>
-        <span className="font-bold text-ink truncate block" title={summary.reportNo || '—'}>
-          {summary.reportNo || '—'}
-        </span>
-      </div>
-      <div>
-        <span className="text-[10px] text-ink-muted block uppercase font-semibold">
-          Đơn vị kiểm nghiệm
-        </span>
-        <span className="font-bold text-ink truncate block" title={summary.labName || '—'}>
-          {summary.labName || '—'}
-        </span>
-      </div>
-      <div>
-        <span className="text-[10px] text-ink-muted block uppercase font-semibold">
-          Số lô (Batch No)
-        </span>
-        <span
-          className="font-bold text-emerald-600 dark:text-emerald-400 truncate block"
-          title={summary.batchNo || '—'}
-        >
-          {summary.batchNo || '—'}
-        </span>
-      </div>
-      <div>
-        <span className="text-[10px] text-ink-muted block uppercase font-semibold">
-          Sản phẩm / Mẫu
-        </span>
-        <span
-          className="font-bold text-ink truncate block"
-          title={summary.productName || summary.productCode || '—'}
-        >
-          {summary.productName || summary.productCode || '—'}
-        </span>
-      </div>
-      <div>
-        <span className="text-[10px] text-ink-muted block uppercase font-semibold">
-          Ngày kiểm nghiệm
-        </span>
-        <span className="font-bold text-ink truncate block">{summary.testDate || '—'}</span>
-      </div>
-      <div>
-        <span className="text-[10px] text-ink-muted block uppercase font-semibold">
-          Kết luận phiếu
+    <div className="bg-surface-2 p-3.5 rounded-xl border border-border text-xs space-y-2.5 shrink-0">
+      <div className="flex items-center justify-between">
+        <span className="text-[10px] font-black uppercase tracking-wider text-emerald-700 dark:text-emerald-400">
+          📋 Thông tin Phiếu Kiểm Nghiệm trích xuất (Có thể sửa trực tiếp)
         </span>
         {isPass ? (
           <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/15 text-emerald-700 dark:text-emerald-400">
@@ -232,11 +193,70 @@ function DocumentSummaryCard({ summary }: { summary?: DocumentSummary | null }) 
           <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-black bg-rose-500/20 text-rose-700 dark:text-rose-400 border border-rose-500/30">
             ⚠ KHÔNG ĐẠT (OOS)
           </span>
-        ) : (
-          <span className="text-ink-muted text-[11px] font-medium">
-            {summary.overallStatus || '—'}
-          </span>
-        )}
+        ) : null}
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-2.5">
+        <div>
+          <label className="text-[10px] text-ink-muted block uppercase font-semibold mb-1">
+            Số phiếu (Report No)
+          </label>
+          <input
+            type="text"
+            value={summary.reportNo || ''}
+            onChange={(e) => onChange('reportNo', e.target.value)}
+            placeholder="Nhập số phiếu..."
+            className="w-full px-2.5 py-1.5 rounded-lg bg-surface border border-border font-bold text-ink text-xs outline-none focus:border-emerald-500"
+          />
+        </div>
+        <div>
+          <label className="text-[10px] text-ink-muted block uppercase font-semibold mb-1">
+            Đơn vị kiểm nghiệm
+          </label>
+          <input
+            type="text"
+            value={summary.labName || ''}
+            onChange={(e) => onChange('labName', e.target.value)}
+            placeholder="VD: Quatest 3, CASE..."
+            className="w-full px-2.5 py-1.5 rounded-lg bg-surface border border-border font-bold text-ink text-xs outline-none focus:border-emerald-500"
+          />
+        </div>
+        <div>
+          <label className="text-[10px] text-ink-muted block uppercase font-semibold mb-1">
+            Số lô (Batch No)
+          </label>
+          <input
+            type="text"
+            value={summary.batchNo || ''}
+            onChange={(e) => onChange('batchNo', e.target.value)}
+            placeholder="Số lô SX..."
+            className="w-full px-2.5 py-1.5 rounded-lg bg-surface border border-border font-bold text-emerald-600 dark:text-emerald-400 text-xs outline-none focus:border-emerald-500"
+          />
+        </div>
+        <div>
+          <label className="text-[10px] text-ink-muted block uppercase font-semibold mb-1">
+            Sản phẩm / Mẫu
+          </label>
+          <input
+            type="text"
+            value={summary.productName || summary.productCode || ''}
+            onChange={(e) => onChange('productName', e.target.value)}
+            placeholder="Tên sản phẩm..."
+            className="w-full px-2.5 py-1.5 rounded-lg bg-surface border border-border font-bold text-ink text-xs outline-none focus:border-emerald-500"
+          />
+        </div>
+        <div>
+          <label className="text-[10px] text-ink-muted block uppercase font-semibold mb-1">
+            Ngày xuất phiếu
+          </label>
+          <input
+            type="text"
+            value={summary.testDate || ''}
+            onChange={(e) => onChange('testDate', e.target.value)}
+            placeholder="DD/MM/YYYY"
+            className="w-full px-2.5 py-1.5 rounded-lg bg-surface border border-border font-bold text-ink text-xs outline-none focus:border-emerald-500"
+          />
+        </div>
       </div>
     </div>
   );
@@ -256,26 +276,43 @@ export const MappingConfirmModal: React.FC<MappingConfirmModalProps> = ({
   const [userMappings, setUserMappings] = useState<Record<string, string>>(() => {
     const initial: Record<string, string> = {};
     lowConfidenceItems.forEach((item) => {
-      initial[item.criteriaName] = item.mappedName || '';
+      initial[item.criteriaName] = item.mappedName || '__KEEP_ORIGINAL__';
     });
     return initial;
   });
   const [rememberMappings, setRememberMappings] = useState(true);
+  const [editedSummary, setEditedSummary] = useState<DocumentSummary>(() => ({
+    ...(documentSummary || {}),
+  }));
 
   React.useEffect(() => {
     const initial: Record<string, string> = {};
     lowConfidenceItems.forEach((item) => {
-      initial[item.criteriaName] = item.mappedName || '';
+      initial[item.criteriaName] = item.mappedName || '__KEEP_ORIGINAL__';
     });
     setUserMappings(initial);
   }, [lowConfidenceItems]);
 
+  React.useEffect(() => {
+    setEditedSummary({ ...(documentSummary || {}) });
+  }, [documentSummary]);
+
+  const handleSummaryFieldChange = (field: keyof DocumentSummary, value: string) => {
+    setEditedSummary((prev) => ({ ...prev, [field]: value }));
+  };
+
   const handleConfirm = () => {
     const confirmed: ConfirmedMapping[] = [];
-    highConfidenceItems.forEach((item) => {
+    lowConfidenceItems.forEach((item) => {
+      const chosen = userMappings[item.criteriaName] || '__KEEP_ORIGINAL__';
+      if (chosen === '__SKIP__') {
+        return;
+      }
+      const isKeepOriginal = chosen === '__KEEP_ORIGINAL__';
       confirmed.push({
         originalName: item.criteriaName,
-        systemName: item.mappedName,
+        systemName: isKeepOriginal ? item.criteriaName : chosen,
+        isKeepOriginal,
         value: item.value,
         unit: item.unit,
         limit: item.limit,
@@ -284,26 +321,11 @@ export const MappingConfirmModal: React.FC<MappingConfirmModalProps> = ({
         analysisMethod: item.analysisMethod,
       });
     });
-    lowConfidenceItems.forEach((item) => {
-      const chosen = userMappings[item.criteriaName];
-      if (chosen) {
-        confirmed.push({
-          originalName: item.criteriaName,
-          systemName: chosen,
-          value: item.value,
-          unit: item.unit,
-          limit: item.limit,
-          category: item.category,
-          status: item.status,
-          analysisMethod: item.analysisMethod,
-        });
-      }
-    });
-    onConfirm(confirmed, rememberMappings);
+    onConfirm(confirmed, rememberMappings, editedSummary);
   };
 
   const confirmedCount = useMemo(
-    () => Object.values(userMappings).filter((v) => v).length,
+    () => Object.values(userMappings).filter((v) => v !== '__SKIP__').length,
     [userMappings]
   );
 
@@ -355,8 +377,8 @@ export const MappingConfirmModal: React.FC<MappingConfirmModalProps> = ({
 
         {/* ── Body ───────────────────────────────────────────────────────── */}
         <div className="flex-1 overflow-y-auto p-5 space-y-5">
-          {/* Thông tin tóm tắt phiếu kiểm nghiệm */}
-          <DocumentSummaryCard summary={documentSummary} />
+          {/* Thông tin tóm tắt phiếu kiểm nghiệm (luôn hiển thị và cho phép chỉnh sửa trực tiếp) */}
+          <DocumentSummaryCard summary={editedSummary} onChange={handleSummaryFieldChange} />
 
           {/* HIGH confidence — bảng gọn */}
           {highConfidenceItems.length > 0 && (
@@ -555,7 +577,7 @@ export const MappingConfirmModal: React.FC<MappingConfirmModalProps> = ({
                           <ArrowRightIcon className="w-3 h-3" /> Ghép với chỉ tiêu TCCS
                         </p>
                         <select
-                          value={userMappings[item.criteriaName] || ''}
+                          value={userMappings[item.criteriaName] || '__KEEP_ORIGINAL__'}
                           onChange={(e) =>
                             setUserMappings((prev) => ({
                               ...prev,
@@ -564,12 +586,16 @@ export const MappingConfirmModal: React.FC<MappingConfirmModalProps> = ({
                           }
                           className="w-full px-3 py-2 bg-surface border border-border rounded-lg text-xs font-bold text-ink outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all"
                         >
-                          <option value="">— Bỏ qua chỉ tiêu này —</option>
+                          <option value="__KEEP_ORIGINAL__">
+                            ✓ Giữ nguyên tên gốc "{item.criteriaName}" (Tự khớp theo Lô / Chỉ tiêu
+                            bổ sung)
+                          </option>
                           {tccsNames.map((name) => (
                             <option key={name} value={name}>
-                              {name}
+                              🎯 Ghép vào TCCS: {name}
                             </option>
                           ))}
+                          <option value="__SKIP__">✕ Bỏ qua không nhập chỉ tiêu này</option>
                         </select>
                       </div>
                     </div>

@@ -427,8 +427,10 @@ LƯU Ý QUAN TRỌNG:
 9. Điền "documentType" dựa theo hướng dẫn VN_LAB_TERMINOLOGY ở trên.
 10. Điền "analysisMethod" cho từng chỉ tiêu nếu phiếu ghi rõ phương pháp thử (cột "Phương pháp", "Method", "Test method").
 11. Điền "productCode" là mã số sản phẩm (thường ký hiệu: Mã SP, Mã HH, Product Code, SKU, Item Code, Ref. No...) thường xuất hiện ở header phiếu gần tên sản phẩm hoặc trong bảng thông tin mẫu. Đây là ưu tiên số 1 để nhận diện sản phẩm.
-12. Điền "productName" là tên đầy đủ của sản phẩm được kiểm nghiệm (thường đứng đầu phiếu, sau label "Tên sản phẩm:", "Product:", "Commodity:", "Sample name:").
-13. Điền "reportNo" là số hiệu phiếu kiểm nghiệm / Số kết quả phân tích / Report No / Số KQPT (thường xuất hiện ở phần đầu trang, cạnh hoặc dưới tiêu đề phiếu sau các nhãn: "Số:", "Số/No.:", "Report No:", "Số KQPT:", "Số phiếu:"). Nếu không tìm thấy, để rỗng.
+12. Điền "productName" là tên đầy đủ của sản phẩm được kiểm nghiệm (thường đứng đầu phiếu, sau label "Tên sản phẩm:", "Tên mẫu:", "Mẫu thử:", "Product:", "Commodity:", "Sample name:"). Nếu dòng Tên mẫu có ghi kèm số lô/NSX/HD (ví dụ: "Viên nang X - Số lô: 682605 - NSX: 01/01/2026"), hãy tách riêng phần tên sản phẩm vào "productName" và tách số lô vào "batchNo".
+13. Điền "reportNo" là số hiệu phiếu kiểm nghiệm / Số kết quả phân tích / Report No / Số KQPT (thường xuất hiện ở phần đầu trang, góc trên bên phải hoặc dưới tiêu đề phiếu sau các nhãn: "Số:", "Số/No.:", "Report No:", "Certificate No:", "Số KQPT:", "Số PKQKN:", "Mã số KQ:", "Số phiếu:"). Chỉ lấy mã số phiếu, KHÔNG lấy chữ "Số:".
+14. Điền "batchNo" là Số lô sản xuất: tìm kỹ ở cả ô "Số lô / Lot No / Batch No / Lô SX" LẪN bên trong phần "Tên mẫu / Ký hiệu mẫu / Mô tả mẫu / Thông tin mẫu do khách hàng cung cấp" (trên phiếu Quatest 1/3, CASE, Eurofins, NIFC số lô rất hay được ghi gộp trong dòng Mô tả mẫu hoặc Ký hiệu mẫu như "Lô: 682605", "Số lô SX: 682605", "Lot: 682605"). Chỉ trích xuất mã số lô thuần túy (ví dụ: "682605"), bỏ từ khóa "Số lô:" ở đầu.
+15. Điền "testDate" là Ngày xuất phiếu / Ngày ký ban hành phiếu: tìm ở dòng "..., ngày DD tháng MM năm YYYY" phía trên chữ ký/con dấu ở cuối phiếu, hoặc ở mục "Ngày trả kết quả / Ngày phát hành / Ngày kiểm nghiệm / Date of Issue / Report Date". Luôn chuẩn hóa về đúng định dạng DD/MM/YYYY (ví dụ: "Ngày 05 tháng 11 năm 2026" -> "05/11/2026").
 `;
 };
 

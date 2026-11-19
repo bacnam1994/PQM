@@ -171,20 +171,20 @@ const TestResultFormPage: React.FC = () => {
 
   const { data: activeMasterCriteria = [] } = useMasterCriteriaActiveQuery();
 
-  // Unique criteria names across all active TCCS & Master Criteria for OCR prompt
+  // Unique criteria names across activeTCCS, all TCCS & Master Criteria for OCR prompt & dropdown
   const allActiveTccsNames = useMemo(() => {
     const names = new Set<string>();
-    // Ưu tiên nạp Master Data chuẩn toàn hệ thống
+    // 1. Ưu tiên chỉ tiêu của TCCS đang chọn cho Lô hiện tại
+    allCriteria.forEach((c) => c?.name && names.add(c.name));
+    // 2. Nạp Master Data chuẩn toàn hệ thống
     activeMasterCriteria.forEach((mc) => mc?.canonicalName && names.add(mc.canonicalName));
-    // Nạp thêm tên chỉ tiêu từ các TCCS đang active
-    tccsList
-      .filter((t) => t.isActive)
-      .forEach((tccs) => {
-        (tccs.mainQualityCriteria || []).forEach((c) => c?.name && names.add(c.name));
-        (tccs.safetyCriteria || []).forEach((c) => c?.name && names.add(c.name));
-      });
-    return Array.from(names).sort();
-  }, [tccsList, activeMasterCriteria]);
+    // 3. Nạp thêm tên chỉ tiêu từ toàn bộ danh sách TCCS trong hệ thống
+    tccsList.forEach((tccs) => {
+      (tccs.mainQualityCriteria || []).forEach((c) => c?.name && names.add(c.name));
+      (tccs.safetyCriteria || []).forEach((c) => c?.name && names.add(c.name));
+    });
+    return Array.from(names);
+  }, [allCriteria, tccsList, activeMasterCriteria]);
 
   // Integrated AI Hook
   const ai = useTestResultAIIntegration({

@@ -187,6 +187,7 @@ export function harmonizeGroupedCriteria(
  * Hợp nhất thông tin Header tài liệu từ các trang theo mức độ ưu tiên
  */
 export function resolveDocumentHeader(successfulPages: PageExtractionResult[]): {
+  reportNo: string;
   labName: string;
   documentType: string;
   productCode: string;
@@ -195,8 +196,16 @@ export function resolveDocumentHeader(successfulPages: PageExtractionResult[]): 
   mfgDate: string;
   expDate: string;
   testDate: string;
+  sampleDate: string;
+  sampleType: string;
+  overallStatus: string;
 } {
   const first = successfulPages[0];
+
+  const reportNo =
+    successfulPages.find((p) => p.reportNo && p.reportNo.trim().length > 0)?.reportNo?.trim() ||
+    first?.reportNo ||
+    '';
 
   // Ưu tiên tên phòng thí nghiệm dài hơn hoặc có đầy đủ định danh
   const labName =
@@ -208,7 +217,7 @@ export function resolveDocumentHeader(successfulPages: PageExtractionResult[]): 
     '';
 
   const productCode =
-    successfulPages.find((p) => p.productCode && p.productCode.length > 2)?.productCode ||
+    successfulPages.find((p) => p.productCode && p.productCode.length > 1)?.productCode ||
     first?.productCode ||
     '';
 
@@ -227,17 +236,30 @@ export function resolveDocumentHeader(successfulPages: PageExtractionResult[]): 
 
   // Định dạng ngày chuẩn DD/MM/YYYY
   const isValidDate = (d?: string) => Boolean(d && /^\d{1,2}\/\d{1,2}\/\d{4}$/.test(d.trim()));
+  const pickDateField = (getter: (p: PageExtractionResult) => string | undefined): string => {
+    const exactMatch = successfulPages.find((p) => isValidDate(getter(p)));
+    if (exactMatch) return getter(exactMatch)!.trim();
+    const anyMatch = successfulPages.find((p) => Boolean(getter(p)?.trim()));
+    return anyMatch ? getter(anyMatch)!.trim() : '';
+  };
 
-  const mfgDate =
-    successfulPages.find((p) => isValidDate(p.mfgDate))?.mfgDate || first?.mfgDate || '';
-  const expDate =
-    successfulPages.find((p) => isValidDate(p.expDate))?.expDate || first?.expDate || '';
-  const testDate =
-    successfulPages.find((p) => isValidDate(p.testDate))?.testDate || first?.testDate || '';
+  const mfgDate = pickDateField((p) => p.mfgDate);
+  const expDate = pickDateField((p) => p.expDate);
+  const testDate = pickDateField((p) => p.testDate);
+  const sampleDate = pickDateField((p) => p.sampleDate);
 
-  const documentType = first?.rawResponse?.documentType || 'External_Lab';
+  const sampleType =
+    successfulPages.find((p) => p.sampleType && p.sampleType.trim())?.sampleType?.trim() || '';
+  const overallStatus =
+    successfulPages.find((p) => p.overallStatus && p.overallStatus.trim())?.overallStatus?.trim() ||
+    '';
+
+  const documentType =
+    successfulPages.find((p) => p.rawResponse?.documentType)?.rawResponse?.documentType ||
+    'External_Lab';
 
   return {
+    reportNo,
     labName,
     documentType,
     productCode,
@@ -246,6 +268,9 @@ export function resolveDocumentHeader(successfulPages: PageExtractionResult[]): 
     mfgDate,
     expDate,
     testDate,
+    sampleDate,
+    sampleType,
+    overallStatus,
   };
 }
 
@@ -324,6 +349,7 @@ export function mergeMultiPageExtraction(
   const finalTestResults = harmonizeGroupedCriteria(mergedItems);
 
   return {
+    reportNo: header.reportNo,
     labName: header.labName,
     documentType: header.documentType,
     pageCount: totalPages,
@@ -333,6 +359,9 @@ export function mergeMultiPageExtraction(
     mfgDate: header.mfgDate,
     expDate: header.expDate,
     testDate: header.testDate,
+    sampleDate: header.sampleDate,
+    sampleType: header.sampleType,
+    overallStatus: header.overallStatus,
     notes: notesList.join(' | '),
     testResults: finalTestResults,
     pageResults,

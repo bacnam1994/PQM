@@ -154,10 +154,18 @@ export function assessCriterionConfidence(item: ExtractedCriterionItem): FieldCo
   }
 
   // 4. Kiểm tra sự trùng lẫn giữa giá trị và giới hạn (Rule 5 violation)
+  // Ngoại trừ các kết quả định tính / vi sinh hợp lệ ("Âm tính", "Không phát hiện", "KPH", "Đạt", "ND"...)
   if (item.value && item.limit && item.value.trim() === item.limit.trim()) {
-    suspiciousFields.push('value');
-    warningMessages.push('Giá trị kết quả trùng hoàn toàn với mức giới hạn tiêu chuẩn');
-    baseScore -= 15;
+    const normVal = item.value.trim().toLowerCase();
+    const isLegitimateQualitativeMatch =
+      /^(âm tính|không phát hiện|kph|k\.p\.h|nd|not detected|negative|absent|đạt|đạt yêu cầu|phù hợp|conform|conforms|complies|pass|passed|normal|bình thường)$/i.test(
+        normVal
+      );
+    if (!isLegitimateQualitativeMatch) {
+      suspiciousFields.push('value');
+      warningMessages.push('Giá trị kết quả trùng hoàn toàn với mức giới hạn tiêu chuẩn');
+      baseScore -= 15;
+    }
   }
 
   // 5. Chuẩn hóa điểm trong khoảng 0 - 100

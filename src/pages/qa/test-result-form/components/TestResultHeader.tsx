@@ -16,6 +16,12 @@ export interface AIScanInfo {
   pageCount?: number;
   notes?: string;
   fileCount?: number;
+  reportNo?: string;
+  labName?: string;
+  batchNo?: string;
+  productName?: string;
+  testDate?: string;
+  criteriaCount?: number;
 }
 
 export interface TestResultHeaderProps {
@@ -126,10 +132,35 @@ export const TestResultHeader: React.FC<TestResultHeaderProps> = ({
                 ? `– Đã đọc ${aiScanInfo.fileCount} file`
                 : ''}
             </p>
-            <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1">
-              {aiScanInfo.documentType && (
+            <div className="flex flex-wrap gap-x-4 gap-y-1.5 mt-1.5">
+              {aiScanInfo.reportNo && (
+                <span className="text-xs text-emerald-700 dark:text-emerald-300 bg-surface/70 px-2 py-0.5 rounded border border-emerald-500/20">
+                  # Số phiếu: <strong>{aiScanInfo.reportNo}</strong>
+                </span>
+              )}
+              {aiScanInfo.labName && (
+                <span className="text-xs text-emerald-700 dark:text-emerald-300 bg-surface/70 px-2 py-0.5 rounded border border-emerald-500/20">
+                  🏛️ Đơn vị KN: <strong>{aiScanInfo.labName}</strong>
+                </span>
+              )}
+              {aiScanInfo.batchNo && (
+                <span className="text-xs text-emerald-700 dark:text-emerald-300 bg-surface/70 px-2 py-0.5 rounded border border-emerald-500/20">
+                  📦 Số lô: <strong>{aiScanInfo.batchNo}</strong>
+                </span>
+              )}
+              {aiScanInfo.productName && (
+                <span className="text-xs text-emerald-700 dark:text-emerald-300 bg-surface/70 px-2 py-0.5 rounded border border-emerald-500/20">
+                  💊 Sản phẩm: <strong>{aiScanInfo.productName}</strong>
+                </span>
+              )}
+              {aiScanInfo.testDate && (
+                <span className="text-xs text-emerald-700 dark:text-emerald-300 bg-surface/70 px-2 py-0.5 rounded border border-emerald-500/20">
+                  📅 Ngày phiếu: <strong>{aiScanInfo.testDate}</strong>
+                </span>
+              )}
+              {aiScanInfo.criteriaCount != null && (
                 <span className="text-xs text-emerald-600 dark:text-emerald-400">
-                  📄 Loại phiếu: <strong>{aiScanInfo.documentType}</strong>
+                  🧪 Chỉ tiêu đọc được: <strong>{aiScanInfo.criteriaCount}</strong>
                 </span>
               )}
               {aiScanInfo.pageCount != null && aiScanInfo.pageCount > 0 && (

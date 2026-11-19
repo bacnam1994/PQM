@@ -370,5 +370,57 @@ describe('Multi-Page Merge Engine (OCR-07)', () => {
       expect(merged.notes).toContain('[Cảnh báo: Không thể đọc dữ liệu trang: 2]');
       expect(merged.testResults.length).toBe(1);
     });
+
+    it('bảo toàn đầy đủ reportNo, sampleDate, sampleType, overallStatus và testDate ở trang 2 khi hợp nhất đa trang', () => {
+      const page1: PageExtractionResult = {
+        pageNumber: 1,
+        totalPages: 2,
+        status: 'SUCCESS',
+        reportNo: 'CASE-2026/9988',
+        labName: 'Trung tâm Dịch vụ Phân tích Thí nghiệm TP.HCM (CASE)',
+        batchNo: '682605',
+        sampleDate: '10/10/2026',
+        sampleType: 'FINISHED',
+        testResults: [
+          {
+            criteriaName: 'Cảm quan',
+            value: 'Đạt',
+            category: 'PHYSICAL',
+            status: 'PASS',
+            confidence: 'high',
+            sourcePageNumber: 1,
+          },
+        ],
+      };
+      const page2: PageExtractionResult = {
+        pageNumber: 2,
+        totalPages: 2,
+        status: 'SUCCESS',
+        testDate: '15/10/2026',
+        overallStatus: 'PASS',
+        testResults: [
+          {
+            criteriaName: 'E. coli',
+            value: 'Âm tính',
+            limit: 'Âm tính',
+            category: 'MICROBIAL',
+            status: 'PASS',
+            confidence: 'high',
+            sourcePageNumber: 2,
+          },
+        ],
+      };
+
+      const merged = mergeMultiPageExtraction([page1, page2], 2);
+      expect(merged.reportNo).toBe('CASE-2026/9988');
+      expect(merged.labName).toContain('CASE');
+      expect(merged.batchNo).toBe('682605');
+      expect(merged.sampleDate).toBe('10/10/2026');
+      expect(merged.sampleType).toBe('FINISHED');
+      expect(merged.testDate).toBe('15/10/2026');
+      expect(merged.overallStatus).toBe('PASS');
+      expect(merged.testResults[0].category).toBe('PHYSICAL');
+      expect(merged.testResults[1].category).toBe('MICROBIAL');
+    });
   });
 });

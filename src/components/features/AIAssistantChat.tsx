@@ -627,7 +627,8 @@ export const AIAssistantChat: React.FC<AIAssistantChatProps> = ({
 
   const handleMappingConfirmed = (
     confirmedMappings: ConfirmedMapping[],
-    rememberMappings: boolean
+    rememberMappings: boolean,
+    updatedSummary?: any
   ) => {
     setIsMappingModalOpen(false);
     if (!pendingNavigateData) return;
@@ -636,7 +637,7 @@ export const AIAssistantChat: React.FC<AIAssistantChatProps> = ({
 
     if (rememberMappings) {
       confirmedMappings.forEach((m) => {
-        if (m.originalName !== m.systemName) {
+        if (!m.isKeepOriginal && m.systemName && m.originalName !== m.systemName) {
           addAiLearnedMapping(m.originalName, m.systemName);
         }
       });
@@ -647,7 +648,8 @@ export const AIAssistantChat: React.FC<AIAssistantChatProps> = ({
       .map((i) => ({ originalName: i.criteriaName, systemName: i.mappedName }));
     if (autoMappings.length > 0) recordHighConfidenceOCRMappings(autoMappings);
 
-    finalizeMappingAndNavigate(result, context, pendingHighItems, confirmedMappings, true);
+    const mergedResult = updatedSummary ? { ...result, ...updatedSummary } : result;
+    finalizeMappingAndNavigate(mergedResult, context, pendingHighItems, confirmedMappings, true);
   };
 
   const finalizeMappingAndNavigate = (

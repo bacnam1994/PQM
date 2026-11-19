@@ -25,6 +25,7 @@ const DB_VERSION = 1;
 const STORE_NAME = 'ocr_entries';
 const DEFAULT_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 ngày
 const MAX_CACHE_ENTRIES = 200;
+const CURRENT_OCR_ENGINE_VERSION = 'gemini-ocr-v3';
 
 class OcrDocumentCacheService {
   private dbPromise: Promise<IDBDatabase> | null = null;
@@ -108,9 +109,12 @@ class OcrDocumentCacheService {
             return;
           }
 
-          // Kiểm tra TTL
+          // Kiểm tra TTL và phiên bản Engine (vô hiệu hóa cache cũ bị thiếu thông tin phiếu)
           const now = Date.now();
-          if (now - entry.cachedAt > DEFAULT_TTL_MS) {
+          if (
+            now - entry.cachedAt > DEFAULT_TTL_MS ||
+            entry.engineVersion !== CURRENT_OCR_ENGINE_VERSION
+          ) {
             this.delete(fileHash).catch(() => {});
             resolve(null);
             return;
@@ -143,7 +147,7 @@ class OcrDocumentCacheService {
         fileSize: metadata?.fileSize || 0,
         extractedData,
         cachedAt: Date.now(),
-        engineVersion: metadata?.engineVersion || 'gemini-ocr-v1',
+        engineVersion: metadata?.engineVersion || CURRENT_OCR_ENGINE_VERSION,
       };
 
       await new Promise<void>((resolve, reject) => {

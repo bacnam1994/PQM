@@ -34,6 +34,9 @@ export function buildPageExtractionPrompt(
     `- Đang phân tích trang ${pageNumber} trên tổng số ${totalPages} trang của cùng một Phiếu kiểm nghiệm.`,
   ];
 
+  if (context?.reportNo) {
+    contextLines.push(`- Số phiếu kiểm nghiệm đã ghi nhận: "${context.reportNo}"`);
+  }
   if (context?.batchNo) {
     contextLines.push(`- Số lô sản xuất đã ghi nhận từ trang trước: "${context.batchNo}"`);
   }
@@ -50,7 +53,7 @@ export function buildPageExtractionPrompt(
   if (pageNumber > 1) {
     contextLines.push(
       `- LƯU Ý BẢNG NỐI TRANG: Trang ${pageNumber} là phần tiếp nối bảng chỉ tiêu từ trang trước. ` +
-        `Hãy bóc tách tất cả các hàng chỉ tiêu kiểm nghiệm trên trang này.`
+        `Hãy bóc tách tất cả các hàng chỉ tiêu kiểm nghiệm trên trang này, đồng thời chú ý tìm Ngày xuất phiếu/Ngày ký (testDate), Kết luận chung (overallStatus), Số phiếu (reportNo) hoặc Đơn vị kiểm nghiệm trên con dấu ở cuối trang nếu có.`
     );
     if (context?.lastItemFromPreviousPage) {
       contextLines.push(
@@ -111,6 +114,8 @@ export async function extractSinglePageData(
       return {
         criteriaName: String(item.criteriaName || '').trim(),
         mappedName: item.mappedName ? String(item.mappedName).trim() : '',
+        category: item.category ? (String(item.category).trim().toUpperCase() as any) : undefined,
+        status: item.status ? (String(item.status).trim().toUpperCase() as any) : undefined,
         confidence: confStr,
         confidenceScore: score,
         value: String(item.value ?? '').trim(),
@@ -125,6 +130,7 @@ export async function extractSinglePageData(
     return {
       pageNumber: page.pageNumber,
       totalPages,
+      reportNo: rawResult?.reportNo ? String(rawResult.reportNo).trim() : undefined,
       labName: rawResult?.labName ? String(rawResult.labName).trim() : undefined,
       productCode: rawResult?.productCode ? String(rawResult.productCode).trim() : undefined,
       productName: rawResult?.productName ? String(rawResult.productName).trim() : undefined,
@@ -132,6 +138,9 @@ export async function extractSinglePageData(
       mfgDate: rawResult?.mfgDate ? String(rawResult.mfgDate).trim() : undefined,
       expDate: rawResult?.expDate ? String(rawResult.expDate).trim() : undefined,
       testDate: rawResult?.testDate ? String(rawResult.testDate).trim() : undefined,
+      sampleDate: rawResult?.sampleDate ? String(rawResult.sampleDate).trim() : undefined,
+      sampleType: rawResult?.sampleType ? String(rawResult.sampleType).trim() : undefined,
+      overallStatus: rawResult?.overallStatus ? String(rawResult.overallStatus).trim() : undefined,
       notes: rawResult?.notes ? String(rawResult.notes).trim() : undefined,
       testResults,
       status: 'SUCCESS',
@@ -282,10 +291,14 @@ export async function extractAllPagesSequentially(
   pageResults.push(firstResult);
 
   if (firstResult.status === 'SUCCESS') {
+    if (firstResult.reportNo) runningContext.reportNo = firstResult.reportNo;
     if (firstResult.batchNo) runningContext.batchNo = firstResult.batchNo;
     if (firstResult.productCode) runningContext.productCode = firstResult.productCode;
     if (firstResult.productName) runningContext.productName = firstResult.productName;
     if (firstResult.labName) runningContext.labName = firstResult.labName;
+    if (firstResult.testDate) runningContext.testDate = firstResult.testDate;
+    if (firstResult.sampleDate) runningContext.sampleDate = firstResult.sampleDate;
+    if (firstResult.overallStatus) runningContext.overallStatus = firstResult.overallStatus;
     if (firstResult.testResults.length > 0) {
       const lastItem = firstResult.testResults[firstResult.testResults.length - 1];
       runningContext.lastItemFromPreviousPage = lastItem.criteriaName;

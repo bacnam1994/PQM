@@ -270,14 +270,29 @@ const OCR_RESPONSE_SCHEMA = {
             description: 'Dòng văn bản thô nguyên bản trên phiếu của chỉ tiêu này',
           },
         },
-        required: ['criteriaName', 'value', 'mappedName', 'confidence'],
+        required: ['criteriaName', 'value', 'unit', 'limit', 'mappedName', 'confidence'],
       },
     },
   },
+  required: [
+    'labName',
+    'reportNo',
+    'batchNo',
+    'productName',
+    'productCode',
+    'mfgDate',
+    'expDate',
+    'testDate',
+    'sampleDate',
+    'overallStatus',
+    'notes',
+    'testResults',
+  ],
 } as const;
 
-// Model dự phòng khi model chính bị 503/429
-const FALLBACK_OCR_MODEL = FALLBACK_GEMINI_MODEL;
+// Model dự phòng khi model chính bị 503/429 (khác với model mặc định lite để tăng khả năng phục hồi Vision)
+const getFallbackOcrModel = (primaryModel: string): string =>
+  primaryModel === 'gemini-3.5-flash-lite' ? 'gemini-3.5-flash' : FALLBACK_GEMINI_MODEL;
 
 // ─── Helper gọi Gemini OCR với danh sách inlineData parts ─────────────────────
 async function executeGeminiOcrCall(
@@ -303,12 +318,13 @@ async function executeGeminiOcrCall(
   const maxRetries = 3;
   let attempt = 0;
   let useFallback = false;
+  const fallbackModelName = getFallbackOcrModel(primaryModelName);
 
   while (attempt < maxRetries) {
     try {
-      const modelName = useFallback ? FALLBACK_OCR_MODEL : primaryModelName;
+      const modelName = useFallback ? fallbackModelName : primaryModelName;
       if (useFallback && attempt === 1) {
-        onProgress?.(`Chuyển sang model dự phòng (${FALLBACK_OCR_MODEL})...`, progressBase + 5);
+        onProgress?.(`Chuyển sang model dự phòng (${fallbackModelName})...`, progressBase + 5);
       }
       const model = buildModel(modelName);
       onProgress?.('AI đang phân tích tài liệu...', progressBase + 15 + attempt * 10);
@@ -345,11 +361,11 @@ async function executeGeminiOcrCall(
 
       if (isFallbackTrigger && !useFallback && attempt < maxRetries) {
         console.warn(
-          `Gemini OCR error (${errorMessage}). Switching to fallback '${FALLBACK_OCR_MODEL}' (attempt ${attempt})...`
+          `Gemini OCR error (${errorMessage}). Switching to fallback '${fallbackModelName}' (attempt ${attempt})...`
         );
         useFallback = true;
         onProgress?.(
-          `Model gặp sự cố/quá tải, đang chuyển sang model dự phòng (${FALLBACK_OCR_MODEL})...`,
+          `Model gặp sự cố/quá tải, đang chuyển sang model dự phòng (${fallbackModelName})...`,
           progressBase + 5
         );
         await new Promise((res) => setTimeout(res, backoffMs));
@@ -577,10 +593,18 @@ export const geminiService = {
             }
           );
 
+          const hasHeaderMetadata = Boolean(
+            mergedFinalResult?.batchNo ||
+            mergedFinalResult?.labName ||
+            mergedFinalResult?.reportNo ||
+            mergedFinalResult?.productName
+          );
+
           if (
             mergedFinalResult &&
             Array.isArray(mergedFinalResult.testResults) &&
-            mergedFinalResult.testResults.length > 0
+            mergedFinalResult.testResults.length > 0 &&
+            hasHeaderMetadata
           ) {
             mergedFinalResult.documentType = docType;
             onProgress?.('Hoàn tất!', 100);
@@ -588,11 +612,12 @@ export const geminiService = {
           }
 
           // CƠ CHẾ TỰ PHỤC HỒI CAO CẤP (Self-Recovery via High-DPI Vision):
-          // Nếu nhánh trích xuất text thuần túy trả về 0 kết quả (do bảng biểu PDF bị vỡ cấu trúc cột hoặc font subset),
-          // tự động kích hoạt High-DPI Canvas Rendering (200 DPI JPEG) để Gemini Vision đọc trực quan layout bảng.
+          // Nếu nhánh trích xuất text thuần túy trả về 0 kết quả hoặc mất hoàn toàn thông tin hành chính của phiếu
+          // (do Header là ảnh/khung scan hoặc bảng biểu PDF bị vỡ cấu trúc cột/font subset),
+          // tự động kích hoạt High-DPI Canvas Rendering (200 DPI JPEG) để Gemini Vision đọc trực quan toàn trang.
           if (pageInputs.some((p) => p.isNativeText || !p.base64)) {
             onProgress?.(
-              'Text layer không chứa đủ cấu trúc bảng, đang kích hoạt Vision Engine kết xuất ảnh High-DPI...',
+              'Text layer thiếu thông tin phiếu hoặc cấu trúc bảng, đang kích hoạt Vision Engine kết xuất ảnh High-DPI...',
               25
             );
             try {
@@ -679,6 +704,17 @@ export const geminiService = {
                 renderRetryError
               );
             }
+          }
+
+          // Nếu Vision retry thất bại nhưng NATIVE_TEXT trước đó vẫn có kết quả chỉ tiêu thì trả về kết quả NATIVE_TEXT
+          if (
+            mergedFinalResult &&
+            Array.isArray(mergedFinalResult.testResults) &&
+            mergedFinalResult.testResults.length > 0
+          ) {
+            mergedFinalResult.documentType = docType;
+            onProgress?.('Hoàn tất!', 100);
+            return await saveToOcrCache(mergedFinalResult);
           }
 
           console.warn(
