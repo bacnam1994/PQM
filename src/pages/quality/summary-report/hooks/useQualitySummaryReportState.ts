@@ -137,7 +137,9 @@ export const useQualitySummaryReportState = () => {
     if (pTccs.length === 0) return undefined;
     const active = pTccs.find((t) => t.isActive);
     if (active) return active;
-    return [...pTccs].sort((a, b) => b.issueDate.localeCompare(a.issueDate))[0];
+    return [...pTccs].sort((a, b) =>
+      String(b?.issueDate || '').localeCompare(String(a?.issueDate || ''))
+    )[0];
   }, [selectedProductId, tccsList]);
 
   const mainCriteria = useMemo<Criterion[]>(() => {
@@ -147,11 +149,21 @@ export const useQualitySummaryReportState = () => {
 
   const resolver = useCriteriaResolver(activeTccs);
 
+  // Reset nhận xét AI PQR và chỉ tiêu đang chọn khi chuyển sản phẩm
   useEffect(() => {
-    if (mainCriteria.length > 0 && !spcCriteriaName) {
-      setSpcCriteriaName(mainCriteria[0].name);
+    setPqrNarrative(null);
+    setSelectedCriteriaName(null);
+  }, [selectedProductId]);
+
+  useEffect(() => {
+    if (mainCriteria.length > 0) {
+      if (!spcCriteriaName || !mainCriteria.some((c) => c.name === spcCriteriaName)) {
+        setSpcCriteriaName(mainCriteria[0].name);
+      }
+    } else {
+      setSpcCriteriaName('');
     }
-  }, [mainCriteria]);
+  }, [mainCriteria, spcCriteriaName]);
 
   const reportData = useMemo<ReportDataRow[]>(() => {
     if (!selectedProductId) return [];
@@ -164,14 +176,16 @@ export const useQualitySummaryReportState = () => {
     });
 
     const sortedBatches = [...filteredBatches].sort((a, b) => {
-      return (a.mfgDate || '').localeCompare(b.mfgDate || '');
+      return String(a.mfgDate || '').localeCompare(String(b.mfgDate || ''));
     });
 
     return sortedBatches.map((batch) => {
-      const batchResults = testResults.filter((r) => r.batchId === batch.id);
+      const batchResults = testResults.filter(
+        (r) => r.batchId === batch.id || (batch.batchNo && r.batchId === batch.batchNo)
+      );
       const consolidatedMap = new Map<string, any>();
       [...batchResults]
-        .sort((a, b) => a.testDate.localeCompare(b.testDate))
+        .sort((a, b) => String(a?.testDate || '').localeCompare(String(b?.testDate || '')))
         .forEach((r) => {
           (r.results || []).forEach((entry) => {
             if (entry && entry.criteriaName) {
@@ -186,7 +200,7 @@ export const useQualitySummaryReportState = () => {
       let overallStatus: 'PASS' | 'FAIL' | 'PENDING' = 'PENDING';
       if (batchResults.length > 0) {
         const latestResult = [...batchResults].sort((a, b) =>
-          b.testDate.localeCompare(a.testDate)
+          String(b?.testDate || '').localeCompare(String(a?.testDate || ''))
         )[0];
         overallStatus = latestResult.overallStatus as any;
       }

@@ -219,7 +219,9 @@ export const useTrendAnalyticsState = () => {
     const pTccs = tccsList.filter((t) => t.productId === selectedProductId);
     return (
       pTccs.find((t) => t.isActive) ||
-      [...pTccs].sort((a, b) => b.issueDate.localeCompare(a.issueDate))[0]
+      [...pTccs].sort((a, b) =>
+        String(b?.issueDate || '').localeCompare(String(a?.issueDate || ''))
+      )[0]
     );
   }, [selectedProductId, tccsList]);
 
@@ -264,6 +266,7 @@ export const useTrendAnalyticsState = () => {
 
   useEffect(() => {
     setManualBasisChoice('AUTO');
+    setAiStabilitySummary(null);
   }, [selectedProductId, selectedCriteriaName]);
 
   const resolver = useCriteriaResolver(activeTccs);
@@ -345,13 +348,17 @@ export const useTrendAnalyticsState = () => {
 
     return filteredBatches
       .map((batch) => {
-        const batchResults = testResults.filter((r: any) => r.batchId === batch.id);
+        const batchResults = testResults.filter(
+          (r: any) => r.batchId === batch.id || (batch.batchNo && r.batchId === batch.batchNo)
+        );
         const map = new Map<string, any>();
         // Phụ: map theo masterCriterionId để Group By chính xác
         const masterIdMap = new Map<string, any>();
 
         [...batchResults]
-          .sort((a: any, b: any) => a.testDate.localeCompare(b.testDate))
+          .sort((a: any, b: any) =>
+            String(a?.testDate || '').localeCompare(String(b?.testDate || ''))
+          )
           .forEach((r: any) => {
             (r.results || []).forEach((rawEntry: any) => {
               const entry = {

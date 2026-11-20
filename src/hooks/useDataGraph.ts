@@ -275,7 +275,9 @@ export const useDataGraph = () => {
   const batches = useMemo<HydratedBatch[]>(() => {
     return rawBatches.map((batch) => {
       const bTests = testResultsByBatchId.get(batch.id) || [];
-      const sortedTests = [...bTests].sort((a, b) => b.testDate.localeCompare(a.testDate));
+      const sortedTests = [...bTests].sort((a, b) =>
+        String(b?.testDate || '').localeCompare(String(a?.testDate || ''))
+      );
       const passTests = bTests.filter((t) => t.overallStatus === 'PASS');
       return {
         ...batch,
@@ -484,7 +486,9 @@ export const useDataGraph = () => {
       const pTccs = tccsByProductId.get(prod.id) || [];
       const activeTCCS = pTccs.find((t) => t.isActive) || pTccs[0];
       const pBatches = batchesByProductId.get(prod.id) || [];
-      const sortedBatches = [...pBatches].sort((a, b) => b.mfgDate.localeCompare(a.mfgDate));
+      const sortedBatches = [...pBatches].sort((a, b) =>
+        String(b?.mfgDate || '').localeCompare(String(a?.mfgDate || ''))
+      );
 
       let pTestsCount = 0;
       let passCount = 0;
@@ -568,7 +572,9 @@ export const useDataGraph = () => {
       const batch = batchesById.get(batchId);
       if (!batch) return undefined;
       const bTests = testResultsByBatchId.get(batch.id) || [];
-      const sortedTests = [...bTests].sort((a, b) => b.testDate.localeCompare(a.testDate));
+      const sortedTests = [...bTests].sort((a, b) =>
+        String(b?.testDate || '').localeCompare(String(a?.testDate || ''))
+      );
       const passTests = bTests.filter((t) => t.overallStatus === 'PASS');
       return {
         ...batch,

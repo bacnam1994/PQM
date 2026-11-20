@@ -111,7 +111,7 @@ export const createTestResultSlice: StoreSlice<TestResultSlice> = (set, get) => 
         const map = new Map(state.testResults.map((item: TestResult) => [item.id, item]));
         list.forEach((item) => map.set(item.id, item));
         const merged = Array.from(map.values());
-        merged.sort((a, b) => b.testDate.localeCompare(a.testDate));
+        merged.sort((a, b) => String(b?.testDate || '').localeCompare(String(a?.testDate || '')));
         return { testResults: merged };
       },
       false,

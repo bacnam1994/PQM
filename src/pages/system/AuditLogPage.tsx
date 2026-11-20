@@ -5,21 +5,21 @@
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { 
-  ClockIcon, 
-  MagnifyingGlassIcon, 
-  ArrowPathIcon, 
-  ShieldCheckIcon, 
-  PlusCircleIcon, 
-  PencilSquareIcon, 
-  TrashIcon, 
-  ArrowDownTrayIcon, 
-  ArrowRightOnRectangleIcon, 
+import {
+  ClockIcon,
+  MagnifyingGlassIcon,
+  ArrowPathIcon,
+  ShieldCheckIcon,
+  PlusCircleIcon,
+  PencilSquareIcon,
+  TrashIcon,
+  ArrowDownTrayIcon,
+  ArrowRightOnRectangleIcon,
   CircleStackIcon,
-  UserIcon, 
-  ChevronLeftIcon, 
-  ChevronRightIcon, 
-  TableCellsIcon
+  UserIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  TableCellsIcon,
 } from '@heroicons/react/24/outline';
 import { subscribeAuditLogs, AuditLogRecord } from '../../services/auditService';
 import { formatDateStandard } from '../../utils';
@@ -28,52 +28,59 @@ import { ALCOAWatchdogWidget } from '../../components/features/ALCOAWatchdogWidg
 const ACTION_CONFIG = {
   CREATE: {
     label: 'Thêm mới',
-    color: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800',
+    color:
+      'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800',
     badge: 'bg-emerald-500',
-    icon: PlusCircleIcon
+    icon: PlusCircleIcon,
   },
   UPDATE: {
     label: 'Cập nhật',
-    color: 'bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-950/40 dark:text-sky-300 dark:border-sky-800',
+    color:
+      'bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-950/40 dark:text-sky-300 dark:border-sky-800',
     badge: 'bg-sky-500',
-    icon: PencilSquareIcon
+    icon: PencilSquareIcon,
   },
   DELETE: {
     label: 'Xóa',
-    color: 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-800',
+    color:
+      'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-800',
     badge: 'bg-rose-500',
-    icon: TrashIcon
+    icon: TrashIcon,
   },
   IMPORT: {
     label: 'Nhập dữ liệu',
-    color: 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/40 dark:text-purple-300 dark:border-purple-800',
+    color:
+      'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/40 dark:text-purple-300 dark:border-purple-800',
     badge: 'bg-purple-500',
-    icon: ArrowDownTrayIcon
+    icon: ArrowDownTrayIcon,
   },
   RESTORE: {
     label: 'Khôi phục',
-    color: 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800',
+    color:
+      'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800',
     badge: 'bg-amber-500',
-    icon: ArrowPathIcon
+    icon: ArrowPathIcon,
   },
   LOGIN: {
     label: 'Đăng nhập',
     color: 'bg-surface-2 text-ink-muted border-border',
     badge: 'bg-slate-500',
-    icon: ArrowRightOnRectangleIcon
+    icon: ArrowRightOnRectangleIcon,
   },
   SYNC_MERGE: {
     label: 'Hợp nhất đồng bộ',
-    color: 'bg-teal-50 text-teal-700 border-teal-200 dark:bg-teal-950/40 dark:text-teal-300 dark:border-teal-800',
+    color:
+      'bg-teal-50 text-teal-700 border-teal-200 dark:bg-teal-950/40 dark:text-teal-300 dark:border-teal-800',
     badge: 'bg-teal-500',
-    icon: ArrowPathIcon
+    icon: ArrowPathIcon,
   },
   SYNC_CONFLICT: {
     label: 'Xung đột đồng bộ',
-    color: 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800',
+    color:
+      'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800',
     badge: 'bg-amber-500',
-    icon: ShieldCheckIcon
-  }
+    icon: ShieldCheckIcon,
+  },
 };
 
 const COLLECTION_LABELS: Record<string, string> = {
@@ -87,7 +94,7 @@ const COLLECTION_LABELS: Record<string, string> = {
   DEVIATIONS: 'Sai lệch & CAPA',
   ELECTRONIC_SIGNATURES: 'Chữ ký điện tử',
   AI_GATEWAY: 'Trí tuệ nhân tạo',
-  SYSTEM: 'Hệ thống'
+  SYSTEM: 'Hệ thống',
 };
 
 const PAGE_SIZE = 25;
@@ -115,7 +122,7 @@ const AuditLogPage: React.FC = () => {
   // Danh sách email người thực hiện (unique)
   const uniqueUsers = useMemo(() => {
     const set = new Set<string>();
-    logs.forEach(l => {
+    logs.forEach((l) => {
       if (l.performedBy) set.add(l.performedBy);
     });
     return Array.from(set).sort();
@@ -123,7 +130,7 @@ const AuditLogPage: React.FC = () => {
 
   // Bộ lọc dữ liệu
   const filteredLogs = useMemo(() => {
-    return logs.filter(log => {
+    return logs.filter((log) => {
       // 1. Lọc theo hành động
       if (actionFilter !== 'ALL' && log.action !== actionFilter) return false;
 
@@ -151,11 +158,16 @@ const AuditLogPage: React.FC = () => {
   const stats = useMemo(() => {
     return {
       total: logs.length,
-      createCount: logs.filter(l => l.action === 'CREATE').length,
-      updateCount: logs.filter(l => l.action === 'UPDATE').length,
-      deleteCount: logs.filter(l => l.action === 'DELETE').length,
+      createCount: logs.filter((l) => l.action === 'CREATE').length,
+      updateCount: logs.filter((l) => l.action === 'UPDATE').length,
+      deleteCount: logs.filter((l) => l.action === 'DELETE').length,
     };
   }, [logs]);
+
+  // Reset trang hiện tại về 1 khi thay đổi bộ lọc hoặc từ khóa tìm kiếm
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, actionFilter, collectionFilter, userFilter]);
 
   // Phân trang
   const totalPages = Math.ceil(filteredLogs.length / PAGE_SIZE) || 1;
@@ -167,17 +179,24 @@ const AuditLogPage: React.FC = () => {
   // Xuất file CSV
   const exportToCSV = () => {
     if (filteredLogs.length === 0) return;
-    const headers = ['Thời gian', 'Người thực hiện', 'Hành động', 'Phân hệ', 'Mã tài liệu', 'Chi tiết'];
-    const rows = filteredLogs.map(l => [
+    const headers = [
+      'Thời gian',
+      'Người thực hiện',
+      'Hành động',
+      'Phân hệ',
+      'Mã tài liệu',
+      'Chi tiết',
+    ];
+    const rows = filteredLogs.map((l) => [
       formatDateStandard(l.timestamp),
       `"${l.performedBy || ''}"`,
       `"${l.action}"`,
       `"${COLLECTION_LABELS[l.collection] || l.collection}"`,
       `"${l.documentId || ''}"`,
-      `"${(l.details || '').replace(/"/g, '""')}"`
+      `"${(l.details || '').replace(/"/g, '""')}"`,
     ]);
 
-    const csvContent = '\uFEFF' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
+    const csvContent = '\uFEFF' + [headers.join(','), ...rows.map((e) => e.join(','))].join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -245,7 +264,9 @@ const AuditLogPage: React.FC = () => {
             <span>Tạo mới</span>
             <PlusCircleIcon className="w-4 h-4" />
           </div>
-          <p className="text-2xl font-black text-emerald-600 dark:text-emerald-400 mt-1">{stats.createCount}</p>
+          <p className="text-2xl font-black text-emerald-600 dark:text-emerald-400 mt-1">
+            {stats.createCount}
+          </p>
         </div>
 
         <div className="p-4 rounded-2xl border border-border bg-surface shadow-xs">
@@ -253,7 +274,9 @@ const AuditLogPage: React.FC = () => {
             <span>Cập nhật</span>
             <PencilSquareIcon className="w-4 h-4" />
           </div>
-          <p className="text-2xl font-black text-sky-600 dark:text-sky-400 mt-1">{stats.updateCount}</p>
+          <p className="text-2xl font-black text-sky-600 dark:text-sky-400 mt-1">
+            {stats.updateCount}
+          </p>
         </div>
 
         <div className="p-4 rounded-2xl border border-border bg-surface shadow-xs">
@@ -261,7 +284,9 @@ const AuditLogPage: React.FC = () => {
             <span>Đã xóa</span>
             <TrashIcon className="w-4 h-4" />
           </div>
-          <p className="text-2xl font-black text-rose-600 dark:text-rose-400 mt-1">{stats.deleteCount}</p>
+          <p className="text-2xl font-black text-rose-600 dark:text-rose-400 mt-1">
+            {stats.deleteCount}
+          </p>
         </div>
       </div>
 
@@ -335,8 +360,10 @@ const AuditLogPage: React.FC = () => {
               className="w-full px-3 py-2.5 rounded-xl border border-border bg-surface-2 text-sm font-medium text-ink outline-none"
             >
               <option value="ALL">Tất cả người dùng</option>
-              {uniqueUsers.map(email => (
-                <option key={email} value={email}>{email}</option>
+              {uniqueUsers.map((email) => (
+                <option key={email} value={email}>
+                  {email}
+                </option>
               ))}
             </select>
           </div>
@@ -345,9 +372,13 @@ const AuditLogPage: React.FC = () => {
         {/* Thông báo số kết quả lọc */}
         <div className="flex items-center justify-between text-xs text-ink-muted pt-1">
           <span>
-            Hiển thị <strong>{filteredLogs.length}</strong> trên tổng số <strong>{logs.length}</strong> bản ghi
+            Hiển thị <strong>{filteredLogs.length}</strong> trên tổng số{' '}
+            <strong>{logs.length}</strong> bản ghi
           </span>
-          {(searchTerm || actionFilter !== 'ALL' || collectionFilter !== 'ALL' || userFilter !== 'ALL') && (
+          {(searchTerm ||
+            actionFilter !== 'ALL' ||
+            collectionFilter !== 'ALL' ||
+            userFilter !== 'ALL') && (
             <button
               onClick={() => {
                 setSearchTerm('');
@@ -391,7 +422,8 @@ const AuditLogPage: React.FC = () => {
               </thead>
               <tbody className="divide-y divide-border">
                 {paginatedLogs.map((log) => {
-                  const cfg = ACTION_CONFIG[log.action as keyof typeof ACTION_CONFIG] || ACTION_CONFIG.LOGIN;
+                  const cfg =
+                    ACTION_CONFIG[log.action as keyof typeof ACTION_CONFIG] || ACTION_CONFIG.LOGIN;
                   const Icon = cfg.icon;
 
                   return (
@@ -403,7 +435,9 @@ const AuditLogPage: React.FC = () => {
 
                       {/* Hành động */}
                       <td className="py-3 px-4">
-                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold border ${cfg.color}`}>
+                        <span
+                          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold border ${cfg.color}`}
+                        >
                           <Icon className="w-3.5 h-3.5" />
                           {cfg.label}
                         </span>
@@ -415,7 +449,10 @@ const AuditLogPage: React.FC = () => {
                           {COLLECTION_LABELS[log.collection] || log.collection}
                         </span>
                         {log.documentId && (
-                          <span className="block text-[11px] font-mono text-ink-muted mt-0.5 truncate max-w-[140px]" title={log.documentId}>
+                          <span
+                            className="block text-[11px] font-mono text-ink-muted mt-0.5 truncate max-w-[140px]"
+                            title={log.documentId}
+                          >
                             ID: {log.documentId}
                           </span>
                         )}
@@ -453,7 +490,7 @@ const AuditLogPage: React.FC = () => {
             <div className="flex items-center gap-1.5">
               <button
                 disabled={currentPage === 1}
-                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
                 className="p-1.5 rounded-lg border border-border bg-surface text-ink disabled:opacity-40 disabled:cursor-not-allowed hover:bg-surface-2 transition-colors"
               >
                 <ChevronLeftIcon className="w-4 h-4" />
@@ -461,7 +498,7 @@ const AuditLogPage: React.FC = () => {
 
               <button
                 disabled={currentPage === totalPages}
-                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
                 className="p-1.5 rounded-lg border border-border bg-surface text-ink disabled:opacity-40 disabled:cursor-not-allowed hover:bg-surface-2 transition-colors"
               >
                 <ChevronRightIcon className="w-4 h-4" />

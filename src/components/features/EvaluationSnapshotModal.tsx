@@ -23,7 +23,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { Modal } from '../ui/CommonUI';
 import { TestResult, TCCS } from '../../types';
-import { formatDateStandard } from '../../utils';
+import { formatDateStandard, ensureArray } from '../../utils';
 import {
   createEvaluationHash,
   verifyEvaluationSnapshotIntegrity,
@@ -181,8 +181,8 @@ export const EvaluationSnapshotModal: React.FC<EvaluationSnapshotModalProps> = (
                 </tr>
               </thead>
               <tbody className="divide-y divide-border text-xs">
-                {snapshot?.criterionResults && snapshot.criterionResults.length > 0 ? (
-                  snapshot.criterionResults.map((item, idx) => (
+                {ensureArray(snapshot?.criterionResults).length > 0 ? (
+                  ensureArray(snapshot?.criterionResults).map((item, idx) => (
                     <tr key={idx} className="hover:bg-surface-2/50 transition-colors">
                       <td className="py-2 px-3.5 text-ink-muted font-mono">{idx + 1}</td>
                       <td className="py-2 px-3.5 font-medium text-ink">{item.criteriaName}</td>
