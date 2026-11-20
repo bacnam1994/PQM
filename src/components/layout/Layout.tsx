@@ -32,11 +32,14 @@ import { useUIStore } from '../../store/useUIStore';
 import { useShallow } from 'zustand/react/shallow';
 import { useQualityAlerts } from '../../hooks/useQualityAlerts';
 import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcuts';
-import { GlobalCommandPalette } from './GlobalCommandPalette';
 import { ConfirmationModal } from '../ui/CommonUI';
 import { MaintenanceBanner } from '../system/MaintenanceBanner';
 
 import { useAIChatHostStore } from '../../store/useAIChatHostStore';
+
+const LazyGlobalCommandPalette = React.lazy(() =>
+  import('./GlobalCommandPalette').then((m) => ({ default: m.GlobalCommandPalette }))
+);
 
 const LazyAIAssistantChat = React.lazy(() =>
   import('../features/AIAssistantChat').then((m) => ({ default: m.AIAssistantChat }))
@@ -110,15 +113,6 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [showDropdown, setShowDropdown] = useState(false);
   const searchInputRef = React.useRef<HTMLInputElement>(null);
 
-  const { products, batches, tccsList, rawMaterials } = useAppStore(
-    useShallow((s) => ({
-      products: s.products,
-      batches: s.batches,
-      tccsList: s.tccsList,
-      rawMaterials: s.rawMaterials,
-    }))
-  );
-
   // Kích hoạt hệ thống phím tắt toàn cục (Ctrl+K, Ctrl+B, Esc, Ctrl+S)
   useKeyboardShortcuts({ onToggleSidebar: toggleSidebar });
 
@@ -128,19 +122,23 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     return () => window.removeEventListener('pqm:toggle-sidebar', handleToggleSidebarEvent);
   }, [toggleSidebar]);
 
+  // Chỉ đọc danh mục từ Store khi người dùng thực sự gõ vào ô tìm kiếm nhanh (tránh re-render toàn bộ Layout khi đồng bộ ngầm)
   const searchResults = React.useMemo(() => {
     if (!searchTerm.trim()) return null;
     const lowerQuery = searchTerm.toLowerCase();
+    const { products, batches, tccsList, rawMaterials } = useAppStore.getState();
     return {
-      products: products
+      products: (products || [])
         .filter(
           (p) =>
             p.name.toLowerCase().includes(lowerQuery) || p.code.toLowerCase().includes(lowerQuery)
         )
         .slice(0, 3),
-      batches: batches.filter((b) => b.batchNo.toLowerCase().includes(lowerQuery)).slice(0, 3),
-      tccs: tccsList.filter((t) => t.code.toLowerCase().includes(lowerQuery)).slice(0, 3),
-      materials: rawMaterials
+      batches: (batches || [])
+        .filter((b) => b.batchNo.toLowerCase().includes(lowerQuery))
+        .slice(0, 3),
+      tccs: (tccsList || []).filter((t) => t.code.toLowerCase().includes(lowerQuery)).slice(0, 3),
+      materials: (rawMaterials || [])
         .filter(
           (m) =>
             m.name.toLowerCase().includes(lowerQuery) ||
@@ -148,7 +146,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         )
         .slice(0, 3),
     };
-  }, [searchTerm, products, batches, tccsList, rawMaterials]);
+  }, [searchTerm]);
 
   const toggleTheme = () => setTheme(theme === 'dark' ? 'light' : 'dark');
 
@@ -696,20 +694,14 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
         {/* Main Content Area */}
         <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 bg-transparent">
-          <motion.div
-            key={location.pathname}
-            initial={shouldReduceMotion ? false : { opacity: 0, y: 6 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.18, ease: 'easeOut' }}
-            className="mx-auto max-w-7xl"
-          >
-            {children}
-          </motion.div>
+          <div className="mx-auto max-w-7xl">{children}</div>
         </main>
       </div>
 
       {role !== 'GUEST' && <AIChatSessionHost />}
-      <GlobalCommandPalette />
+      <React.Suspense fallback={null}>
+        <LazyGlobalCommandPalette />
+      </React.Suspense>
       <ConfirmationModal
         isOpen={isLogoutModalOpen}
         onClose={() => setIsLogoutModalOpen(false)}

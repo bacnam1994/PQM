@@ -5,7 +5,7 @@
 
 import { useMemo } from 'react';
 import { useAppStore } from '../store/useAppStore';
-import { useDataGraph } from './useDataGraph';
+import { useShallow } from 'zustand/react/shallow';
 
 export interface ActionItem {
   id: string;
@@ -28,32 +28,25 @@ export interface QAQCActionQueueReturn {
 }
 
 export function useQAQCActionQueue(): QAQCActionQueueReturn {
-  const {
-    batches: graphBatches = [],
-    testResults: graphTestResults = [],
-    products: graphProducts = [],
-    getBatchById,
-    getProductById,
-  } = useDataGraph();
-
-  const storeBatches = useAppStore((state) => state.batches) || [];
-  const storeTestResults = useAppStore((state) => state.testResults) || [];
-  const qualityAlerts = useAppStore((state) => state.qualityAlerts) || [];
-  const storeProducts = useAppStore((state) => state.products) || [];
-
-  const batches = graphBatches.length > 0 ? graphBatches : storeBatches;
-  const testResults = graphTestResults.length > 0 ? graphTestResults : storeTestResults;
-  const products = graphProducts.length > 0 ? graphProducts : storeProducts;
+  const { batches, testResults, qualityAlerts, products } = useAppStore(
+    useShallow((state) => ({
+      batches: state.batches || [],
+      testResults: state.testResults || [],
+      qualityAlerts: state.qualityAlerts || [],
+      products: state.products || [],
+    }))
+  );
 
   return useMemo(() => {
     const items: ActionItem[] = [];
+    const productById = new Map(products.map((p) => [p.id, p]));
+    const batchById = new Map(batches.map((b) => [b.id, b]));
+    const batchByNo = new Map(batches.filter((b) => b.batchNo).map((b) => [b.batchNo, b]));
 
     // 1. Các lô sản xuất đang chờ thẩm định / kiểm nghiệm (Pending Clearance)
     const activeBatches = batches.filter((b) => b.status === 'TESTING' || b.status === 'PENDING');
     activeBatches.forEach((b) => {
-      const prod = getProductById
-        ? getProductById(b.productId)
-        : products.find((p) => p.id === b.productId);
+      const prod = productById.get(b.productId);
       items.push({
         id: `action_batch_${b.id}`,
         type: 'BATCH_CLEARANCE',
@@ -69,15 +62,8 @@ export function useQAQCActionQueue(): QAQCActionQueueReturn {
     // 2. Phiếu kiểm nghiệm có kết quả OOS/FAIL hoặc chưa đạt
     const nonPassResults = testResults.filter((r) => r.overallStatus !== 'PASS');
     nonPassResults.forEach((r) => {
-      // Tích hợp useDataGraph ($O(1)$ Lookup): getBatchById và getProductById
-      const batch = getBatchById
-        ? getBatchById(r.batchId)
-        : batches.find((b) => b.id === r.batchId);
-      const product = batch?.productId
-        ? getProductById
-          ? getProductById(batch.productId)
-          : products.find((p) => p.id === batch.productId)
-        : undefined;
+      const batch = batchById.get(r.batchId) || batchByNo.get(r.batchId);
+      const product = batch?.productId ? productById.get(batch.productId) : undefined;
 
       const batchNo = batch?.batchNo || r.batchId;
       const productName = product?.name || 'Sản phẩm';
@@ -133,5 +119,5 @@ export function useQAQCActionQueue(): QAQCActionQueueReturn {
       alertCount: qualityAlerts.length,
       hasUrgentItems: highCount > 0,
     };
-  }, [batches, testResults, qualityAlerts, products, getBatchById, getProductById]);
+  }, [batches, testResults, qualityAlerts, products]);
 }

@@ -11,7 +11,12 @@ import { useAppStore } from './store/useAppStore';
 import { useShallow } from 'zustand/react/shallow';
 import { useUIStore, loadUserPreferences, resetToSharedKey } from './store/useUIStore';
 import { lazyWithRetry } from './utils/lazyWithRetry';
-import { initIdleRoutePrefetch } from './utils/routePreloader';
+import { initIdleRoutePrefetch, preloadRoute } from './utils/routePreloader';
+
+// Phá vỡ Network Waterfall: Bắt đầu tải chunk của URL hiện tại ngay khi đánh giá module App.tsx
+if (typeof window !== 'undefined') {
+  preloadRoute(window.location.pathname);
+}
 
 const Dashboard = lazyWithRetry(() => import('./pages/system/Dashboard'), 'Dashboard');
 const ProductList = lazyWithRetry(() => import('./pages/products/ProductList'), 'ProductList');

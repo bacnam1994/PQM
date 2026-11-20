@@ -58,9 +58,22 @@ const Dashboard: React.FC = () => {
   // Quality alerts from custom hook
   const { alerts, highCount } = useQualityAlerts(30);
 
-  // Fetch all test results once on dashboard mount
+  // Fetch all test results in idle time on dashboard mount so it never blocks first paint
   useEffect(() => {
-    fetchAllTestResultsForDashboard();
+    if ('requestIdleCallback' in window) {
+      const id = (window as any).requestIdleCallback(
+        () => {
+          fetchAllTestResultsForDashboard();
+        },
+        { timeout: 1500 }
+      );
+      return () => (window as any).cancelIdleCallback?.(id);
+    } else {
+      const timer = setTimeout(() => {
+        fetchAllTestResultsForDashboard();
+      }, 400);
+      return () => clearTimeout(timer);
+    }
   }, [fetchAllTestResultsForDashboard]);
 
   // Handle manual refresh
@@ -148,7 +161,7 @@ const Dashboard: React.FC = () => {
     return items.sort((a, b) => a.daysRemaining - b.daysRemaining);
   }, [batches, productMap]);
 
-  // Aggregate global statistics
+  // Aggregate global statistics (O(N + M) pre-indexed Maps instead of O(N * M) nested scans)
   const stats = useMemo<DashboardStats>(() => {
     const totalProducts = products.length;
     const activeProducts = products.filter((p) => p.status === PRODUCT_STATUS.ACTIVE).length;
@@ -160,16 +173,30 @@ const Dashboard: React.FC = () => {
     let rejectedBatches = 0; // REJECTED or FAIL
     let passBatches = 0;
 
+    // Pre-index TCCS by ID and TestResults by BatchID / BatchNo in O(M) once
+    const tccsByIdMap = new Map(tccsList.map((t) => [t.id, t]));
+    const resultsByBatchKey = new Map<string, typeof testResults>();
+    testResults.forEach((r) => {
+      if (!r?.batchId) return;
+      const list = resultsByBatchKey.get(r.batchId);
+      if (list) list.push(r);
+      else resultsByBatchKey.set(r.batchId, [r]);
+    });
+
     filteredBatchesByDate.forEach((b) => {
-      const boundTccs = (b as any).tccs || tccsList.find((t) => t.id === b.tccsId);
-      const inspectionStatus =
-        b.inspectionStatus ||
-        BatchInspectionProgressService.resolveInspectionStatusWithFallback({
+      const boundTccs = (b as any).tccs || (b.tccsId ? tccsByIdMap.get(b.tccsId) : undefined);
+      let inspectionStatus = b.inspectionStatus;
+      if (!inspectionStatus) {
+        const byId = resultsByBatchKey.get(b.id) || [];
+        const byNo = b.batchNo && b.batchNo !== b.id ? resultsByBatchKey.get(b.batchNo) || [] : [];
+        const scopedResults = byNo.length > 0 ? [...byId, ...byNo] : byId;
+        inspectionStatus = BatchInspectionProgressService.resolveInspectionStatusWithFallback({
           batch: b,
-          testResults,
+          testResults: scopedResults,
           tccs: boundTccs,
           tccsList,
         });
+      }
 
       if (b.status === BATCH_STATUS.RELEASED) {
         releasedBatches++;
@@ -253,7 +280,7 @@ const Dashboard: React.FC = () => {
     testResults.forEach((r) => {
       const dateStr = r.testDate || r.createdAt;
       if (!dateStr) return;
-      const key = dateStr.slice(0, 7);
+      const key = String(dateStr).slice(0, 7);
       const bucket = monthsMap.get(key);
       if (bucket) {
         bucket.total++;

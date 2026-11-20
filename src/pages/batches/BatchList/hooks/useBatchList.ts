@@ -127,10 +127,14 @@ export function useBatchList() {
 
           if (isInspectionFilter) {
             const resolvedInspection =
+              batch.inspectionStatus ||
               BatchInspectionProgressService.resolveInspectionStatusWithFallback({
                 batch,
-                testResults: sourceResults,
-                tccs: tccsList.find((t) => t.id === batch.tccsId),
+                testResults:
+                  Array.isArray(batch.testResults) && batch.testResults.length > 0
+                    ? batch.testResults
+                    : sourceResults,
+                tccs: batch.tccs || tccsList.find((t) => t.id === batch.tccsId),
                 tccsList,
               });
             if (resolvedInspection !== filterStatus) return false;
