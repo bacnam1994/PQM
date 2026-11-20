@@ -147,7 +147,9 @@ export const useTestResultForm = (onInitialBatchSelect?: (batchNo: string) => vo
     );
     const hasExtra = Array.isArray(vals?.extraCriteria) && vals.extraCriteria.length > 0;
     const hasNotes = Boolean(vals?.notes && String(vals.notes).trim() !== '');
-    return !hasMeaningfulCriteria && !hasExtra && !hasNotes;
+    const hasLabName = Boolean(vals?.labName && String(vals.labName).trim() !== '');
+    const hasReportNo = Boolean(vals?.reportNo && String(vals.reportNo).trim() !== '');
+    return !hasMeaningfulCriteria && !hasExtra && !hasNotes && !hasLabName && !hasReportNo;
   }, []);
 
   const onDraftLoaded = useCallback(

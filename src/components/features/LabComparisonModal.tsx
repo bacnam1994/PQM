@@ -57,14 +57,14 @@ export const LabComparisonModal: React.FC<LabComparisonModalProps> = ({
   const [isUploading, setIsUploading] = useState(false);
   const [uploadStep, setUploadStep] = useState('');
 
-  if (!isOpen) return null;
-
   const mergedResults = React.useMemo(() => {
     const map = new Map<string, TestResult>();
     (allTestResults || []).forEach((r) => r && map.set(r.id, r));
     (testResults || []).forEach((r) => r && map.set(r.id, r));
     return Array.from(map.values());
   }, [allTestResults, testResults]);
+
+  if (!isOpen) return null;
 
   const availableResults = batch
     ? mergedResults.filter(

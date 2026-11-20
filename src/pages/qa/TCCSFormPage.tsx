@@ -401,6 +401,8 @@ const TCCSFormPage = () => {
       return;
     }
 
+    const existingTccs = id && !cloneId ? tccsList.find((t) => t.id === id) : undefined;
+
     const tccsData: TCCS = {
       id: id && !cloneId ? id : generateId('tccs'),
       productId: formValues.productId,
@@ -410,8 +412,8 @@ const TCCSFormPage = () => {
       storage: formValues.storage,
       shelfLife: formValues.shelfLife,
       standardRefs: formValues.standardRefs?.join(', ') || '',
-      isActive: true,
-      composition: '',
+      isActive: existingTccs ? existingTccs.isActive : true,
+      composition: existingTccs?.composition || '',
       mainQualityCriteria: formValues.mainCriteria.filter((c) => c.name),
       safetyCriteria: [
         ...formValues.microbiologicalCriteria
@@ -425,13 +427,12 @@ const TCCSFormPage = () => {
           .map((c) => ({ ...(c as any), category: 'mycotoxin' })),
       ],
       alternateRules: formValues.alternateRules.filter((r) => r.main && r.alt),
-      createdAt: new Date().toISOString(),
+      createdAt: existingTccs?.createdAt || new Date().toISOString(),
     };
 
     try {
       if (id && !cloneId) {
-        const oldTCCS = tccsList.find((t) => t.id === id);
-        await updateTCCSMutation.mutateAsync({ tccs: tccsData, oldTCCS });
+        await updateTCCSMutation.mutateAsync({ tccs: tccsData, oldTCCS: existingTccs });
         notify({ type: 'SUCCESS', title: 'Thành công', message: 'Đã cập nhật hồ sơ TCCS.' });
       } else {
         await createTCCSMutation.mutateAsync({ tccs: tccsData });

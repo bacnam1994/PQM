@@ -266,8 +266,6 @@ const CriteriaInputGroup: React.FC<CriteriaInputGroupProps> = ({
   existingResultsForBatch,
   aiFilledFields,
 }) => {
-  if (!criteria || criteria.length === 0) return null;
-
   const rulesMap = useMemo(() => {
     const map = new Map<string, any>();
     (activeTCCS?.alternateRules || []).forEach((r: any) => {
@@ -288,6 +286,7 @@ const CriteriaInputGroup: React.FC<CriteriaInputGroupProps> = ({
 
   const historyMap = useMemo(() => {
     const map = new Map<string, any[]>();
+    if (!criteria || criteria.length === 0) return map;
     existingResultsForBatch.forEach((r) => {
       ensureArray(r.results).forEach((item) => {
         if (item && item.criteriaName) {
@@ -309,7 +308,7 @@ const CriteriaInputGroup: React.FC<CriteriaInputGroupProps> = ({
     [setMapValue]
   );
 
-  if (visibleCriteria.length === 0) return null;
+  if (!visibleCriteria || visibleCriteria.length === 0) return null;
 
   return (
     <div className="space-y-3 animate-in fade-in">

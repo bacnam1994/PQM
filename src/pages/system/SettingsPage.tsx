@@ -363,7 +363,11 @@ const SettingsPage: React.FC = () => {
       URL.revokeObjectURL(url);
     } catch (error) {
       console.error('Lỗi khi tạo bản sao lưu:', error);
-      alert('Không thể tạo bản sao lưu. Vui lòng kiểm tra kết nối mạng.');
+      useAppStore.getState().notify({
+        type: 'ERROR',
+        title: 'Lỗi sao lưu',
+        message: 'Không thể tạo bản sao lưu. Vui lòng kiểm tra kết nối mạng.',
+      });
     }
   };
 
@@ -394,7 +398,11 @@ const SettingsPage: React.FC = () => {
             () => loadBackup(data)
           );
         } catch (err) {
-          alert('Tệp dữ liệu không hợp lệ hoặc bị hỏng!');
+          useAppStore.getState().notify({
+            type: 'ERROR',
+            title: 'Lỗi tệp sao lưu',
+            message: 'Tệp dữ liệu không hợp lệ hoặc bị hỏng!',
+          });
           console.error(err);
         }
       };
