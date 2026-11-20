@@ -21,7 +21,7 @@ export class FirebaseMasterCriterionRepository
       const q = fbQuery(ref(db, this.collectionPath), orderByChild('isActive'), equalTo(true));
       const snap = await get(q);
       if (!snap.exists()) return [];
-      return Object.values(snap.val()) as MasterCriterion[];
+      return this.normalizeRecordsMap(snap.val());
     } catch {
       // Fallback nếu chưa đánh index Firebase
       const all = await this.findAll();

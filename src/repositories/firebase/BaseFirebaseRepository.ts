@@ -22,6 +22,7 @@ import {
 import { db } from '../../firebase';
 import { IRepository, PaginationOptions, QueryFilter, PaginatedResult } from '../types';
 import { removeUndefined } from '../../utils';
+import { normalizeEntityByCollection, normalizeCollectionList } from '../../utils/entityNormalizer';
 import { paginateDataset, applyFilters } from '../utils/paginationHelper';
 import { getQueryPolicy, FailClosedQueryError, QueryPolicy } from '../queryPolicy';
 
@@ -32,18 +33,28 @@ export abstract class BaseFirebaseRepository<T extends { id: string }> implement
     return getQueryPolicy(this.collectionPath);
   }
 
+  protected normalizeRecord(raw: any, fallbackId?: string): T {
+    return normalizeEntityByCollection<T>(this.collectionPath, raw, fallbackId);
+  }
+
+  protected normalizeRecordsMap(rawObj: Record<string, any> | null | undefined): T[] {
+    if (!rawObj || typeof rawObj !== 'object') return [];
+    return Object.entries(rawObj)
+      .filter(([, val]) => val != null && typeof val === 'object')
+      .map(([key, val]) => this.normalizeRecord(val, key));
+  }
+
   async findById(id: string): Promise<T | null> {
     if (!id) return null;
     const snapshot = await get(ref(db, `${this.collectionPath}/${id}`));
     if (!snapshot.exists()) return null;
-    return snapshot.val() as T;
+    return this.normalizeRecord(snapshot.val(), id);
   }
 
   async findAll(): Promise<T[]> {
     const snapshot = await get(ref(db, this.collectionPath));
     if (!snapshot.exists()) return [];
-    const val = snapshot.val();
-    return Object.values(val) as T[];
+    return this.normalizeRecordsMap(snapshot.val());
   }
 
   /**
@@ -71,7 +82,7 @@ export abstract class BaseFirebaseRepository<T extends { id: string }> implement
         try {
           const boundedQuery = query(ref(db, this.collectionPath), limitToLast(500));
           const snap = await get(boundedQuery);
-          candidateItems = snap.exists() ? (Object.values(snap.val()) as T[]) : [];
+          candidateItems = snap.exists() ? this.normalizeRecordsMap(snap.val()) : [];
         } catch (err) {
           if (this.queryPolicy.noFullScanFallback) {
             throw new FailClosedQueryError(
@@ -140,7 +151,7 @@ export abstract class BaseFirebaseRepository<T extends { id: string }> implement
       }
 
       const rawObj = snapshot.val();
-      let items = Object.values(rawObj) as T[];
+      let items = this.normalizeRecordsMap(rawObj);
 
       // Đảo chiều nếu sắp xếp giảm dần và dùng limitToLast
       if (direction === 'desc') {
@@ -198,7 +209,7 @@ export abstract class BaseFirebaseRepository<T extends { id: string }> implement
     } else {
       try {
         const snap = await get(query(ref(db, this.collectionPath), limitToLast(500)));
-        candidateItems = snap.exists() ? (Object.values(snap.val()) as T[]) : [];
+        candidateItems = snap.exists() ? this.normalizeRecordsMap(snap.val()) : [];
       } catch (err) {
         if (this.queryPolicy.noFullScanFallback) {
           throw new FailClosedQueryError(this.collectionPath, 'count.candidate', err);
@@ -225,8 +236,7 @@ export abstract class BaseFirebaseRepository<T extends { id: string }> implement
       );
       const snapshot = await get(q);
       if (!snapshot.exists()) return [];
-      const val = snapshot.val();
-      return Object.values(val) as T[];
+      return this.normalizeRecordsMap(snapshot.val());
     } catch (err) {
       if (this.queryPolicy.noFullScanFallback) {
         throw new FailClosedQueryError(

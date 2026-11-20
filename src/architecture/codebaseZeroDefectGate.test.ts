@@ -304,5 +304,41 @@ describe('PQM Zero-Defect Codebase Invariant Gates (100% Source Coverage)', () =
       { id: 'rm_1', name: 'Vitamin C', aliases: undefined } as any,
     ]);
     expect(Array.isArray(normMaterials[0].aliases)).toBe(true);
+
+    // Also verify Firebase RTDB path names (snake_case) used by BaseFirebaseRepository
+    const normFormulaFromRepo = normalizeEntityByCollection('product_formulas', rawFormulaFromRtdb);
+    expect(Array.isArray(normFormulaFromRepo.ingredients)).toBe(true);
+    expect(Array.isArray(normFormulaFromRepo.excipients)).toBe(true);
+
+    const normMasterCriterion = normalizeEntityByCollection('master_criteria', {
+      id: 'mc_1',
+      canonicalName: 'Định tính',
+      defaultUnit: undefined,
+      aliases: undefined,
+    } as any);
+    expect(normMasterCriterion.defaultUnit).toBe('');
+    expect(Array.isArray(normMasterCriterion.aliases)).toBe(true);
+  });
+
+  it('Gate 7: All primary Firebase RTDB ingestion boundaries enforce entityNormalizer', () => {
+    const ingestionFiles = [
+      path.join(SRC_DIR, 'hooks', 'useFirebaseSync.ts'),
+      path.join(SRC_DIR, 'repositories', 'firebase', 'BaseFirebaseRepository.ts'),
+      path.join(SRC_DIR, 'repositories', 'firebase', 'FirebaseMasterCriterionRepository.ts'),
+      path.join(SRC_DIR, 'services', 'testResultService.ts'),
+    ];
+
+    for (const file of ingestionFiles) {
+      const content = fs.readFileSync(file, 'utf8');
+      const hasNormalizer =
+        content.includes('normalizeEntityByCollection') ||
+        content.includes('normalizeCollectionList') ||
+        content.includes('this.normalizeRecordsMap') ||
+        content.includes('this.normalizeRecord');
+      expect(
+        hasNormalizer,
+        `Ingestion boundary ${path.relative(SRC_DIR, file)} must normalize RTDB payloads`
+      ).toBe(true);
+    }
   });
 });

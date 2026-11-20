@@ -2,6 +2,7 @@ import { ref, query, orderByChild, equalTo, get, update, limitToLast } from 'fir
 import { db } from '../firebase';
 import { TestResult } from '../types';
 import { getFromCache, saveToCache } from '../utils/offlineCache';
+import { normalizeEntityByCollection, normalizeCollectionList } from '../utils/entityNormalizer';
 import { useAppStore } from '../store/useAppStore';
 
 /**
@@ -83,10 +84,12 @@ export const fetchTestResultsByBatchId = async (targetBatchId: string): Promise<
           r.batchId?.endsWith(targetBatchId))
     );
 
-    // 4. Gộp dữ liệu (ưu tiên DB nếu trùng ID)
+    // 4. Gộp dữ liệu (ưu tiên DB nếu trùng ID) và chuẩn hóa cấu trúc tại biên
     const merged = new Map<string, TestResult>();
     [...storeResults, ...localResults, ...fbResults].forEach((r) => {
-      if (r && r.id) merged.set(r.id, r);
+      if (r && r.id) {
+        merged.set(r.id, normalizeEntityByCollection('testResults', r, r.id));
+      }
     });
     const finalResults = Array.from(merged.values());
 
@@ -143,7 +146,11 @@ export const fetchTestResultById = async (idOrSuffix: string): Promise<TestResul
     // 3.1 Thử fetch trực tiếp theo ID đầy đủ trước (nhanh nhất)
     const directSnap = await get(ref(db, `testResults/${idOrSuffix}`));
     if (directSnap.exists()) {
-      const found = directSnap.val() as TestResult;
+      const found = normalizeEntityByCollection(
+        'testResults',
+        directSnap.val() as TestResult,
+        idOrSuffix
+      );
       const mergeTestResults = useAppStore.getState().mergeTestResults;
       if (mergeTestResults) mergeTestResults([found]);
       return found;
@@ -157,7 +164,7 @@ export const fetchTestResultById = async (idOrSuffix: string): Promise<TestResul
         const val = recentSnap.val();
         for (const key of Object.keys(val)) {
           if (key === idOrSuffix || key.endsWith(idOrSuffix)) {
-            const found = val[key] as TestResult;
+            const found = normalizeEntityByCollection('testResults', val[key] as TestResult, key);
             const mergeTestResults = useAppStore.getState().mergeTestResults;
             if (mergeTestResults) mergeTestResults([found]);
             return found;
@@ -207,34 +214,38 @@ export const fetchTestResultsByProductId = async (productId: string): Promise<Te
 
     if (productBatches.length === 0) return [];
 
-    const batchIds = productBatches.map((b) => b.id);
+    const batchIds = productBatches.map((b) => b.id).filter(Boolean);
+    const batchNos = productBatches.map((b) => b.batchNo).filter(Boolean);
 
-    // 2. Tra cứu kết quả kiểm nghiệm có sẵn trong store và cache trước (không cần fetch riêng lẻ)
+    // 2. Tra cứu kết quả kiểm nghiệm có sẵn trong store và cache trước (khớp cả batch.id lẫn batchNo)
     const allAvailableResults = [
       ...(appState.allTestResults || []),
       ...(appState.testResults || []),
     ];
 
-    const batchIdSet = new Set(batchIds);
-    const fromStore = allAvailableResults.filter((r) => r && batchIdSet.has(r.batchId));
+    const batchKeySet = new Set([...batchIds, ...batchNos]);
+    const fromStore = allAvailableResults.filter((r) => r && batchKeySet.has(r.batchId));
 
     // Kiểm tra các lô chưa có dữ liệu kiểm nghiệm trong store
-    const batchIdsInStore = new Set(fromStore.map((r) => r.batchId));
-    const missingBatchIds = batchIds.filter((id) => !batchIdsInStore.has(id));
+    const batchKeysInStore = new Set(fromStore.map((r) => r.batchId));
+    const missingBatchKeys = Array.from(batchKeySet).filter((k) => !batchKeysInStore.has(k));
 
     // 3. Fetch các lô còn thiếu từ Firebase
     let fromFirebase: TestResult[] = [];
-    if (missingBatchIds.length > 0) {
+    if (missingBatchKeys.length > 0) {
       try {
-        // Model 2.5 Hardening: Query chính xác theo batchId của các lô còn thiếu, không quét toàn bộ testResults
+        // Model 2.5 Hardening: Query chính xác theo batchId/batchNo của các lô còn thiếu, không quét toàn bộ testResults
         const results = await Promise.all(
-          missingBatchIds.map(async (bId) => {
+          missingBatchKeys.map(async (bKey) => {
             try {
-              const q = query(ref(db, 'testResults'), orderByChild('batchId'), equalTo(bId));
+              const q = query(ref(db, 'testResults'), orderByChild('batchId'), equalTo(bKey));
               const snap = await get(q);
               return snap.exists() ? (Object.values(snap.val()) as TestResult[]) : [];
             } catch (e) {
-              console.warn(`[testResultService] Không thể tải testResults cho batchId ${bId}:`, e);
+              console.warn(
+                `[testResultService] Không thể tải testResults cho batchKey ${bKey}:`,
+                e
+              );
               return [];
             }
           })
@@ -245,10 +256,12 @@ export const fetchTestResultsByProductId = async (productId: string): Promise<Te
       }
     }
 
-    // 4. Gộp và loại trùng
+    // 4. Gộp, loại trùng và chuẩn hóa cấu trúc tại biên
     const merged = new Map<string, TestResult>();
     [...fromStore, ...fromFirebase].forEach((r) => {
-      if (r && r.id) merged.set(r.id, r);
+      if (r && r.id) {
+        merged.set(r.id, normalizeEntityByCollection('testResults', r, r.id));
+      }
     });
 
     const finalResults = Array.from(merged.values());
@@ -298,7 +311,7 @@ export const fetchAllTestResultsRaw = async (limitCount = 300): Promise<TestResu
     const snapshot = await get(recentQuery);
     if (snapshot.exists()) {
       const data = snapshot.val();
-      return Object.values(data) as TestResult[];
+      return normalizeCollectionList('testResults', Object.values(data) as TestResult[]);
     }
   } catch (err) {
     console.error('[testResultService] Lỗi khi tải testResults gần nhất (Fail-Closed):', err);

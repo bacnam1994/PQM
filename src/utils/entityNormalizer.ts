@@ -65,11 +65,13 @@ export function normalizeEntityByCollection<T = any>(
       break;
 
     case 'productFormulas':
+    case 'product_formulas':
       item.ingredients = ensureArray(item.ingredients);
       item.excipients = ensureArray(item.excipients);
       break;
 
     case 'rawMaterials':
+    case 'raw_materials':
       item.name = item.name != null ? String(item.name) : '';
       item.code = item.code != null ? String(item.code) : '';
       item.aliases = ensureArray(item.aliases);
@@ -90,12 +92,21 @@ export function normalizeEntityByCollection<T = any>(
       break;
 
     case 'criteriaAliases':
+    case 'criteria_aliases':
       item.aliases = ensureArray(item.aliases);
       break;
 
     case 'testingLaboratories':
+    case 'testing_laboratories':
       item.code = item.code != null ? String(item.code) : '';
       item.canonicalName = item.canonicalName != null ? String(item.canonicalName) : '';
+      item.aliases = ensureArray(item.aliases);
+      break;
+
+    case 'masterCriteria':
+    case 'master_criteria':
+      item.canonicalName = item.canonicalName != null ? String(item.canonicalName) : '';
+      item.defaultUnit = item.defaultUnit != null ? String(item.defaultUnit) : '';
       item.aliases = ensureArray(item.aliases);
       break;
 
