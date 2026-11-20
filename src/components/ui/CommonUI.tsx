@@ -1,4 +1,4 @@
-import React, { memo, Fragment } from 'react';
+import React, { memo, Fragment, useEffect } from 'react';
 import { Dialog, DialogPanel, DialogTitle, Transition, TransitionChild } from '@headlessui/react';
 import {
   XMarkIcon,
@@ -245,6 +245,13 @@ export const Pagination: React.FC<{
   totalPages: number;
   onPageChange: (page: number) => void;
 }> = memo(({ currentPage, totalPages, onPageChange }) => {
+  // Tự động đưa currentPage về trang hợp lệ khi số trang giảm (vd: xóa bản ghi cuối ở trang cuối)
+  useEffect(() => {
+    if (totalPages > 0 && currentPage > totalPages) {
+      onPageChange(totalPages);
+    }
+  }, [currentPage, totalPages, onPageChange]);
+
   if (totalPages <= 1) {
     return null;
   }

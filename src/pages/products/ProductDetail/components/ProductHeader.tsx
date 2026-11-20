@@ -62,7 +62,7 @@ export const ProductHeader: React.FC<ProductHeaderProps> = ({
               <>
                 <button
                   type="button"
-                  onClick={() => navigate(`/products/${product.id}/edit`)}
+                  onClick={() => navigate(`/products/edit/${product.id}`)}
                   className="flex items-center gap-1.5 px-3 py-1.5 bg-surface-2 text-ink hover:bg-surface-3 rounded-lg font-medium border border-border transition-all text-xs cursor-pointer"
                 >
                   <PencilSquareIcon className="h-3.5 w-3.5" /> Sửa
@@ -82,15 +82,17 @@ export const ProductHeader: React.FC<ProductHeaderProps> = ({
 
       {/* Tabs */}
       <div className="flex border-b border-border gap-2 overflow-x-auto scrollbar-hide">
-        {tabs.map(tab => (
+        {tabs.map((tab) => (
           <button
             key={tab.id}
             onClick={() => onTabChange(tab.id)}
             className={`
               flex items-center gap-2 px-4 py-2.5 text-xs font-semibold border-b-2 transition-all whitespace-nowrap cursor-pointer
-              ${activeTab === tab.id 
-                ? 'border-emerald-600 text-emerald-700 dark:text-emerald-400' 
-                : 'border-transparent text-ink-muted hover:text-ink'}
+              ${
+                activeTab === tab.id
+                  ? 'border-emerald-600 text-emerald-700 dark:text-emerald-400'
+                  : 'border-transparent text-ink-muted hover:text-ink'
+              }
             `}
           >
             <tab.icon className="h-4 w-4" />

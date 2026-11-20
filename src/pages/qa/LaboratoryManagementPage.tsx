@@ -94,7 +94,7 @@ export const LaboratoryManagementPage: React.FC = () => {
       if (tr.labId && stats[tr.labId]) {
         stats[tr.labId].total += 1;
         if (tr.overallStatus === 'PASS') stats[tr.labId].pass += 1;
-        else stats[tr.labId].fail += 1;
+        else if (tr.overallStatus === 'FAIL') stats[tr.labId].fail += 1;
       }
     });
 
@@ -148,10 +148,11 @@ export const LaboratoryManagementPage: React.FC = () => {
 
       if (!query) return true;
 
-      const inCode = lab.code.toLowerCase().includes(query);
-      const inName = lab.canonicalName.toLowerCase().includes(query);
+      const inCode = (lab.code || '').toLowerCase().includes(query);
+      const inName = (lab.canonicalName || '').toLowerCase().includes(query);
       const inAliases =
-        Array.isArray(lab.aliases) && lab.aliases.some((a) => a.toLowerCase().includes(query));
+        Array.isArray(lab.aliases) &&
+        lab.aliases.some((a) => (a || '').toLowerCase().includes(query));
       const inDesc = (lab.description || '').toLowerCase().includes(query);
 
       return inCode || inName || inAliases || inDesc;

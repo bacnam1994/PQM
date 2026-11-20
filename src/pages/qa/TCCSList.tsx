@@ -61,7 +61,8 @@ const TCCSGridItem = React.memo(
     onEdit,
     onDelete,
     handleViewHistory,
-    isAdmin,
+    canManage,
+    canDelete,
   }: any) => {
     return (
       <div
@@ -145,9 +146,9 @@ const TCCSGridItem = React.memo(
             </button>
             <ActionButtons
               onView={() => onView(tccs)}
-              onClone={isAdmin ? () => onClone(tccs) : undefined}
-              onEdit={isAdmin ? () => onEdit(tccs) : undefined}
-              onDelete={isAdmin ? () => onDelete(tccs) : undefined}
+              onClone={canManage ? () => onClone(tccs) : undefined}
+              onEdit={canManage ? () => onEdit(tccs) : undefined}
+              onDelete={canDelete ? () => onDelete(tccs) : undefined}
             />
           </div>
           <button
@@ -174,22 +175,21 @@ const TCCSGridItem = React.memo(
 );
 
 const TCCSExpandedStructure = ({ tccs }: { tccs: any }) => {
-  const HEAVY_METAL_KEYWORDS = ['asen', 'chì', 'thủy ngân', 'cadmi'];
+  const HEAVY_METAL_KEYWORDS = ['asen', 'chì', 'thủy ngân', 'cadmi', 'pb', 'as', 'hg', 'cd'];
+  const MYCOTOXIN_KEYWORDS = ['aflatoxin', 'ochratoxin', 'độc tố', 'mycotoxin', 'vi nấm'];
   const safety = ensureArray(tccs?.safetyCriteria);
-  const micro = safety.filter((c: any) => {
-    if (!c) return false;
-    const nl = (c.name || '').toLowerCase();
-    return (
-      c.category === 'micro' || (!c.category && !HEAVY_METAL_KEYWORDS.some((kw) => nl.includes(kw)))
-    );
-  });
-  const metal = safety.filter((c: any) => {
-    if (!c) return false;
-    const nl = (c.name || '').toLowerCase();
-    return (
-      c.category === 'metal' || (!c.category && HEAVY_METAL_KEYWORDS.some((kw) => nl.includes(kw)))
-    );
-  });
+  const classify = (c: any): 'micro' | 'metal' | 'mycotoxin' => {
+    if (c?.category === 'micro' || c?.category === 'metal' || c?.category === 'mycotoxin') {
+      return c.category;
+    }
+    const nl = (c?.name || '').toLowerCase();
+    if (MYCOTOXIN_KEYWORDS.some((kw) => nl.includes(kw))) return 'mycotoxin';
+    if (HEAVY_METAL_KEYWORDS.some((kw) => nl.includes(kw))) return 'metal';
+    return 'micro';
+  };
+  const micro = safety.filter((c: any) => c && classify(c) === 'micro');
+  const metal = safety.filter((c: any) => c && classify(c) === 'metal');
+  const mycotoxin = safety.filter((c: any) => c && classify(c) === 'mycotoxin');
 
   const renderReq = (c: any) => {
     if (c.type === 'NUMBER') {
@@ -261,9 +261,15 @@ const TCCSExpandedStructure = ({ tccs }: { tccs: any }) => {
         criteria={metal}
         color="text-rose-600 dark:text-rose-400"
       />
+      <CriteriaTable
+        title="Độc tố vi nấm (Mycotoxin)"
+        criteria={mycotoxin}
+        color="text-amber-600 dark:text-amber-400"
+      />
       {ensureArray(tccs?.mainQualityCriteria).length === 0 &&
         micro.length === 0 &&
-        metal.length === 0 && (
+        metal.length === 0 &&
+        mycotoxin.length === 0 && (
           <p className="text-center text-ink-muted italic text-xs py-3">
             Chưa có chỉ tiêu nào được khai báo.
           </p>
@@ -273,7 +279,7 @@ const TCCSExpandedStructure = ({ tccs }: { tccs: any }) => {
 };
 
 const TCCSListItem = React.memo(
-  ({ tccs, product, onView, onClone, onEdit, onDelete, isAdmin }: any) => (
+  ({ tccs, product, onView, onClone, onEdit, onDelete, canManage, canDelete }: any) => (
     <tr className="hover:bg-surface-2/60 transition-colors">
       <td className="px-4 py-3 font-mono font-medium text-ink text-sm">{tccs.code}</td>
       <td className="px-4 py-3 font-medium text-ink">{product?.name}</td>
@@ -321,9 +327,9 @@ const TCCSListItem = React.memo(
         <div className="relative z-10 flex justify-end gap-1.5">
           <ActionButtons
             onView={() => onView(tccs)}
-            onClone={isAdmin ? () => onClone(tccs) : undefined}
-            onEdit={isAdmin ? () => onEdit(tccs) : undefined}
-            onDelete={isAdmin ? () => onDelete(tccs) : undefined}
+            onClone={canManage ? () => onClone(tccs) : undefined}
+            onEdit={canManage ? () => onEdit(tccs) : undefined}
+            onDelete={canDelete ? () => onDelete(tccs) : undefined}
           />
         </div>
       </td>
@@ -342,7 +348,8 @@ const TCCSDataList = ({
   onEdit,
   onDelete,
   handleViewHistory,
-  isAdmin,
+  canManage,
+  canDelete,
 }: any) => {
   if (!data || data.length === 0) {
     return (
@@ -369,7 +376,8 @@ const TCCSDataList = ({
             onEdit={onEdit}
             onDelete={onDelete}
             handleViewHistory={handleViewHistory}
-            isAdmin={isAdmin}
+            canManage={canManage}
+            canDelete={canDelete}
           />
         ))}
       </div>
@@ -397,7 +405,8 @@ const TCCSDataList = ({
             onClone={onClone}
             onEdit={onEdit}
             onDelete={onDelete}
-            isAdmin={isAdmin}
+            canManage={canManage}
+            canDelete={canDelete}
           />
         ))}
       </tbody>
@@ -717,7 +726,8 @@ const TCCSList: React.FC = () => {
         onEdit={handleEdit}
         onDelete={handleDeleteTCCS}
         handleViewHistory={handleViewHistory}
-        isAdmin={canManageTccs}
+        canManage={canManageTccs}
+        canDelete={isAdmin}
       />
 
       <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />

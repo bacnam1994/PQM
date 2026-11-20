@@ -198,6 +198,28 @@ const AdminRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   return <>{children}</>;
 };
 
+const RoleRoute: React.FC<{ allowedRoles: string[]; children: React.ReactNode }> = ({
+  allowedRoles,
+  children,
+}) => {
+  const { user, role, isAdmin, authLoading } = useAppStore(
+    useShallow((s) => ({
+      user: s.user,
+      role: s.role,
+      isAdmin: s.isAdmin,
+      authLoading: s.authLoading,
+    }))
+  );
+
+  if (authLoading) return null;
+  if (!user) return <Navigate to="/login" replace />;
+  const normalizedRole = (user?.role || role || '').trim().toUpperCase();
+  if (!isAdmin && !allowedRoles.includes(normalizedRole)) {
+    return <Navigate to="/unauthorized" replace />;
+  }
+  return <>{children}</>;
+};
+
 // [BẢO MẬT] Route bảo vệ trang in/xuất báo cáo - không có sidebar nhưng bắt buộc đăng nhập
 const PrintRoute: React.FC = () => {
   const { user, authLoading } = useAppStore(
@@ -270,17 +292,17 @@ const AppRoutes: React.FC = () => {
           <Route
             path="/tccs/new"
             element={
-              <AdminRoute>
+              <RoleRoute allowedRoles={['ADMIN', 'QA']}>
                 <TCCSFormPage />
-              </AdminRoute>
+              </RoleRoute>
             }
           />
           <Route
             path="/tccs/edit/:id"
             element={
-              <AdminRoute>
+              <RoleRoute allowedRoles={['ADMIN', 'QA']}>
                 <TCCSFormPage />
-              </AdminRoute>
+              </RoleRoute>
             }
           />
           <Route path="/tccs/detail/:id" element={<TccsDetailPage />} />
@@ -288,34 +310,34 @@ const AppRoutes: React.FC = () => {
           <Route
             path="/product-formulas/new"
             element={
-              <AdminRoute>
+              <RoleRoute allowedRoles={['ADMIN', 'QA']}>
                 <ProductFormulaFormPage />
-              </AdminRoute>
+              </RoleRoute>
             }
           />
           <Route
             path="/product-formulas/edit/:id"
             element={
-              <AdminRoute>
+              <RoleRoute allowedRoles={['ADMIN', 'QA']}>
                 <ProductFormulaFormPage />
-              </AdminRoute>
+              </RoleRoute>
             }
           />
           <Route path="/materials" element={<MaterialList />} />
           <Route
             path="/materials/new"
             element={
-              <AdminRoute>
+              <RoleRoute allowedRoles={['ADMIN', 'QA']}>
                 <MaterialFormPage />
-              </AdminRoute>
+              </RoleRoute>
             }
           />
           <Route
             path="/materials/edit/:id"
             element={
-              <AdminRoute>
+              <RoleRoute allowedRoles={['ADMIN', 'QA']}>
                 <MaterialFormPage />
-              </AdminRoute>
+              </RoleRoute>
             }
           />
           {/* /materials/catalog redirect về /materials — RawMaterialCatalog đã gộp vào MaterialList */}
@@ -324,28 +346,28 @@ const AppRoutes: React.FC = () => {
           <Route
             path="/criteria/new"
             element={
-              <AdminRoute>
+              <RoleRoute allowedRoles={['ADMIN', 'QA']}>
                 <CriteriaFormPage />
-              </AdminRoute>
+              </RoleRoute>
             }
           />
           <Route
             path="/criteria/edit/:id"
             element={
-              <AdminRoute>
+              <RoleRoute allowedRoles={['ADMIN', 'QA']}>
                 <CriteriaFormPage />
-              </AdminRoute>
+              </RoleRoute>
             }
           />
           <Route path="/batches" element={<BatchList />} />
-          {/* USER được tạo lô mới, chỉ ADMIN mới sửa/xóa */}
+          {/* USER được tạo lô mới, ADMIN/QA/PRODUCTION sửa lô (chưa RELEASED) */}
           <Route path="/batches/new" element={<BatchFormPage />} />
           <Route
             path="/batches/edit/:id"
             element={
-              <AdminRoute>
+              <RoleRoute allowedRoles={['ADMIN', 'QA', 'PRODUCTION']}>
                 <BatchFormPage />
-              </AdminRoute>
+              </RoleRoute>
             }
           />
           <Route path="/batches/:id" element={<BatchDetailPage />} />
@@ -353,15 +375,15 @@ const AppRoutes: React.FC = () => {
           <Route path="/test-results" element={<TestResultList />} />
           <Route path="/laboratories" element={<LaboratoryManagementPage />} />
           <Route path="/labs" element={<Navigate to="/laboratories" replace />} />
-          {/* USER được tạo phiếu KN mới, chỉ ADMIN mới sửa */}
+          {/* Phân quyền sửa PKN khớp database.rules.json & ROLE_PERMISSIONS */}
           <Route path="/test-results/new" element={<TestResultFormPage />} />
           <Route path="/test-results/form" element={<Navigate to="/test-results/new" replace />} />
           <Route
             path="/test-results/edit/:id"
             element={
-              <AdminRoute>
+              <RoleRoute allowedRoles={['ADMIN', 'QA', 'QC', 'LAB', 'USER']}>
                 <TestResultFormPage />
-              </AdminRoute>
+              </RoleRoute>
             }
           />
           {/* So sánh Đối chiếu Lab (Nội bộ vs Ngoại kiểm) */}
@@ -385,17 +407,17 @@ const AppRoutes: React.FC = () => {
           <Route
             path="/audit-logs"
             element={
-              <AdminRoute>
+              <RoleRoute allowedRoles={['ADMIN', 'QA', 'QC']}>
                 <AuditLogPage />
-              </AdminRoute>
+              </RoleRoute>
             }
           />
           <Route
             path="/criteria-aliases"
             element={
-              <AdminRoute>
+              <RoleRoute allowedRoles={['ADMIN', 'QA']}>
                 <CriteriaAliasManager />
-              </AdminRoute>
+              </RoleRoute>
             }
           />
         </Route>

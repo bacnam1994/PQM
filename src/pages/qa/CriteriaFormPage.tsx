@@ -65,6 +65,8 @@ const CriteriaFormPage: React.FC = () => {
 
   const [selectedName, setSelectedName] = useState<string>('');
   const [newName, setNewName] = useState<string>('');
+  const [isCustomInputOpen, setIsCustomInputOpen] = useState(false);
+  const [customNameInput, setCustomNameInput] = useState('');
   const [renameScope, setRenameScope] = useState<'global' | 'product'>('global');
   const [targetProductId, setTargetProductId] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -313,7 +315,7 @@ const CriteriaFormPage: React.FC = () => {
           </div>
         </div>
         <Link
-          to="/system/criteria-aliases"
+          to="/criteria-aliases"
           className="inline-flex items-center gap-1.5 px-3 py-2 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/40 rounded-lg font-medium text-xs hover:bg-emerald-100 dark:hover:bg-emerald-950/50 transition-colors"
         >
           <SparklesIcon className="h-4 w-4" />
@@ -344,17 +346,49 @@ const CriteriaFormPage: React.FC = () => {
           <button
             type="button"
             onClick={() => {
-              const customName = prompt('Nhập tên chỉ tiêu mới cần tra cứu:');
-              if (customName && customName.trim()) {
-                setSelectedName(customName.trim());
-                setNewName(customName.trim());
-              }
+              setIsCustomInputOpen((prev) => !prev);
+              setCustomNameInput('');
             }}
-            className="px-4 py-2 bg-surface-2 hover:bg-surface-3 text-ink font-semibold rounded-lg text-xs border border-border transition-colors whitespace-nowrap"
+            className="px-4 py-2 bg-surface-2 hover:bg-surface-3 text-ink font-semibold rounded-lg text-xs border border-border transition-colors whitespace-nowrap cursor-pointer"
           >
-            + Nhập tên khác
+            {isCustomInputOpen ? 'Đóng' : '+ Nhập tên khác'}
           </button>
         </div>
+        {isCustomInputOpen && (
+          <div className="flex gap-2 pt-1">
+            <input
+              type="text"
+              value={customNameInput}
+              onChange={(e) => setCustomNameInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && customNameInput.trim()) {
+                  e.preventDefault();
+                  setSelectedName(customNameInput.trim());
+                  setNewName(customNameInput.trim());
+                  setIsCustomInputOpen(false);
+                  setCustomNameInput('');
+                }
+              }}
+              placeholder="Nhập tên chỉ tiêu mới cần tra cứu..."
+              className="flex-1 px-3 py-2 bg-surface border border-border rounded-lg text-sm text-ink outline-none focus:ring-2 focus:ring-emerald-500"
+              autoFocus
+            />
+            <button
+              type="button"
+              onClick={() => {
+                if (customNameInput.trim()) {
+                  setSelectedName(customNameInput.trim());
+                  setNewName(customNameInput.trim());
+                  setIsCustomInputOpen(false);
+                  setCustomNameInput('');
+                }
+              }}
+              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-lg text-xs transition-colors cursor-pointer"
+            >
+              Áp dụng
+            </button>
+          </div>
+        )}
       </div>
 
       {currentInfo && (

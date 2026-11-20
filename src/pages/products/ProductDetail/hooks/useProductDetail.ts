@@ -16,6 +16,7 @@ export function useProductDetail() {
   const isAdmin = useAppStore((state) => state.isAdmin);
   const batches = useAppStore((state) => state.batches);
   const testResults = useAppStore((state) => state.testResults);
+  const allTestResults = useAppStore((state) => state.allTestResults) || [];
   const deleteProductAction = useAppStore((state) => state.deleteProduct);
 
   const [activeTab, setActiveTab] = useState<'info' | 'formula' | 'tccs' | 'history' | 'analytics'>(
@@ -40,24 +41,33 @@ export function useProductDetail() {
   // Lô thuộc sản phẩm này
   const productBatches = useMemo(() => batches.filter((b) => b.productId === id), [batches, id]);
 
-  // Kết quả từ Store (50 phiếu gần nhất)
-  const productResults = useMemo(
-    () =>
-      testResults
-        .filter((r) => {
-          const b = batches.find((batch) => batch.id === r.batchId);
-          return b?.productId === id;
-        })
-        .sort(
-          (a, b) => new Date(b?.testDate || '').getTime() - new Date(a?.testDate || '').getTime()
-        ),
-    [testResults, batches, id]
-  );
+  // Kết quả từ Store (hợp nhất allTestResults + testResults, khớp cả batch.id lẫn batchNo)
+  const productResults = useMemo(() => {
+    const productBatchIds = new Set(productBatches.map((b) => b.id));
+    const productBatchNos = new Set(productBatches.map((b) => b.batchNo).filter(Boolean));
+    const mergedMap = new Map<string, any>();
+    [...allTestResults, ...testResults].forEach((r) => {
+      if (r?.id) mergedMap.set(r.id, r);
+    });
+    return Array.from(mergedMap.values())
+      .filter((r) => productBatchIds.has(r.batchId) || productBatchNos.has(r.batchId))
+      .sort((a, b) =>
+        String(b?.testDate || b?.createdAt || '').localeCompare(
+          String(a?.testDate || a?.createdAt || '')
+        )
+      );
+  }, [allTestResults, testResults, productBatches]);
 
   // Toàn bộ lịch sử kiểm nghiệm (fetch riêng khi vào tab lịch sử / biến động)
   const [allProductResults, setAllProductResults] = useState(productResults);
   const [isFetchingAll, setIsFetchingAll] = useState(false);
   const [hasFetchedAll, setHasFetchedAll] = useState(false);
+
+  // Reset trạng thái cache cục bộ khi chuyển sang sản phẩm khác
+  useEffect(() => {
+    setHasFetchedAll(false);
+    setAllProductResults([]);
+  }, [id]);
 
   const fetchAllResults = useCallback(async () => {
     if (!id || hasFetchedAll || isFetchingAll) return;
@@ -323,23 +333,25 @@ export function useProductDetail() {
     batches,
   ]);
 
-  // Thống kê tổng quan KPI
+  // Thống kê tổng quan KPI (ưu tiên nguồn toàn bộ kết quả đã nạp)
   const metrics = useMemo(() => {
+    const sourceResults =
+      allProductResults.length >= productResults.length ? allProductResults : productResults;
     const totalBatches = productBatches.length;
-    const passedResults = productResults.filter((r) => r.overallStatus === 'PASS').length;
+    const passedResults = sourceResults.filter((r) => r.overallStatus === 'PASS').length;
     const passRate =
-      productResults.length > 0 ? Math.round((passedResults / productResults.length) * 100) : null;
+      sourceResults.length > 0 ? Math.round((passedResults / sourceResults.length) * 100) : null;
     const activeTccsCode = activeTCCS?.code || 'Chưa có';
-    const lastTestDate = productResults[0]?.testDate || null;
+    const lastTestDate = sourceResults[0]?.testDate || null;
 
     return {
       totalBatches,
-      totalTestResults: productResults.length,
+      totalTestResults: sourceResults.length,
       passRate,
       activeTccsCode,
       lastTestDate,
     };
-  }, [productBatches, productResults, activeTCCS]);
+  }, [productBatches, productResults, allProductResults, activeTCCS]);
 
   const handleDeleteProduct = useCallback(async () => {
     if (!product) return;

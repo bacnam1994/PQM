@@ -52,8 +52,14 @@ export const ProductFormulaTab: React.FC<ProductFormulaTabProps> = ({
             </span>
           )}
           {isAdmin && (
-            <button 
-              onClick={() => navigate(productFormula ? `/product-formulas/edit/${productFormula.id}` : '/product-formulas/new')}
+            <button
+              onClick={() =>
+                navigate(
+                  productFormula
+                    ? `/product-formulas/edit/${productFormula.id}`
+                    : '/product-formulas/new'
+                )
+              }
               className="text-xs font-medium text-emerald-700 dark:text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 px-3 py-1.5 rounded-lg transition-all border border-emerald-500/20 cursor-pointer"
             >
               {productFormula ? 'Chỉnh sửa' : 'Tạo mới'}
@@ -61,9 +67,11 @@ export const ProductFormulaTab: React.FC<ProductFormulaTabProps> = ({
           )}
         </div>
       </div>
-      
+
       <div className="bg-surface rounded-xl border border-border overflow-hidden shadow-xs">
-        {productFormula && productFormula.ingredients.length > 0 ? (
+        {productFormula &&
+        Array.isArray(productFormula.ingredients) &&
+        productFormula.ingredients.length > 0 ? (
           <table className="w-full text-left text-xs">
             <thead className="bg-surface-2/60 border-b border-border text-xs font-semibold text-ink-muted">
               <tr>

@@ -318,6 +318,16 @@ const TestResultFormPage: React.FC = () => {
       .slice(0, 50);
   }, [hydratedBatches, batchSearch]);
 
+  // Tối ưu Workflow steps cho Workbench (khai báo trước mọi early return để tuân thủ React Rules of Hooks)
+  const currentWorkflowStep = useMemo(() => {
+    if (!formValues.batchId) return 0;
+    const hasResults = Object.keys(formValues.testResultsMap || {}).length > 0;
+    if (!hasResults) return 1;
+    if (!formValues.notes && (!formValues.attachments || formValues.attachments.length === 0))
+      return 2;
+    return 3;
+  }, [formValues.batchId, formValues.testResultsMap, formValues.notes, formValues.attachments]);
+
   if (id && editItemNotFound) {
     return (
       <div className="min-h-[70vh] flex items-center justify-center p-4">
@@ -352,16 +362,6 @@ const TestResultFormPage: React.FC = () => {
       />
     );
   }
-
-  // Tối ưu Workflow steps cho Workbench
-  const currentWorkflowStep = useMemo(() => {
-    if (!formValues.batchId) return 0;
-    const hasResults = Object.keys(formValues.testResultsMap || {}).length > 0;
-    if (!hasResults) return 1;
-    if (!formValues.notes && (!formValues.attachments || formValues.attachments.length === 0))
-      return 2;
-    return 3;
-  }, [formValues.batchId, formValues.testResultsMap, formValues.notes, formValues.attachments]);
 
   const workflowSteps: WorkflowStep[] = [
     {
