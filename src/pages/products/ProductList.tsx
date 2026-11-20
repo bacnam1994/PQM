@@ -58,7 +58,7 @@ const ProductGridItem = memo(
     onDelete: (p: Product) => void;
     isAdmin: boolean;
   }) => {
-    const isSelf = product.registrant.trim().toUpperCase() === SELF_ANNOUNCED_COMPANY;
+    const isSelf = (product.registrant || '').trim().toUpperCase() === SELF_ANNOUNCED_COMPANY;
     return (
       <div className="p-4 flex flex-col gap-3 rounded-xl transition-all duration-200 group relative overflow-hidden bg-surface border border-border shadow-xs hover:border-emerald-500/30">
         {/* Header: Eyebrow text and Status */}
@@ -177,16 +177,18 @@ const ProductGridItem = memo(
 const ProductListItem = memo(
   ({
     product,
+    onView,
     onEdit,
     onDelete,
     isAdmin,
   }: {
     product: Product;
+    onView: (p: Product) => void;
     onEdit: (p: Product) => void;
     onDelete: (p: Product) => void;
     isAdmin: boolean;
   }) => {
-    const isSelf = product.registrant.trim().toUpperCase() === SELF_ANNOUNCED_COMPANY;
+    const isSelf = (product.registrant || '').trim().toUpperCase() === SELF_ANNOUNCED_COMPANY;
     return (
       <tr className="hover:bg-surface-2/60 transition-colors group">
         <td className="px-4 py-3">
@@ -233,17 +235,13 @@ const ProductListItem = memo(
           <StatusBadge type="PRODUCT" status={product.status} />
         </td>
         <td className="px-4 py-3 text-right">
-          {isAdmin && (
-            <div className="flex justify-end gap-1">
-              <ActionButtons
-                onView={() => {
-                  /* Navigate handled by Link */
-                }}
-                onEdit={() => onEdit(product)}
-                onDelete={() => onDelete(product)}
-              />
-            </div>
-          )}
+          <div className="flex justify-end gap-1">
+            <ActionButtons
+              onView={() => onView(product)}
+              onEdit={isAdmin ? () => onEdit(product) : undefined}
+              onDelete={isAdmin ? () => onDelete(product) : undefined}
+            />
+          </div>
         </td>
       </tr>
     );
@@ -254,6 +252,7 @@ const ProductDataList = ({
   viewMode,
   data,
   hydratedProductMap,
+  onView,
   onEdit,
   onDelete,
   isAdmin,
@@ -300,6 +299,7 @@ const ProductDataList = ({
           <ProductListItem
             key={product.id}
             product={product}
+            onView={onView}
             onEdit={onEdit}
             onDelete={onDelete}
             isAdmin={isAdmin}
@@ -372,16 +372,16 @@ const ProductList: React.FC = () => {
       if (filterStatus !== 'ALL' && p.status !== filterStatus) return false;
 
       if (filterType !== 'ALL') {
-        const isSelf = p.registrant.trim().toUpperCase() === SELF_ANNOUNCED_COMPANY;
+        const isSelf = (p.registrant || '').trim().toUpperCase() === SELF_ANNOUNCED_COMPANY;
         if (filterType === 'SELF' && !isSelf) return false;
         if (filterType === 'OUTSOURCE' && isSelf) return false;
       }
 
       if (hasSearch) {
         if (
-          !p.name.toLowerCase().includes(searchLower) &&
-          !p.code.toLowerCase().includes(searchLower) &&
-          !p.registrant.toLowerCase().includes(searchLower)
+          !(p.name || '').toLowerCase().includes(searchLower) &&
+          !(p.code || '').toLowerCase().includes(searchLower) &&
+          !(p.registrant || '').toLowerCase().includes(searchLower)
         ) {
           return false;
         }
@@ -428,6 +428,11 @@ const ProductList: React.FC = () => {
     ); // Use replace to avoid polluting browser history
     setCurrentPage(1); // Reset to first page on new search
   }, [debouncedSearchTerm, setSearchParams]);
+
+  // Reset pagination when filter, sort, or viewMode changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filterType, filterStatus, sortConfig, viewMode]);
 
   const totalPages = Math.ceil(filteredProducts.length / itemsPerPage);
   const currentProducts = filteredProducts.slice(
@@ -659,6 +664,7 @@ const ProductList: React.FC = () => {
         viewMode={viewMode}
         data={currentProducts}
         hydratedProductMap={hydratedProductMap}
+        onView={(product: Product) => navigate(`/products/${product.id}`)}
         onEdit={handleEditClick}
         onDelete={handleDeleteClick}
         isAdmin={isAdmin}

@@ -41,6 +41,7 @@ import {
   ActionButtons,
   DeleteModal,
   AddButton,
+  DSEmptyState,
   AnimatedCollapsible,
   AnimatedChevron,
 } from '../../components';
@@ -343,6 +344,16 @@ const TCCSDataList = ({
   handleViewHistory,
   isAdmin,
 }: any) => {
+  if (!data || data.length === 0) {
+    return (
+      <DSEmptyState
+        icon={DocumentTextIcon}
+        title="Không tìm thấy hồ sơ TCCS"
+        message="Chưa có Tiêu chuẩn cơ sở nào khớp với từ khóa hoặc bộ lọc hiện tại."
+      />
+    );
+  }
+
   if (viewMode === 'grid') {
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -402,8 +413,11 @@ const TCCSList: React.FC = () => {
   const updateTCCS = useAppStore((s) => s.updateTCCS);
   const deleteTCCS = useAppStore((s) => s.deleteTCCS);
   const isAdmin = useAppStore((s) => s.isAdmin);
+  const role = useAppStore((s) => s.role);
   const notify = useAppStore((s) => s.notify);
   const user = useAppStore((s) => s.user);
+  const canManageTccs =
+    isAdmin || ['QA', 'ADMIN'].includes((user?.role || role || '').trim().toUpperCase());
   const { tccsList: hydratedTccsList } = useDataGraph();
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
@@ -564,7 +578,7 @@ const TCCSList: React.FC = () => {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, filterProductId, filterStatus, sortConfig, filterMonth, filterYear]);
+  }, [searchTerm, filterProductId, filterStatus, sortConfig, filterMonth, filterYear, viewMode]);
 
   const totalPages = Math.ceil(filteredTCCS.length / ITEMS_PER_PAGE);
   const paginatedTCCS = filteredTCCS.slice(
@@ -605,7 +619,7 @@ const TCCSList: React.FC = () => {
         subtitle="Quản lý định mức kỹ thuật và chỉ tiêu chất lượng sản phẩm."
         icon={DocumentTextIcon}
         action={
-          isAdmin && <AddButton onClick={() => navigate('/tccs/new')} label="Lập hồ sơ mới" />
+          canManageTccs && <AddButton onClick={() => navigate('/tccs/new')} label="Lập hồ sơ mới" />
         }
       />
 
@@ -703,7 +717,7 @@ const TCCSList: React.FC = () => {
         onEdit={handleEdit}
         onDelete={handleDeleteTCCS}
         handleViewHistory={handleViewHistory}
-        isAdmin={isAdmin}
+        isAdmin={canManageTccs}
       />
 
       <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
@@ -769,15 +783,28 @@ const TCCSList: React.FC = () => {
                         </span>
                       )}
                     </div>
-                    <button
-                      onClick={() => {
-                        setIsHistoryModalOpen(false);
-                        handleEdit(ver);
-                      }}
-                      className="w-full mt-2 py-1.5 bg-surface border border-border rounded-lg text-xs font-medium text-ink-soft hover:text-emerald-600 hover:border-emerald-300 transition-all"
-                    >
-                      Xem chi tiết / Chỉnh sửa
-                    </button>
+                    <div className="flex gap-2 mt-2">
+                      <button
+                        onClick={() => {
+                          setIsHistoryModalOpen(false);
+                          handleView(ver);
+                        }}
+                        className="flex-1 py-1.5 bg-surface border border-border rounded-lg text-xs font-medium text-ink-soft hover:text-emerald-600 hover:border-emerald-300 transition-all cursor-pointer"
+                      >
+                        Xem chi tiết
+                      </button>
+                      {canManageTccs && (
+                        <button
+                          onClick={() => {
+                            setIsHistoryModalOpen(false);
+                            handleEdit(ver);
+                          }}
+                          className="py-1.5 px-3 bg-surface border border-border rounded-lg text-xs font-medium text-ink-soft hover:text-emerald-600 hover:border-emerald-300 transition-all cursor-pointer"
+                        >
+                          Chỉnh sửa
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
               ))}

@@ -180,7 +180,7 @@ export const ComparisonPage: React.FC = () => {
         testDate: parsed1.testDate,
         batchNo: parsed1.batchNo,
         overallStatus: parsed1.overallStatus,
-        results: parsed1.results || [],
+        results: parsed1.testResults || parsed1.results || [],
       };
 
       const report2: LabReportSource = {
@@ -189,7 +189,7 @@ export const ComparisonPage: React.FC = () => {
         testDate: parsed2.testDate,
         batchNo: parsed2.batchNo,
         overallStatus: parsed2.overallStatus,
-        results: parsed2.results || [],
+        results: parsed2.testResults || parsed2.results || [],
       };
 
       const res = await compareLabReports(report1, report2, aiLearnedMappings);

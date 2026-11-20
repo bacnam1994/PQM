@@ -102,7 +102,9 @@ const MasterDataTab: React.FC<MasterDataTabProps> = ({ rawMaterials, isAdmin }) 
     if (search) {
       const q = search.toLowerCase();
       list = list.filter(
-        (c) => c.canonicalName.toLowerCase().includes(q) || c.defaultUnit.toLowerCase().includes(q)
+        (c) =>
+          (c.canonicalName || '').toLowerCase().includes(q) ||
+          (c.defaultUnit || '').toLowerCase().includes(q)
       );
     }
     return list;

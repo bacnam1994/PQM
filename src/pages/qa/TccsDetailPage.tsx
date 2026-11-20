@@ -37,7 +37,10 @@ const TccsDetailPage = () => {
   const navigate = useNavigate();
   const user = useAppStore((state) => state.user);
   const role = useAppStore((state) => state.role);
+  const isAdmin = useAppStore((state) => state.isAdmin);
   const { tccsList, batches, testResults } = useDataGraph();
+  const canManageTccs =
+    isAdmin || ['QA', 'ADMIN'].includes((user?.role || role || '').trim().toUpperCase());
 
   const [showDiffModal, setShowDiffModal] = useState(false);
   const [showImpactModal, setShowImpactModal] = useState(false);
@@ -48,6 +51,38 @@ const TccsDetailPage = () => {
 
   const tccs = tccsList.find((t) => t.id === id);
   const product = tccs?.product;
+
+  // Danh sách các phiên bản TCCS khác của cùng sản phẩm (Đặt trước early return để tuân thủ React Rules of Hooks)
+  const otherTccsVersions = useMemo(() => {
+    if (!tccs) return [];
+    return tccsList
+      .filter((t) => t.productId === tccs.productId && t.id !== tccs.id)
+      .sort((a, b) => String(b.issueDate || '').localeCompare(String(a.issueDate || '')));
+  }, [tccsList, tccs]);
+
+  const previousVersion = otherTccsVersions[0] || null;
+
+  const currentTask = useMemo(() => {
+    if (workflowTask) return workflowTask;
+    return ApprovalWorkflowService.createStandardTask(
+      'TCCS',
+      tccs?.id || id || 'unknown',
+      `Phê duyệt TCCS ${tccs?.code || ''}`,
+      user?.email || 'system@pqm.com'
+    );
+  }, [workflowTask, tccs?.id, tccs?.code, id, user?.email]);
+
+  useEffect(() => {
+    if (tccs?.id) {
+      ApprovalWorkflowService.findByEntity('TCCS', tccs.id)
+        .then((tasks) => {
+          if (tasks && tasks.length > 0) {
+            setWorkflowTask(tasks[0]);
+          }
+        })
+        .catch((e) => console.warn('[TccsDetailPage] Lỗi tải approval task:', e));
+    }
+  }, [tccs?.id]);
 
   if (!tccs) {
     return (
@@ -127,25 +162,6 @@ const TccsDetailPage = () => {
     },
   ];
 
-  // Danh sách các phiên bản TCCS khác của cùng sản phẩm
-  const otherTccsVersions = useMemo(() => {
-    return tccsList
-      .filter((t) => t.productId === tccs.productId && t.id !== tccs.id)
-      .sort((a, b) => (b.issueDate || '').localeCompare(a.issueDate || ''));
-  }, [tccsList, tccs.productId, tccs.id]);
-
-  const previousVersion = otherTccsVersions[0] || null;
-
-  const currentTask = useMemo(() => {
-    if (workflowTask) return workflowTask;
-    return ApprovalWorkflowService.createStandardTask(
-      'TCCS',
-      tccs.id,
-      `Phê duyệt TCCS ${tccs.code}`,
-      user?.email || 'system@pqm.com'
-    );
-  }, [workflowTask, tccs.id, tccs.code, user?.email]);
-
   const currentStep = currentTask.steps[currentTask.currentStepIndex];
 
   const handleOpenDiff = (target?: TCCS) => {
@@ -170,18 +186,6 @@ const TccsDetailPage = () => {
     setImpactReport(report);
     setShowImpactModal(true);
   };
-
-  useEffect(() => {
-    if (tccs?.id) {
-      ApprovalWorkflowService.findByEntity('TCCS', tccs.id)
-        .then((tasks) => {
-          if (tasks && tasks.length > 0) {
-            setWorkflowTask(tasks[0]);
-          }
-        })
-        .catch((e) => console.warn('[TccsDetailPage] Lỗi tải approval task:', e));
-    }
-  }, [tccs?.id]);
 
   const handleSignatureSuccess = async (sig: ElectronicSignature) => {
     try {
@@ -268,7 +272,23 @@ const TccsDetailPage = () => {
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          {canManageTccs && (
+            <>
+              <button
+                onClick={() => navigate(`/tccs/edit/${tccs.id}`)}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-surface hover:bg-surface-2 text-ink-soft hover:text-ink rounded-lg text-xs font-medium border border-border transition-colors shadow-xs cursor-pointer"
+              >
+                Chỉnh sửa TCCS
+              </button>
+              <button
+                onClick={() => navigate(`/tccs/new?cloneId=${tccs.id}`)}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-surface hover:bg-surface-2 text-ink-soft hover:text-ink rounded-lg text-xs font-medium border border-border transition-colors shadow-xs cursor-pointer"
+              >
+                Sao chép bản mới
+              </button>
+            </>
+          )}
           <button
             onClick={() => window.print()}
             className="flex items-center gap-1.5 px-3 py-1.5 bg-surface hover:bg-surface-2 text-ink-soft rounded-lg text-xs font-medium border border-border transition-colors shadow-xs cursor-pointer"

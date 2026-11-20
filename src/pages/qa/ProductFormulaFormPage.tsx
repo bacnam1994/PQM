@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeftIcon, ArrowPathIcon, CubeIcon, CheckIcon } from '@heroicons/react/24/outline';
 import { useAppStore } from '../../store/useAppStore';
@@ -44,11 +44,15 @@ const ProductFormulaFormPage: React.FC = () => {
   const [productSearch, setProductSearch] = useState('');
   const [showProductDropdown, setShowProductDropdown] = useState(false);
 
-  // Load dữ liệu khi có id
+  const isInitializedRef = useRef<string | null>(null);
+
+  // Load dữ liệu khi có id (chỉ nạp lần đầu để không ghi đè dữ liệu đang sửa khi query refetch ngầm)
   useEffect(() => {
     if (id && productFormulas.length > 0) {
+      if (isInitializedRef.current === id) return;
       const formula = productFormulas.find((f) => f.id === id);
       if (formula) {
+        isInitializedRef.current = id;
         setFormulaToEdit(formula);
         setSelectedProductId(formula.productId);
         const p = products.find((prod) => prod.id === formula.productId);

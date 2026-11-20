@@ -37,9 +37,10 @@ export const LabComparisonModal: React.FC<LabComparisonModalProps> = ({
   initialResult2,
   batch,
 }) => {
-  const { testResults, batches, aiLearnedMappings } = useAppStore(
+  const { testResults, allTestResults, batches, aiLearnedMappings } = useAppStore(
     useShallow((s) => ({
       testResults: s.testResults,
+      allTestResults: s.allTestResults,
       batches: s.batches,
       aiLearnedMappings: s.aiLearnedMappings,
     }))
@@ -58,7 +59,18 @@ export const LabComparisonModal: React.FC<LabComparisonModalProps> = ({
 
   if (!isOpen) return null;
 
-  const availableResults = batch ? testResults.filter((r) => r.batchId === batch.id) : testResults;
+  const mergedResults = React.useMemo(() => {
+    const map = new Map<string, TestResult>();
+    (allTestResults || []).forEach((r) => r && map.set(r.id, r));
+    (testResults || []).forEach((r) => r && map.set(r.id, r));
+    return Array.from(map.values());
+  }, [allTestResults, testResults]);
+
+  const availableResults = batch
+    ? mergedResults.filter(
+        (r) => r.batchId === batch.id || (batch.batchNo && r.batchId === batch.batchNo)
+      )
+    : mergedResults;
 
   const handleRunComparison = async () => {
     // Trường hợp 1: Chọn từ danh sách phiếu có sẵn
@@ -67,8 +79,8 @@ export const LabComparisonModal: React.FC<LabComparisonModalProps> = ({
         toast.error('Vui lòng chọn 2 phiếu kiểm nghiệm khác nhau để đối chiếu.');
         return;
       }
-      const r1 = testResults.find((r) => r.id === selectedId1);
-      const r2 = testResults.find((r) => r.id === selectedId2);
+      const r1 = mergedResults.find((r) => r.id === selectedId1);
+      const r2 = mergedResults.find((r) => r.id === selectedId2);
       if (!r1 || !r2) return;
 
       setIsComparing(true);

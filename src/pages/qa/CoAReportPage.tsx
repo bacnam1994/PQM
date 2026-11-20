@@ -47,12 +47,14 @@ const CoAReportPage = () => {
     setIsResealConfirmOpen(false);
     try {
       setLoading(true);
-      const currentUser = useAppStore.getState().user;
+      const appState = useAppStore.getState();
+      const currentUser = appState.user;
       if (id) {
         const rawResult = await fetchTestResultById(id);
         if (rawResult) {
-          const appState = useAppStore.getState();
-          const matchedBatch = appState.batches.find((b) => b.id === rawResult.batchId);
+          const matchedBatch = appState.batches.find(
+            (b) => b.id === rawResult.batchId || (b.batchNo && b.batchNo === rawResult.batchId)
+          );
           const matchedTccs =
             (rawResult.tccsId ? appState.tccsList.find((t) => t.id === rawResult.tccsId) : null) ||
             (matchedBatch as any)?.tccs ||
@@ -70,13 +72,55 @@ const CoAReportPage = () => {
             evaluationSnapshot: freshSnapshot,
             evaluationHash: freshSnapshot.evaluationHash,
           };
-          await useAppStore.getState().updateTestResult(updated);
+          await appState.updateTestResult(updated);
           setFailClosedReason(null);
+          appState.notify({
+            type: 'SUCCESS',
+            title: 'Đã tái niêm phong',
+            message: 'Đã cập nhật chữ ký băm toàn vẹn ALCOA+ SHA-256 cho phiếu kiểm nghiệm.',
+          });
+          window.location.reload();
+        }
+      } else if (batchId) {
+        const matchedBatch = appState.batches.find(
+          (b) => b.id === batchId || b.id.endsWith(batchId)
+        );
+        const fetchedResults = await fetchTestResultsByBatchId(batchId);
+        const latestRes = fetchedResults[fetchedResults.length - 1];
+        if (latestRes) {
+          const matchedTccs =
+            (matchedBatch?.tccsId
+              ? appState.tccsList.find((t) => t.id === matchedBatch.tccsId)
+              : null) ||
+            (matchedBatch?.productId
+              ? appState.tccsList.find((t) => t.productId === matchedBatch.productId && t.isActive)
+              : null);
+          const freshSnapshot = QualityEvaluationEngine.evaluate(
+            latestRes,
+            matchedTccs,
+            currentUser
+          );
+          await appState.updateTestResult({
+            ...latestRes,
+            evaluationSnapshot: freshSnapshot,
+            evaluationHash: freshSnapshot.evaluationHash,
+          });
+          setFailClosedReason(null);
+          appState.notify({
+            type: 'SUCCESS',
+            title: 'Đã tái niêm phong',
+            message: 'Đã cập nhật chữ ký băm toàn vẹn ALCOA+ SHA-256 cho CoA tổng hợp của lô.',
+          });
           window.location.reload();
         }
       }
     } catch (err: any) {
-      alert('Không thể tái niêm phong: ' + (err.message || String(err)));
+      useAppStore.getState().notify({
+        type: 'ERROR',
+        title: 'Lỗi tái niêm phong',
+        message: 'Không thể tái niêm phong: ' + (err.message || String(err)),
+      });
+    } finally {
       setLoading(false);
     }
   };
@@ -353,16 +397,36 @@ const CoAReportPage = () => {
           batch.product = batchProduct;
           batch.tccs = batchTccs;
 
-          // Lấy toàn bộ kết quả kiểm nghiệm của Lô
+          // Lấy toàn bộ kết quả kiểm nghiệm của Lô (kết hợp server và store cho cả batch.id & batch.batchNo)
           const fetchedResults = await fetchTestResultsByBatchId(batchId);
           if (!isMounted) return;
 
-          if (fetchedResults.length === 0) {
+          const sourceStoreResults =
+            allTestResultsHydrated.length > 0 ? allTestResultsHydrated : hydratedResults;
+          const storeMatched = sourceStoreResults.filter(
+            (r) =>
+              r &&
+              (r.batchId === batch!.id ||
+                r.batchId === batchId ||
+                (batch!.batchNo && r.batchId === batch!.batchNo))
+          );
+
+          const mergedById = new Map<string, TestResult>();
+          storeMatched.forEach((r) => mergedById.set(r.id, r));
+          fetchedResults.forEach((r) => mergedById.set(r.id, r));
+
+          const allBatchResults = Array.from(mergedById.values());
+          if (allBatchResults.length === 0) {
             setNotFound(true);
             return;
           }
 
-          const resultsForBatch = [...fetchedResults].reverse(); // Đảo ngược để phiếu cũ lên trước (nạp dữ liệu đè lên nhau)
+          // Sắp xếp theo thời gian kiểm nghiệm tăng dần để phiếu mới nhất ghi đè phiếu cũ
+          const resultsForBatch = [...allBatchResults].sort((a, b) =>
+            String(a.testDate || a.createdAt || '').localeCompare(
+              String(b.testDate || b.createdAt || '')
+            )
+          );
           const consolidatedResultsMap = new Map<string, TestResultEntry>();
           resultsForBatch.forEach((res: TestResult) => {
             ensureArray(res.results).forEach((entry) => {

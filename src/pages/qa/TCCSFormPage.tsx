@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowLeftIcon, ArrowPathIcon, InformationCircleIcon } from '@heroicons/react/24/outline';
 import { useAppStore } from '../../store/useAppStore';
@@ -223,10 +223,12 @@ const TCCSFormPage = () => {
 
   const [productSearch, setProductSearch] = useState('');
   const [showProductDropdown, setShowProductDropdown] = useState(false);
+  const isInitializedRef = useRef<string | null>(null);
 
   const {
     values: formValues,
     setValues,
+    validate,
     handleChange,
     setFieldValue,
     addToArray,
@@ -235,11 +237,24 @@ const TCCSFormPage = () => {
     errors,
   } = useForm(initialTccsFormState, validateTCCS);
 
+  const skipSave = useCallback((vals: TccsFormState) => {
+    const hasCode = Boolean(vals?.code && vals.code.trim() !== '');
+    const hasProduct = Boolean(vals?.productId && vals.productId.trim() !== '');
+    const hasCriterionName = [
+      ...(vals?.mainCriteria || []),
+      ...(vals?.microbiologicalCriteria || []),
+      ...(vals?.heavyMetalCriteria || []),
+      ...(vals?.mycotoxinCriteria || []),
+    ].some((c) => Boolean(c?.name && c.name.trim() !== ''));
+    return !hasCode && !hasProduct && !hasCriterionName;
+  }, []);
+
   const { clearDraft, hasDraft, draftTimestamp, restoreDraft, discardDraft } = useFormDraft({
     key: 'tccs_form_draft',
     formValues,
     setFormValues: setValues,
     isEnabled: !id && !cloneId,
+    skipSave,
     onDraftLoaded: (draft) => {
       if (!id && !cloneId) {
         setValues(draft);
@@ -253,9 +268,50 @@ const TCCSFormPage = () => {
 
   useEffect(() => {
     const targetId = id || cloneId;
-    if (targetId && tccsList.length > 0) {
+    if (!targetId) {
+      isInitializedRef.current = null;
+      return;
+    }
+    if (tccsList.length > 0 && isInitializedRef.current !== targetId) {
       const existing = tccsList.find((t) => t.id === targetId);
       if (existing) {
+        isInitializedRef.current = targetId;
+        const HEAVY_METAL_KEYWORDS = ['asen', 'chì', 'thủy ngân', 'cadmi', 'pb', 'cd', 'hg', 'as'];
+        const MYCOTOXIN_KEYWORDS = [
+          'aflatoxin',
+          'ochratoxin',
+          'patulin',
+          'zearalenone',
+          'độc tố vi nấm',
+          'mycotoxin',
+          'dư lượng',
+        ];
+        const safetyList = existing.safetyCriteria || [];
+        const microList = safetyList.filter((c: any) => {
+          if (!c) return false;
+          if (c.category === 'micro') return true;
+          if (c.category) return false;
+          const nl = (c.name || '').toLowerCase();
+          return (
+            !HEAVY_METAL_KEYWORDS.some((kw) => nl.includes(kw)) &&
+            !MYCOTOXIN_KEYWORDS.some((kw) => nl.includes(kw))
+          );
+        });
+        const metalList = safetyList.filter((c: any) => {
+          if (!c) return false;
+          if (c.category === 'metal') return true;
+          if (c.category) return false;
+          const nl = (c.name || '').toLowerCase();
+          return HEAVY_METAL_KEYWORDS.some((kw) => nl.includes(kw));
+        });
+        const mycotoxinList = safetyList.filter((c: any) => {
+          if (!c) return false;
+          if (c.category === 'mycotoxin' || c.category === 'other') return true;
+          if (c.category) return false;
+          const nl = (c.name || '').toLowerCase();
+          return MYCOTOXIN_KEYWORDS.some((kw) => nl.includes(kw));
+        });
+
         setValues({
           productId: existing.productId,
           code: cloneId ? `${existing.code}-COPY` : existing.code,
@@ -265,25 +321,25 @@ const TCCSFormPage = () => {
           shelfLife: existing.shelfLife || '',
           standardRefs:
             typeof existing.standardRefs === 'string'
-              ? [existing.standardRefs]
+              ? existing.standardRefs
+                  .split(',')
+                  .map((s) => s.trim())
+                  .filter(Boolean)
               : existing.standardRefs || [],
           mainCriteria: existing.mainQualityCriteria || [],
-          microbiologicalCriteria: (existing.safetyCriteria || []).filter(
-            (c: any) => c.category === 'micro'
-          ),
-          heavyMetalCriteria: (existing.safetyCriteria || []).filter(
-            (c: any) => c.category === 'metal'
-          ),
-          mycotoxinCriteria: (existing.safetyCriteria || []).filter(
-            (c: any) => c.category === 'mycotoxin'
-          ),
+          microbiologicalCriteria: microList,
+          heavyMetalCriteria: metalList,
+          mycotoxinCriteria: mycotoxinList,
           alternateRules: existing.alternateRules || [],
         });
         const p = products.find((prod) => prod.id === existing.productId);
         if (p) setProductSearch(`${p.code} - ${p.name}`);
+      } else {
+        notify({ type: 'ERROR', message: 'Không tìm thấy hồ sơ TCCS!' });
+        navigate('/tccs');
       }
     }
-  }, [id, cloneId, tccsList, products, setValues]);
+  }, [id, cloneId, tccsList, products, setValues, notify, navigate]);
 
   const selectedFormula = useMemo(() => {
     return productFormulas.find((f) => f.productId === formValues.productId);
@@ -340,8 +396,8 @@ const TCCSFormPage = () => {
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (Object.keys(errors).length > 0) {
-      toast.error('Vui lòng kiểm tra lại các trường lỗi!');
+    if (!validate()) {
+      toast.error('Vui lòng kiểm tra lại các trường thông tin bắt buộc hoặc giới hạn Min/Max!');
       return;
     }
 

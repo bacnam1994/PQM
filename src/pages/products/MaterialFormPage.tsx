@@ -89,12 +89,16 @@ const MaterialFormPage = () => {
     [rawMaterials]
   );
 
-  // 2. Load dữ liệu
+  const isInitializedRef = useRef<string | null>(null);
+
+  // 2. Load dữ liệu (chỉ nạp lần đầu khi mở trang để không ghi đè dữ liệu đang sửa khi store đồng bộ ngầm)
   useEffect(() => {
-    if (id && id !== 'new') {
+    if (id && id !== 'new' && rawMaterials.length > 0) {
+      if (isInitializedRef.current === id) return;
       const material = rawMaterials.find((m) => m.id === id);
 
       if (material) {
+        isInitializedRef.current = id;
         setMaterialToEdit(material);
         setCode(material.code || '');
         setName(material.name || '');
@@ -109,9 +113,10 @@ const MaterialFormPage = () => {
           type: 'ERROR',
           message: 'Không tìm thấy thông tin nguyên liệu này trong danh mục!',
         });
+        navigate('/materials');
       }
     }
-  }, [id, rawMaterials, notify]);
+  }, [id, rawMaterials, notify, navigate]);
 
   const handleAddAlias = () => {
     const trimmed = aliasInput.trim();
