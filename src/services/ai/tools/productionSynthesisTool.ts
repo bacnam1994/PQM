@@ -13,9 +13,9 @@ const formatDate = (dateStr: string): string => {
  * Lập báo cáo tổng hợp chất lượng theo ngày sản xuất
  */
 export const generateProductionSynthesisReport = (
-  productId: string, 
-  startDate: string | undefined, 
-  endDate: string | undefined, 
+  productId: string,
+  startDate: string | undefined,
+  endDate: string | undefined,
   appContext: any
 ) => {
   const products = appContext.products || [];
@@ -30,7 +30,11 @@ export const generateProductionSynthesisReport = (
   }
 
   const pTccs = tccsList.filter((t: any) => t.productId === productId);
-  const activeTccs = pTccs.find((t: any) => t.isActive) || [...pTccs].sort((a, b) => b.issueDate.localeCompare(a.issueDate))[0];
+  const activeTccs =
+    pTccs.find((t: any) => t.isActive) ||
+    [...pTccs].sort((a, b) =>
+      String(b?.issueDate || '').localeCompare(String(a?.issueDate || ''))
+    )[0];
   if (!activeTccs) {
     return { error: `Sản phẩm ${product.name} chưa cấu hình tiêu chuẩn cơ sở (TCCS).` };
   }
@@ -59,11 +63,11 @@ export const generateProductionSynthesisReport = (
 
   const rows = filteredBatches.map((batch: any) => {
     const batchResults = testResults.filter((r: any) => r.batchId === batch.id);
-    
+
     const consolidatedMap = new Map<string, any>();
     [...batchResults]
-      .sort((a, b) => a.testDate.localeCompare(b.testDate))
-      .forEach(r => {
+      .sort((a, b) => String(a?.testDate || '').localeCompare(String(b?.testDate || '')))
+      .forEach((r) => {
         (r.results || []).forEach((entry: any) => {
           if (entry && entry.criteriaName) {
             consolidatedMap.set(entry.criteriaName.trim().toLowerCase(), entry);
@@ -73,7 +77,9 @@ export const generateProductionSynthesisReport = (
 
     let overallStatus = 'PENDING';
     if (batchResults.length > 0) {
-      const latestResult = [...batchResults].sort((a, b) => b.testDate.localeCompare(a.testDate))[0];
+      const latestResult = [...batchResults].sort((a, b) =>
+        String(b?.testDate || '').localeCompare(String(a?.testDate || ''))
+      )[0];
       overallStatus = latestResult.overallStatus;
     }
 
@@ -81,8 +87,13 @@ export const generateProductionSynthesisReport = (
     mainCriteria.forEach((criterion: any) => {
       const key = criterion.name.trim().toLowerCase();
       const entry = consolidatedMap.get(key);
-      
-      if (!entry || entry.value === undefined || entry.value === null || String(entry.value).trim() === '') {
+
+      if (
+        !entry ||
+        entry.value === undefined ||
+        entry.value === null ||
+        String(entry.value).trim() === ''
+      ) {
         criteriaData[criterion.name] = '---';
         return;
       }
@@ -95,20 +106,33 @@ export const generateProductionSynthesisReport = (
 
       let basis: number | undefined = undefined;
       if (criterion.declaredContent != null && criterion.declaredContent !== '') {
-        basis = typeof criterion.declaredContent === 'string' ? parseNumber(criterion.declaredContent) : Number(criterion.declaredContent);
+        basis =
+          typeof criterion.declaredContent === 'string'
+            ? parseNumber(criterion.declaredContent)
+            : Number(criterion.declaredContent);
       } else if (formula) {
-        let formulaItem = formula.ingredients?.find((i: any) => i.name.trim().toLowerCase() === key) ||
-                          formula.excipients?.find((e: any) => e.name.trim().toLowerCase() === key);
+        let formulaItem =
+          formula.ingredients?.find((i: any) => i.name.trim().toLowerCase() === key) ||
+          formula.excipients?.find((e: any) => e.name.trim().toLowerCase() === key);
         if (criterion.formulaIngredientId) {
           const linkedName = criterion.formulaIngredientId.trim().toLowerCase();
-          const linkedItem = formula.ingredients?.find((i: any) => i.name.trim().toLowerCase() === linkedName) ||
-                             formula.excipients?.find((e: any) => e.name.trim().toLowerCase() === linkedName);
+          const linkedItem =
+            formula.ingredients?.find((i: any) => i.name.trim().toLowerCase() === linkedName) ||
+            formula.excipients?.find((e: any) => e.name.trim().toLowerCase() === linkedName);
           if (linkedItem) formulaItem = linkedItem;
         }
 
         if (formulaItem) {
-          const dc = typeof formulaItem.declaredContent === 'string' ? parseNumber(formulaItem.declaredContent) : formulaItem.declaredContent;
-          const ec = formulaItem.elementalContent != null ? (typeof formulaItem.elementalContent === 'string' ? parseNumber(formulaItem.elementalContent) : formulaItem.elementalContent) : undefined;
+          const dc =
+            typeof formulaItem.declaredContent === 'string'
+              ? parseNumber(formulaItem.declaredContent)
+              : formulaItem.declaredContent;
+          const ec =
+            formulaItem.elementalContent != null
+              ? typeof formulaItem.elementalContent === 'string'
+                ? parseNumber(formulaItem.elementalContent)
+                : formulaItem.elementalContent
+              : undefined;
           if (criterion.calculationBasis === 'ELEMENTAL' && ec != null && ec > 0) basis = ec;
           else basis = dc;
         }
@@ -127,8 +151,13 @@ export const generateProductionSynthesisReport = (
       batchNo: batch.batchNo,
       mfgDate: batch.mfgDate,
       expDate: batch.expDate,
-      overallStatus: overallStatus === 'PASS' ? 'ĐẠT' : overallStatus === 'FAIL' ? 'KHÔNG ĐẠT' : 'CHƯA HOÀN THIỆN',
-      criteria: criteriaData
+      overallStatus:
+        overallStatus === 'PASS'
+          ? 'ĐẠT'
+          : overallStatus === 'FAIL'
+            ? 'KHÔNG ĐẠT'
+            : 'CHƯA HOÀN THIỆN',
+      criteria: criteriaData,
     };
   });
 
@@ -138,7 +167,7 @@ export const generateProductionSynthesisReport = (
     tccsCode: activeTccs.code,
     totalBatches: rows.length,
     batches: rows,
-    mainCriteria: mainCriteria.map((c: any) => c.name)
+    mainCriteria: mainCriteria.map((c: any) => c.name),
   };
 };
 
@@ -147,22 +176,29 @@ export const generateProductionSynthesisReport = (
  */
 export const handleProductionSynthesisReport = (args: any, appContext: any) => {
   try {
-    const result = generateProductionSynthesisReport(args.productId, args.startDate, args.endDate, appContext);
+    const result = generateProductionSynthesisReport(
+      args.productId,
+      args.startDate,
+      args.endDate,
+      appContext
+    );
     if (result.error) {
       return { error: result.error };
     }
-    
+
     // Build markdown summary for the chatbot
     const markdownHeaders = ['Số Lô', 'Ngày SX', 'Hạn dùng', ...result.mainCriteria, 'Kết luận'];
     const mdHeaderRow = `| ${markdownHeaders.join(' | ')} |`;
     const mdDividerRow = `| ${markdownHeaders.map(() => '---').join(' | ')} |`;
-    const mdDataRows = result.batches.map((b: any) => {
-      const criteriaVals = result.mainCriteria.map((cName: string) => b.criteria[cName] || '---');
-      return `| ${b.batchNo} | ${formatDate(b.mfgDate)} | ${formatDate(b.expDate)} | ${criteriaVals.join(' | ')} | **${b.overallStatus}** |`;
-    }).join('\n');
+    const mdDataRows = result.batches
+      .map((b: any) => {
+        const criteriaVals = result.mainCriteria.map((cName: string) => b.criteria[cName] || '---');
+        return `| ${b.batchNo} | ${formatDate(b.mfgDate)} | ${formatDate(b.expDate)} | ${criteriaVals.join(' | ')} | **${b.overallStatus}** |`;
+      })
+      .join('\n');
 
     const tableMarkdown = `${mdHeaderRow}\n${mdDividerRow}\n${mdDataRows}`;
-    
+
     return {
       success: true,
       productName: result.productName,
@@ -171,7 +207,7 @@ export const handleProductionSynthesisReport = (args: any, appContext: any) => {
       totalBatches: result.totalBatches,
       message: `### Báo cáo tổng hợp chất lượng: **${result.productName} (${result.productCode})**\n- Tiêu chuẩn cơ sở: **${result.tccsCode}**\n- Tổng số lô sản xuất: **${result.totalBatches}**\n\n${tableMarkdown}\n\n*Bạn có thể xem chi tiết biểu đồ xu hướng và xuất file Excel đầy đủ tại trang [Báo cáo tổng hợp chất lượng](/quality-summary-report).*`,
       action: 'REDIRECT',
-      path: '/quality-summary-report'
+      path: '/quality-summary-report',
     };
   } catch (e: any) {
     return { error: e.message };

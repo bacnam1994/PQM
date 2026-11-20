@@ -13,6 +13,7 @@ import {
 import { db } from '../firebase';
 import { useAppStore } from '../store/useAppStore';
 import { getFromCache, saveToCache, saveItemToCache, deleteItemFromCache } from '../utils';
+import { normalizeEntityByCollection, normalizeCollectionList } from '../utils/entityNormalizer';
 import { queryClient } from '../lib/queryClient';
 import {
   PRODUCT_QUERY_KEYS,
@@ -251,7 +252,9 @@ export const useFirebaseSync = () => {
         const snapshot = await get(queryTarget);
         if (snapshot.exists() && isMounted) {
           const data = snapshot.val();
-          let list = data ? Object.values(data) : [];
+          let list = data
+            ? Object.entries(data).map(([k, v]) => normalizeEntityByCollection(config.key, v, k))
+            : [];
           if (config.sortFn) {
             list = list.sort(config.sortFn);
           }
@@ -297,9 +300,10 @@ export const useFirebaseSync = () => {
       // BẮT BUỘC: Lắng nghe trên queryTarget (chính xác phạm vi BOUNDED_SYNC hoặc FULL_SYNC)
       const unsubChanged = onChildChanged(queryTarget, (snapshot) => {
         if (!isMounted) return;
-        const updatedEntity = snapshot.val();
-        const id = snapshot.key || updatedEntity?.id;
-        if (!updatedEntity || !id) return;
+        const rawEntity = snapshot.val();
+        const id = snapshot.key || rawEntity?.id;
+        if (!rawEntity || !id) return;
+        const updatedEntity = normalizeEntityByCollection(config.key, rawEntity, id);
 
         knownIds.add(String(id));
 
@@ -341,9 +345,10 @@ export const useFirebaseSync = () => {
       // CHỈ xử lý các bản ghi THỰC SỰ MỚI (chưa có trong knownIds từ snapshot ban đầu)
       const unsubAdded = onChildAdded(queryTarget, (snapshot) => {
         if (!isMounted) return;
-        const newEntity = snapshot.val();
-        const id = snapshot.key || newEntity?.id;
-        if (!newEntity || !id) return;
+        const rawEntity = snapshot.val();
+        const id = snapshot.key || rawEntity?.id;
+        if (!rawEntity || !id) return;
+        const newEntity = normalizeEntityByCollection(config.key, rawEntity, id);
 
         // Bỏ qua nếu bản ghi đã có từ snapshot ban đầu -> LOẠI BỎ HOÀN TOÀN DUPLICATE BOOTSTRAP REPLAY
         if (knownIds.has(String(id))) return;
@@ -417,20 +422,24 @@ export const useFirebaseSync = () => {
         if (!isMounted) return;
 
         if (cachedProducts?.length > 0) {
-          queryClient.setQueryData(PRODUCT_QUERY_KEYS.all, cachedProducts);
-          useAppStore.getState().setAppState({ products: cachedProducts });
+          const norm = normalizeCollectionList('products', cachedProducts);
+          queryClient.setQueryData(PRODUCT_QUERY_KEYS.all, norm);
+          useAppStore.getState().setAppState({ products: norm });
         }
         if (cachedBatches?.length > 0) {
-          queryClient.setQueryData(BATCH_QUERY_KEYS.all, cachedBatches);
-          useAppStore.getState().setAppState({ batches: cachedBatches });
+          const norm = normalizeCollectionList('batches', cachedBatches);
+          queryClient.setQueryData(BATCH_QUERY_KEYS.all, norm);
+          useAppStore.getState().setAppState({ batches: norm });
         }
         if (cachedTccs?.length > 0) {
-          queryClient.setQueryData(TCCS_QUERY_KEYS.all, cachedTccs);
-          useAppStore.getState().setAppState({ tccsList: cachedTccs });
+          const norm = normalizeCollectionList('tccsList', cachedTccs);
+          queryClient.setQueryData(TCCS_QUERY_KEYS.all, norm);
+          useAppStore.getState().setAppState({ tccsList: norm });
         }
         if (cachedTestingLaboratories?.length > 0) {
-          queryClient.setQueryData(LABORATORY_QUERY_KEYS.all, cachedTestingLaboratories);
-          useAppStore.getState().setAppState({ testingLaboratories: cachedTestingLaboratories });
+          const norm = normalizeCollectionList('testingLaboratories', cachedTestingLaboratories);
+          queryClient.setQueryData(LABORATORY_QUERY_KEYS.all, norm);
+          useAppStore.getState().setAppState({ testingLaboratories: norm });
         } else {
           queryClient.setQueryData(LABORATORY_QUERY_KEYS.all, DEFAULT_TESTING_LABORATORIES);
         }
@@ -461,20 +470,24 @@ export const useFirebaseSync = () => {
             if (!isMounted) return;
 
             if (cachedFormulas?.length > 0) {
-              queryClient.setQueryData(PRODUCT_QUERY_KEYS.formulas, cachedFormulas);
-              useAppStore.getState().setAppState({ productFormulas: cachedFormulas });
+              const norm = normalizeCollectionList('productFormulas', cachedFormulas);
+              queryClient.setQueryData(PRODUCT_QUERY_KEYS.formulas, norm);
+              useAppStore.getState().setAppState({ productFormulas: norm });
             }
             if (cachedMaterials?.length > 0) {
-              queryClient.setQueryData(PRODUCT_QUERY_KEYS.materials, cachedMaterials);
-              useAppStore.getState().setAppState({ rawMaterials: cachedMaterials });
+              const norm = normalizeCollectionList('rawMaterials', cachedMaterials);
+              queryClient.setQueryData(PRODUCT_QUERY_KEYS.materials, norm);
+              useAppStore.getState().setAppState({ rawMaterials: norm });
             }
             if (cachedTestResults?.length > 0) {
-              queryClient.setQueryData(TEST_RESULT_QUERY_KEYS.all, cachedTestResults);
-              useAppStore.getState().setAppState({ testResults: cachedTestResults });
+              const norm = normalizeCollectionList('testResults', cachedTestResults);
+              queryClient.setQueryData(TEST_RESULT_QUERY_KEYS.all, norm);
+              useAppStore.getState().setAppState({ testResults: norm });
             }
             if (cachedCriteriaAliases?.length > 0) {
-              queryClient.setQueryData(TCCS_QUERY_KEYS.aliases, cachedCriteriaAliases);
-              useAppStore.getState().setAppState({ criteriaAliases: cachedCriteriaAliases });
+              const norm = normalizeCollectionList('criteriaAliases', cachedCriteriaAliases);
+              queryClient.setQueryData(TCCS_QUERY_KEYS.aliases, norm);
+              useAppStore.getState().setAppState({ criteriaAliases: norm });
             }
             if (cachedAiMappings?.length > 0) {
               queryClient.setQueryData(TCCS_QUERY_KEYS.aiMappings, cachedAiMappings);

@@ -461,8 +461,12 @@ export const executeNLQuery = (query: string, ctx: NLQueryContext): NLQueryResul
     const resultsA = ctx.testResults.filter((r) => r.batchId === batchA.id);
     const resultsB = ctx.testResults.filter((r) => r.batchId === batchB.id);
 
-    const latestA = resultsA.sort((a, b) => b.testDate.localeCompare(a.testDate))[0];
-    const latestB = resultsB.sort((a, b) => b.testDate.localeCompare(a.testDate))[0];
+    const latestA = resultsA.sort((a, b) =>
+      String(b?.testDate || '').localeCompare(String(a?.testDate || ''))
+    )[0];
+    const latestB = resultsB.sort((a, b) =>
+      String(b?.testDate || '').localeCompare(String(a?.testDate || ''))
+    )[0];
 
     if (!latestA || !latestB) {
       return { type: 'EMPTY', message: 'Một trong hai lô chưa có kết quả kiểm nghiệm để so sánh.' };

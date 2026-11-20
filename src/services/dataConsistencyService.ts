@@ -389,7 +389,9 @@ export const auditDataConsistency = (data: SystemDataSnapshot): ConsistencyRepor
       const activeList = pTccs.filter((t) => t.isActive);
       if (activeList.length === 0) {
         // Không có TCCS nào active
-        const sorted = [...pTccs].sort((a, b) => b.issueDate.localeCompare(a.issueDate));
+        const sorted = [...pTccs].sort((a, b) =>
+          String(b?.issueDate || '').localeCompare(String(a?.issueDate || ''))
+        );
         issues.push({
           id: `no_active_tccs_${p.id}`,
           type: 'NO_ACTIVE_TCCS',
@@ -407,7 +409,9 @@ export const auditDataConsistency = (data: SystemDataSnapshot): ConsistencyRepor
         });
       } else if (activeList.length > 1) {
         // Có nhiều hơn 1 TCCS active
-        const sorted = [...activeList].sort((a, b) => b.issueDate.localeCompare(a.issueDate));
+        const sorted = [...activeList].sort((a, b) =>
+          String(b?.issueDate || '').localeCompare(String(a?.issueDate || ''))
+        );
         issues.push({
           id: `multi_active_tccs_${p.id}`,
           type: 'MULTIPLE_ACTIVE_TCCS',
