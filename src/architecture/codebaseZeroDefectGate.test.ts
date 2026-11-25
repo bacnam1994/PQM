@@ -18,6 +18,8 @@ import * as ts from 'typescript';
 import { normalizeEntityByCollection, normalizeCollectionList } from '../utils/entityNormalizer';
 import { calculateBatchProgress } from '../pages/batches/BatchList/utils/batchProgress';
 import { resolveDeclaredBasis } from '../utils/basisCalculation';
+import { CoARules } from '../domains/coa/domain/rules';
+import { EntityIdentityManager } from '../domain/identity/entityIdentity';
 
 function walkSourceFiles(dir: string): string[] {
   let results: string[] = [];
@@ -370,6 +372,37 @@ describe('PQM Zero-Defect Codebase Invariant Gates (100% Source Coverage)', () =
     // 2. resolveDeclaredBasis must safely handle undefined formula or non-object formula on cold start
     expect(() =>
       resolveDeclaredBasis({ name: 'Vitamin C', min: 90, max: 110, unit: 'mg' }, undefined)
+    ).not.toThrow();
+
+    // 3. CoARules.buildCriteriaAndFootnotes must safely handle sparse/object-map criterionResults & alternateRules
+    expect(() =>
+      CoARules.buildCriteriaAndFootnotes(
+        {
+          overallStatus: 'PASS',
+          criterionResults: {
+            0: { criteriaName: 'Định lượng', value: '100', isPass: true, alternateState: 'NONE' },
+          } as any,
+        } as any,
+        {
+          id: 'tccs_1',
+          alternateRules: { 0: { main: 'Định lượng', alt: 'Độ ẩm' } } as any,
+        } as any
+      )
+    ).not.toThrow();
+
+    // 4. EntityIdentityManager.validateTestResultLab must safely handle partial/legacy laboratory records
+    expect(() =>
+      EntityIdentityManager.validateTestResultLab(
+        { id: 'tr_1', batchId: 'b_1', labName: 'Viện Kiểm Nghiệm' } as any,
+        [
+          {
+            id: 'lab_1',
+            canonicalName: undefined as any,
+            code: undefined as any,
+            aliases: [null as any, 'VKN'],
+          } as any,
+        ]
+      )
     ).not.toThrow();
   });
 });

@@ -431,10 +431,12 @@ export class EntityIdentityManager {
       if (testResult.labName && testResult.labName.trim()) {
         const matchedLab = laboratories.find(
           (l) =>
-            l.canonicalName.toLowerCase() === testResult.labName.trim().toLowerCase() ||
-            l.code.toLowerCase() === testResult.labName.trim().toLowerCase() ||
-            (l.aliases &&
-              l.aliases.some((a) => a.toLowerCase() === testResult.labName.trim().toLowerCase()))
+            (l.canonicalName || '').toLowerCase() === testResult.labName.trim().toLowerCase() ||
+            (l.code || '').toLowerCase() === testResult.labName.trim().toLowerCase() ||
+            (Array.isArray(l.aliases) &&
+              l.aliases.some(
+                (a) => String(a || '').toLowerCase() === testResult.labName.trim().toLowerCase()
+              ))
         );
         if (matchedLab) {
           return {
@@ -905,10 +907,12 @@ export class EntityIdentityManager {
       if (!normalized.labId && normalized.labName) {
         const found = laboratories.find(
           (l) =>
-            l.canonicalName.toLowerCase() === normalized.labName.trim().toLowerCase() ||
-            l.code.toLowerCase() === normalized.labName.trim().toLowerCase() ||
-            (l.aliases &&
-              l.aliases.some((a) => a.toLowerCase() === normalized.labName.trim().toLowerCase()))
+            (l.canonicalName || '').toLowerCase() === normalized.labName.trim().toLowerCase() ||
+            (l.code || '').toLowerCase() === normalized.labName.trim().toLowerCase() ||
+            (Array.isArray(l.aliases) &&
+              l.aliases.some(
+                (a) => String(a || '').toLowerCase() === normalized.labName.trim().toLowerCase()
+              ))
         );
         if (found) {
           normalized.labId = found.id;

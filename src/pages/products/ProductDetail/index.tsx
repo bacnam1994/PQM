@@ -12,6 +12,7 @@ import { Surface, DeleteModal } from '../../../components';
 export const ProductDetail: React.FC = () => {
   const {
     product,
+    isLoadingProduct,
     productTCCSList,
     activeTCCS,
     productFormula,
@@ -40,6 +41,14 @@ export const ProductDetail: React.FC = () => {
   } = useProductDetail();
 
   if (!product) {
+    if (isLoadingProduct) {
+      return (
+        <div className="p-12 text-center space-y-3">
+          <div className="w-8 h-8 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin mx-auto" />
+          <p className="text-xs font-medium text-ink-muted">Đang tải hồ sơ sản phẩm...</p>
+        </div>
+      );
+    }
     return (
       <div className="min-h-[60vh] flex items-center justify-center p-6">
         <div className="bg-surface border border-border rounded-2xl p-8 text-center max-w-md w-full space-y-3 shadow-xs">

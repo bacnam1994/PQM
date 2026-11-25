@@ -16,6 +16,7 @@ import {
   SparklesIcon,
 } from '@heroicons/react/24/outline';
 import { useDataGraph } from '../../../hooks/useDataGraph';
+import { useAppStore } from '../../../store/useAppStore';
 import { ensureArray, formatDateStandard } from '../../../utils';
 import { ProductTccsHistory } from './components/ProductTccsHistory';
 import { ProductBatchReleaseMatrix } from './components/ProductBatchReleaseMatrix';
@@ -24,6 +25,7 @@ export const Product360Page: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { products } = useDataGraph();
+  const isInitialSyncing = useAppStore((state) => !state.lastSync && state.products.length === 0);
 
   const [activeTab, setActiveTab] = useState<'BATCHES' | 'TCCS' | 'FORMULA'>('BATCHES');
 
@@ -43,6 +45,14 @@ export const Product360Page: React.FC = () => {
   const releaseRate = totalBatches > 0 ? Math.round((releasedBatches / totalBatches) * 100) : null;
 
   if (!product) {
+    if (isInitialSyncing) {
+      return (
+        <div className="p-12 text-center space-y-3">
+          <div className="w-8 h-8 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin mx-auto" />
+          <p className="text-xs font-medium text-ink-muted">Đang tải hồ sơ Product 360°...</p>
+        </div>
+      );
+    }
     return (
       <div className="p-8 text-center">
         <div className="inline-block p-4 bg-surface-2 rounded-2xl mb-4 border border-border">

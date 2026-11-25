@@ -55,6 +55,9 @@ export const BatchDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const storeBatches = useAppStore((state) => state.batches);
+  const storeTestResults = useAppStore((state) => state.testResults);
+  const storeAllTestResults = useAppStore((state) => state.allTestResults);
+  const isInitialSyncing = useAppStore((state) => !state.lastSync && state.batches.length === 0);
   const products = useAppStore((state) => state.products);
   const tccsList = useAppStore((state) => state.tccsList);
   const productFormulas = useAppStore((state) => (state as any).productFormulas || []);
@@ -192,6 +195,60 @@ export const BatchDetailPage: React.FC = () => {
       tccsList,
     });
   }, [batch, viewBatchResults, boundTccs, tccsList]);
+
+  // Đồng bộ kết quả từ Store (IndexedDB / RTDB) ngay khi Store hydrate sau F5 hoặc khi đổi id Lô
+  useEffect(() => {
+    if (!id) {
+      setViewBatchResults([]);
+      return;
+    }
+    const allStoreResults =
+      storeAllTestResults && storeAllTestResults.length > 0
+        ? storeAllTestResults
+        : storeTestResults;
+    const targetBatchId = batch?.id || id;
+    const currentBatchNo = (batch?.batchNo || '').trim().toLowerCase();
+
+    const matchedFromStore = ensureArray(allStoreResults).filter((r: any) => {
+      if (!r) return false;
+      const trBatchId = String(r.batchId || '').trim();
+      const trBatchNo = String(r.batchNo || (r.batch as any)?.batchNo || '')
+        .trim()
+        .toLowerCase();
+      return (
+        trBatchId === targetBatchId ||
+        trBatchId === id ||
+        (currentBatchNo !== '' &&
+          (trBatchId.toLowerCase() === currentBatchNo || trBatchNo === currentBatchNo))
+      );
+    });
+
+    setViewBatchResults((prev) => {
+      const merged = new Map<string, TestResult>();
+      // Chỉ giữ lại các phiếu trong prev thuộc về đúng lô hiện tại (tránh rò rỉ khi chuyển giữa 2 lô qua Ctrl+K)
+      prev.forEach((r: any) => {
+        if (!r?.id) return;
+        const trBatchId = String(r.batchId || '').trim();
+        const trBatchNo = String(r.batchNo || (r.batch as any)?.batchNo || '')
+          .trim()
+          .toLowerCase();
+        if (
+          trBatchId === targetBatchId ||
+          trBatchId === id ||
+          (currentBatchNo !== '' &&
+            (trBatchId.toLowerCase() === currentBatchNo || trBatchNo === currentBatchNo))
+        ) {
+          merged.set(r.id, r);
+        }
+      });
+      matchedFromStore.forEach((r) => {
+        if (r?.id) merged.set(r.id, r);
+      });
+      return Array.from(merged.values()).sort((a, b) =>
+        String(b.testDate || '').localeCompare(String(a.testDate || ''))
+      );
+    });
+  }, [id, batch?.id, batch?.batchNo, storeTestResults, storeAllTestResults]);
 
   // Tải danh sách kết quả kiểm nghiệm của Lô và hợp nhất với Store
   useEffect(() => {
@@ -347,7 +404,7 @@ export const BatchDetailPage: React.FC = () => {
   };
 
   if (!batch) {
-    if (isFetchingBatch) {
+    if (isFetchingBatch || isInitialSyncing) {
       return (
         <div className="p-12 text-center space-y-3">
           <div className="w-8 h-8 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto" />

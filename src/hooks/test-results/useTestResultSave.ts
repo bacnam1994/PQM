@@ -155,10 +155,9 @@ export const useTestResultSave = ({
           allCriteria.forEach((c: any) => {
             const getMapVal = (name: string) => {
               const target = name.trim().toLowerCase();
-              const key = Object.keys(formValues.testResultsMap).find(
-                (k) => k.trim().toLowerCase() === target
-              );
-              return key ? formValues.testResultsMap[key] : undefined;
+              const mapObj = formValues.testResultsMap || {};
+              const key = Object.keys(mapObj).find((k) => k.trim().toLowerCase() === target);
+              return key ? mapObj[key] : undefined;
             };
 
             let val = getMapVal(c.name);
@@ -219,8 +218,8 @@ export const useTestResultSave = ({
           });
         }
 
-        formValues.extraCriteria.forEach((item: any) => {
-          if (item.name && item.value) {
+        ensureArray(formValues.extraCriteria).forEach((item: any) => {
+          if (item && item.name && item.value) {
             let isPass: boolean | null = null;
 
             if (item.limit) {
@@ -235,7 +234,7 @@ export const useTestResultSave = ({
               const productFormulas = useAppStore.getState().productFormulas || [];
               const formula = productFormulas.find((f) => f.productId === currentBatch?.productId);
               if (formula && formula.ingredients) {
-                const matchedIng = formula.ingredients.find(
+                const matchedIng = ensureArray(formula.ingredients).find(
                   (ing) =>
                     isCriteriaMatch(item.name, ing.name) ||
                     (lookupPharmaTerm(item.name) &&

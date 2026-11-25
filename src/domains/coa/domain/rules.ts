@@ -60,10 +60,18 @@ export class CoARules {
     let footnoteCounter = 1;
 
     const alternateNotesMap = boundTccs?.alternateRules
-      ? AlternateRuleResolver.generateAlternateRuleNotes(boundTccs.alternateRules)
+      ? AlternateRuleResolver.generateAlternateRuleNotes(
+          Array.isArray(boundTccs.alternateRules)
+            ? boundTccs.alternateRules
+            : Object.values(boundTccs.alternateRules || {})
+        )
       : [];
 
-    const criteriaList = snapshot.criterionResults.map((entry) => {
+    const rawCriterionResults: any[] = Array.isArray(snapshot?.criterionResults)
+      ? snapshot.criterionResults
+      : Object.values(snapshot?.criterionResults || {});
+
+    const criteriaList = rawCriterionResults.map((entry: any) => {
       let footnoteSymbol: string | undefined;
 
       if (entry.alternateState && entry.alternateState !== 'NONE') {

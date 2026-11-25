@@ -11,6 +11,7 @@ export function useProductDetail() {
   const navigate = useNavigate();
 
   const products = useAppStore((state) => state.products);
+  const isInitialSyncing = useAppStore((state) => !state.lastSync && state.products.length === 0);
   const tccsList = useAppStore((state) => state.tccsList);
   const productFormulas = useAppStore((state) => state.productFormulas);
   const isAdmin = useAppStore((state) => state.isAdmin);
@@ -366,6 +367,7 @@ export function useProductDetail() {
   return {
     id,
     product,
+    isLoadingProduct: !product && isInitialSyncing,
     productTCCSList,
     activeTCCS,
     productFormula,

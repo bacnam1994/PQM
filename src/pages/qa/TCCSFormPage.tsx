@@ -7,6 +7,7 @@ import { useForm, useFormDraft } from '../../hooks';
 import { CriterionType, TCCS, Criterion, Product, AlternateRule } from '../../types';
 import {
   generateId,
+  ensureArray,
   parseFlexibleValue,
   normalizeNumericString,
   autoFormatInput,
@@ -338,8 +339,27 @@ const TCCSFormPage = () => {
         notify({ type: 'ERROR', message: 'Không tìm thấy hồ sơ TCCS!' });
         navigate('/tccs');
       }
+    } else if (
+      targetId &&
+      isInitializedRef.current === targetId &&
+      !productSearch &&
+      formValues.productId &&
+      products.length > 0
+    ) {
+      const p = products.find((prod) => prod.id === formValues.productId);
+      if (p) setProductSearch(`${p.code} - ${p.name}`);
     }
-  }, [id, cloneId, tccsList, products, setValues, notify, navigate]);
+  }, [
+    id,
+    cloneId,
+    tccsList,
+    products,
+    productSearch,
+    formValues.productId,
+    setValues,
+    notify,
+    navigate,
+  ]);
 
   const selectedFormula = useMemo(() => {
     return productFormulas.find((f) => f.productId === formValues.productId);
@@ -364,7 +384,11 @@ const TCCSFormPage = () => {
     if (!template) return;
     let added = 0;
     template.criteria.forEach((crit) => {
-      if (!formValues.mainCriteria.some((c) => c.name.toLowerCase() === crit.name.toLowerCase())) {
+      if (
+        !ensureArray(formValues.mainCriteria).some(
+          (c) => (c?.name || '').toLowerCase() === (crit.name || '').toLowerCase()
+        )
+      ) {
         addToArray('mainCriteria', crit);
         added++;
       }
@@ -414,19 +438,19 @@ const TCCSFormPage = () => {
       standardRefs: formValues.standardRefs?.join(', ') || '',
       isActive: existingTccs ? existingTccs.isActive : true,
       composition: existingTccs?.composition || '',
-      mainQualityCriteria: formValues.mainCriteria.filter((c) => c.name),
+      mainQualityCriteria: ensureArray(formValues.mainCriteria).filter((c) => c && c.name),
       safetyCriteria: [
-        ...formValues.microbiologicalCriteria
-          .filter((c) => c.name)
+        ...ensureArray(formValues.microbiologicalCriteria)
+          .filter((c) => c && c.name)
           .map((c) => ({ ...(c as any), category: 'micro' })),
-        ...formValues.heavyMetalCriteria
-          .filter((c) => c.name)
+        ...ensureArray(formValues.heavyMetalCriteria)
+          .filter((c) => c && c.name)
           .map((c) => ({ ...(c as any), category: 'metal' })),
-        ...formValues.mycotoxinCriteria
-          .filter((c) => c.name)
+        ...ensureArray(formValues.mycotoxinCriteria)
+          .filter((c) => c && c.name)
           .map((c) => ({ ...(c as any), category: 'mycotoxin' })),
       ],
-      alternateRules: formValues.alternateRules.filter((r) => r.main && r.alt),
+      alternateRules: ensureArray(formValues.alternateRules).filter((r) => r && r.main && r.alt),
       createdAt: existingTccs?.createdAt || new Date().toISOString(),
     };
 

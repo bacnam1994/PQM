@@ -267,10 +267,9 @@ export const useTestResultForm = (onInitialBatchSelect?: (batchNo: string) => vo
 
     const getMapVal = (name: string) => {
       const target = name.trim().toLowerCase();
-      const key = Object.keys(formValues.testResultsMap).find(
-        (k) => k.trim().toLowerCase() === target
-      );
-      return key ? formValues.testResultsMap[key] : undefined;
+      const mapObj = formValues.testResultsMap || {};
+      const key = Object.keys(mapObj).find((k) => k.trim().toLowerCase() === target);
+      return key ? mapObj[key] : undefined;
     };
 
     allCriteria.forEach((c) => {

@@ -49,7 +49,13 @@ const ProductFormulaFormPage: React.FC = () => {
   // Load dữ liệu khi có id (chỉ nạp lần đầu để không ghi đè dữ liệu đang sửa khi query refetch ngầm)
   useEffect(() => {
     if (id && productFormulas.length > 0) {
-      if (isInitializedRef.current === id) return;
+      if (isInitializedRef.current === id) {
+        if (!productSearch && selectedProductId && products.length > 0) {
+          const p = products.find((prod) => prod.id === selectedProductId);
+          if (p) setProductSearch(`${p.code} - ${p.name}`);
+        }
+        return;
+      }
       const formula = productFormulas.find((f) => f.id === id);
       if (formula) {
         isInitializedRef.current = id;
@@ -64,7 +70,7 @@ const ProductFormulaFormPage: React.FC = () => {
         navigate('/product-formulas');
       }
     }
-  }, [id, productFormulas, products, navigate, notify]);
+  }, [id, productFormulas, products, productSearch, selectedProductId, navigate, notify]);
 
   const materialMap = useMemo(() => new Map(rawMaterials.map((m) => [m.id, m])), [rawMaterials]);
 

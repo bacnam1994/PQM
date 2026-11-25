@@ -62,6 +62,9 @@ const BatchFormPage = () => {
         setProductSearch(p ? `${p.code} - ${p.name}` : '');
         setMfgDate(batch.mfgDate ? parseDateToISO(batch.mfgDate) : '');
         setExpDate(batch.expDate ? parseDateToISO(batch.expDate) : '');
+      } else if (!productSearch && batch.productId && products.length > 0) {
+        const p = products.find((prod) => prod.id === batch.productId);
+        if (p) setProductSearch(`${p.code} - ${p.name}`);
       }
     } else if (batches.length > 0) {
       notify({ type: 'ERROR', message: 'Không tìm thấy Lô hàng!' });

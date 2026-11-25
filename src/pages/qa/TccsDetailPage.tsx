@@ -38,6 +38,7 @@ const TccsDetailPage = () => {
   const user = useAppStore((state) => state.user);
   const role = useAppStore((state) => state.role);
   const isAdmin = useAppStore((state) => state.isAdmin);
+  const isInitialSyncing = useAppStore((state) => !state.lastSync && state.tccsList.length === 0);
   const { tccsList, batches, testResults } = useDataGraph();
   const canManageTccs =
     isAdmin || ['QA', 'ADMIN'].includes((user?.role || role || '').trim().toUpperCase());
@@ -85,6 +86,14 @@ const TccsDetailPage = () => {
   }, [tccs?.id]);
 
   if (!tccs) {
+    if (isInitialSyncing) {
+      return (
+        <div className="p-12 text-center space-y-3">
+          <div className="w-8 h-8 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin mx-auto" />
+          <p className="text-xs font-medium text-ink-muted">Đang tải hồ sơ TCCS...</p>
+        </div>
+      );
+    }
     return (
       <div className="p-8 text-center text-ink-muted">
         Không tìm thấy thông tin TCCS.
