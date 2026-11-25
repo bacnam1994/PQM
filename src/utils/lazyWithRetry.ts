@@ -16,9 +16,13 @@ export const isChunkLoadError = (error: unknown): boolean => {
     /Failed to fetch dynamically imported module/i.test(message) ||
     /Importing a module script failed/i.test(message) ||
     /error loading dynamically imported module/i.test(message) ||
+    /dynamically imported module/i.test(message) ||
+    /Unable to preload CSS/i.test(message) ||
+    /ChunkLoadError/i.test(message) ||
     /Unexpected token '<'/i.test(message) ||
     /is not a valid JavaScript/i.test(message) ||
-    /Loading chunk .* failed/i.test(message)
+    /Loading chunk .* failed/i.test(message) ||
+    /Loading CSS chunk .* failed/i.test(message)
   );
 };
 

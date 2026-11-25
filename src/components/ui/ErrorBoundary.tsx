@@ -19,11 +19,36 @@ interface State {
 }
 
 export class ErrorBoundary extends Component<Props, State> {
+  private autoRecoveryTimer: ReturnType<typeof setTimeout> | null = null;
+  private hasAttemptedAutoRecovery = false;
+
   public state: State = {
     hasError: false,
     error: null,
     errorId: null,
     isChunkMismatch: false,
+  };
+
+  public componentDidMount() {
+    if (typeof window !== 'undefined') {
+      window.addEventListener('popstate', this.handlePopStateReset);
+    }
+  }
+
+  public componentWillUnmount() {
+    if (typeof window !== 'undefined') {
+      window.removeEventListener('popstate', this.handlePopStateReset);
+    }
+    if (this.autoRecoveryTimer) {
+      clearTimeout(this.autoRecoveryTimer);
+    }
+  }
+
+  private handlePopStateReset = () => {
+    if (this.state.hasError) {
+      this.hasAttemptedAutoRecovery = false;
+      this.handleRecover();
+    }
   };
 
   public static getDerivedStateFromError(error: Error): State {
@@ -56,6 +81,15 @@ export class ErrorBoundary extends Component<Props, State> {
       if (triggerAutoReloadOnce('error-boundary')) {
         return;
       }
+    }
+
+    // Tự động thử khôi phục 1 lần sau 120ms đối với lỗi race condition khi vừa F5 reload (cold start hydration)
+    if (!this.hasAttemptedAutoRecovery) {
+      this.hasAttemptedAutoRecovery = true;
+      if (this.autoRecoveryTimer) clearTimeout(this.autoRecoveryTimer);
+      this.autoRecoveryTimer = setTimeout(() => {
+        this.handleRecover();
+      }, 120);
     }
   }
 

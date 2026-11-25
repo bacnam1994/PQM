@@ -105,16 +105,27 @@ export const BatchDetailPage: React.FC = () => {
   );
 
   const [fetchedBatch, setFetchedBatch] = useState<Batch | null>(null);
+  const [isFetchingBatch, setIsFetchingBatch] = useState<boolean>(() => !rawBatch && Boolean(id));
 
   useEffect(() => {
     let isMounted = true;
+    if (rawBatch) {
+      setIsFetchingBatch(false);
+      return;
+    }
     if (!rawBatch && id) {
+      setIsFetchingBatch(true);
       import('../../services/app/BatchAppService')
         .then(({ batchAppService }) => batchAppService.getBatchById(id))
         .then((b) => {
           if (isMounted && b) setFetchedBatch(b);
         })
-        .catch(console.warn);
+        .catch(console.warn)
+        .finally(() => {
+          if (isMounted) setIsFetchingBatch(false);
+        });
+    } else {
+      setIsFetchingBatch(false);
     }
     return () => {
       isMounted = false;
@@ -239,6 +250,9 @@ export const BatchDetailPage: React.FC = () => {
 
   // Tiến độ kiểm nghiệm theo TCCS
   const { progressPercent, missingCriteria } = useMemo(() => {
+    if (!batch) {
+      return { progressPercent: 0, missingCriteria: [], requiredCriteria: [] };
+    }
     return calculateBatchProgress(batch, viewBatchResults);
   }, [batch, viewBatchResults]);
 
@@ -263,9 +277,9 @@ export const BatchDetailPage: React.FC = () => {
       const cDef = allCriteriaMap.get(critName.trim().toLowerCase());
       if (!cDef) return null;
 
-      const formula = productFormulas.find((f: any) => f.productId === batch.productId);
-      const basis = resolveDeclaredBasis(cDef, formula?.ingredients || []);
-      if (!basis) return null;
+      const matchedFormula = productFormulas.find((f: any) => f.productId === batch.productId);
+      const basis = resolveDeclaredBasis(cDef, matchedFormula);
+      if (!basis?.basis) return null;
 
       const pct = calculateRelativePercentage(actualVal, basis.basis);
       return pct != null ? `${pct}% nhãn` : null;
@@ -333,6 +347,14 @@ export const BatchDetailPage: React.FC = () => {
   };
 
   if (!batch) {
+    if (isFetchingBatch) {
+      return (
+        <div className="p-12 text-center space-y-3">
+          <div className="w-8 h-8 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto" />
+          <p className="text-xs font-medium text-ink-muted">Đang tải hồ sơ Lô sản xuất...</p>
+        </div>
+      );
+    }
     return (
       <div className="p-8 text-center space-y-4">
         <p className="text-ink-muted">Không tìm thấy thông tin Lô sản xuất.</p>

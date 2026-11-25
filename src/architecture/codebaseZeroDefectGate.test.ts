@@ -16,6 +16,8 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as ts from 'typescript';
 import { normalizeEntityByCollection, normalizeCollectionList } from '../utils/entityNormalizer';
+import { calculateBatchProgress } from '../pages/batches/BatchList/utils/batchProgress';
+import { resolveDeclaredBasis } from '../utils/basisCalculation';
 
 function walkSourceFiles(dir: string): string[] {
   let results: string[] = [];
@@ -340,5 +342,34 @@ describe('PQM Zero-Defect Codebase Invariant Gates (100% Source Coverage)', () =
         `Ingestion boundary ${path.relative(SRC_DIR, file)} must normalize RTDB payloads`
       ).toBe(true);
     }
+  });
+
+  it('Gate 8: Cold-start F5 reload tolerance — detail helpers & progress calculators never crash on undefined entity', () => {
+    // 1. calculateBatchProgress must safely handle undefined/null/partial batch on Render 1 during F5 cold start
+    expect(() => calculateBatchProgress(undefined, [])).not.toThrow();
+    expect(calculateBatchProgress(undefined, [])).toEqual({
+      progressPercent: 0,
+      missingCriteria: [],
+      requiredCriteria: [],
+    });
+
+    expect(() => calculateBatchProgress(null, undefined as any)).not.toThrow();
+    expect(() =>
+      calculateBatchProgress(
+        {
+          id: 'batch_cold_start',
+          tccs: {
+            mainQualityCriteria: { 0: { name: 'Định lượng', type: 'NUMBER' } },
+            alternateRules: { 0: { main: 'Định lượng', alt: 'Độ ẩm' } },
+          },
+        },
+        undefined as any
+      )
+    ).not.toThrow();
+
+    // 2. resolveDeclaredBasis must safely handle undefined formula or non-object formula on cold start
+    expect(() =>
+      resolveDeclaredBasis({ name: 'Vitamin C', min: 90, max: 110, unit: 'mg' }, undefined)
+    ).not.toThrow();
   });
 });

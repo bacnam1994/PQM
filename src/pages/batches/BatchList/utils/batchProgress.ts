@@ -5,8 +5,12 @@ import { isCriteriaMatch } from '../../../../utils/aiMapping';
 /**
  * Tính toán tiến độ kiểm nghiệm (% hoàn thành và danh sách chỉ tiêu còn thiếu theo TCCS)
  */
-export const calculateBatchProgress = (batch: any, batchResults: TestResult[]) => {
-  const tccs = batch.tccs;
+export const calculateBatchProgress = (batch: any, batchResults: TestResult[] = []) => {
+  if (!batch) {
+    return { progressPercent: 0, missingCriteria: [], requiredCriteria: [] };
+  }
+  const tccs = batch?.tccs;
+  const safeResults = ensureArray(batchResults);
   const requiredCriteria = tccs
     ? [...ensureArray(tccs.mainQualityCriteria), ...ensureArray(tccs.safetyCriteria)].filter(
         (c) => c && c.name && c.name.trim() !== ''
@@ -21,11 +25,11 @@ export const calculateBatchProgress = (batch: any, batchResults: TestResult[]) =
   const latestResultsMap = new Map<string, { value: any; isPass: boolean }>();
 
   // Sắp xếp tăng dần theo thời gian để kết quả mới nhất ghi đè kết quả cũ
-  if (batchResults.length > 0 && batch) {
+  if (safeResults.length > 0 && batch) {
     const batchNoNormalized = String(batch.batchNo || '')
       .trim()
       .toLowerCase();
-    const sortedBatchResults = [...batchResults]
+    const sortedBatchResults = [...safeResults]
       .filter((r) => {
         if (!r) return false;
         const rBatchId = String(r.batchId || '').trim();
@@ -57,7 +61,7 @@ export const calculateBatchProgress = (batch: any, batchResults: TestResult[]) =
   // Chuyển alternateRules thành Map để tra cứu O(1)
   const rulesMap = new Map<string, any>();
   if (tccs && tccs.alternateRules) {
-    tccs.alternateRules.forEach((r: any) => {
+    ensureArray(tccs.alternateRules).forEach((r: any) => {
       if (r && r.alt && r.alt.trim() !== '') rulesMap.set(r.alt.trim().toLowerCase(), r);
     });
   }
