@@ -328,8 +328,9 @@ export const TccsSafetyCriteriaTable: React.FC<TccsSafetyCriteriaTableProps> = (
                   }}
                   onBlur={(e) => {
                     const v = e.target.value;
+                    const hasSci = /[⁰¹²³⁴⁵⁶⁷⁸⁹⁻^×xX]/.test(v);
                     const n = parseNumberFromText(v);
-                    if (v !== '' && !isNaN(n) && !v.trim().endsWith('.')) {
+                    if (v !== '' && !isNaN(n) && !v.trim().endsWith('.') && !hasSci) {
                       onUpdate(category, i, 'max', n);
                     }
                   }}

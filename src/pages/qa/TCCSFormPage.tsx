@@ -8,11 +8,13 @@ import { CriterionType, TCCS, Criterion, Product, AlternateRule } from '../../ty
 import {
   generateId,
   ensureArray,
+  removeUndefined,
   parseFlexibleValue,
   normalizeNumericString,
   autoFormatInput,
   parseNumberFromText,
 } from '../../utils';
+import { SpecialCharToolbar } from '../../components';
 import {
   PHARMACOPOEIA_TEMPLATES,
   generateCriteriaFromFormula,
@@ -151,6 +153,15 @@ const initialTccsFormState: TccsFormState = {
 const validateTCCS = (values: TccsFormState) => {
   const errors: Record<string, string> = {};
 
+  const nonEmptyMain = ensureArray(values.mainCriteria).filter(
+    (c) => c && c.name && c.name.trim() !== ''
+  );
+  const nonEmptySafety = [
+    ...ensureArray(values.microbiologicalCriteria),
+    ...ensureArray(values.heavyMetalCriteria),
+    ...ensureArray(values.mycotoxinCriteria),
+  ].filter((c) => c && c.name && c.name.trim() !== '');
+
   const zodResult = tccsFormSchema.safeParse({
     productId: values.productId,
     code: values.code,
@@ -158,12 +169,8 @@ const validateTCCS = (values: TccsFormState) => {
     packaging: values.packaging || '',
     storage: values.storage || '',
     shelfLife: values.shelfLife || '',
-    mainQualityCriteria: values.mainCriteria || [],
-    safetyCriteria: [
-      ...(values.microbiologicalCriteria || []),
-      ...(values.heavyMetalCriteria || []),
-      ...(values.mycotoxinCriteria || []),
-    ],
+    mainQualityCriteria: nonEmptyMain,
+    safetyCriteria: nonEmptySafety,
   });
 
   if (!zodResult.success) {
@@ -175,20 +182,30 @@ const validateTCCS = (values: TccsFormState) => {
     }
   }
 
+  if (nonEmptyMain.length === 0 && nonEmptySafety.length === 0) {
+    errors.mainQualityCriteria =
+      'Vui lòng nhập ít nhất 1 chỉ tiêu chất lượng hoặc chỉ tiêu an toàn';
+  }
+
   const checkMinMax = (list: Criterion[], sectionName: string, label: string) => {
-    (list || []).forEach((c, idx) => {
+    ensureArray(list).forEach((c, idx) => {
       if (
+        c &&
+        c.name &&
+        c.name.trim() !== '' &&
         c.type === CriterionType.NUMBER &&
         c.min !== undefined &&
         c.max !== undefined &&
         c.min !== null &&
-        c.max !== null
+        c.max !== null &&
+        String(c.min).trim() !== '' &&
+        String(c.max).trim() !== ''
       ) {
-        const minNum = Number(c.min);
-        const maxNum = Number(c.max);
+        const minNum = parseNumberFromText(String(c.min));
+        const maxNum = parseNumberFromText(String(c.max));
         if (!isNaN(minNum) && !isNaN(maxNum) && minNum > maxNum) {
           errors[`minMax_${sectionName}_${idx}`] =
-            `Mục ${label} - Chỉ tiêu "${c.name || `#${idx + 1}`}": Min (${minNum}) không được lớn hơn Max (${maxNum})`;
+            `Mục ${label} - Chỉ tiêu "${c.name || `#${idx + 1}`}": Min (${c.min}) không được lớn hơn Max (${c.max})`;
         }
       }
     });
@@ -460,13 +477,49 @@ const TCCSFormPage = () => {
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validate()) {
-      toast.error('Vui lòng kiểm tra lại các trường thông tin bắt buộc hoặc giới hạn Min/Max!');
+      const currentErrors = validateTCCS(formValues);
+      const firstErrorMsg = Object.values(currentErrors)[0];
+      toast.error(
+        firstErrorMsg ||
+          'Vui lòng kiểm tra lại các trường thông tin bắt buộc hoặc giới hạn Min/Max!'
+      );
       return;
     }
 
     const existingTccs = id && !cloneId ? tccsList.find((t) => t.id === id) : undefined;
 
-    const tccsData: TCCS = {
+    const sanitizeCriterion = (c: any, category?: string) => {
+      const cleaned: any = {
+        ...c,
+        name: String(c.name || '').trim(),
+        unit: String(c.unit || '').trim(),
+        type:
+          c.type === CriterionType.TEXT || c.type === 'TEXT'
+            ? CriterionType.TEXT
+            : CriterionType.NUMBER,
+      };
+      if (category) cleaned.category = category;
+      if (cleaned.type === CriterionType.NUMBER) {
+        if (c.min !== undefined && c.min !== null && String(c.min).trim() !== '') {
+          const parsedMin = parseNumberFromText(String(c.min));
+          cleaned.min = !isNaN(parsedMin) ? parsedMin : c.min;
+        } else {
+          delete cleaned.min;
+        }
+        if (c.max !== undefined && c.max !== null && String(c.max).trim() !== '') {
+          const parsedMax = parseNumberFromText(String(c.max));
+          cleaned.max = !isNaN(parsedMax) ? parsedMax : c.max;
+        } else {
+          delete cleaned.max;
+        }
+      } else {
+        delete cleaned.min;
+        delete cleaned.max;
+      }
+      return removeUndefined(cleaned);
+    };
+
+    const tccsData: TCCS = removeUndefined({
       id: id && !cloneId ? id : generateId('tccs'),
       productId: formValues.productId,
       code: formValues.code.toUpperCase(),
@@ -477,21 +530,23 @@ const TCCSFormPage = () => {
       standardRefs: formValues.standardRefs?.join(', ') || '',
       isActive: existingTccs ? existingTccs.isActive : true,
       composition: existingTccs?.composition || '',
-      mainQualityCriteria: ensureArray(formValues.mainCriteria).filter((c) => c && c.name),
+      mainQualityCriteria: ensureArray(formValues.mainCriteria)
+        .filter((c) => c && c.name && String(c.name).trim() !== '')
+        .map((c) => sanitizeCriterion(c)),
       safetyCriteria: [
         ...ensureArray(formValues.microbiologicalCriteria)
-          .filter((c) => c && c.name)
-          .map((c) => ({ ...(c as any), category: 'micro' })),
+          .filter((c) => c && c.name && String(c.name).trim() !== '')
+          .map((c) => sanitizeCriterion(c, 'micro')),
         ...ensureArray(formValues.heavyMetalCriteria)
-          .filter((c) => c && c.name)
-          .map((c) => ({ ...(c as any), category: 'metal' })),
+          .filter((c) => c && c.name && String(c.name).trim() !== '')
+          .map((c) => sanitizeCriterion(c, 'metal')),
         ...ensureArray(formValues.mycotoxinCriteria)
-          .filter((c) => c && c.name)
-          .map((c) => ({ ...(c as any), category: 'mycotoxin' })),
+          .filter((c) => c && c.name && String(c.name).trim() !== '')
+          .map((c) => sanitizeCriterion(c, 'mycotoxin')),
       ],
       alternateRules: ensureArray(formValues.alternateRules).filter((r) => r && r.main && r.alt),
       createdAt: existingTccs?.createdAt || new Date().toISOString(),
-    };
+    });
 
     try {
       if (id && !cloneId) {
@@ -538,6 +593,7 @@ const TCCSFormPage = () => {
 
       <div className="bg-surface rounded-xl shadow-xs border border-border p-6">
         <form onSubmit={handleSave} className="space-y-6">
+          <SpecialCharToolbar />
           <datalist id="criteria-name-suggestions">
             {allCriteriaNames.map((name) => (
               <option key={name} value={name} />

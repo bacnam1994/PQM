@@ -90,8 +90,8 @@ export const normalizeNumericString = (value: string | number | null | undefined
     return String(num * Math.pow(10, exp));
   });
 
-  // 3. Xử lý định dạng khoa học đứng độc lập (VD: 10^3, khoảng trắng 10 3)
-  str = str.replace(/(^|[^\d.xX*×])10(?:\s*\^\s*|\s+)([+-]?\d+)/gi, (_, prefix, p1) => {
+  // 3. Xử lý định dạng khoa học đứng độc lập (VD: 10^3, x10^3, ×10^3, khoảng trắng 10 3)
+  str = str.replace(/(^|[^\d.])[xX*×]?\s*10(?:\s*\^\s*|\s+)([+-]?\d+)/gi, (_, prefix, p1) => {
     const exp = parseInt(p1, 10);
     return prefix + String(Math.pow(10, exp));
   });

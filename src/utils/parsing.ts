@@ -218,9 +218,13 @@ export const evaluateCriterion = (c: any, value: string | number): boolean => {
       return false;
     }
     const min =
-      c.min !== undefined && c.min !== null && c.min !== '' ? parseFloat(String(c.min)) : -Infinity;
+      c.min !== undefined && c.min !== null && c.min !== ''
+        ? (parseFlexibleValue(c.min) ?? -Infinity)
+        : -Infinity;
     const max =
-      c.max !== undefined && c.max !== null && c.max !== '' ? parseFloat(String(c.max)) : Infinity;
+      c.max !== undefined && c.max !== null && c.max !== ''
+        ? (parseFlexibleValue(c.max) ?? Infinity)
+        : Infinity;
 
     // Nếu kết quả là dưới ngưỡng phát hiện (< 10) và chỉ tiêu chỉ có giới hạn trên (min <= 0 hoặc không có min)
     if (

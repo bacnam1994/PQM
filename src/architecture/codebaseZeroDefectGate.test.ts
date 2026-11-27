@@ -25,6 +25,7 @@ import {
   CriterionSuggestionItem,
 } from '../pages/qa/tccs-form/useExistingCriteriaSuggestions';
 import { CriterionType } from '../types';
+import { tccsFormSchema } from '../schemas/tccsSchema';
 
 function walkSourceFiles(dir: string): string[] {
   let results: string[] = [];
@@ -447,5 +448,27 @@ describe('PQM Zero-Defect Codebase Invariant Gates (100% Source Coverage)', () =
     // Alias search ("TAMC") finds "Tổng số vi sinh vật hiếu khí"
     const aliasMatch = filterCriteriaSuggestions(mockCatalog, 'TAMC');
     expect(aliasMatch[0]?.canonicalName).toBe('Tổng số vi sinh vật hiếu khí');
+
+    // 6. tccsFormSchema validates criteria without id and with exponent / string limits ("2×10³", "10⁴")
+    const validTccs = tccsFormSchema.safeParse({
+      productId: 'prod_1',
+      code: 'TCCS-01:2026',
+      issueDate: '2026-11-27',
+      mainQualityCriteria: [
+        {
+          name: 'Bacillus clausii',
+          type: 'NUMBER',
+          unit: 'CFU/g',
+          min: '10⁸',
+          max: '10⁹',
+          declaredContent: '2×10⁸',
+        },
+      ],
+      safetyCriteria: [
+        { name: 'Tổng số vi sinh vật hiếu khí', type: 'NUMBER', unit: 'CFU/g', max: '2×10³' },
+        { name: 'Escherichia coli', type: 'TEXT', unit: '/ 1g', expectedText: 'Không được có' },
+      ],
+    });
+    expect(validTccs.success).toBe(true);
   });
 });

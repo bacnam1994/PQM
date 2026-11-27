@@ -369,13 +369,19 @@ export const TccsMainCriteriaTable: React.FC<TccsMainCriteriaTableProps> = ({
 
       {/* Danh sách từng dòng chỉ tiêu */}
       {mainCriteria.map((c, i) => {
+        const minParsed =
+          c.min !== undefined && c.min !== null && String(c.min).trim() !== ''
+            ? parseNumberFromText(String(c.min))
+            : NaN;
+        const maxParsed =
+          c.max !== undefined && c.max !== null && String(c.max).trim() !== ''
+            ? parseNumberFromText(String(c.max))
+            : NaN;
         const isMinMaxError =
           c.type === CriterionType.NUMBER &&
-          c.min !== undefined &&
-          c.max !== undefined &&
-          c.min !== null &&
-          c.max !== null &&
-          Number(c.min) > Number(c.max);
+          !isNaN(minParsed) &&
+          !isNaN(maxParsed) &&
+          minParsed > maxParsed;
 
         const isLinked = !!c.masterCriterionId;
 
@@ -469,12 +475,13 @@ export const TccsMainCriteriaTable: React.FC<TccsMainCriteriaTableProps> = ({
                     }}
                     onBlur={(e) => {
                       const v = e.target.value;
+                      const hasSci = /[⁰¹²³⁴⁵⁶⁷⁸⁹⁻^×xX]/.test(v);
                       const n = parseNumberFromText(v);
-                      if (v !== '' && !isNaN(n) && !v.trim().endsWith('.')) {
+                      if (v !== '' && !isNaN(n) && !v.trim().endsWith('.') && !hasSci) {
                         onUpdateCriterion(i, 'min', n);
                       }
                     }}
-                    className="w-20 px-3 py-2 bg-surface text-ink rounded-lg text-xs font-semibold outline-none text-right border border-border shadow-xs font-mono"
+                    className="w-24 px-3 py-2 bg-surface text-ink rounded-lg text-xs font-semibold outline-none text-right border border-border shadow-xs font-mono"
                   />
                   <input
                     type="text"
@@ -487,12 +494,13 @@ export const TccsMainCriteriaTable: React.FC<TccsMainCriteriaTableProps> = ({
                     }}
                     onBlur={(e) => {
                       const v = e.target.value;
+                      const hasSci = /[⁰¹²³⁴⁵⁶⁷⁸⁹⁻^×xX]/.test(v);
                       const n = parseNumberFromText(v);
-                      if (v !== '' && !isNaN(n) && !v.trim().endsWith('.')) {
+                      if (v !== '' && !isNaN(n) && !v.trim().endsWith('.') && !hasSci) {
                         onUpdateCriterion(i, 'max', n);
                       }
                     }}
-                    className="w-20 px-3 py-2 bg-surface text-ink rounded-lg text-xs font-semibold outline-none text-right border border-border shadow-xs font-mono"
+                    className="w-24 px-3 py-2 bg-surface text-ink rounded-lg text-xs font-semibold outline-none text-right border border-border shadow-xs font-mono"
                   />
                 </>
               ) : (

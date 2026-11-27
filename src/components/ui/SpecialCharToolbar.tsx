@@ -1,7 +1,24 @@
 import React from 'react';
 import { CommandLineIcon } from '@heroicons/react/24/outline';
 
-const SPECIAL_CHARS = ['\u00b0C', '\u00b5', '\u2264', '\u2265', '\u00b1', '\u2070', '\u00b9', '\u00b2', '\u00b3', '\u2074', '\u2075', '\u2076', '\u2077', '\u2078', '\u2079', '\u207b'];
+const SPECIAL_CHARS = [
+  '\u00b0C',
+  '\u00b5',
+  '\u2264',
+  '\u2265',
+  '\u00b1',
+  '\u2070',
+  '\u00b9',
+  '\u00b2',
+  '\u00b3',
+  '\u2074',
+  '\u2075',
+  '\u2076',
+  '\u2077',
+  '\u2078',
+  '\u2079',
+  '\u207b',
+];
 
 export const insertSpecialChar = (char: string) => {
   const active = document.activeElement as HTMLInputElement | HTMLTextAreaElement;
@@ -9,11 +26,25 @@ export const insertSpecialChar = (char: string) => {
     const start = active.selectionStart || 0;
     const end = active.selectionEnd || 0;
     const val = active.value;
-    const newVal = val.slice(0, start) + char + val.slice(end);
+    const beforeCursor = val.slice(0, start);
+
+    // Nếu người dùng bấm nút "×10³" khi ô input đang trống hoặc phía trước chưa có chữ số → chèn "10³" thay vì "x10^3"
+    let effectiveChar = char;
+    if (/^[x×]10/i.test(char) && !/\d\s*$/.test(beforeCursor)) {
+      effectiveChar = char.replace(/^[x×]/i, '');
+    }
+
+    const newVal = beforeCursor + effectiveChar + val.slice(end);
 
     // Kích hoạt sự kiện onChange của React
-    const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
-    const nativeTextAreaValueSetter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value')?.set;
+    const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
+      window.HTMLInputElement.prototype,
+      'value'
+    )?.set;
+    const nativeTextAreaValueSetter = Object.getOwnPropertyDescriptor(
+      window.HTMLTextAreaElement.prototype,
+      'value'
+    )?.set;
 
     if (active.tagName === 'INPUT' && nativeInputValueSetter) {
       nativeInputValueSetter.call(active, newVal);
@@ -24,38 +55,46 @@ export const insertSpecialChar = (char: string) => {
     }
     active.dispatchEvent(new Event('input', { bubbles: true }));
     active.focus();
-    active.setSelectionRange(start + char.length, start + char.length);
+    const newCursor = start + effectiveChar.length;
+    active.setSelectionRange(newCursor, newCursor);
   }
 };
 
 // Các nút số mũ nhanh: label hiển thị → chuỗi chèn vào input
 const SCI_SHORTCUTS: { label: string; insert: string }[] = [
   { label: '10^', insert: '10^' },
-  { label: '\u00d710\u00b3', insert: 'x10^3' },
-  { label: '\u00d710\u2074', insert: 'x10^4' },
-  { label: '\u00d710\u2075', insert: 'x10^5' },
-  { label: '\u00d710\u2076', insert: 'x10^6' },
-  { label: '\u00d710\u2077', insert: 'x10^7' },
-  { label: '\u00d710\u207b\u00b9', insert: 'x10^-1' },
-  { label: '\u00d710\u207b\u00b2', insert: 'x10^-2' },
-  { label: '\u00d710\u207b\u00b3', insert: 'x10^-3' },
+  { label: '\u00d710\u00b2', insert: '\u00d710\u00b2' },
+  { label: '\u00d710\u00b3', insert: '\u00d710\u00b3' },
+  { label: '\u00d710\u2074', insert: '\u00d710\u2074' },
+  { label: '\u00d710\u2075', insert: '\u00d710\u2075' },
+  { label: '\u00d710\u2076', insert: '\u00d710\u2076' },
+  { label: '\u00d710\u2077', insert: '\u00d710\u2077' },
+  { label: '\u00d710\u2078', insert: '\u00d710\u2078' },
+  { label: '\u00d710\u2079', insert: '\u00d710\u2079' },
+  { label: '\u00d710\u207b\u00b9', insert: '\u00d710\u207b\u00b9' },
+  { label: '\u00d710\u207b\u00b2', insert: '\u00d710\u207b\u00b2' },
+  { label: '\u00d710\u207b\u00b3', insert: '\u00d710\u207b\u00b3' },
 ];
 
 export const SpecialCharToolbar: React.FC<{ className?: string }> = ({ className }) => {
   return (
-    <div className={`fixed top-20 left-1/2 -translate-x-1/2 z-[100] w-[95%] md:w-auto max-w-[980px] bg-surface/90 backdrop-blur-xl border border-border shadow-xl rounded-2xl px-4 py-2 flex items-center gap-3 overflow-x-auto no-scrollbar transition-all duration-300 group ${className || ''}`}>
-
+    <div
+      className={`fixed top-20 left-1/2 -translate-x-1/2 z-[100] w-[95%] md:w-auto max-w-[980px] bg-surface/90 backdrop-blur-xl border border-border shadow-xl rounded-2xl px-4 py-2 flex items-center gap-3 overflow-x-auto no-scrollbar transition-all duration-300 group ${className || ''}`}
+    >
       {/* Nhóm 1: Ký tự đặc biệt */}
       <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider font-bold text-emerald-700 dark:text-emerald-400 shrink-0">
         <CommandLineIcon className="w-4 h-4" />
         <span>Ký tự</span>
       </div>
       <div className="flex items-center gap-1.5 py-0.5">
-        {SPECIAL_CHARS.map(char => (
+        {SPECIAL_CHARS.map((char) => (
           <button
             key={char}
             type="button"
-            onMouseDown={(e) => { e.preventDefault(); insertSpecialChar(char); }}
+            onMouseDown={(e) => {
+              e.preventDefault();
+              insertSpecialChar(char);
+            }}
             className="px-2.5 py-1 bg-surface-2 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 hover:text-emerald-700 dark:hover:text-emerald-300 text-ink border border-border/80 rounded-lg text-xs font-bold transition-all shrink-0 shadow-2xs hover:shadow-xs active:scale-95"
           >
             {char}
@@ -75,7 +114,10 @@ export const SpecialCharToolbar: React.FC<{ className?: string }> = ({ className
           <button
             key={label}
             type="button"
-            onMouseDown={(e) => { e.preventDefault(); insertSpecialChar(insert); }}
+            onMouseDown={(e) => {
+              e.preventDefault();
+              insertSpecialChar(insert);
+            }}
             title={`Chèn: ${insert}`}
             className="px-2.5 py-1 bg-teal-50/60 dark:bg-teal-950/30 hover:bg-teal-100/70 dark:hover:bg-teal-900/40 text-teal-800 dark:text-teal-300 border border-teal-200/60 dark:border-teal-800/40 rounded-lg text-xs font-bold transition-all shrink-0 shadow-2xs hover:shadow-xs active:scale-95"
           >
@@ -87,4 +129,4 @@ export const SpecialCharToolbar: React.FC<{ className?: string }> = ({ className
   );
 };
 
-export default SpecialCharToolbar;
+export default SpecialCharToolbar;
