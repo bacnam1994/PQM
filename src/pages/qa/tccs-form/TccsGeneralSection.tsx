@@ -1,6 +1,8 @@
-import React from 'react';
+import React, { useMemo, useRef, useEffect } from 'react';
 import { DSDateInput } from '../../../components';
 import { Product } from '../../../types';
+import { normalizeSearch } from '../../../utils';
+import { cleanProductNameForMatch } from '../../../services/ai/tccsOcrService';
 
 interface TccsGeneralSectionProps {
   productId: string;
@@ -41,13 +43,75 @@ export const TccsGeneralSection: React.FC<TccsGeneralSectionProps> = ({
   onChange,
   onDateChange,
 }) => {
+  const dropdownContainerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (
+        dropdownContainerRef.current &&
+        !dropdownContainerRef.current.contains(e.target as Node)
+      ) {
+        setShowProductDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [setShowProductDropdown]);
+
+  // Lọc sản phẩm thông minh: hỗ trợ tìm không dấu, bỏ qua tiền tố "Thực phẩm bảo vệ sức khỏe",
+  // và luôn hiển thị danh sách gợi ý kể cả khi ô tìm kiếm đang chứa chuỗi "${code} - ${name}" hoặc tên dài từ bản cứng TCCS
+  const filteredProducts = useMemo(() => {
+    const rawQuery = (productSearch || '').trim();
+    if (!rawQuery) return products;
+
+    const selectedProd = productId ? products.find((p) => p.id === productId) : undefined;
+    if (selectedProd && rawQuery === `${selectedProd.code} - ${selectedProd.name}`) {
+      return products;
+    }
+
+    const qNorm = normalizeSearch(rawQuery);
+    const qClean = cleanProductNameForMatch(rawQuery);
+    const qTokens = qClean.split(' ').filter((t) => t.length >= 2);
+
+    const exactOrSubstring = products.filter((p) => {
+      const pNameNorm = normalizeSearch(p.name);
+      const pCodeNorm = normalizeSearch(p.code);
+      const pClean = cleanProductNameForMatch(p.name);
+      return (
+        pNameNorm.includes(qNorm) ||
+        pCodeNorm.includes(qNorm) ||
+        (qClean.length >= 2 && (pClean.includes(qClean) || qClean.includes(pClean)))
+      );
+    });
+
+    if (exactOrSubstring.length > 0) return exactOrSubstring;
+
+    // Fallback: khớp theo từ khóa (Token overlap) khi tên trên bản cứng TCCS dài hơn tên trong danh mục
+    if (qTokens.length > 0) {
+      const tokenMatches = products
+        .map((p) => {
+          const pClean = cleanProductNameForMatch(p.name);
+          const pCode = normalizeSearch(p.code);
+          const hitCount = qTokens.filter((qt) => pClean.includes(qt) || pCode.includes(qt)).length;
+          return { product: p, hitCount };
+        })
+        .filter((x) => x.hitCount > 0)
+        .sort((a, b) => b.hitCount - a.hitCount)
+        .map((x) => x.product);
+
+      if (tokenMatches.length > 0) return tokenMatches;
+    }
+
+    return products;
+  }, [products, productSearch, productId]);
+
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-2 text-indigo-600 dark:text-indigo-400 font-bold text-xs uppercase tracking-wider">
         <span>1. Thông tin chung TCCS</span>
       </div>
 
-      <div className="relative">
+      <div ref={dropdownContainerRef} className="relative">
         <label className="block text-xs font-semibold text-ink-muted mb-1">
           Sản phẩm áp dụng <span className="text-rose-500">*</span>
         </label>
@@ -66,26 +130,20 @@ export const TccsGeneralSection: React.FC<TccsGeneralSectionProps> = ({
         />
         {showProductDropdown && (
           <div className="absolute z-20 left-0 right-0 mt-1 max-h-56 overflow-y-auto bg-surface border border-border rounded-xl shadow-xl divide-y divide-border">
-            {products
-              .filter(
-                (p) =>
-                  p.name.toLowerCase().includes(productSearch.toLowerCase()) ||
-                  p.code.toLowerCase().includes(productSearch.toLowerCase())
-              )
-              .map((p) => (
-                <div
-                  key={p.id}
-                  onClick={() => onProductSelect(p)}
-                  className={`px-4 py-3 hover:bg-surface-2 cursor-pointer transition-colors ${
-                    productId === p.id
-                      ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
-                      : ''
-                  }`}
-                >
-                  <p className="text-sm font-semibold text-ink">{p.name}</p>
-                  <p className="text-[11px] font-mono text-ink-muted uppercase">{p.code}</p>
-                </div>
-              ))}
+            {filteredProducts.map((p) => (
+              <div
+                key={p.id}
+                onClick={() => onProductSelect(p)}
+                className={`px-4 py-3 hover:bg-surface-2 cursor-pointer transition-colors ${
+                  productId === p.id
+                    ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+                    : ''
+                }`}
+              >
+                <p className="text-sm font-semibold text-ink">{p.name}</p>
+                <p className="text-[11px] font-mono text-ink-muted uppercase">{p.code}</p>
+              </div>
+            ))}
           </div>
         )}
         {errors.productId && (

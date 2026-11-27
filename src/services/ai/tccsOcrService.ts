@@ -3,10 +3,11 @@
  * ================================================================
  * Cho phép quét bản cứng Tiêu chuẩn cơ sở (TCCS) từ file PDF (scan nhiều trang hoặc PDF điện tử)
  * hoặc nhiều ảnh chụp (JPG/PNG/WEBP/HEIC) để tự động điền toàn bộ biểu mẫu Xây dựng TCCS:
- * 1. Thông tin chung: Mã TCCS, Sản phẩm áp dụng, Ngày ban hành, Quy cách đóng gói, Bảo quản, Hạn dùng, Tài liệu tham khảo.
- * 2. Chỉ tiêu Chất lượng chính: Cảm quan, Lý hóa, Định tính, Định lượng hoạt chất (Min, Max, Công bố, ĐVT, Phương pháp thử).
- * 3. Giới hạn Vi sinh vật, Kim loại nặng, Độc tố vi nấm & An toàn khác (bảo toàn số mũ 10³, 2×10³, Không phát hiện).
- * 4. Quy tắc thay thế / Điều kiện miễn kiểm (Alternate Rules).
+ * 1. Thông tin chung: Mã TCCS, Sản phẩm áp dụng (khớp thông minh với danh mục SP), Ngày ban hành, Quy cách đóng gói, Bảo quản, Hạn dùng, Tài liệu tham khảo.
+ * 2. Thành phần cấu tạo / Công thức sản phẩm trên bản cứng TCCS (Hoạt chất & Phụ liệu) -> Tự động khớp nối với Công thức có sẵn hoặc tạo Công thức mới cho Sản phẩm.
+ * 3. Chỉ tiêu Chất lượng chính: Cảm quan, Lý hóa, Định tính, Định lượng hoạt chất (Min, Max, Công bố, ĐVT, Phương pháp thử, tự động link `formulaIngredientId`).
+ * 4. Giới hạn Vi sinh vật, Kim loại nặng, Độc tố vi nấm & An toàn khác (bảo toàn số mũ 10³, 2×10³, Không phát hiện).
+ * 5. Quy tắc thay thế / Điều kiện miễn kiểm (Alternate Rules).
  */
 
 import { createGoogleGenerativeAI, SchemaType } from './geminiClientLoader';
@@ -19,8 +20,22 @@ import {
   formatGeminiError,
 } from './aiConfig';
 import { validateOCRFile } from './geminiService';
-import { Criterion, CriterionType, AlternateRule, Product } from '../../types';
-import { ensureArray, normalizeSearch, parseNumberFromText } from '../../utils';
+import {
+  Criterion,
+  CriterionType,
+  AlternateRule,
+  Product,
+  ProductFormula,
+  FormulaIngredient,
+} from '../../types';
+import { ensureArray, generateId, normalizeSearch, parseNumberFromText } from '../../utils';
+
+export interface ExtractedTccsFormulaItemRaw {
+  name: string;
+  declaredContent?: string | number;
+  elementalContent?: string | number;
+  unit?: string;
+}
 
 export interface ExtractedTccsCriterionRaw {
   name: string;
@@ -30,6 +45,7 @@ export interface ExtractedTccsCriterionRaw {
   max?: string | number;
   expectedText?: string;
   declaredContent?: string | number;
+  formulaIngredientName?: string;
   notes?: string;
   category?: 'MAIN' | 'MICROBIO' | 'HEAVY_METAL' | 'MYCOTOXIN' | string;
 }
@@ -38,11 +54,14 @@ export interface ExtractedTccsDocumentRaw {
   code?: string;
   productName?: string;
   productCode?: string;
+  matchedProductId?: string;
   issueDate?: string;
   packaging?: string;
   storage?: string;
   shelfLife?: string;
   standardRefs?: string[];
+  formulaIngredients?: ExtractedTccsFormulaItemRaw[];
+  formulaExcipients?: ExtractedTccsFormulaItemRaw[];
   mainCriteria?: ExtractedTccsCriterionRaw[];
   microbiologicalCriteria?: ExtractedTccsCriterionRaw[];
   heavyMetalCriteria?: ExtractedTccsCriterionRaw[];
@@ -66,14 +85,42 @@ export interface NormalizedTccsExtractionResult {
   storage: string;
   shelfLife: string;
   standardRefs: string[];
+  extractedFormulaIngredients: FormulaIngredient[];
+  extractedFormulaExcipients: FormulaIngredient[];
   mainCriteria: (Criterion & { notes?: string })[];
   microbiologicalCriteria: (Criterion & { notes?: string })[];
   heavyMetalCriteria: (Criterion & { notes?: string })[];
   mycotoxinCriteria: (Criterion & { notes?: string })[];
   alternateRules: AlternateRule[];
+  linkedFormulaCount: number;
   pageCount: number;
   fileCount: number;
 }
+
+const TCCS_FORMULA_ITEM_SCHEMA = {
+  type: SchemaType.OBJECT,
+  properties: {
+    name: {
+      type: SchemaType.STRING,
+      description:
+        'Tên hoạt chất hoặc phụ liệu trong mục Thành phần cấu tạo / Công thức của TCCS (VD: "Vitamin C", "Kẽm gluconat", "Bacillus clausii"). Không gộp lượng vào tên.',
+    },
+    declaredContent: {
+      type: SchemaType.STRING,
+      description: 'Hàm lượng công bố của thành phần (chỉ lấy phần số, VD: "500", "70", "2×10⁹").',
+    },
+    elementalContent: {
+      type: SchemaType.STRING,
+      description:
+        'Hàm lượng nguyên tố / ion quy đổi nếu có ghi "(tương đương Kẽm 10mg)" -> điền "10". Để rỗng nếu không có.',
+    },
+    unit: {
+      type: SchemaType.STRING,
+      description: 'Đơn vị tính của thành phần (VD: "mg", "mcg", "IU", "CFU", "g", "ml").',
+    },
+  },
+  required: ['name', 'declaredContent', 'unit'],
+};
 
 const TCCS_CRITERION_ITEM_SCHEMA = {
   type: SchemaType.OBJECT,
@@ -106,12 +153,17 @@ const TCCS_CRITERION_ITEM_SCHEMA = {
     expectedText: {
       type: SchemaType.STRING,
       description:
-        'Mô tả mức chất lượng chấp nhận bằng chữ (cho chỉ tiêu TEXT như Cảm quan, Định tính, hoặc "Không được có", "Không phát hiện"). Với chỉ tiêu NUMBER đã tách được min/max thì để rỗng hoặc giữ nguyên chuỗi gốc nếu là dung sai phức tạp.',
+        'Mô tả mức chất lượng chấp nhận bằng chữ (cho chỉ tiêu TEXT như Cảm quan, Định tính, hoặc "Không được có", "Không phát hiện"). Với chỉ tiêu NUMBER đã tách được min/max thì để rỗng.',
     },
     declaredContent: {
       type: SchemaType.STRING,
       description:
-        'Hàm lượng công bố trên nhãn của hoạt chất nếu có ghi trong TCCS (VD: "500", "100", "10⁸"). Để rỗng nếu không có.',
+        'Hàm lượng công bố trên nhãn của hoạt chất tương ứng với chỉ tiêu định lượng này (VD: "500", "100", "2×10⁹"). Để rỗng nếu không có.',
+    },
+    formulaIngredientName: {
+      type: SchemaType.STRING,
+      description:
+        'Tên thành phần hoạt chất tương ứng trong Công thức / Thành phần cấu tạo nếu chỉ tiêu này là chỉ tiêu Định lượng / Hàm lượng hoạt chất (VD: chỉ tiêu "Hàm lượng Kẽm" -> formulaIngredientName: "Kẽm gluconat" hoặc "Kẽm"). Để rỗng nếu là chỉ tiêu lý hóa chung.',
     },
     notes: {
       type: SchemaType.STRING,
@@ -132,11 +184,17 @@ const TCCS_OCR_RESPONSE_SCHEMA = {
     },
     productName: {
       type: SchemaType.STRING,
-      description: 'Tên sản phẩm áp dụng bản TCCS này.',
+      description:
+        'Tên thương mại chính của sản phẩm trên TCCS (bỏ tiền tố "Thực phẩm bảo vệ sức khỏe:", "TPBVSK:", "Tiêu chuẩn cơ sở:" nếu có để lấy đúng tên sản phẩm).',
     },
     productCode: {
       type: SchemaType.STRING,
-      description: 'Mã sản phẩm / Mã hàng hóa nếu có ghi trên TCCS.',
+      description: 'Mã sản phẩm / Mã hàng hóa nếu có ghi trên TCCS hoặc khớp từ danh mục.',
+    },
+    matchedProductId: {
+      type: SchemaType.STRING,
+      description:
+        'ID sản phẩm (id) khớp nhất trong DANH MỤC SẢN PHẨM HỆ THỐNG được cung cấp trong prompt. Để rỗng nếu không có sản phẩm nào trong danh mục khớp với tài liệu này.',
     },
     issueDate: {
       type: SchemaType.STRING,
@@ -161,6 +219,18 @@ const TCCS_OCR_RESPONSE_SCHEMA = {
       description:
         'Danh sách các tiêu chuẩn / quy chuẩn tham chiếu (VD: ["DĐVN V", "QCVN 8-2:2011/BYT", "QCVN 8-3:2012/BYT", "46/2007/QĐ-BYT"]).',
       items: { type: SchemaType.STRING },
+    },
+    formulaIngredients: {
+      type: SchemaType.ARRAY,
+      description:
+        'Danh sách các HOẠT CHẤT CHÍNH trích xuất từ mục "Thành phần cấu tạo / Công thức" trong bản TCCS.',
+      items: TCCS_FORMULA_ITEM_SCHEMA,
+    },
+    formulaExcipients: {
+      type: SchemaType.ARRAY,
+      description:
+        'Danh sách các PHỤ LIỆU / TÁ DƯỢC trích xuất từ mục "Thành phần cấu tạo / Công thức" trong bản TCCS.',
+      items: TCCS_FORMULA_ITEM_SCHEMA,
     },
     mainCriteria: {
       type: SchemaType.ARRAY,
@@ -215,6 +285,7 @@ const TCCS_OCR_RESPONSE_SCHEMA = {
     'packaging',
     'storage',
     'shelfLife',
+    'formulaIngredients',
     'mainCriteria',
     'microbiologicalCriteria',
     'heavyMetalCriteria',
@@ -223,28 +294,30 @@ const TCCS_OCR_RESPONSE_SCHEMA = {
 };
 
 const TCCS_OCR_SYSTEM_PROMPT = `Bạn là Chuyên gia AI Thẩm định Hồ sơ Tiêu chuẩn Cơ sở (TCCS) Dược phẩm & Thực phẩm Bảo vệ Sức khỏe của hệ thống V-BIOTECH PQM.
-Nhiệm vụ: Đọc toàn bộ các trang của bản cứng Tiêu chuẩn Cơ sở (TCCS) và bóc tách ĐẦY ĐỦ 100% thông tin hành chính cùng tất cả các bảng chỉ tiêu kỹ thuật sang cấu trúc JSON chuẩn.
+Nhiệm vụ: Đọc toàn bộ các trang của bản cứng Tiêu chuẩn Cơ sở (TCCS) và bóc tách ĐẦY ĐỦ 100% thông tin hành chính, công thức thành phần cấu tạo, cùng tất cả các bảng chỉ tiêu kỹ thuật sang cấu trúc JSON chuẩn.
 
 QUY TẮC BẤT BIẾN (TUÂN THỦ TUYỆT ĐỐI):
-1. KHÔNG BỎ SÓT BẤT KỲ CHỈ TIÊU NÀO:
+1. ĐỐI CHIẾU TÊN SẢN PHẨM & CÔNG THỨC TRONG HỆ THỐNG:
+   - Trên bìa hoặc tiêu đề TCCS thường ghi kèm tiền tố như "Thực phẩm bảo vệ sức khỏe: <Tên SP>", "TPBVSK <Tên SP>", "Thực phẩm bổ sung: <Tên SP>". Hãy tách bỏ tiền tố chung để lấy đúng tên sản phẩm thương mại vào "productName".
+   - Đối chiếu với [DANH MỤC SẢN PHẨM HỆ THỐNG] được đính kèm trong prompt: nếu tìm thấy sản phẩm tương ứng (kể cả viết tắt, không dấu hoặc khác dấu gạch ngang), hãy điền chính xác "id" của sản phẩm đó vào "matchedProductId".
+   - Đọc kỹ mục "Thành phần cấu tạo / Công thức" trong TCCS để trích xuất đầy đủ danh sách hoạt chất vào "formulaIngredients" (kèm hàm lượng công bố declaredContent, hàm lượng nguyên tố quy đổi elementalContent nếu có, và đơn vị tính).
+   - Với mỗi chỉ tiêu Định lượng / Hàm lượng hoạt chất trong "mainCriteria", hãy điền luôn "declaredContent" và "formulaIngredientName" khớp với tên hoạt chất trong Công thức.
+2. KHÔNG BỎ SÓT BẤT KỲ CHỈ TIÊU NÀO:
    - Quét kỹ tất cả các mục: Chỉ tiêu cảm quan, Chỉ tiêu lý học / hóa học, Định tính, Định lượng / Hàm lượng hoạt chất, Chỉ tiêu vi sinh vật, Chỉ tiêu kim loại nặng, Độc tố vi nấm.
-   - Nếu mục "Chỉ tiêu cảm quan" trên văn bản TCCS tách thành các dòng nhỏ (Hình thức, Màu sắc, Mùi vị...) hoặc gộp chung 1 dòng "Cảm quan", hãy trích xuất đầy đủ.
-2. TÁCH MIN / MAX & KIỂU SỐ (NUMBER) VS CHỮ (TEXT) CHUẨN XÁC:
-   - Nếu mức yêu cầu là một khoảng số: VD "90,0 - 110,0%", "450 - 550 mg", "5.0 ~ 7.0" -> Đặt type = "NUMBER", min = "90.0", max = "110.0", unit = "%".
-   - Nếu mức yêu cầu là dung sai quanh hàm lượng công bố: VD "500 mg ± 10%" hoặc "100 mg ± 7.5%" -> Tính luôn min = "450", max = "550", declaredContent = "500", unit = "mg/viên" (hoặc đơn vị tương ứng), type = "NUMBER".
-   - Nếu mức yêu cầu là giới hạn trên: VD "≤ 5,0%", "Không quá 2000", "≤ 2 x 10³", "≤ 10⁴", "Không lớn hơn 3,0" -> Đặt type = "NUMBER", min = "", max = "5.0" (hoặc "2×10³", "10⁴", "3.0").
+3. TÁCH MIN / MAX & KIỂU SỐ (NUMBER) VS CHỮ (TEXT) CHUẨN XÁC:
+   - Nếu mức yêu cầu là một khoảng số: VD "90,0 - 110,0%", "450 - 550 mg", "8,0 ~ 12,0 mg/viên" -> Đặt type = "NUMBER", min = "90.0", max = "110.0", unit = "%".
+   - Nếu mức yêu cầu là dung sai quanh hàm lượng công bố: VD "500 mg ± 10%" hoặc "100 mg ± 7.5%" -> Tính luôn min = "450", max = "550", declaredContent = "500", type = "NUMBER".
+   - Nếu mức yêu cầu là giới hạn trên: VD "≤ 5,0%", "Không quá 2000", "≤ 2 x 10³", "≤ 10⁴" -> Đặt type = "NUMBER", min = "", max = "5.0" (hoặc "2×10³", "10⁴").
    - Nếu mức yêu cầu là giới hạn dưới: VD "≥ 10⁸ CFU/g", "Không thấp hơn 80%", "≥ 1,5 x 10⁹" -> Đặt type = "NUMBER", min = "10⁸" (hoặc "80", "1.5×10⁹"), max = "".
-   - Nếu mức yêu cầu là chữ định tính: VD "Không phát hiện", "Không được có", "Âm tính", "Đạt yêu cầu", "Viên nang cứng, màu xanh..." -> Đặt type = "TEXT", expectedText = nguyên văn mức yêu cầu, min = "", max = "".
-3. BẢO TOÀN SỐ MŨ LŨY THỪA & SỐ THẬP PHÂN:
-   - Giữ nguyên ký hiệu lũy thừa Unicode chuẩn như "10²", "10³", "2×10³", "10⁴", "10⁵", "10⁶", "10⁸", "10⁹" (chuyển "10^3" hoặc "10 3" trong vi sinh/lợi khuẩn thành "10³").
+   - Nếu mức yêu cầu là chữ định tính: VD "Không phát hiện", "Không được có", "Âm tính", "Đạt yêu cầu", "Viên nang cứng..." -> Đặt type = "TEXT", expectedText = nguyên văn mức yêu cầu, min = "", max = "".
+4. BẢO TOÀN SỐ MŨ LŨY THỪA & SỐ THẬP PHÂN:
+   - Giữ nguyên ký hiệu lũy thừa Unicode chuẩn như "10²", "10³", "2×10³", "10⁴", "10⁵", "10⁶", "10⁸", "10⁹".
    - Đổi dấu phẩy thập phân tiếng Việt ("0,5", "1,5", "5,0") thành dấu chấm ("0.5", "1.5", "5.0").
-4. PHÂN NHÓM CHÍNH XÁC:
+5. PHÂN NHÓM CHÍNH XÁC:
    - Lợi khuẩn có ích là thành phần hoạt chất của sản phẩm (VD: Bacillus clausii, Bacillus subtilis, Lactobacillus, Bifidobacterium, Saccharomyces boulardii) -> Đưa vào "mainCriteria" (Chỉ tiêu chất lượng chính).
    - Vi sinh vật tạp nhiễm / gây bệnh (Tổng số vi sinh vật hiếu khí, Tổng số bào tử nấm men nấm mốc, E. coli, Salmonella, S. aureus, P. aeruginosa, Coliforms, Cl. perfringens) -> Đưa vào "microbiologicalCriteria".
    - Kim loại nặng (Chì Pb, Cadmi Cd, Thủy ngân Hg, Arsen/Asen As tổng số, Arsen vô cơ) -> Đưa vào "heavyMetalCriteria".
-   - Độc tố vi nấm (Aflatoxin B1, Aflatoxin tổng số, Ochratoxin A...) -> Đưa vào "mycotoxinCriteria".
-5. NHẬN DIỆN QUY TẮC THAY THẾ (alternateRules):
-   - Nếu trong TCCS có câu ghi chú dạng: "Chỉ kiểm tra Arsen vô cơ khi Arsen tổng số vượt quá giới hạn cho phép" -> Thêm vào alternateRules: { main: "Arsen (As) tổng số", alt: "Arsen vô cơ", type: "FAIL_RETRY" }.`;
+   - Độc tố vi nấm (Aflatoxin B1, Aflatoxin tổng số, Ochratoxin A...) -> Đưa vào "mycotoxinCriteria".`;
 
 const PROBIOTIC_ACTIVE_KEYWORDS = [
   'bacillus',
@@ -309,6 +382,57 @@ const SUPERSCRIPT_MAP: Record<string, string> = {
 };
 
 /**
+ * Làm sạch tên sản phẩm khỏi các tiền tố pháp lý chung ("Thực phẩm bảo vệ sức khỏe:", "TPBVSK", "Tiêu chuẩn cơ sở"...)
+ * để đối chiếu chính xác với Danh mục Sản phẩm
+ */
+export function cleanProductNameForMatch(rawName?: string): string {
+  if (!rawName) return '';
+  let s = normalizeSearch(rawName);
+  s = s
+    .replace(
+      /\b(thuc pham bao ve suc khoe|tpbvsk|thuc pham bo sung|thuc pham chuc nang|tpcn|tieu chuan co so|tccs|san pham|ten san pham)\b/g,
+      ' '
+    )
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return s;
+}
+
+/**
+ * Làm sạch tên hoạt chất / chỉ tiêu định lượng để khớp nối giữa Chỉ tiêu TCCS <-> Thành phần Công thức
+ * VD: "Định lượng Vitamin C (Acid ascorbic)" -> "vitamin c acid ascorbic"
+ *     "Hàm lượng Kẽm (dưới dạng Kẽm gluconat)" -> "kem kem gluconat"
+ */
+export function cleanIngredientKeyForMatch(rawName?: string): string {
+  if (!rawName) return '';
+  let s = normalizeSearch(rawName);
+  // Đồng nghĩa hóa học / dược học phổ biến
+  s = s
+    .replace(/\bcanxi\b/g, 'calci')
+    .replace(/\bcalcium\b/g, 'calci')
+    .replace(/\bzinc\b/g, 'kem')
+    .replace(/\basen\b/g, 'arsen')
+    .replace(/\bthiamin\w*\b/g, 'vitamin b1')
+    .replace(/\briboflavin\w*\b/g, 'vitamin b2')
+    .replace(/\bpyridoxin\w*\b/g, 'vitamin b6')
+    .replace(/\bcyanocobalamin\w*\b/g, 'vitamin b12')
+    .replace(/\bcholecalciferol\b/g, 'vitamin d3')
+    .replace(/\bascorbic acid\b/g, 'vitamin c')
+    .replace(/\bacid ascorbic\b/g, 'vitamin c');
+
+  s = s
+    .replace(
+      /\b(dinh luong|ham luong|dinh tinh va dinh luong|dinh tinh|hoat chat|thanh phan|tuong duong|duoi dang|nguyen to|tong so)\b/g,
+      ' '
+    )
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return s;
+}
+
+/**
  * Chuẩn hóa chuỗi số / lũy thừa từ OCR (VD: "2 x 10^3" -> "2×10³", "0,5" -> "0.5")
  */
 export function normalizeOcrLimitNumber(
@@ -320,16 +444,13 @@ export function normalizeOcrLimitNumber(
   let s = String(raw).trim();
   if (!s) return undefined;
 
-  // Bỏ các tiền tố bất đẳng thức nếu AI lỡ đặt vào ô min/max
   s = s
     .replace(/^(<=|>=|≤|≥|<|>|không quá|không lớn hơn|không nhỏ hơn|không ít hơn|nmt|nlt)\s*/i, '')
     .trim();
   if (!s) return undefined;
 
-  // Đổi dấu phẩy thập phân đơn lẻ sang dấu chấm ("0,5" -> "0.5")
   s = s.replace(/(\d+),(\d+)/g, '$1.$2');
 
-  // Chuyển "10^3" hoặc "2 x 10^3" sang Unicode superscript "10³", "2×10³"
   s = s.replace(/(\d+(?:\.\d+)?)\s*[xX*×]\s*10\s*\^\s*([+-]?\d+)/g, (_, coef, exp) => {
     const sup = String(exp)
       .split('')
@@ -346,7 +467,6 @@ export function normalizeOcrLimitNumber(
   });
   s = s.replace(/(\d+(?:\.\d+)?)\s*[xX*×]\s*10([⁰¹²³⁴⁵⁶⁷⁸⁹⁻]+)/g, '$1×10$2');
 
-  // Nếu có ký hiệu lũy thừa thì giữ nguyên chuỗi hiển thị lũy thừa (VD: "2×10³", "10⁴")
   if (/[⁰¹²³⁴⁵⁶⁷⁸⁹⁻^×]/.test(s)) {
     return s;
   }
@@ -366,19 +486,16 @@ export function parseTccsOcrDate(raw?: string): string {
   if (!raw || !raw.trim()) return new Date().toISOString().split('T')[0];
   const s = raw.trim();
 
-  // Đã ở dạng YYYY-MM-DD
   const isoMatch = s.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})$/);
   if (isoMatch) {
     return `${isoMatch[1]}-${isoMatch[2].padStart(2, '0')}-${isoMatch[3].padStart(2, '0')}`;
   }
 
-  // Dạng DD/MM/YYYY hoặc DD-MM-YYYY
   const dmyMatch = s.match(/(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})/);
   if (dmyMatch) {
     return `${dmyMatch[3]}-${dmyMatch[2].padStart(2, '0')}-${dmyMatch[1].padStart(2, '0')}`;
   }
 
-  // Dạng "Ngày 15 tháng 08 năm 2024"
   const vnMatch = s.match(/ngày\s*(\d{1,2})\s*tháng\s*(\d{1,2})\s*năm\s*(\d{4})/i);
   if (vnMatch) {
     return `${vnMatch[3]}-${vnMatch[2].padStart(2, '0')}-${vnMatch[1].padStart(2, '0')}`;
@@ -387,9 +504,6 @@ export function parseTccsOcrDate(raw?: string): string {
   return new Date().toISOString().split('T')[0];
 }
 
-/**
- * Chuẩn hóa 1 dòng chỉ tiêu trích xuất từ OCR sang Criterion của TCCSFormPage
- */
 function normalizeCriterionItem(
   raw: ExtractedTccsCriterionRaw
 ): (Criterion & { notes?: string }) | null {
@@ -401,26 +515,43 @@ function normalizeCriterionItem(
   let max = normalizeOcrLimitNumber(raw.max);
   let expectedText = String(raw.expectedText || '').trim();
   let declaredContent = normalizeOcrLimitNumber(raw.declaredContent);
+  const formulaIngredientId = raw.formulaIngredientName
+    ? String(raw.formulaIngredientName).trim()
+    : undefined;
 
-  // Nếu min và max đều trống nhưng expectedText chứa biểu thức số rõ ràng (VD: "≤ 2×10³", "90.0 - 110.0", "≥ 10⁸")
   if (min === undefined && max === undefined && expectedText) {
     const expNorm = expectedText.replace(/(\d+),(\d+)/g, '$1.$2').trim();
 
-    // Kiểm tra khoảng "A - B" hoặc "A ~ B"
-    const rangeMatch = expNorm.match(
-      /^([+-]?\d+(?:\.\d+)?(?:\s*[x×*]\s*10[⁰¹²³⁴⁵⁶⁷⁸⁹⁻^+-]+)?)\s*(?:~|-|đến)\s*([+-]?\d+(?:\.\d+)?(?:\s*[x×*]\s*10[⁰¹²³⁴⁵⁶⁷⁸⁹⁻^+-]+)?)\s*%?$/i
-    );
-    if (rangeMatch) {
-      min = normalizeOcrLimitNumber(rangeMatch[1]);
-      max = normalizeOcrLimitNumber(rangeMatch[2]);
-    } else if (/^(?:<=|≤|không quá|không lớn hơn|nmt)\s*(.+)$/i.test(expNorm)) {
-      const m = expNorm.match(/^(?:<=|≤|không quá|không lớn hơn|nmt)\s*(.+)$/i);
-      const cand = normalizeOcrLimitNumber(m?.[1]);
-      if (cand !== undefined) max = cand;
-    } else if (/^(?:>=|≥|không nhỏ hơn|không thấp hơn|ít nhất|nlt)\s*(.+)$/i.test(expNorm)) {
-      const m = expNorm.match(/^(?:>=|≥|không nhỏ hơn|không thấp hơn|ít nhất|nlt)\s*(.+)$/i);
-      const cand = normalizeOcrLimitNumber(m?.[1]);
-      if (cand !== undefined) min = cand;
+    // Kiểm tra dung sai "500 mg ± 10%" hoặc "100 ± 7.5%"
+    const pmSymbol = expNorm.includes('±') ? '±' : expNorm.includes('+/-') ? '+/-' : null;
+    if (pmSymbol) {
+      const parts = expNorm.split(pmSymbol);
+      const baseNum = parseNumberFromText(parts[0]);
+      const tolNum = parseNumberFromText(parts[1] || '');
+      if (!isNaN(baseNum) && !isNaN(tolNum) && baseNum > 0) {
+        const delta = (parts[1] || '').includes('%') ? (baseNum * tolNum) / 100 : tolNum;
+        min = Math.round((baseNum - delta) * 1000) / 1000;
+        max = Math.round((baseNum + delta) * 1000) / 1000;
+        if (declaredContent === undefined) declaredContent = baseNum;
+      }
+    }
+
+    if (min === undefined && max === undefined) {
+      const rangeMatch = expNorm.match(
+        /^([+-]?\d+(?:\.\d+)?(?:\s*[x×*]\s*10[⁰¹²³⁴⁵⁶⁷⁸⁹⁻^+-]+)?)\s*(?:~|-|đến)\s*([+-]?\d+(?:\.\d+)?(?:\s*[x×*]\s*10[⁰¹²³⁴⁵⁶⁷⁸⁹⁻^+-]+)?)\s*%?$/i
+      );
+      if (rangeMatch) {
+        min = normalizeOcrLimitNumber(rangeMatch[1]);
+        max = normalizeOcrLimitNumber(rangeMatch[2]);
+      } else if (/^(?:<=|≤|không quá|không lớn hơn|nmt)\s*(.+)$/i.test(expNorm)) {
+        const m = expNorm.match(/^(?:<=|≤|không quá|không lớn hơn|nmt)\s*(.+)$/i);
+        const cand = normalizeOcrLimitNumber(m?.[1]);
+        if (cand !== undefined) max = cand;
+      } else if (/^(?:>=|≥|không nhỏ hơn|không thấp hơn|ít nhất|nlt)\s*(.+)$/i.test(expNorm)) {
+        const m = expNorm.match(/^(?:>=|≥|không nhỏ hơn|không thấp hơn|ít nhất|nlt)\s*(.+)$/i);
+        const cand = normalizeOcrLimitNumber(m?.[1]);
+        if (cand !== undefined) min = cand;
+      }
     }
   }
 
@@ -447,39 +578,241 @@ function normalizeCriterionItem(
     max: (resolvedType === CriterionType.NUMBER ? max : undefined) as any,
     expectedText: resolvedType === CriterionType.TEXT ? expectedText || 'Đạt yêu cầu' : undefined,
     declaredContent: (declaredContent !== undefined ? declaredContent : undefined) as any,
+    formulaIngredientId: formulaIngredientId || undefined,
     notes,
   };
 }
 
 /**
- * Tìm sản phẩm khớp nhất trong danh mục Products từ tên/mã trích xuất trên bản cứng TCCS
+ * Tìm sản phẩm khớp nhất trong danh mục Products từ:
+ * 1. matchedProductId do AI chọn trực tiếp từ danh mục
+ * 2. Mã sản phẩm (productCode) hoặc Mã TCCS (code có chứa mã SP)
+ * 3. Tên sản phẩm đã làm sạch tiền tố pháp lý ("Thực phẩm bảo vệ sức khỏe...", dấu gạch ngang, v.v.)
+ * 4. Độ phủ từ khóa (Token Overlap Score) giữa tên SP trên TCCS và tên SP trong hệ thống
  */
 export function findMatchingProductFromTccsOcr(
   productName?: string,
   productCode?: string,
-  products: Product[] = []
+  products: Product[] = [],
+  matchedProductId?: string,
+  tccsCode?: string
 ): Product | undefined {
   if (!products || products.length === 0) return undefined;
-  const codeNorm = normalizeSearch(productCode || '');
-  const nameNorm = normalizeSearch(productName || '');
 
-  if (codeNorm) {
-    const exactCode = products.find((p) => normalizeSearch(p.code) === codeNorm);
+  // 1. Ưu tiên ID khớp trực tiếp từ AI
+  if (matchedProductId && matchedProductId.trim()) {
+    const byId = products.find((p) => p.id === matchedProductId.trim());
+    if (byId) return byId;
+  }
+
+  // 2. Khớp theo Mã sản phẩm (productCode)
+  const codeClean = normalizeSearch(productCode || '').replace(/[^a-z0-9]/g, '');
+  if (codeClean && codeClean.length >= 2) {
+    const exactCode = products.find(
+      (p) => normalizeSearch(p.code).replace(/[^a-z0-9]/g, '') === codeClean
+    );
     if (exactCode) return exactCode;
   }
 
-  if (nameNorm) {
-    const exactName = products.find((p) => normalizeSearch(p.name) === nameNorm);
-    if (exactName) return exactName;
+  // 3. Khớp theo Tên sản phẩm đã khử tiền tố pháp lý ("Thực phẩm bảo vệ sức khỏe", dấu câu...)
+  const targetClean = cleanProductNameForMatch(productName);
+  if (targetClean) {
+    for (const p of products) {
+      const pClean = cleanProductNameForMatch(p.name);
+      if (!pClean) continue;
+      if (pClean === targetClean) return p;
+      // Khớp không khoảng trắng (VD: "bio-plus" vs "bioplus" vs "bio plus")
+      if (pClean.replace(/\s+/g, '') === targetClean.replace(/\s+/g, '')) return p;
+    }
 
-    const containsMatch = products.find((p) => {
-      const pName = normalizeSearch(p.name);
-      return pName.length >= 4 && (nameNorm.includes(pName) || pName.includes(nameNorm));
+    // Substring hai chiều sau khi làm sạch tiền tố
+    for (const p of products) {
+      const pClean = cleanProductNameForMatch(p.name);
+      if (pClean.length >= 3 && (targetClean.includes(pClean) || pClean.includes(targetClean))) {
+        return p;
+      }
+    }
+
+    // 4. Chấm điểm Token Overlap (F1 token similarity)
+    const targetTokens = targetClean.split(' ').filter((t) => t.length >= 2);
+    if (targetTokens.length > 0) {
+      let bestProduct: Product | undefined;
+      let bestScore = 0;
+
+      for (const p of products) {
+        const pClean = cleanProductNameForMatch(p.name);
+        const pTokens = pClean.split(' ').filter((t) => t.length >= 2);
+        if (pTokens.length === 0) continue;
+
+        const matchedCount = pTokens.filter(
+          (pt) =>
+            targetTokens.includes(pt) ||
+            targetTokens.some((tt) => tt.includes(pt) || pt.includes(tt))
+        ).length;
+
+        const recallOnProduct = matchedCount / pTokens.length;
+        const precisionOnTarget = matchedCount / targetTokens.length;
+        const score = recallOnProduct * 0.7 + precisionOnTarget * 0.3;
+
+        if (score > bestScore && (recallOnProduct >= 0.6 || matchedCount >= 2)) {
+          bestScore = score;
+          bestProduct = p;
+        }
+      }
+
+      if (bestProduct && bestScore >= 0.5) {
+        return bestProduct;
+      }
+    }
+  }
+
+  // 5. Kiểm tra nếu Mã TCCS hoặc Tên SP trên TCCS có chứa Mã sản phẩm (p.code)
+  const combinedSource = normalizeSearch(`${productName || ''} ${tccsCode || ''}`);
+  if (combinedSource) {
+    const byEmbeddedCode = products.find((p) => {
+      const pCode = normalizeSearch(p.code);
+      return pCode.length >= 3 && combinedSource.includes(pCode);
     });
-    if (containsMatch) return containsMatch;
+    if (byEmbeddedCode) return byEmbeddedCode;
   }
 
   return undefined;
+}
+
+/**
+ * Tự động liên kết danh sách Chỉ tiêu Chất lượng chính (mainCriteria) với Công thức sản phẩm (ProductFormula / FormulaIngredient[])
+ * - Khớp theo tên hoạt chất (bỏ tiền tố "Định lượng", "Hàm lượng", xử lý từ đồng nghĩa Kẽm/Zinc, Calci/Canxi, Vitamin...)
+ * - Tự động điền `formulaIngredientId = ing.name`
+ * - Tự động điền `declaredContent` từ Công thức nếu chỉ tiêu chưa có `declaredContent`
+ * - Tự động chọn `calculationBasis = 'ELEMENTAL'` nếu thành phần công thức có `elementalContent`, ngược lại `'DECLARED'`
+ * - Tự động gán `masterCriterionId` nếu khớp với danh mục chỉ tiêu đã có
+ */
+export function linkCriteriaWithFormulaAndCatalog(
+  mainCriteria: (Criterion & { notes?: string })[],
+  formulaIngredients: FormulaIngredient[] = [],
+  existingCatalog: Array<{
+    canonicalName: string;
+    masterCriterionId?: string;
+    defaultUnit?: string;
+  }> = []
+): { linkedCriteria: (Criterion & { notes?: string })[]; linkedCount: number } {
+  const safeIngredients = ensureArray(formulaIngredients).filter((ing) => ing && ing.name);
+  let linkedCount = 0;
+
+  const linkedCriteria = ensureArray(mainCriteria).map((crit) => {
+    if (!crit || !crit.name) return crit;
+    const updated = { ...crit };
+    const critKey = cleanIngredientKeyForMatch(updated.name);
+    const critNorm = normalizeSearch(updated.name);
+
+    // 1. Liên kết với Master Criterion nếu có trong catalog
+    if (!updated.masterCriterionId && existingCatalog.length > 0) {
+      const matchedCatalog = existingCatalog.find(
+        (cat) => normalizeSearch(cat.canonicalName) === critNorm
+      );
+      if (matchedCatalog?.masterCriterionId) {
+        updated.masterCriterionId = matchedCatalog.masterCriterionId;
+      }
+      if (!updated.unit && matchedCatalog?.defaultUnit) {
+        updated.unit = matchedCatalog.defaultUnit;
+      }
+    }
+
+    // 2. Liên kết với Thành phần Công thức (FormulaIngredient)
+    if (safeIngredients.length > 0 && critKey.length >= 2) {
+      // Nếu đã có formulaIngredientId, kiểm tra xem có khớp chính xác tên thành phần trong formula không
+      let matchedIng: FormulaIngredient | undefined;
+
+      if (updated.formulaIngredientId) {
+        const hintKey = cleanIngredientKeyForMatch(updated.formulaIngredientId);
+        matchedIng = safeIngredients.find((ing) => {
+          const ingKey = cleanIngredientKeyForMatch(ing.name);
+          return (
+            ing.name.toLowerCase() === updated.formulaIngredientId!.toLowerCase() ||
+            (ingKey && hintKey && (ingKey.includes(hintKey) || hintKey.includes(ingKey)))
+          );
+        });
+      }
+
+      if (!matchedIng) {
+        // Tìm thành phần khớp theo từ khóa hoạt chất
+        let bestIngScore = 0;
+        for (const ing of safeIngredients) {
+          const ingKey = cleanIngredientKeyForMatch(ing.name);
+          if (!ingKey) continue;
+
+          if (ingKey === critKey) {
+            matchedIng = ing;
+            break;
+          }
+
+          if (critKey.includes(ingKey) || ingKey.includes(critKey)) {
+            const score =
+              Math.min(ingKey.length, critKey.length) / Math.max(ingKey.length, critKey.length);
+            if (score > bestIngScore) {
+              bestIngScore = score;
+              matchedIng = ing;
+            }
+            continue;
+          }
+
+          // Khớp token đầu tiên (VD: chỉ tiêu "Hàm lượng Kẽm" vs thành phần "Kẽm gluconat" -> cùng token chính "kem")
+          const critTokens = critKey.split(' ').filter((t) => t.length >= 2);
+          const ingTokens = ingKey.split(' ').filter((t) => t.length >= 2);
+          if (critTokens.length > 0 && ingTokens.length > 0) {
+            const sharedTokens = critTokens.filter((ct) => ingTokens.includes(ct));
+            // Nếu chỉ tiêu có dạng "Vitamin B1", đòi hỏi khớp cả "vitamin" và "b1"
+            const isVitamin = critTokens[0] === 'vitamin' || ingTokens[0] === 'vitamin';
+            const isMatch = isVitamin
+              ? sharedTokens.length >= 2
+              : sharedTokens.length >= 1 &&
+                (critTokens[0] === ingTokens[0] || sharedTokens[0].length >= 3);
+
+            if (isMatch) {
+              const score = sharedTokens.length / Math.max(critTokens.length, ingTokens.length);
+              if (score > bestIngScore) {
+                bestIngScore = score;
+                matchedIng = ing;
+              }
+            }
+          }
+        }
+      }
+
+      if (matchedIng) {
+        updated.formulaIngredientId = matchedIng.name;
+        const hasElemental =
+          matchedIng.elementalContent !== undefined &&
+          matchedIng.elementalContent !== null &&
+          String(matchedIng.elementalContent).trim() !== '' &&
+          Number(matchedIng.elementalContent) > 0;
+
+        if (!updated.calculationBasis) {
+          updated.calculationBasis = hasElemental ? 'ELEMENTAL' : 'DECLARED';
+        }
+
+        if (
+          updated.declaredContent === undefined ||
+          String(updated.declaredContent).trim() === ''
+        ) {
+          const basisVal = hasElemental ? matchedIng.elementalContent : matchedIng.declaredContent;
+          if (basisVal !== undefined && basisVal !== null && String(basisVal).trim() !== '') {
+            updated.declaredContent = basisVal as any;
+          }
+        }
+
+        if (!updated.unit && matchedIng.unit) {
+          updated.unit = matchedIng.unit;
+        }
+
+        linkedCount += 1;
+      }
+    }
+
+    return updated;
+  });
+
+  return { linkedCriteria, linkedCount };
 }
 
 /**
@@ -488,7 +821,9 @@ export function findMatchingProductFromTccsOcr(
 export function normalizeExtractedTccsData(
   raw: ExtractedTccsDocumentRaw,
   products: Product[] = [],
-  fileCount: number = 1
+  fileCount: number = 1,
+  productFormulas: ProductFormula[] = [],
+  currentProductId?: string
 ): NormalizedTccsExtractionResult {
   const mainCriteria: (Criterion & { notes?: string })[] = [];
   const microbiologicalCriteria: (Criterion & { notes?: string })[] = [];
@@ -511,7 +846,6 @@ export function normalizeExtractedTccsData(
     }
 
     if (defaultBucket === 'MAIN') {
-      // Kiểm tra nếu AI đặt nhầm chỉ tiêu vi sinh / kim loại nặng / độc tố vi nấm vào bảng chính
       if (MYCOTOXIN_KEYWORDS.some((kw) => nl.includes(kw))) {
         mycotoxinCriteria.push(item);
       } else if (HEAVY_METAL_KEYWORDS.some((kw) => nl.includes(kw)) && !nl.includes('định tính')) {
@@ -538,7 +872,35 @@ export function normalizeExtractedTccsData(
   ensureArray(raw?.heavyMetalCriteria).forEach((c) => routeCriterion(c, 'HEAVY_METAL'));
   ensureArray(raw?.mycotoxinCriteria).forEach((c) => routeCriterion(c, 'MYCOTOXIN'));
 
-  // Tự động phát hiện quy tắc thay thế Arsen tổng số -> Arsen vô cơ nếu có cả 2 chỉ tiêu mà AI chưa sinh rule
+  // Chuẩn hóa danh sách Thành phần công thức trích xuất trực tiếp từ bản cứng TCCS
+  const normalizeFormulaList = (
+    list?: ExtractedTccsFormulaItemRaw[],
+    prefix = 'ing'
+  ): FormulaIngredient[] => {
+    return ensureArray(list)
+      .filter((it) => it && it.name && String(it.name).trim() !== '')
+      .map((it) => {
+        const dc = normalizeOcrLimitNumber(it.declaredContent);
+        const ec = normalizeOcrLimitNumber(it.elementalContent);
+        return {
+          id: generateId(prefix),
+          name: String(it.name).trim(),
+          declaredContent:
+            typeof dc === 'number' ? dc : parseNumberFromText(String(dc || '0')) || 0,
+          elementalContent:
+            ec !== undefined
+              ? typeof ec === 'number'
+                ? ec
+                : parseNumberFromText(String(ec)) || undefined
+              : undefined,
+          unit: String(it.unit || 'mg').trim(),
+        };
+      });
+  };
+
+  const extractedFormulaIngredients = normalizeFormulaList(raw?.formulaIngredients, 'ing');
+  const extractedFormulaExcipients = normalizeFormulaList(raw?.formulaExcipients, 'exc');
+
   const alternateRules: AlternateRule[] = ensureArray(raw?.alternateRules)
     .filter((r) => r && r.main && r.alt)
     .map((r) => ({
@@ -564,10 +926,32 @@ export function normalizeExtractedTccsData(
     }
   }
 
-  const matchedProduct = findMatchingProductFromTccsOcr(
+  // Khớp Sản phẩm: Ưu tiên match từ OCR, nếu không thấy mà người dùng đã chọn sẵn sản phẩm trên Form thì giữ sản phẩm đã chọn
+  let matchedProduct = findMatchingProductFromTccsOcr(
     raw?.productName,
     raw?.productCode,
-    products
+    products,
+    raw?.matchedProductId,
+    raw?.code
+  );
+  if (!matchedProduct && currentProductId) {
+    matchedProduct = products.find((p) => p.id === currentProductId);
+  }
+
+  // Tìm Công thức của Sản phẩm trong hệ thống; nếu chưa có thì dùng chính Công thức bóc tách từ bản cứng TCCS
+  const existingFormula = matchedProduct
+    ? ensureArray(productFormulas).find((f) => f && f.productId === matchedProduct!.id)
+    : undefined;
+
+  const activeFormulaIngredients =
+    existingFormula && ensureArray(existingFormula.ingredients).length > 0
+      ? [...ensureArray(existingFormula.ingredients), ...ensureArray(existingFormula.excipients)]
+      : [...extractedFormulaIngredients, ...extractedFormulaExcipients];
+
+  // Tự động liên kết Chỉ tiêu Chất lượng chính với Thành phần Công thức
+  const { linkedCriteria, linkedCount } = linkCriteriaWithFormulaAndCatalog(
+    mainCriteria,
+    activeFormulaIngredients
   );
 
   return {
@@ -582,11 +966,14 @@ export function normalizeExtractedTccsData(
     standardRefs: ensureArray(raw?.standardRefs)
       .map((s) => String(s || '').trim())
       .filter(Boolean),
-    mainCriteria,
+    extractedFormulaIngredients,
+    extractedFormulaExcipients,
+    mainCriteria: linkedCriteria,
     microbiologicalCriteria,
     heavyMetalCriteria,
     mycotoxinCriteria,
     alternateRules,
+    linkedFormulaCount: linkedCount,
     pageCount: Number(raw?.pageCount) || 1,
     fileCount,
   };
@@ -610,7 +997,11 @@ function fileToBase64(file: File): Promise<string> {
 export async function extractTccsFromFiles(
   files: File[],
   products: Product[] = [],
-  onProgress?: (step: string, percent: number) => void
+  onProgress?: (step: string, percent: number) => void,
+  options?: {
+    productFormulas?: ProductFormula[];
+    currentProductId?: string;
+  }
 ): Promise<NormalizedTccsExtractionResult> {
   if (!files || files.length === 0) {
     throw new Error('Vui lòng chọn ít nhất 1 file PDF hoặc ảnh chụp bản cứng TCCS.');
@@ -651,7 +1042,6 @@ export async function extractTccsFromFiles(
         ]);
 
         const analysis = await analyzePdf(file).catch(() => null);
-        // Với TCCS bản cứng (thường có khung bảng nhiều trang), kết xuất ảnh High-DPI 200 DPI kết hợp Text Layer (nếu có) để đạt độ chính xác 100%
         const renderedPages = await convertPdfToImages(file, {
           targetDpi: 200,
           format: 'image/jpeg',
@@ -711,11 +1101,17 @@ export async function extractTccsFromFiles(
     }
   }
 
+  // Đính kèm Danh mục Sản phẩm & Công thức hiện có để AI tự động đối chiếu chính xác ID sản phẩm & Tên hoạt chất
+  const productCatalogSummary = ensureArray(products)
+    .slice(0, 150)
+    .map((p) => `- id: "${p.id}" | code: "${p.code}" | name: "${p.name}"`)
+    .join('\n');
+
   contentParts.push(
-    `\nHãy đọc toàn bộ ${totalPageCount} trang tài liệu Tiêu chuẩn Cơ sở (TCCS) ở trên và bóc tách đầy đủ thông tin chung cùng tất cả các chỉ tiêu chất lượng chính, vi sinh vật, kim loại nặng, độc tố vi nấm và quy tắc thay thế.`
+    `\n[DANH MỤC SẢN PHẨM HỆ THỐNG ĐỂ ĐỐI CHIẾU matchedProductId]:\n${productCatalogSummary || '(Chưa có sản phẩm)'}\n\nHãy đọc toàn bộ ${totalPageCount} trang tài liệu Tiêu chuẩn Cơ sở (TCCS) ở trên và bóc tách đầy đủ: Thông tin chung, matchedProductId (nếu khớp với sản phẩm trong danh mục), Thành phần cấu tạo / Công thức (formulaIngredients, formulaExcipients), cùng tất cả các chỉ tiêu chất lượng chính, vi sinh vật, kim loại nặng, độc tố vi nấm và quy tắc thay thế.`
   );
 
-  onProgress?.('AI đang phân tích bảng chỉ tiêu kỹ thuật và giới hạn TCCS...', 55);
+  onProgress?.('AI đang phân tích bảng chỉ tiêu kỹ thuật, sản phẩm và công thức TCCS...', 55);
 
   const primaryModel = getValidGeminiModel(getGeminiModel());
   let currentModel = primaryModel;
@@ -736,13 +1132,22 @@ export async function extractTccsFromFiles(
       });
 
       const response = await model.generateContent(contentParts);
-      onProgress?.('Đang chuẩn hóa chỉ tiêu và đối chiếu danh mục sản phẩm...', 90);
+      onProgress?.(
+        'Đang đối chiếu sản phẩm, liên kết thành phần công thức & chuẩn hóa chỉ tiêu...',
+        90
+      );
       const text = response.response.text();
       const parsed = JSON.parse(text) as ExtractedTccsDocumentRaw;
       parsed.pageCount = totalPageCount;
 
-      const normalized = normalizeExtractedTccsData(parsed, products, files.length);
-      onProgress?.('Hoàn tất bóc tách bản cứng TCCS!', 100);
+      const normalized = normalizeExtractedTccsData(
+        parsed,
+        products,
+        files.length,
+        options?.productFormulas || [],
+        options?.currentProductId
+      );
+      onProgress?.('Hoàn tất bóc tách và liên kết TCCS!', 100);
       return normalized;
     } catch (err: any) {
       const msg = String(err?.message || '');
