@@ -26,6 +26,7 @@ import {
 } from '../pages/qa/tccs-form/useExistingCriteriaSuggestions';
 import { CriterionType } from '../types';
 import { tccsFormSchema } from '../schemas/tccsSchema';
+import { normalizeExtractedTccsData } from '../services/ai/tccsOcrService';
 
 function walkSourceFiles(dir: string): string[] {
   let results: string[] = [];
@@ -470,5 +471,57 @@ describe('PQM Zero-Defect Codebase Invariant Gates (100% Source Coverage)', () =
       ],
     });
     expect(validTccs.success).toBe(true);
+
+    // 7. normalizeExtractedTccsData normalizes scanned hardcopy TCCS metadata, exponents, categories, and Arsen alternate rule
+    const normTccsScan = normalizeExtractedTccsData(
+      {
+        code: 'TCCS 08:2025/V-BIOTECH',
+        productName: 'Men vi sinh Bio-Plus',
+        issueDate: 'Ngày 15 tháng 08 năm 2025',
+        packaging: 'Hộp 20 ống x 10ml',
+        storage: 'Nơi khô mát, dưới 30°C',
+        shelfLife: '36 tháng',
+        standardRefs: ['DĐVN V', 'QCVN 8-2:2011/BYT'],
+        mainCriteria: [
+          { name: 'Cảm quan', type: 'TEXT', expectedText: 'Hỗn dịch đồng nhất' },
+          {
+            name: 'Bacillus clausii',
+            type: 'NUMBER',
+            unit: 'CFU/10ml',
+            min: '≥ 2 x 10^9',
+            declaredContent: '2 x 10^9',
+          },
+          { name: 'Định lượng Kẽm', type: 'NUMBER', unit: 'mg', expectedText: '9,0 - 11,0' },
+        ],
+        microbiologicalCriteria: [
+          {
+            name: 'Tổng số vi sinh vật hiếu khí',
+            type: 'NUMBER',
+            unit: 'CFU/ml',
+            max: '≤ 2 x 10^3',
+          },
+          { name: 'Escherichia coli', type: 'TEXT', unit: '/ 1ml', expectedText: 'Không được có' },
+        ],
+        heavyMetalCriteria: [
+          { name: 'Arsen (As) tổng số', type: 'NUMBER', unit: 'mg/kg', max: '5,0' },
+          { name: 'Arsen vô cơ', type: 'NUMBER', unit: 'mg/kg', max: '1,5' },
+        ],
+      },
+      [{ id: 'p_bio', code: 'BIO01', name: 'Men vi sinh Bio-Plus', status: 'ACTIVE' } as any]
+    );
+    expect(normTccsScan.issueDate).toBe('2025-08-15');
+    expect(normTccsScan.matchedProduct?.id).toBe('p_bio');
+    expect(normTccsScan.mainCriteria).toHaveLength(3);
+    expect(normTccsScan.mainCriteria[1].min).toBe('2×10⁹');
+    expect(normTccsScan.mainCriteria[2].min).toBe(9);
+    expect(normTccsScan.mainCriteria[2].max).toBe(11);
+    expect(normTccsScan.microbiologicalCriteria[0].max).toBe('2×10³');
+    expect(normTccsScan.heavyMetalCriteria[0].max).toBe(5);
+    expect(normTccsScan.alternateRules).toHaveLength(1);
+    expect(normTccsScan.alternateRules[0]).toEqual({
+      main: 'Arsen (As) tổng số',
+      alt: 'Arsen vô cơ',
+      type: 'FAIL_RETRY',
+    });
   });
 });

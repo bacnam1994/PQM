@@ -1,6 +1,14 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeftIcon, ArrowPathIcon, InformationCircleIcon } from '@heroicons/react/24/outline';
+import {
+  ArrowLeftIcon,
+  ArrowPathIcon,
+  InformationCircleIcon,
+  DocumentDuplicateIcon,
+  SparklesIcon,
+  CheckCircleIcon,
+  XMarkIcon,
+} from '@heroicons/react/24/outline';
 import { useAppStore } from '../../store/useAppStore';
 import { useShallow } from 'zustand/react/shallow';
 import { useForm, useFormDraft } from '../../hooks';
@@ -20,6 +28,10 @@ import {
   generateCriteriaFromFormula,
   DosageFormType,
 } from '../../services/ai/tccsAssistantService';
+import {
+  extractTccsFromFiles,
+  NormalizedTccsExtractionResult,
+} from '../../services/ai/tccsOcrService';
 import { useCreateTCCSMutation, useUpdateTCCSMutation } from '../../hooks/queries/useTCCSQueries';
 import { TccsGeneralSection } from './tccs-form/TccsGeneralSection';
 import { TccsMainCriteriaTable } from './tccs-form/TccsMainCriteriaTable';
@@ -242,6 +254,10 @@ const TCCSFormPage = () => {
   const [productSearch, setProductSearch] = useState('');
   const [showProductDropdown, setShowProductDropdown] = useState(false);
   const isInitializedRef = useRef<string | null>(null);
+  const tccsFileInputRef = useRef<HTMLInputElement | null>(null);
+  const [isScanningTccs, setIsScanningTccs] = useState(false);
+  const [scanProgress, setScanProgress] = useState<{ step: string; percent: number } | null>(null);
+  const [scanSummary, setScanSummary] = useState<NormalizedTccsExtractionResult | null>(null);
 
   const {
     values: formValues,
@@ -474,6 +490,85 @@ const TCCSFormPage = () => {
     setShowProductDropdown(false);
   };
 
+  // Tự động mở hộp thoại chọn file nếu điều hướng từ nút "Scan bản cứng TCCS" (?autoScan=1)
+  useEffect(() => {
+    if (searchParams.get('autoScan') === '1' && tccsFileInputRef.current) {
+      const timer = setTimeout(() => {
+        tccsFileInputRef.current?.click();
+      }, 150);
+      return () => clearTimeout(timer);
+    }
+  }, [searchParams]);
+
+  const handleScanTccsFiles = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const fileList = e.target.files;
+    if (!fileList || fileList.length === 0) return;
+    const files: File[] = Array.from(fileList);
+    e.target.value = '';
+
+    setIsScanningTccs(true);
+    setScanProgress({ step: 'Đang chuẩn bị đọc bản cứng TCCS...', percent: 5 });
+
+    try {
+      const extracted = await extractTccsFromFiles(files, products, (step, percent) => {
+        setScanProgress({ step, percent });
+      });
+
+      setScanSummary(extracted);
+
+      setValues((prev) => ({
+        ...prev,
+        productId: extracted.matchedProduct?.id || prev.productId,
+        code: extracted.code || prev.code,
+        issueDate: extracted.issueDate || prev.issueDate,
+        packaging: extracted.packaging || prev.packaging,
+        storage: extracted.storage || prev.storage,
+        shelfLife: extracted.shelfLife || prev.shelfLife,
+        standardRefs:
+          extracted.standardRefs.length > 0 ? extracted.standardRefs : prev.standardRefs,
+        mainCriteria:
+          extracted.mainCriteria.length > 0 ? extracted.mainCriteria : prev.mainCriteria,
+        microbiologicalCriteria:
+          extracted.microbiologicalCriteria.length > 0
+            ? extracted.microbiologicalCriteria
+            : prev.microbiologicalCriteria,
+        heavyMetalCriteria:
+          extracted.heavyMetalCriteria.length > 0
+            ? extracted.heavyMetalCriteria
+            : prev.heavyMetalCriteria,
+        mycotoxinCriteria:
+          extracted.mycotoxinCriteria.length > 0
+            ? extracted.mycotoxinCriteria
+            : prev.mycotoxinCriteria,
+        alternateRules:
+          extracted.alternateRules.length > 0 ? extracted.alternateRules : prev.alternateRules,
+      }));
+
+      if (extracted.matchedProduct) {
+        setProductSearch(`${extracted.matchedProduct.code} - ${extracted.matchedProduct.name}`);
+      } else if (extracted.productName) {
+        setProductSearch(extracted.productName);
+        setShowProductDropdown(true);
+      }
+
+      const totalCriteriaCount =
+        extracted.mainCriteria.length +
+        extracted.microbiologicalCriteria.length +
+        extracted.heavyMetalCriteria.length +
+        extracted.mycotoxinCriteria.length;
+
+      toast.success(
+        `Đã trích xuất thành công ${totalCriteriaCount} chỉ tiêu từ bản cứng TCCS (${extracted.pageCount} trang)!`
+      );
+    } catch (err: any) {
+      console.error('[TCCS OCR Error]:', err);
+      toast.error(err?.message || 'Lỗi khi quét bản cứng TCCS. Vui lòng thử lại.');
+    } finally {
+      setIsScanningTccs(false);
+      setScanProgress(null);
+    }
+  };
+
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validate()) {
@@ -568,22 +663,132 @@ const TCCSFormPage = () => {
 
   return (
     <div className="p-6 max-w-6xl mx-auto space-y-6">
-      <div className="flex items-center gap-4">
-        <button
-          onClick={() => navigate('/tccs')}
-          className="p-2 bg-surface text-ink-muted hover:text-emerald-700 dark:hover:text-emerald-400 rounded-lg border border-border shadow-xs transition-colors cursor-pointer"
-        >
-          <ArrowLeftIcon className="w-5 h-5" />
-        </button>
-        <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-ink tracking-tight">
-            {id && !cloneId ? 'Chỉnh sửa TCCS' : cloneId ? 'Sao chép TCCS' : 'Tạo TCCS mới'}
-          </h1>
-          <p className="text-xs text-ink-muted mt-0.5">
-            Xây dựng và cấu hình tiêu chuẩn chất lượng cơ sở cho sản phẩm
-          </p>
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div className="flex items-center gap-4">
+          <button
+            type="button"
+            onClick={() => navigate('/tccs')}
+            className="p-2 bg-surface text-ink-muted hover:text-emerald-700 dark:hover:text-emerald-400 rounded-lg border border-border shadow-xs transition-colors cursor-pointer"
+          >
+            <ArrowLeftIcon className="w-5 h-5" />
+          </button>
+          <div>
+            <h1 className="text-xl sm:text-2xl font-bold text-ink tracking-tight">
+              {id && !cloneId ? 'Chỉnh sửa TCCS' : cloneId ? 'Sao chép TCCS' : 'Tạo TCCS mới'}
+            </h1>
+            <p className="text-xs text-ink-muted mt-0.5">
+              Xây dựng tiêu chuẩn cơ sở thủ công hoặc quét tự động từ bản cứng TCCS (PDF / Ảnh chụp)
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <input
+            ref={tccsFileInputRef}
+            type="file"
+            accept="application/pdf,image/*"
+            multiple
+            className="hidden"
+            onChange={handleScanTccsFiles}
+          />
+          <button
+            type="button"
+            disabled={isScanningTccs}
+            onClick={() => tccsFileInputRef.current?.click()}
+            className="inline-flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-semibold text-xs shadow-xs transition-all active:scale-[0.98] disabled:opacity-50 cursor-pointer"
+          >
+            {isScanningTccs ? (
+              <ArrowPathIcon className="w-4 h-4 animate-spin" />
+            ) : (
+              <SparklesIcon className="w-4 h-4" />
+            )}
+            <span>
+              {isScanningTccs ? 'Đang đọc bản cứng TCCS...' : 'Scan bản cứng TCCS (PDF / Ảnh)'}
+            </span>
+          </button>
         </div>
       </div>
+
+      {/* Thanh tiến trình AI Scan bản cứng TCCS */}
+      {isScanningTccs && scanProgress && (
+        <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-xl space-y-2 animate-pulse">
+          <div className="flex items-center justify-between text-xs font-semibold text-emerald-800 dark:text-emerald-300">
+            <span className="flex items-center gap-2">
+              <ArrowPathIcon className="w-4 h-4 animate-spin text-emerald-600" />
+              {scanProgress.step}
+            </span>
+            <span className="font-mono">{scanProgress.percent}%</span>
+          </div>
+          <div className="w-full h-1.5 bg-emerald-500/20 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-emerald-600 transition-all duration-300 rounded-full"
+              style={{ width: `${scanProgress.percent}%` }}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Tóm tắt kết quả sau khi Scan bản cứng TCCS */}
+      {scanSummary && !isScanningTccs && (
+        <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-xl flex items-start justify-between gap-3">
+          <div className="flex items-start gap-3">
+            <CheckCircleIcon className="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
+            <div className="space-y-1.5">
+              <p className="text-xs font-bold text-emerald-800 dark:text-emerald-300 uppercase tracking-wider">
+                Đã nạp dữ liệu từ bản cứng TCCS ({scanSummary.pageCount} trang)
+              </p>
+              <div className="flex flex-wrap gap-2 text-xs">
+                {scanSummary.code && (
+                  <span className="px-2 py-0.5 rounded bg-surface/80 border border-emerald-500/20 text-ink">
+                    Mã TCCS: <strong>{scanSummary.code}</strong>
+                  </span>
+                )}
+                {scanSummary.productName && (
+                  <span className="px-2 py-0.5 rounded bg-surface/80 border border-emerald-500/20 text-ink">
+                    Sản phẩm trên bản cứng: <strong>{scanSummary.productName}</strong>
+                    {scanSummary.matchedProduct ? (
+                      <span className="ml-1 text-emerald-600 dark:text-emerald-400 font-semibold">
+                        (✓ Đã khớp mã {scanSummary.matchedProduct.code})
+                      </span>
+                    ) : (
+                      <span className="ml-1 text-amber-600 dark:text-amber-400 font-semibold">
+                        (⚠ Vui lòng chọn sản phẩm tương ứng trong danh mục)
+                      </span>
+                    )}
+                  </span>
+                )}
+                <span className="px-2 py-0.5 rounded bg-surface/80 border border-emerald-500/20 text-ink">
+                  Chất lượng chính: <strong>{scanSummary.mainCriteria.length}</strong>
+                </span>
+                <span className="px-2 py-0.5 rounded bg-surface/80 border border-emerald-500/20 text-ink">
+                  Vi sinh: <strong>{scanSummary.microbiologicalCriteria.length}</strong>
+                </span>
+                <span className="px-2 py-0.5 rounded bg-surface/80 border border-emerald-500/20 text-ink">
+                  Kim loại nặng: <strong>{scanSummary.heavyMetalCriteria.length}</strong>
+                </span>
+                {scanSummary.mycotoxinCriteria.length > 0 && (
+                  <span className="px-2 py-0.5 rounded bg-surface/80 border border-emerald-500/20 text-ink">
+                    Độc tố vi nấm: <strong>{scanSummary.mycotoxinCriteria.length}</strong>
+                  </span>
+                )}
+                {scanSummary.alternateRules.length > 0 && (
+                  <span className="px-2 py-0.5 rounded bg-surface/80 border border-emerald-500/20 text-ink">
+                    Quy tắc thay thế: <strong>{scanSummary.alternateRules.length}</strong>
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setScanSummary(null)}
+            className="p-1 text-ink-muted hover:text-ink rounded-lg"
+            title="Đóng thông báo"
+          >
+            <XMarkIcon className="w-4 h-4" />
+          </button>
+        </div>
+      )}
       <OperationalDraftBanner
         hasDraft={hasDraft && !id && !cloneId}
         draftTimestamp={draftTimestamp}

@@ -628,7 +628,19 @@ const TCCSList: React.FC = () => {
         subtitle="Quản lý định mức kỹ thuật và chỉ tiêu chất lượng sản phẩm."
         icon={DocumentTextIcon}
         action={
-          canManageTccs && <AddButton onClick={() => navigate('/tccs/new')} label="Lập hồ sơ mới" />
+          canManageTccs && (
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => navigate('/tccs/new?autoScan=1')}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-surface hover:bg-surface-2 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30 rounded-xl font-semibold text-xs shadow-2xs transition-all cursor-pointer"
+              >
+                <DocumentDuplicateIcon className="w-4 h-4" />
+                <span>Scan bản cứng TCCS</span>
+              </button>
+              <AddButton onClick={() => navigate('/tccs/new')} label="Lập hồ sơ mới" />
+            </div>
+          )
         }
       />
 
