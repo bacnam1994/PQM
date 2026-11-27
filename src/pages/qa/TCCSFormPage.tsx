@@ -4,7 +4,6 @@ import {
   ArrowLeftIcon,
   ArrowPathIcon,
   InformationCircleIcon,
-  DocumentDuplicateIcon,
   SparklesIcon,
   CheckCircleIcon,
   XMarkIcon,
@@ -251,7 +250,6 @@ const TCCSFormPage = () => {
       notify: s.notify,
     }))
   );
-  const currentUser = useAppStore((state) => state.user);
 
   const createTCCSMutation = useCreateTCCSMutation();
   const updateTCCSMutation = useUpdateTCCSMutation();
@@ -561,117 +559,110 @@ const TCCSFormPage = () => {
     }
   };
 
-  // Tạo nhanh Sản phẩm mới & Công thức trực tiếp từ dữ liệu bản cứng TCCS vừa scan
+  // Tạo Sản phẩm (nếu chưa có) và tạo/bổ sung Công thức từ dữ liệu bản cứng TCCS - dùng chung cho auto-scan và nút tạo nhanh
+  const ensureProductAndFormula = async (
+    data: NormalizedTccsExtractionResult,
+    product?: Product
+  ): Promise<Product | undefined> => {
+    let target = product;
+    if (!target && data.productName) {
+      const cleanName = data.productName.trim();
+      const code =
+        data.productCode?.trim().toUpperCase() ||
+        `SP-${cleanName
+          .normalize('NFD')
+          .replace(/[\\u0300-\\u036f]/g, '')
+          .replace(/[^a-zA-Z0-9]/g, '')
+          .slice(0, 6)
+          .toUpperCase()}-${Date.now().toString().slice(-3)}`;
+      const nowIso = new Date().toISOString();
+      const created: Product = {
+        id: generateId('prod'),
+        code,
+        name: cleanName,
+        group: 'Thực phẩm bảo vệ sức khỏe',
+        status: 'ACTIVE' as any,
+        registrationNo: data.code || '',
+        registrationDate: data.issueDate || nowIso.split('T')[0],
+        registrant: 'V-BIOTECH',
+        description: data.packaging || '',
+        createdAt: nowIso,
+        updatedAt: nowIso,
+      };
+      await addProduct(created);
+      target = created;
+    }
+
+    if (
+      target &&
+      (data.extractedFormulaIngredients.length > 0 || data.extractedFormulaExcipients.length > 0)
+    ) {
+      const existing = productFormulas.find((f) => f.productId === target!.id);
+      const nowIso = new Date().toISOString();
+      if (!existing) {
+        await createFormulaMutation.mutateAsync({
+          id: generateId('form'),
+          productId: target.id,
+          ingredients: data.extractedFormulaIngredients,
+          excipients: data.extractedFormulaExcipients,
+          packaging: data.packaging || '',
+          storage: data.storage || '',
+          shelfLife: data.shelfLife || '',
+          createdAt: nowIso,
+          updatedAt: nowIso,
+        } as any);
+      } else if (ensureArray(existing.ingredients).length === 0) {
+        await updateFormulaMutation.mutateAsync({
+          formula: {
+            ...existing,
+            ingredients: data.extractedFormulaIngredients,
+            excipients:
+              ensureArray(existing.excipients).length > 0
+                ? existing.excipients
+                : data.extractedFormulaExcipients,
+            updatedAt: nowIso,
+          },
+        });
+      }
+    }
+    return target;
+  };
+
   const [isCreatingQuickProduct, setIsCreatingQuickProduct] = useState(false);
 
   const handleQuickCreateProductAndFormulaFromScan = async () => {
     if (!scanSummary) return;
     setIsCreatingQuickProduct(true);
     try {
-      let targetProduct =
+      const current =
         scanSummary.matchedProduct ||
         (formValues.productId ? products.find((p) => p.id === formValues.productId) : undefined);
+      const target = await ensureProductAndFormula(
+        {
+          ...scanSummary,
+          productName: scanSummary.productName || productSearch.trim() || 'Sản phẩm mới',
+        },
+        current
+      );
+      if (!target) return;
 
-      if (!targetProduct) {
-        const cleanName = (scanSummary.productName || productSearch || 'Sản phẩm mới').trim();
-        const generatedCode =
-          scanSummary.productCode?.trim().toUpperCase() ||
-          `SP-${cleanName
-            .normalize('NFD')
-            .replace(/[\u0300-\u036f]/g, '')
-            .replace(/[^a-zA-Z0-9]/g, '')
-            .slice(0, 6)
-            .toUpperCase()}-${Date.now().toString().slice(-3)}`;
+      const existing = productFormulas.find((f) => f.productId === target.id);
+      const formulaIngs =
+        existing && ensureArray(existing.ingredients).length > 0
+          ? [...ensureArray(existing.ingredients), ...ensureArray(existing.excipients)]
+          : [...scanSummary.extractedFormulaIngredients, ...scanSummary.extractedFormulaExcipients];
 
-        const nowIso = new Date().toISOString();
-        const newProd: Product = {
-          id: generateId('prod'),
-          code: generatedCode,
-          name: cleanName,
-          group: 'Thực phẩm bảo vệ sức khỏe',
-          status: 'ACTIVE' as any,
-          registrationNo: formValues.code || scanSummary.code || '',
-          registrationDate: formValues.issueDate || scanSummary.issueDate || nowIso.split('T')[0],
-          registrant: 'V-BIOTECH',
-          description: formValues.packaging || scanSummary.packaging || '',
-          createdAt: nowIso,
-          updatedAt: nowIso,
-        };
-        await addProduct(newProd);
-        targetProduct = newProd;
-      }
-
-      // Nếu bản cứng TCCS có bóc tách được Thành phần cấu tạo / Công thức -> Tạo hoặc cập nhật luôn Công thức cho sản phẩm
-      let activeFormulaIngs: any[] = [];
-      if (
-        scanSummary.extractedFormulaIngredients.length > 0 ||
-        scanSummary.extractedFormulaExcipients.length > 0
-      ) {
-        const existingFormula = productFormulas.find((f) => f.productId === targetProduct!.id);
-        if (existingFormula) {
-          const mergedIngs =
-            ensureArray(existingFormula.ingredients).length > 0
-              ? existingFormula.ingredients
-              : scanSummary.extractedFormulaIngredients;
-          const mergedExcs =
-            ensureArray(existingFormula.excipients).length > 0
-              ? existingFormula.excipients
-              : scanSummary.extractedFormulaExcipients;
-          await updateFormulaMutation.mutateAsync({
-            formula: {
-              ...existingFormula,
-              ingredients: mergedIngs,
-              excipients: mergedExcs,
-              updatedAt: new Date().toISOString(),
-            },
-          });
-          activeFormulaIngs = [...mergedIngs, ...mergedExcs];
-        } else {
-          const newFormula = {
-            id: generateId('form'),
-            productId: targetProduct.id,
-            ingredients: scanSummary.extractedFormulaIngredients,
-            excipients: scanSummary.extractedFormulaExcipients,
-            packaging: formValues.packaging || scanSummary.packaging || '',
-            storage: formValues.storage || scanSummary.storage || '',
-            shelfLife: formValues.shelfLife || scanSummary.shelfLife || '',
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-          };
-          await createFormulaMutation.mutateAsync(newFormula as any);
-          activeFormulaIngs = [
-            ...scanSummary.extractedFormulaIngredients,
-            ...scanSummary.extractedFormulaExcipients,
-          ];
-        }
-      } else {
-        const existingFormula = productFormulas.find((f) => f.productId === targetProduct!.id);
-        if (existingFormula) {
-          activeFormulaIngs = [
-            ...ensureArray(existingFormula.ingredients),
-            ...ensureArray(existingFormula.excipients),
-          ];
-        }
-      }
-
-      setFieldValue('productId', targetProduct.id);
-      setProductSearch(`${targetProduct.code} - ${targetProduct.name}`);
+      setFieldValue('productId', target.id);
+      setProductSearch(`${target.code} - ${target.name}`);
       setShowProductDropdown(false);
-
       const { linkedCriteria, linkedCount } = linkCriteriaWithFormulaAndCatalog(
         ensureArray(formValues.mainCriteria),
-        activeFormulaIngs
+        formulaIngs
       );
       setFieldValue('mainCriteria', linkedCriteria);
-
-      setScanSummary({
-        ...scanSummary,
-        matchedProduct: targetProduct,
-        linkedFormulaCount: linkedCount,
-      });
-
+      setScanSummary({ ...scanSummary, matchedProduct: target, linkedFormulaCount: linkedCount });
       toast.success(
-        `Đã liên kết Sản phẩm "${targetProduct.name}" và khớp nối ${linkedCount} chỉ tiêu với Công thức!`
+        `Đã liên kết Sản phẩm "${target.name}" và khớp nối ${linkedCount} chỉ tiêu với Công thức!`
       );
     } catch (err: any) {
       console.error('Lỗi tạo nhanh Sản phẩm / Công thức từ TCCS:', err);
@@ -714,78 +705,10 @@ const TCCSFormPage = () => {
       );
 
       let targetProduct = extracted.matchedProduct;
-
-      // Khắc phục Dead Branch: Nếu sản phẩm trên bản cứng TCCS chưa có trong Danh mục Sản phẩm,
-      // tự động tạo ngay Sản phẩm mới từ thông tin bản cứng TCCS để formValues.productId luôn được liên kết 100%!
-      if (!targetProduct && extracted.productName) {
-        const cleanName = extracted.productName.trim();
-        const generatedCode =
-          extracted.productCode?.trim().toUpperCase() ||
-          `SP-${cleanName
-            .normalize('NFD')
-            .replace(/[\u0300-\u036f]/g, '')
-            .replace(/[^a-zA-Z0-9]/g, '')
-            .slice(0, 6)
-            .toUpperCase()}-${Date.now().toString().slice(-3)}`;
-
-        const nowIso = new Date().toISOString();
-        const autoCreatedProduct: Product = {
-          id: generateId('prod'),
-          code: generatedCode,
-          name: cleanName,
-          group: 'Thực phẩm bảo vệ sức khỏe',
-          status: 'ACTIVE' as any,
-          registrationNo: extracted.code || '',
-          registrationDate: extracted.issueDate || nowIso.split('T')[0],
-          registrant: 'V-BIOTECH',
-          description: extracted.packaging || '',
-          createdAt: nowIso,
-          updatedAt: nowIso,
-        };
-        try {
-          await addProduct(autoCreatedProduct);
-          targetProduct = autoCreatedProduct;
-        } catch (prodCreateErr) {
-          console.warn('[TCCS OCR] Không thể tự động tạo sản phẩm, dùng state tạm:', prodCreateErr);
-        }
-      }
-
-      // Tự động tạo hoặc cập nhật Công thức cho Sản phẩm đã khớp / vừa tạo và chờ hoàn tất để selectedFormula có dữ liệu ngay lập tức!
-      if (
-        targetProduct &&
-        (extracted.extractedFormulaIngredients.length > 0 ||
-          extracted.extractedFormulaExcipients.length > 0)
-      ) {
-        const existingFormula = productFormulas.find((f) => f.productId === targetProduct!.id);
-        try {
-          if (!existingFormula) {
-            await createFormulaMutation.mutateAsync({
-              id: generateId('form'),
-              productId: targetProduct.id,
-              ingredients: extracted.extractedFormulaIngredients,
-              excipients: extracted.extractedFormulaExcipients,
-              packaging: extracted.packaging || '',
-              storage: extracted.storage || '',
-              shelfLife: extracted.shelfLife || '',
-              createdAt: new Date().toISOString(),
-              updatedAt: new Date().toISOString(),
-            } as any);
-          } else if (ensureArray(existingFormula.ingredients).length === 0) {
-            await updateFormulaMutation.mutateAsync({
-              formula: {
-                ...existingFormula,
-                ingredients: extracted.extractedFormulaIngredients,
-                excipients:
-                  ensureArray(existingFormula.excipients).length > 0
-                    ? existingFormula.excipients
-                    : extracted.extractedFormulaExcipients,
-                updatedAt: new Date().toISOString(),
-              },
-            });
-          }
-        } catch (e) {
-          console.warn('[TCCS OCR] Tự động đồng bộ công thức cảnh báo:', e);
-        }
+      try {
+        targetProduct = await ensureProductAndFormula(extracted, targetProduct);
+      } catch (syncErr) {
+        console.warn('[TCCS OCR] Không thể tự động đồng bộ Sản phẩm/Công thức:', syncErr);
       }
 
       setScanSummary({
@@ -1112,11 +1035,6 @@ const TCCSFormPage = () => {
       <div className="bg-surface rounded-xl shadow-xs border border-border p-6">
         <form onSubmit={handleSave} className="space-y-6">
           <SpecialCharToolbar />
-          <datalist id="criteria-name-suggestions">
-            {allCriteriaNames.map((name) => (
-              <option key={name} value={name} />
-            ))}
-          </datalist>
           <datalist id="criteria-unit-suggestions">
             {COMMON_CRITERIA_UNITS.map((unit) => (
               <option key={unit} value={unit} />

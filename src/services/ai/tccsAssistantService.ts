@@ -1,5 +1,6 @@
 import { Criterion, CriterionType, ProductFormula, FormulaIngredient } from '../../types';
 import { ensureArray, parseNumberFromText } from '../../utils';
+import { cleanIngredientKeyForMatch } from './tccsOcrService';
 
 export type DosageFormType =
   | 'TABLET'
@@ -407,22 +408,8 @@ export const checkTCCSFormulaConflicts = (
   const activeIngredients = ensureArray(formula.ingredients);
 
   const normalizeKey = (s?: string) =>
-    String(s || '')
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .replace(/đ/g, 'd')
-      .replace(/Đ/g, 'D')
-      .toLowerCase()
-      .replace(/\bcanxi\b/g, 'calci')
-      .replace(/\bcalcium\b/g, 'calci')
-      .replace(/\bzinc\b/g, 'kem')
-      .replace(/\bascorbic acid\b/g, 'vitamin c')
-      .replace(/\bacid ascorbic\b/g, 'vitamin c')
-      .replace(
-        /\b(dinh luong|ham luong|dinh tinh|hoat chat|thanh phan|tuong duong|duoi dang|gluconat|sulfat|citrat|hydroclorid|hcl|oxit|oxide|lactat)\b/g,
-        ' '
-      )
-      .replace(/[^a-z0-9\s]/g, ' ')
+    cleanIngredientKeyForMatch(s)
+      .replace(/\b(gluconat|sulfat|citrat|hydroclorid|hcl|oxit|oxide|lactat)\b/g, ' ')
       .replace(/\s+/g, ' ')
       .trim();
 
