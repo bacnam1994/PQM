@@ -20,6 +20,11 @@ import { calculateBatchProgress } from '../pages/batches/BatchList/utils/batchPr
 import { resolveDeclaredBasis } from '../utils/basisCalculation';
 import { CoARules } from '../domains/coa/domain/rules';
 import { EntityIdentityManager } from '../domain/identity/entityIdentity';
+import {
+  filterCriteriaSuggestions,
+  CriterionSuggestionItem,
+} from '../pages/qa/tccs-form/useExistingCriteriaSuggestions';
+import { CriterionType } from '../types';
 
 function walkSourceFiles(dir: string): string[] {
   let results: string[] = [];
@@ -404,5 +409,43 @@ describe('PQM Zero-Defect Codebase Invariant Gates (100% Source Coverage)', () =
         ]
       )
     ).not.toThrow();
+
+    // 5. filterCriteriaSuggestions supports Vietnamese accent-insensitive search, alias lookup, and category focus suggestions
+    const mockCatalog: CriterionSuggestionItem[] = [
+      {
+        id: 'c_1',
+        canonicalName: 'Định lượng Vitamin C',
+        defaultUnit: 'mg/viên',
+        type: CriterionType.NUMBER,
+        category: 'QUALITY',
+        usageCount: 8,
+        source: 'TCCS',
+        aliases: ['Ascorbic acid'],
+      },
+      {
+        id: 'c_2',
+        canonicalName: 'Tổng số vi sinh vật hiếu khí',
+        defaultUnit: 'CFU/g',
+        type: CriterionType.NUMBER,
+        category: 'MICROBIO',
+        usageCount: 15,
+        source: 'TCCS',
+        aliases: ['TSVSVHK', 'TAMC'],
+      },
+    ];
+    // Empty query on focus in Microbiological table returns MICROBIO items immediately
+    const focusMicro = filterCriteriaSuggestions(mockCatalog, '', {
+      preferredCategories: ['MICROBIO'],
+    });
+    expect(focusMicro).toHaveLength(1);
+    expect(focusMicro[0].canonicalName).toBe('Tổng số vi sinh vật hiếu khí');
+
+    // Accent-insensitive search ("dinh luong") finds "Định lượng Vitamin C"
+    const accentFreeMatch = filterCriteriaSuggestions(mockCatalog, 'dinh luong');
+    expect(accentFreeMatch[0]?.canonicalName).toBe('Định lượng Vitamin C');
+
+    // Alias search ("TAMC") finds "Tổng số vi sinh vật hiếu khí"
+    const aliasMatch = filterCriteriaSuggestions(mockCatalog, 'TAMC');
+    expect(aliasMatch[0]?.canonicalName).toBe('Tổng số vi sinh vật hiếu khí');
   });
 });

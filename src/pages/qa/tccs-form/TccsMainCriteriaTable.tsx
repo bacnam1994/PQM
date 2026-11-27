@@ -12,33 +12,38 @@ import {
   DosageFormType,
   checkTCCSFormulaConflicts,
 } from '../../../services/ai/tccsAssistantService';
-import { useMasterCriteriaActiveQuery } from '../../../hooks/queries/useMasterCriterionQueries';
-import { MasterCriterion } from '../../../types';
+import {
+  useExistingCriteriaSuggestions,
+  filterCriteriaSuggestions,
+  CriterionSuggestionItem,
+} from './useExistingCriteriaSuggestions';
 
 // ─── Autocomplete Combobox cho tên chỉ tiêu ──────────────────────────────────
 
 interface CriterionNameAutocompleteProps {
   value: string;
-  onChange: (name: string, masterCriterionId?: string, defaultUnit?: string) => void;
+  allSuggestions: CriterionSuggestionItem[];
+  onChange: (name: string, suggestion?: CriterionSuggestionItem) => void;
   placeholder?: string;
   className?: string;
 }
 
 /**
  * Autocomplete combobox cho ô "Tên chỉ tiêu" trong TCCS Form.
- * - Gợi ý từ master_criteria/ (chỉ active) theo fuzzy match canonicalName.
- * - Khi chọn: tự động điền masterCriterionId + defaultUnit.
- * - Fallback: vẫn cho phép gõ tự do (tương thích ngược).
+ * - Gợi ý tổng hợp từ: Thành phần Công thức SP đang chọn + Hồ sơ TCCS đã có (kèm tần suất) + Master Criteria + Alias + PKN + Chuẩn Dược điển.
+ * - Hỗ trợ tìm kiếm tiếng Việt có dấu & không dấu (normalizeSearch) và phím mũi tên ↑/↓/Enter.
+ * - Khi chọn: tự động điền tên, đơn vị tính (defaultUnit), kiểu dữ liệu (Số/Chữ), liên kết Master/Công thức.
  */
 const CriterionNameAutocomplete: React.FC<CriterionNameAutocompleteProps> = ({
   value,
+  allSuggestions,
   onChange,
-  placeholder = 'Tên chỉ tiêu',
+  placeholder = 'Nhập hoặc chọn chỉ tiêu đã có...',
   className = '',
 }) => {
-  const { data: masterCriteria = [] } = useMasterCriteriaActiveQuery();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState(value);
+  const [highlightIdx, setHighlightIdx] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -58,42 +63,62 @@ const CriterionNameAutocomplete: React.FC<CriterionNameAutocompleteProps> = ({
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  // Fuzzy filter: ưu tiên startsWith, sau đó includes
+  // Lọc gợi ý không dấu + ưu tiên nhóm Chất lượng chính / Cảm quan / Công thức
   const suggestions = React.useMemo(() => {
-    if (!query || query.length < 1) return masterCriteria.slice(0, 8);
-    const q = query.toLowerCase().trim();
-    const starts = masterCriteria.filter((c) => c.canonicalName.toLowerCase().startsWith(q));
-    const includes = masterCriteria.filter(
-      (c) =>
-        !c.canonicalName.toLowerCase().startsWith(q) && c.canonicalName.toLowerCase().includes(q)
-    );
-    return [...starts, ...includes].slice(0, 8);
-  }, [query, masterCriteria]);
+    return filterCriteriaSuggestions(allSuggestions, query, {
+      preferredCategories: ['QUALITY', 'SENSORY'],
+      limit: 10,
+    });
+  }, [query, allSuggestions]);
+
+  useEffect(() => {
+    setHighlightIdx(0);
+  }, [suggestions]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const v = e.target.value;
     setQuery(v);
     setOpen(true);
-    // Gõ tự do → truyền lên không kèm masterCriterionId
-    onChange(v, undefined, undefined);
+    // Gõ tự do → truyền lên không kèm suggestion
+    onChange(v, undefined);
   };
 
   const handleSelect = useCallback(
-    (item: MasterCriterion) => {
+    (item: CriterionSuggestionItem) => {
       setQuery(item.canonicalName);
       setOpen(false);
-      onChange(item.canonicalName, item.id, item.defaultUnit);
+      onChange(item.canonicalName, item);
     },
     [onChange]
   );
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Escape') setOpen(false);
-    if (e.key === 'Enter' && suggestions.length === 1) {
+    if (e.key === 'Escape') {
+      setOpen(false);
+      return;
+    }
+    if (e.key === 'ArrowDown') {
       e.preventDefault();
-      handleSelect(suggestions[0]);
+      if (!open) setOpen(true);
+      else setHighlightIdx((prev) => Math.min(prev + 1, Math.max(suggestions.length - 1, 0)));
+      return;
+    }
+    if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setHighlightIdx((prev) => Math.max(prev - 1, 0));
+      return;
+    }
+    if (e.key === 'Enter' && open && suggestions[highlightIdx]) {
+      e.preventDefault();
+      handleSelect(suggestions[highlightIdx]);
     }
   };
+
+  const hasExactMatch = React.useMemo(() => {
+    if (!query || !query.trim()) return true;
+    const qLower = query.trim().toLowerCase();
+    return allSuggestions.some((c) => c.canonicalName.toLowerCase() === qLower);
+  }, [query, allSuggestions]);
 
   return (
     <div ref={containerRef} className={`relative ${className}`}>
@@ -108,53 +133,79 @@ const CriterionNameAutocomplete: React.FC<CriterionNameAutocompleteProps> = ({
         className="w-full px-3 py-2 bg-surface text-ink placeholder:text-ink-muted rounded-lg text-xs font-semibold outline-none border border-border shadow-xs focus:border-amber-400 dark:focus:border-amber-600 transition-colors"
       />
       {open && suggestions.length > 0 && (
-        <div className="absolute z-50 left-0 right-0 top-full mt-1 bg-surface border border-border rounded-xl shadow-xl overflow-hidden max-h-52 overflow-y-auto">
-          {suggestions.map((item) => (
+        <div className="absolute z-50 left-0 right-0 top-full mt-1 bg-surface border border-border rounded-xl shadow-xl overflow-hidden max-h-64 overflow-y-auto divide-y divide-border/50">
+          {suggestions.map((item, idx) => (
             <button
               key={item.id}
               type="button"
-              onMouseDown={() => handleSelect(item)}
-              className="w-full flex items-center gap-2.5 px-3 py-2.5 hover:bg-surface-2 transition-colors text-left group"
+              onMouseDown={(e) => {
+                e.preventDefault();
+                handleSelect(item);
+              }}
+              className={`w-full flex items-center justify-between gap-2.5 px-3 py-2 transition-colors text-left group ${
+                idx === highlightIdx ? 'bg-amber-50/80 dark:bg-amber-950/30' : 'hover:bg-surface-2'
+              }`}
             >
-              <LinkIcon className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-              <div className="flex flex-col min-w-0">
-                <span className="text-xs font-semibold text-ink truncate">
-                  {item.canonicalName}
-                </span>
-                <span className="text-[10px] text-ink-muted">
-                  {item.defaultUnit && <span className="font-mono">{item.defaultUnit}</span>}
-                  {item.defaultUnit && item.category && ' · '}
-                  {item.category && (
-                    <span
-                      className={
-                        item.category === 'SAFETY'
-                          ? 'text-rose-500'
-                          : item.category === 'MICROBIO'
-                            ? 'text-violet-500'
-                            : item.category === 'SENSORY'
-                              ? 'text-sky-500'
-                              : 'text-amber-600'
-                      }
-                    >
-                      {item.category}
-                    </span>
-                  )}
-                </span>
+              <div className="flex items-center gap-2 min-w-0">
+                <LinkIcon
+                  className={`w-3.5 h-3.5 shrink-0 ${
+                    item.source === 'FORMULA'
+                      ? 'text-emerald-500'
+                      : item.masterCriterionId
+                        ? 'text-indigo-500'
+                        : 'text-amber-500'
+                  }`}
+                />
+                <div className="flex flex-col min-w-0">
+                  <span className="text-xs font-semibold text-ink truncate">
+                    {item.canonicalName}
+                  </span>
+                  <span className="text-[10px] text-ink-muted truncate">
+                    {item.defaultUnit ? (
+                      <span className="font-mono font-semibold text-ink-soft">
+                        ĐVT: {item.defaultUnit}
+                      </span>
+                    ) : (
+                      <span>
+                        {item.type === CriterionType.TEXT ? 'Định tính (Chữ)' : 'Định lượng (Số)'}
+                      </span>
+                    )}
+                    {item.sampleLimitText && (
+                      <span className="ml-1.5 text-emerald-600 dark:text-emerald-400">
+                        · {item.sampleLimitText}
+                      </span>
+                    )}
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-1 shrink-0">
+                {item.source === 'FORMULA' && (
+                  <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20">
+                    Công thức SP
+                  </span>
+                )}
+                {item.usageCount > 0 && (
+                  <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/20">
+                    {item.usageCount} TCCS
+                  </span>
+                )}
+                {item.masterCriterionId && (
+                  <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border border-indigo-500/20">
+                    Master
+                  </span>
+                )}
               </div>
             </button>
           ))}
-          {/* Gợi ý tạo MasterCriterion mới nếu không match hoàn toàn */}
-          {query.trim() &&
-            !masterCriteria.some((c) => c.canonicalName.toLowerCase() === query.toLowerCase()) && (
-              <div className="px-3 py-2 border-t border-border">
-                <p className="text-[10px] text-ink-muted italic">
-                  💡 Không tìm thấy trong Master Data. Tên sẽ được lưu tự do (fallback).{' '}
-                  <a href="/criteria" className="text-emerald-600 hover:underline">
-                    Vào Master Data để tạo chuẩn hóa
-                  </a>
-                </p>
-              </div>
-            )}
+          {query.trim() && !hasExactMatch && (
+            <div className="px-3 py-2 bg-surface-2">
+              <p className="text-[10px] text-ink-muted italic">
+                💡 Nhập tên mới: <strong>"{query.trim()}"</strong> sẽ được lưu trực tiếp vào TCCS
+                này.
+              </p>
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -194,26 +245,45 @@ export const TccsMainCriteriaTable: React.FC<TccsMainCriteriaTableProps> = ({
   autoFormatInput,
   parseNumberFromText,
 }) => {
+  const allSuggestions = useExistingCriteriaSuggestions(productIngredients);
   const conflicts =
     productId && selectedFormula ? checkTCCSFormulaConflicts(mainCriteria, selectedFormula) : [];
 
   /**
    * Xử lý khi người dùng chọn tên từ Autocomplete.
    * - Cập nhật name
-   * - Nếu có masterCriterionId: lưu FK + auto-điền unit từ defaultUnit
+   * - Tự động điền unit, type, masterCriterionId, và liên kết công thức nếu có
    */
   const handleNameChange = useCallback(
-    (index: number, name: string, masterCriterionId?: string, defaultUnit?: string) => {
+    (index: number, name: string, suggestion?: CriterionSuggestionItem) => {
       onUpdateCriterion(index, 'name', name);
-      if (masterCriterionId) {
-        onUpdateCriterion(index, 'masterCriterionId', masterCriterionId);
-        // Auto-điền unit chỉ khi ô unit đang trống hoặc chưa chỉnh sửa
-        if (defaultUnit && !mainCriteria[index]?.unit) {
-          onUpdateCriterion(index, 'unit', defaultUnit);
+      const currentRow = mainCriteria[index];
+      if (suggestion) {
+        if (suggestion.masterCriterionId) {
+          onUpdateCriterion(index, 'masterCriterionId', suggestion.masterCriterionId);
+        }
+        // Auto-điền unit khi ô unit đang trống
+        if (suggestion.defaultUnit && !currentRow?.unit) {
+          onUpdateCriterion(index, 'unit', suggestion.defaultUnit);
+        }
+        // Auto-điền kiểu Số/Chữ nếu dòng mới chưa nhập giới hạn
+        const isRowUntouched =
+          currentRow?.min === undefined &&
+          currentRow?.max === undefined &&
+          !currentRow?.expectedText;
+        if (isRowUntouched && suggestion.type) {
+          onUpdateCriterion(index, 'type', suggestion.type);
+        }
+        // Nếu gợi ý từ Công thức sản phẩm → tự động điền hàm lượng công bố & liên kết thành phần
+        if (suggestion.declaredContent !== undefined && !currentRow?.declaredContent) {
+          onUpdateCriterion(index, 'declaredContent', suggestion.declaredContent);
+        }
+        if (suggestion.formulaIngredientName && !currentRow?.formulaIngredientId) {
+          onUpdateCriterion(index, 'formulaIngredientId', suggestion.formulaIngredientName);
         }
       } else {
         // Gõ tự do → xóa FK cũ nếu có (tránh stale FK)
-        if (mainCriteria[index]?.masterCriterionId) {
+        if (currentRow?.masterCriterionId) {
           onUpdateCriterion(index, 'masterCriterionId', undefined);
         }
       }
@@ -332,9 +402,8 @@ export const TccsMainCriteriaTable: React.FC<TccsMainCriteriaTableProps> = ({
               <div className="flex-[2] relative">
                 <CriterionNameAutocomplete
                   value={c.name}
-                  onChange={(name, masterCriterionId, defaultUnit) =>
-                    handleNameChange(i, name, masterCriterionId, defaultUnit)
-                  }
+                  allSuggestions={allSuggestions}
+                  onChange={(name, suggestion) => handleNameChange(i, name, suggestion)}
                 />
                 {/* Badge hiển thị khi đã liên kết Master */}
                 {isLinked && (
@@ -382,6 +451,7 @@ export const TccsMainCriteriaTable: React.FC<TccsMainCriteriaTableProps> = ({
 
               <input
                 placeholder="ĐVT"
+                list="criteria-unit-suggestions"
                 value={c.unit}
                 onChange={(e) => onUpdateCriterion(i, 'unit', e.target.value)}
                 className="w-16 px-3 py-2 bg-surface text-ink placeholder:text-ink-muted rounded-lg text-xs font-semibold outline-none text-center border border-border shadow-xs"

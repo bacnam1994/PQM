@@ -371,13 +371,52 @@ const TCCSFormPage = () => {
   }, [selectedFormula]);
 
   const allCriteriaNames = useMemo(() => {
-    const names = new Set<string>();
+    const currentFormNames: string[] = [];
+    const seen = new Set<string>();
+    const addName = (name?: string, toCurrent = false) => {
+      const clean = (name || '').trim();
+      if (!clean) return;
+      const key = clean.toLowerCase();
+      if (!seen.has(key)) {
+        seen.add(key);
+        if (toCurrent) currentFormNames.push(clean);
+      }
+    };
+
+    // Ưu tiên đưa các chỉ tiêu đang nhập trên chính TCCS này lên đầu danh sách (phục vụ chọn Điều kiện thay thế TC1 -> TC2)
+    [
+      ...ensureArray(formValues.mainCriteria),
+      ...ensureArray(formValues.microbiologicalCriteria),
+      ...ensureArray(formValues.heavyMetalCriteria),
+      ...ensureArray(formValues.mycotoxinCriteria),
+    ].forEach((c) => addName(c?.name, true));
+
+    const historicalNames: string[] = [];
     tccsList.forEach((t) => {
-      (t.mainQualityCriteria || []).forEach((c) => c?.name && names.add(c.name));
-      (t.safetyCriteria || []).forEach((c) => c?.name && names.add(c.name));
+      ensureArray(t.mainQualityCriteria).forEach((c) => {
+        const clean = (c?.name || '').trim();
+        if (clean && !seen.has(clean.toLowerCase())) {
+          seen.add(clean.toLowerCase());
+          historicalNames.push(clean);
+        }
+      });
+      ensureArray(t.safetyCriteria).forEach((c) => {
+        const clean = (c?.name || '').trim();
+        if (clean && !seen.has(clean.toLowerCase())) {
+          seen.add(clean.toLowerCase());
+          historicalNames.push(clean);
+        }
+      });
     });
-    return Array.from(names).sort();
-  }, [tccsList]);
+
+    return [...currentFormNames, ...historicalNames.sort((a, b) => a.localeCompare(b, 'vi'))];
+  }, [
+    tccsList,
+    formValues.mainCriteria,
+    formValues.microbiologicalCriteria,
+    formValues.heavyMetalCriteria,
+    formValues.mycotoxinCriteria,
+  ]);
 
   const handleApplyPharmacopoeiaTemplate = (dosageForm: DosageFormType) => {
     const template = PHARMACOPOEIA_TEMPLATES[dosageForm];
