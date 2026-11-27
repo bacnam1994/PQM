@@ -901,6 +901,97 @@ export function normalizeExtractedTccsData(
   const extractedFormulaIngredients = normalizeFormulaList(raw?.formulaIngredients, 'ing');
   const extractedFormulaExcipients = normalizeFormulaList(raw?.formulaExcipients, 'exc');
 
+  // Khắc phục Dead Branch khi bản cứng TCCS chỉ có Bảng Chỉ tiêu chất lượng mà không có bảng Thành phần cấu tạo riêng:
+  // Tự động suy diễn hoạt chất công thức từ các chỉ tiêu Định lượng / Hàm lượng / Lợi khuẩn trong mainCriteria
+  const NON_INGREDIENT_CRITERIA_KEYWORDS = [
+    'cam quan',
+    'hinh thuc',
+    'mau sac',
+    'mui vi',
+    'trang thai',
+    'do am',
+    'mat khoi luong',
+    'khoi luong trung binh',
+    'dong deu khoi luong',
+    'dong deu the tich',
+    'the tich thuc',
+    'the tich',
+    'do ra',
+    'tan ra',
+    'do hoa tan',
+    'do ph',
+    'ty trong',
+    'chi so khuc xa',
+    'do trong',
+    'tro toan phan',
+    'tro khong tan',
+    'can kho',
+    'tap chat',
+    'dinh tinh',
+    'noi doc to',
+    'vo khuan',
+  ];
+
+  mainCriteria.forEach((c) => {
+    if (!c || !c.name || c.type !== CriterionType.NUMBER) return;
+    const cNorm = normalizeSearch(c.name);
+    if (cNorm === 'ph') return;
+    const isPhysicalOrGeneral = NON_INGREDIENT_CRITERIA_KEYWORDS.some(
+      (kw) => cNorm.includes(kw) && !cNorm.includes('dinh luong') && !cNorm.includes('ham luong')
+    );
+    if (isPhysicalOrGeneral) return;
+
+    // Trích tên hoạt chất sạch (bỏ tiền tố "Định lượng ", "Hàm lượng ")
+    const cleanIngName =
+      c.formulaIngredientId?.trim() ||
+      c.name
+        .replace(/^(định lượng|hàm lượng|định tính và định lượng|hoạt chất)\s*[:\-]?\s*/i, '')
+        .trim();
+    if (!cleanIngName || cleanIngName.length < 2) return;
+
+    const ingKey = cleanIngredientKeyForMatch(cleanIngName);
+    const alreadyInExtracted = extractedFormulaIngredients.some((existingIng) => {
+      const exKey = cleanIngredientKeyForMatch(existingIng.name);
+      return (
+        exKey === ingKey ||
+        (exKey.length >= 3 && (exKey.includes(ingKey) || ingKey.includes(exKey)))
+      );
+    });
+
+    if (!alreadyInExtracted) {
+      // Suy diễn hàm lượng công bố từ declaredContent, hoặc trung điểm (min + max) / 2, hoặc min
+      let inferredDeclared: number = 0;
+      if (
+        c.declaredContent !== undefined &&
+        c.declaredContent !== null &&
+        String(c.declaredContent).trim() !== ''
+      ) {
+        const parsedDc = parseNumberFromText(String(c.declaredContent));
+        if (!isNaN(parsedDc) && parsedDc > 0) inferredDeclared = parsedDc;
+      }
+      if (inferredDeclared <= 0) {
+        const minNum = c.min !== undefined ? parseNumberFromText(String(c.min)) : NaN;
+        const maxNum = c.max !== undefined ? parseNumberFromText(String(c.max)) : NaN;
+        if (!isNaN(minNum) && !isNaN(maxNum) && minNum > 0 && maxNum >= minNum) {
+          inferredDeclared = Math.round(((minNum + maxNum) / 2) * 1000) / 1000;
+        } else if (!isNaN(minNum) && minNum > 0) {
+          inferredDeclared = minNum;
+        } else if (!isNaN(maxNum) && maxNum > 0) {
+          inferredDeclared = maxNum;
+        }
+      }
+
+      if (inferredDeclared > 0) {
+        extractedFormulaIngredients.push({
+          id: generateId('ing'),
+          name: cleanIngName,
+          declaredContent: inferredDeclared,
+          unit: c.unit || 'mg',
+        });
+      }
+    }
+  });
+
   const alternateRules: AlternateRule[] = ensureArray(raw?.alternateRules)
     .filter((r) => r && r.main && r.alt)
     .map((r) => ({

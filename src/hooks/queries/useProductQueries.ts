@@ -85,10 +85,11 @@ export function useCreateProductMutation() {
       return product;
     },
     onSuccess: (newProduct) => {
-      queryClient.setQueryData<Product[]>(PRODUCT_QUERY_KEYS.all, (old = []) => [
-        ...old,
-        newProduct,
-      ]);
+      queryClient.setQueryData<Product[]>(PRODUCT_QUERY_KEYS.all, (old = []) => {
+        const next = [...old.filter((p) => p.id !== newProduct.id), newProduct];
+        useAppStore.getState().setAppState({ products: next });
+        return next;
+      });
       queryClient.invalidateQueries({ queryKey: PRODUCT_QUERY_KEYS.all });
     },
   });
@@ -144,10 +145,12 @@ export function useCreateFormulaMutation() {
       return formula;
     },
     onSuccess: (newFormula) => {
-      queryClient.setQueryData<ProductFormula[]>(PRODUCT_QUERY_KEYS.formulas, (old = []) => [
-        ...old,
-        newFormula,
-      ]);
+      queryClient.setQueryData<ProductFormula[]>(PRODUCT_QUERY_KEYS.formulas, (old = []) => {
+        const base = old.length > 0 ? old : useAppStore.getState().productFormulas || [];
+        const next = [...base.filter((f) => f.id !== newFormula.id), newFormula];
+        useAppStore.getState().setAppState({ productFormulas: next });
+        return next;
+      });
       queryClient.invalidateQueries({ queryKey: PRODUCT_QUERY_KEYS.formulas });
       if (newFormula.productId) {
         queryClient.invalidateQueries({
@@ -168,9 +171,12 @@ export function useUpdateFormulaMutation() {
       return formula;
     },
     onSuccess: (updatedFormula) => {
-      queryClient.setQueryData<ProductFormula[]>(PRODUCT_QUERY_KEYS.formulas, (old = []) =>
-        old.map((f) => (f.id === updatedFormula.id ? updatedFormula : f))
-      );
+      queryClient.setQueryData<ProductFormula[]>(PRODUCT_QUERY_KEYS.formulas, (old = []) => {
+        const base = old.length > 0 ? old : useAppStore.getState().productFormulas || [];
+        const next = base.map((f) => (f.id === updatedFormula.id ? updatedFormula : f));
+        useAppStore.getState().setAppState({ productFormulas: next });
+        return next;
+      });
       queryClient.invalidateQueries({ queryKey: PRODUCT_QUERY_KEYS.formulas });
       if (updatedFormula.productId) {
         queryClient.invalidateQueries({

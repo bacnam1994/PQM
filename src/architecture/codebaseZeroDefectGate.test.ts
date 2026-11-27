@@ -30,6 +30,7 @@ import {
   normalizeExtractedTccsData,
   linkCriteriaWithFormulaAndCatalog,
 } from '../services/ai/tccsOcrService';
+import { checkTCCSFormulaConflicts } from '../services/ai/tccsAssistantService';
 
 function walkSourceFiles(dir: string): string[] {
   let results: string[] = [];

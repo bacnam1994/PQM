@@ -713,19 +713,53 @@ const TCCSFormPage = () => {
         }
       );
 
-      setScanSummary(extracted);
+      let targetProduct = extracted.matchedProduct;
 
-      const targetProduct = extracted.matchedProduct;
-      // Nếu sản phẩm đã khớp nhưng trong hệ thống chưa có Công thức, và bản cứng TCCS có mục Thành phần cấu tạo -> Tự động tạo luôn Công thức cho Sản phẩm đó!
+      // Khắc phục Dead Branch: Nếu sản phẩm trên bản cứng TCCS chưa có trong Danh mục Sản phẩm,
+      // tự động tạo ngay Sản phẩm mới từ thông tin bản cứng TCCS để formValues.productId luôn được liên kết 100%!
+      if (!targetProduct && extracted.productName) {
+        const cleanName = extracted.productName.trim();
+        const generatedCode =
+          extracted.productCode?.trim().toUpperCase() ||
+          `SP-${cleanName
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .replace(/[^a-zA-Z0-9]/g, '')
+            .slice(0, 6)
+            .toUpperCase()}-${Date.now().toString().slice(-3)}`;
+
+        const nowIso = new Date().toISOString();
+        const autoCreatedProduct: Product = {
+          id: generateId('prod'),
+          code: generatedCode,
+          name: cleanName,
+          group: 'Thực phẩm bảo vệ sức khỏe',
+          status: 'ACTIVE' as any,
+          registrationNo: extracted.code || '',
+          registrationDate: extracted.issueDate || nowIso.split('T')[0],
+          registrant: 'V-BIOTECH',
+          description: extracted.packaging || '',
+          createdAt: nowIso,
+          updatedAt: nowIso,
+        };
+        try {
+          await addProduct(autoCreatedProduct);
+          targetProduct = autoCreatedProduct;
+        } catch (prodCreateErr) {
+          console.warn('[TCCS OCR] Không thể tự động tạo sản phẩm, dùng state tạm:', prodCreateErr);
+        }
+      }
+
+      // Tự động tạo hoặc cập nhật Công thức cho Sản phẩm đã khớp / vừa tạo và chờ hoàn tất để selectedFormula có dữ liệu ngay lập tức!
       if (
         targetProduct &&
         (extracted.extractedFormulaIngredients.length > 0 ||
           extracted.extractedFormulaExcipients.length > 0)
       ) {
-        const existingFormula = productFormulas.find((f) => f.productId === targetProduct.id);
-        if (!existingFormula) {
-          createFormulaMutation
-            .mutateAsync({
+        const existingFormula = productFormulas.find((f) => f.productId === targetProduct!.id);
+        try {
+          if (!existingFormula) {
+            await createFormulaMutation.mutateAsync({
               id: generateId('form'),
               productId: targetProduct.id,
               ingredients: extracted.extractedFormulaIngredients,
@@ -735,10 +769,29 @@ const TCCSFormPage = () => {
               shelfLife: extracted.shelfLife || '',
               createdAt: new Date().toISOString(),
               updatedAt: new Date().toISOString(),
-            } as any)
-            .catch((e) => console.warn('[TCCS OCR] Tự động tạo công thức cảnh báo:', e));
+            } as any);
+          } else if (ensureArray(existingFormula.ingredients).length === 0) {
+            await updateFormulaMutation.mutateAsync({
+              formula: {
+                ...existingFormula,
+                ingredients: extracted.extractedFormulaIngredients,
+                excipients:
+                  ensureArray(existingFormula.excipients).length > 0
+                    ? existingFormula.excipients
+                    : extracted.extractedFormulaExcipients,
+                updatedAt: new Date().toISOString(),
+              },
+            });
+          }
+        } catch (e) {
+          console.warn('[TCCS OCR] Tự động đồng bộ công thức cảnh báo:', e);
         }
       }
+
+      setScanSummary({
+        ...extracted,
+        matchedProduct: targetProduct,
+      });
 
       setValues((prev) => ({
         ...prev,

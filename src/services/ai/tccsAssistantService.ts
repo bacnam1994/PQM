@@ -396,6 +396,7 @@ export const generateCriteriaFromFormula = (
 
 /**
  * Kiểm tra các sai khác giữa TCCS và Công thức sản phẩm
+ * (Nhận diện cả liên kết trực tiếp qua `c.formulaIngredientId` lẫn khớp tên hoạt chất đã chuẩn hóa)
  */
 export const checkTCCSFormulaConflicts = (
   tccsCriteria: Criterion[],
@@ -405,14 +406,50 @@ export const checkTCCSFormulaConflicts = (
   const warnings: string[] = [];
   const activeIngredients = ensureArray(formula.ingredients);
 
-  const tccsNames = tccsCriteria.map((c) => (c.name || '').toLowerCase().trim());
+  const normalizeKey = (s?: string) =>
+    String(s || '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/đ/g, 'd')
+      .replace(/Đ/g, 'D')
+      .toLowerCase()
+      .replace(/\bcanxi\b/g, 'calci')
+      .replace(/\bcalcium\b/g, 'calci')
+      .replace(/\bzinc\b/g, 'kem')
+      .replace(/\bascorbic acid\b/g, 'vitamin c')
+      .replace(/\bacid ascorbic\b/g, 'vitamin c')
+      .replace(
+        /\b(dinh luong|ham luong|dinh tinh|hoat chat|thanh phan|tuong duong|duoi dang|gluconat|sulfat|citrat|hydroclorid|hcl|oxit|oxide|lactat)\b/g,
+        ' '
+      )
+      .replace(/[^a-z0-9\s]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
 
   activeIngredients.forEach((ing) => {
     if (!ing || !ing.name) return;
-    const ingNameLower = ing.name.toLowerCase().trim();
-    const hasMatch = tccsNames.some(
-      (name) => name.includes(ingNameLower) || ingNameLower.includes(name)
-    );
+    const ingRawLower = ing.name.toLowerCase().trim();
+    const ingKey = normalizeKey(ing.name);
+
+    const hasMatch = ensureArray(tccsCriteria).some((c) => {
+      if (!c) return false;
+      // 1. Đã liên kết trực tiếp qua dropdown formulaIngredientId
+      if (c.formulaIngredientId && c.formulaIngredientId.toLowerCase().trim() === ingRawLower) {
+        return true;
+      }
+      const cRawLower = (c.name || '').toLowerCase().trim();
+      if (!cRawLower) return false;
+      if (cRawLower.includes(ingRawLower) || ingRawLower.includes(cRawLower)) {
+        return true;
+      }
+      // 2. Khớp theo gốc hoạt chất sau khi tách muối / tiền tố "Định lượng" (VD: "Kẽm gluconat" <-> "Định lượng Kẽm")
+      const cKey = normalizeKey(c.name);
+      if (cKey && ingKey && (cKey.includes(ingKey) || ingKey.includes(cKey))) {
+        return true;
+      }
+      return false;
+    });
+
     if (!hasMatch) {
       warnings.push(
         `Hoạt chất "${ing.name}" trong công thức chưa có chỉ tiêu định lượng tương ứng trong TCCS.`
